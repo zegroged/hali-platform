@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { hashPassword, createSession } from "@/lib/auth";
 import { rateLimit, clientIp, tooMany } from "@/lib/ratelimit";
+import { CONTRACT_VERSION } from "@/lib/legal";
 
 // İşletme self-servis kaydı. Hesap PENDING açılır ve görünmez;
 // panel akışı (e-posta doğrulama → profil → admin onayı) tamamlar.
@@ -17,6 +18,10 @@ const Body = z.object({
   // Aracılık sözleşmesi teyidi (işaretlenmemiş zorunlu checkbox) — onaysız
   // kayıt kurulmaz (ETAHS Yönetmeliği: elektronik aracılık sözleşmesi şartı).
   consent: z.literal(true),
+  // Kayıt öncesi e-postaya gönderilen 6 haneli doğrulama kodu.
+  emailCode: z.string().trim().length(6),
+  // Honeypot: gerçek kullanıcı bu gizli alanı görmez/doldurmaz; botlar doldurur.
+  website: z.string().max(200).optional(),
 });
 
 // Kayıtta profil boş açılır; halıcı panelden düzenler (seed ile aynı varsayılan).
@@ -74,8 +79,40 @@ export async function POST(req: NextRequest) {
       { status: 400 },
     );
   }
-  const { businessName, name, phone, email, password, city, district } =
+  const { businessName, name, phone, password, city, district, emailCode } =
     parsed.data;
+  const email = parsed.data.email.toLowerCase();
+
+  // Honeypot dolu = bot → ayrıntı vermeden reddet.
+  if (parsed.data.website) {
+    return NextResponse.json({ error: "Geçersiz istek." }, { status: 400 });
+  }
+
+  // E-posta doğrulama kodu (kayıt ancak posta kutusuna erişenle kurulur).
+  const otp = await prisma.signupOtp.findUnique({ where: { email } });
+  if (!otp || otp.expiresAt < new Date()) {
+    return NextResponse.json(
+      { error: "Doğrulama kodunun süresi dolmuş — yeni kod isteyin." },
+      { status: 400 },
+    );
+  }
+  if (otp.attempts >= 5) {
+    return NextResponse.json(
+      { error: "Çok fazla yanlış deneme — yeni kod isteyin." },
+      { status: 429 },
+    );
+  }
+  if (otp.code !== emailCode) {
+    await prisma.signupOtp.update({
+      where: { email },
+      data: { attempts: { increment: 1 } },
+    });
+    return NextResponse.json(
+      { error: "Doğrulama kodu hatalı." },
+      { status: 400 },
+    );
+  }
+  await prisma.signupOtp.delete({ where: { email } });
 
   const existing = await prisma.user.findFirst({
     where: { OR: [{ phone }, { email }] },
@@ -104,6 +141,7 @@ export async function POST(req: NextRequest) {
       name,
       phone,
       email,
+      emailVerified: true, // kayıt öncesi kodla doğrulandı
       password: hashed,
       // e-posta panel akışında doğrulanır (emailVerified=false başlar)
       ownedBusiness: {
@@ -120,6 +158,7 @@ export async function POST(req: NextRequest) {
           isVisible: false,
           // Sözleşme kayıtta checkbox ile onaylandı — panel adımı otomatik tamam.
           contractAcceptedAt: new Date(),
+          contractVersion: CONTRACT_VERSION,
           serviceAreas: { create: [{ city, district }] },
         },
       },

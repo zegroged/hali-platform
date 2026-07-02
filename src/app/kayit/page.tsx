@@ -12,6 +12,7 @@ type Field =
   | "name"
   | "phone"
   | "email"
+  | "emailCode"
   | "password"
   | "district"
   | "consent";
@@ -42,6 +43,53 @@ export default function KayitPage() {
   // Aracılık sözleşmesi teyidi — işaretlenmemiş başlar, zorunludur
   // (ETAHS Yönetmeliği: işletme ile elektronik aracılık sözleşmesi kurulması).
   const [consent, setConsent] = useState(false);
+  // E-posta doğrulama kodu akışı (kayıt öncesi OTP).
+  const [emailCode, setEmailCode] = useState("");
+  const [codeSent, setCodeSent] = useState(false);
+  const [devCode, setDevCode] = useState<string | null>(null);
+  const [sendingCode, setSendingCode] = useState(false);
+  const [cooldown, setCooldown] = useState(0);
+  // Honeypot: görünmez alan; botlar doldurur, insanlar görmez.
+  const [website, setWebsite] = useState("");
+
+  async function sendCode() {
+    setError(null);
+    if (!/^\S+@\S+\.\S+$/.test(form.email)) {
+      setFieldErrors((f) => ({ ...f, email: "Önce geçerli bir e-posta gir." }));
+      return;
+    }
+    setSendingCode(true);
+    try {
+      const res = await fetch("/api/auth/register/request-code", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: form.email }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        setError(data?.error ?? "Kod gönderilemedi, tekrar deneyin.");
+        return;
+      }
+      setCodeSent(true);
+      setDevCode(data?.devCode ?? null);
+      setFieldErrors((f) => ({ ...f, email: undefined, emailCode: undefined }));
+      // 60 sn yeniden gönderme bekleme sayacı
+      setCooldown(60);
+      const t = setInterval(() => {
+        setCooldown((c) => {
+          if (c <= 1) {
+            clearInterval(t);
+            return 0;
+          }
+          return c - 1;
+        });
+      }, 1000);
+    } catch {
+      setError("Bağlantı hatası, lütfen tekrar deneyin.");
+    } finally {
+      setSendingCode(false);
+    }
+  }
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [loading, setLoading] = useState(false);
@@ -65,6 +113,8 @@ export default function KayitPage() {
     if (form.password.length < 8)
       errs.password = "Şifre en az 8 karakter olmalı.";
     if (form.district.trim().length < 2) errs.district = "İlçe gerekli.";
+    if (emailCode.trim().length !== 6)
+      errs.emailCode = "E-postana gönderilen 6 haneli kodu gir.";
     if (!consent)
       errs.consent =
         "Devam etmek için sözleşmeyi ve kullanım koşullarını kabul etmelisin.";
@@ -76,7 +126,7 @@ export default function KayitPage() {
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...form, consent }),
+        body: JSON.stringify({ ...form, consent, emailCode, website }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => null);
@@ -183,18 +233,60 @@ export default function KayitPage() {
             <label htmlFor="kayit-eposta" className={labelCls}>
               E-posta
             </label>
-            <input
-              id="kayit-eposta"
-              value={form.email}
-              onChange={(e) => set("email", e.target.value)}
-              type="email"
-              inputMode="email"
-              maxLength={120}
-              placeholder="isletme@ornek.com"
-              className={inputCls(fieldErrors.email)}
-              autoComplete="email"
-            />
+            <div className="flex gap-2">
+              <input
+                id="kayit-eposta"
+                value={form.email}
+                onChange={(e) => set("email", e.target.value)}
+                type="email"
+                inputMode="email"
+                maxLength={120}
+                placeholder="isletme@ornek.com"
+                className={inputCls(fieldErrors.email)}
+                autoComplete="email"
+              />
+              <button
+                type="button"
+                onClick={sendCode}
+                disabled={sendingCode || cooldown > 0}
+                className="shrink-0 whitespace-nowrap rounded-lg border border-brand px-3 py-2 text-sm font-semibold text-brand-dark transition hover:bg-brand-light/50 disabled:opacity-50"
+              >
+                {sendingCode
+                  ? "Gönderiliyor…"
+                  : cooldown > 0
+                    ? `Tekrar (${cooldown})`
+                    : codeSent
+                      ? "Tekrar Gönder"
+                      : "Kod Gönder"}
+              </button>
+            </div>
             {err("email")}
+            {codeSent && (
+              <div className="mt-2">
+                <label htmlFor="kayit-kod" className={labelCls}>
+                  E-posta doğrulama kodu
+                </label>
+                <input
+                  id="kayit-kod"
+                  value={emailCode}
+                  onChange={(e) =>
+                    setEmailCode(e.target.value.replace(/\D/g, ""))
+                  }
+                  inputMode="numeric"
+                  maxLength={6}
+                  placeholder="6 haneli kod"
+                  className={`${inputCls(fieldErrors.emailCode)} text-center font-mono tracking-[0.3em]`}
+                  autoComplete="one-time-code"
+                />
+                {devCode && (
+                  <p className="mt-1 text-sm text-amber-700">
+                    Test modu — e-posta altyapısı bağlanana kadar kodun:{" "}
+                    <b className="font-mono">{devCode}</b>
+                  </p>
+                )}
+                {err("emailCode")}
+              </div>
+            )}
           </div>
           <div>
             <label htmlFor="kayit-sifre" className={labelCls}>
@@ -241,6 +333,18 @@ export default function KayitPage() {
               {err("district")}
             </div>
           </div>
+
+          {/* Honeypot — insanlar görmez; dolduran botların kaydı reddedilir */}
+          <input
+            type="text"
+            name="website"
+            value={website}
+            onChange={(e) => setWebsite(e.target.value)}
+            className="hidden"
+            tabIndex={-1}
+            autoComplete="off"
+            aria-hidden="true"
+          />
 
           {error && (
             <p role="alert" className="text-sm text-red-600">

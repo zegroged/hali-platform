@@ -270,6 +270,16 @@ model Order {
   @@index([businessId, status])
 }
 
+// Kayıt öncesi e-posta doğrulama kodu (hesap henüz yokken; 10 dk geçerli).
+model SignupOtp {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  code      String
+  expiresAt DateTime
+  attempts  Int      @default(0) // yanlış deneme sayısı (5'te kilit)
+  createdAt DateTime @default(now())
+}
+
 // SMS gönderim kaydı — bilgilendirme/teyitlerin ispatı (Mesafeli Yön. md.20).
 model SmsLog {
   id        String   @id @default(cuid())
