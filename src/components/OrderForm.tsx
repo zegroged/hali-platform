@@ -7,7 +7,10 @@ import { IconMapPin, IconWallet, IconCheck } from "@/components/icons";
 
 /** Alan bazlı doğrulama hataları (alan adı → mesaj). */
 type FieldErrors = Partial<
-  Record<"customerName" | "customerPhone" | "pickupAddress" | "approxM2", string>
+  Record<
+    "customerName" | "customerPhone" | "pickupAddress" | "approxM2" | "consent",
+    string
+  >
 >;
 
 /** m² metnini sayıya çevirir; Türkçe virgüllü ondalık da kabul eder. */
@@ -18,9 +21,9 @@ function parseM2(v: string): number | null {
 
 export function OrderForm({
   businessId,
+  businessName,
 }: {
   businessId: string;
-  // businessName sayfa başlığında gösterildiği için form içinde kullanılmıyor.
   businessName?: string;
 }) {
   const router = useRouter();
@@ -41,6 +44,9 @@ export function OrderForm({
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [loading, setLoading] = useState(false);
+  // Mesafeli Sözleşmeler Yönetmeliği md.7: ön bilgilendirmenin TEYİDİ —
+  // işaretlenmemiş zorunlu onay kutusu; sunucu tarafında consentAt olarak loglanır.
+  const [consent, setConsent] = useState(false);
 
   function set<K extends keyof typeof form>(k: K, v: (typeof form)[K]) {
     setForm((f) => ({ ...f, [k]: v }));
@@ -75,6 +81,8 @@ export function OrderForm({
       errs.pickupAddress = "Lütfen açık adresi yaz (mahalle, sokak, no).";
     if (form.approxM2 && parseM2(form.approxM2) === null)
       errs.approxM2 = "Geçerli bir m² değeri gir (ör. 12,5).";
+    if (!consent)
+      errs.consent = "Devam etmek için onay kutusunu işaretleyin.";
     setFieldErrors(errs);
     if (Object.keys(errs).length > 0) {
       setError("Lütfen işaretli alanları düzelt.");
@@ -98,6 +106,7 @@ export function OrderForm({
             : undefined,
           note: form.note || undefined,
           paymentMethod: form.paymentMethod,
+          consent,
         }),
       });
       if (!res.ok) {
@@ -274,27 +283,83 @@ export function OrderForm({
         </p>
       )}
 
-      <p className="text-xs text-slate-500">
-        Talebi oluşturarak{" "}
-        <Link
-          href="/on-bilgilendirme"
-          className="underline hover:text-slate-700"
-        >
-          Ön Bilgilendirme Formu
-        </Link>
-        &apos;nu,{" "}
-        <Link href="/mesafeli-satis" className="underline hover:text-slate-700">
-          Mesafeli Satış Sözleşmesi
-        </Link>
-        &apos;ni,{" "}
-        <Link href="/kosullar" className="underline hover:text-slate-700">
-          kullanım koşullarını
+      {/* Mesafeli Sözleşmeler Yönetmeliği md.6/2: (a) temel nitelikler, (d) fiyat
+          hesaplama usulü, (g)-(h) cayma bilgileri, ödeme yükümlülüğü altına
+          girilmeden hemen önce bir bütün olarak gösterilir. md.6/1 "en az on
+          iki punto" gereği bu blokta text-xs KULLANMA (min. text-sm). */}
+      <section className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+        <h2 className="text-sm font-semibold text-slate-800">
+          Sipariş Özeti — Önemli Bilgiler
+        </h2>
+        <ul className="mt-2 list-disc space-y-2 pl-5 text-sm text-slate-700">
+          <li>
+            <span className="font-medium">Hizmet:</span> halının adresinizden
+            alınması, yıkanması ve adresinize teslim edilmesi
+            {businessName ? ` (seçilen işletme: ${businessName})` : ""}.
+          </li>
+          <li>
+            <span className="font-medium">Fiyat:</span> işletmenin profilindeki
+            birim tarifeye (TL/m²) göre hesaplanır; kesin tutar halı ölçüldükten
+            sonra size bildirilir ve{" "}
+            <span className="font-medium">onayınız alınır</span> — onaylamazsanız
+            halınız yıkanmadan ücretsiz iade edilir.
+          </li>
+          <li>
+            <span className="font-medium">Ödeme:</span> teslimde kapıda nakit
+            (online kart ödemesi aktif olduğunda ayrıca duyurulur).
+          </li>
+          <li>
+            <span className="font-medium">Cayma:</span> halı alınmadan ücretsiz
+            iptal edebilirsiniz; kesin fiyatı onaylamanız ifaya başlama
+            onayıdır, yıkama sonrası cayma hakkı yoktur (Yönetmelik md.15/1-h).
+          </li>
+        </ul>
+      </section>
+
+      {/* md.7 teyidi: işaretlenmemiş zorunlu onay kutusu — işaretlenme anı
+          sunucuda consentAt + contractVersion olarak kayda geçer. */}
+      <div>
+        <div className="flex items-start gap-3">
+          <input
+            id="siparis-onay"
+            type="checkbox"
+            checked={consent}
+            onChange={(e) => setConsent(e.target.checked)}
+            className="mt-0.5 h-5 w-5 shrink-0 accent-brand"
+          />
+          <label htmlFor="siparis-onay" className="text-sm text-slate-700">
+            <Link
+              href="/on-bilgilendirme"
+              className="font-medium text-brand-dark underline"
+            >
+              Ön Bilgilendirme Formu
+            </Link>
+            &apos;nu ve{" "}
+            <Link
+              href="/mesafeli-satis"
+              className="font-medium text-brand-dark underline"
+            >
+              Mesafeli Satış Sözleşmesi
+            </Link>
+            &apos;ni okudum, onaylıyorum. Kesin fiyatı onaylamamla birlikte
+            yıkamaya (hizmetin ifasına) başlanmasına onay vermiş olacağımı ve
+            hizmet ifa edildikten sonra cayma hakkımın bulunmadığını biliyorum.
+          </label>
+        </div>
+        {fieldErrors.consent && (
+          <p className="mt-1 text-sm text-red-600">{fieldErrors.consent}</p>
+        )}
+      </div>
+
+      {/* KVKK aydınlatması: Aydınlatma Tebliği md.5/1-f gereği bilgilendirmedir,
+          onaya bağlanmaz — bu yüzden checkbox metninden AYRI tutulur. */}
+      <p className="text-sm text-slate-500">
+        Kişisel verileriniz{" "}
+        <Link href="/kvkk" className="text-brand-dark underline">
+          KVKK Aydınlatma Metni
         </Link>{" "}
-        ve{" "}
-        <Link href="/kvkk" className="underline hover:text-slate-700">
-          KVKK aydınlatma metnini
-        </Link>{" "}
-        kabul etmiş olursun. Bilgilerin yalnızca seçtiğin halıcı ile paylaşılır.
+        kapsamında işlenir; bilgileriniz yalnızca seçtiğiniz işletmeyle
+        paylaşılır.
       </p>
 
       <button

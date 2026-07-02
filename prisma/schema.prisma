@@ -246,7 +246,12 @@ model Order {
 
   pickupPhotoUrl   String?
   deliveryPhotoUrl String? // şoförün teslimde çektiği kanıt fotoğrafı
-  estimatedDays    Int? // halıcının verdiği tahmini teslim süresi (gün)
+
+  // Mesafeli Sözleşmeler Yönetmeliği md.7: ön bilgilendirme TEYİDİ — onay kutusu
+  // işaretlendiği an + o an geçerli sözleşme sürümü (ispat yükü platformda).
+  consentAt       DateTime?
+  contractVersion String?
+  estimatedDays   Int? // halıcının verdiği tahmini teslim süresi (gün)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

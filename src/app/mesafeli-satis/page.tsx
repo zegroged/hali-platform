@@ -9,7 +9,8 @@ export const metadata: Metadata = {
 };
 
 // TODO(künye): Şirket ünvanı, adres, vergi dairesi/no ve MERSİS bilgileri
-// netleşince aşağıdaki [KÖŞELİ] alanlar doldurulacak (iyzico başvurusu öncesi ŞART).
+// netleşince §1'deki geçici künye ifadesi gerçek bilgilerle değiştirilecek
+// (iyzico başvurusu öncesi ŞART).
 export default function MesafeliSatisPage() {
   return (
     <StaticPage
@@ -27,13 +28,15 @@ export default function MesafeliSatisPage() {
           Hizmetin ifasından bu işletme sorumludur.
         </p>
         <p>
-          <strong>ARACI HİZMET SAĞLAYICI (PLATFORM):</strong> [ŞİRKET ÜNVANI] —
-          Adres: [ADRES] · Vergi Dairesi/No: [VERGİ DAİRESİ / VERGİ NO] ·
-          MERSİS: [VARSA MERSİS NO] · E-posta:{" "}
+          <strong>ARACI HİZMET SAĞLAYICI (PLATFORM):</strong>{" "}
+          enyakinhaliyikamaservisi.com. Platform işleticisinin ticari unvanı,
+          merkez adresi, vergi/MERSİS numarası ve KEP adresi, işletme tescil
+          işlemleri tamamlandığında bu bölümde yayımlanacaktır. İletişim:
+          info@enyakinhaliyikamaservisi.com (
           <Link href="/iletisim" className="text-brand-dark underline">
             iletişim sayfası
           </Link>
-          . Platform, 6563 sayılı Kanun kapsamında aracı hizmet sağlayıcıdır;
+          ). Platform, 6563 sayılı Kanun kapsamında aracı hizmet sağlayıcıdır;
           hizmeti bizzat ifa etmez.
         </p>
       </Section>
@@ -73,9 +76,14 @@ export default function MesafeliSatisPage() {
         <p>
           ALICI; halı adresten alınmadan önce ücretsiz iptal, kesin fiyat
           bildirildikten sonra yıkama başlamadan ücretsiz iade hakkına
-          sahiptir. Yıkama hizmeti <strong>ifa edildikten sonra</strong>,
-          Mesafeli Sözleşmeler Yönetmeliği md. 15/1-h uyarınca cayma hakkı
-          kullanılamaz. Ayrıntılar:{" "}
+          sahiptir.{" "}
+          <strong>
+            Kesin fiyatı onaylamanız, cayma süresi dolmadan hizmetin ifasına
+            (yıkamaya) başlanmasına onay verdiğiniz anlamına gelir; bu onay
+            sipariş kaydınıza işlenir.
+          </strong>{" "}
+          Yıkama tamamlandıktan sonra Mesafeli Sözleşmeler Yönetmeliği md.
+          15/1-h uyarınca cayma hakkı kullanılamaz. Ayrıntılar:{" "}
           <Link href="/iade" className="text-brand-dark underline">
             İptal ve İade Koşulları
           </Link>
@@ -85,10 +93,17 @@ export default function MesafeliSatisPage() {
 
       <Section title="6. Kusurlu İfa">
         <p>
-          Hizmetin ayıplı ifası hâlinde ALICI, teslimden itibaren 48 saat
-          içinde bildirimde bulunarak ücretsiz yeniden yıkama, bedel indirimi
-          veya bedel iadesi talep edebilir. Platform çözüm sürecine aracılık
-          eder; sipariş kayıtları ve teslim fotoğrafları delil niteliğindedir.
+          Kusuru fark eder etmez, tercihen teslimden itibaren 48 saat içinde
+          bildirmenizi öneririz — bu bir{" "}
+          <strong>hak düşürücü süre değildir</strong>; 6502 sayılı Kanun md.
+          15-16&apos;daki yasal haklarınız saklıdır. Ayıplı hizmette{" "}
+          <strong>seçiminize bağlı olarak</strong>: hizmetin yeniden
+          görülmesi, bedel indirimi, ücretsiz onarım/yeniden yıkama veya
+          sözleşmeden dönme (bedel iadesi) haklarına sahipsiniz.
+        </p>
+        <p>
+          Platform çözüm sürecine aracılık eder; sipariş kayıtları ve teslim
+          fotoğrafları delil niteliğindedir.
         </p>
       </Section>
 
@@ -106,8 +121,10 @@ export default function MesafeliSatisPage() {
       <Section title="8. Uyuşmazlık Çözümü">
         <p>
           Uyuşmazlıklarda, Ticaret Bakanlığı&apos;nca ilan edilen parasal
-          sınırlar dahilinde ALICI&apos;nın yerleşim yerindeki Tüketici Hakem
-          Heyetleri ve Tüketici Mahkemeleri yetkilidir.
+          sınırlar dahilinde Tüketici Hakem Heyetleri ve Tüketici Mahkemeleri
+          yetkilidir. ALICI, 6502 sayılı Kanun md. 68 uyarınca başvurusunu{" "}
+          <strong>kendi yerleşim yerinin bulunduğu</strong> veya tüketici
+          işleminin yapıldığı yerdeki Tüketici Hakem Heyetine yapabilir.
         </p>
       </Section>
 
@@ -118,7 +135,10 @@ export default function MesafeliSatisPage() {
             Ön Bilgilendirme Formu
           </Link>
           &apos;nu okuduğunu ve kabul ettiğini beyan eder. Sözleşme, sipariş
-          kaydıyla birlikte elektronik ortamda saklanır.
+          kaydıyla birlikte elektronik ortamda saklanır. Sözleşme ve ön
+          bilgilendirme metinlerine sipariş takip sayfanızdaki bağlantılardan
+          dilediğiniz zaman erişebilirsiniz; metinlerin sürümü sipariş
+          kaydınızla ilişkilendirilir.
         </p>
       </Section>
     </StaticPage>

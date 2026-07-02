@@ -13,14 +13,16 @@ type Field =
   | "phone"
   | "email"
   | "password"
-  | "district";
+  | "district"
+  | "consent";
 type FieldErrors = Partial<Record<Field, string>>;
 
 // Kayıt sonrası panel yol haritası — beklentiyi baştan kur.
+// (Sözleşme onayı artık kayıt formundaki checkbox ile alınıyor.)
 const STEPS = [
   "E-postanı doğrula",
   "Profilini tamamla (fiyat, fotoğraf, bölge)",
-  "Sözleşmeyi onayla, doğrulamaya gönder",
+  "Doğrulamaya gönder",
   "Onaydan sonra 30 gün ücretsiz yayında kal",
 ];
 
@@ -35,6 +37,9 @@ export default function KayitPage() {
     city: "İstanbul",
     district: "",
   });
+  // Aracılık sözleşmesi teyidi — işaretlenmemiş başlar, zorunludur
+  // (ETAHS Yönetmeliği: işletme ile elektronik aracılık sözleşmesi kurulması).
+  const [consent, setConsent] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [loading, setLoading] = useState(false);
@@ -58,6 +63,9 @@ export default function KayitPage() {
     if (form.password.length < 8)
       errs.password = "Şifre en az 8 karakter olmalı.";
     if (form.district.trim().length < 2) errs.district = "İlçe gerekli.";
+    if (!consent)
+      errs.consent =
+        "Devam etmek için sözleşmeyi ve kullanım koşullarını kabul etmelisin.";
     setFieldErrors(errs);
     if (Object.keys(errs).length > 0) return;
 
@@ -66,7 +74,7 @@ export default function KayitPage() {
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, consent }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => null);
@@ -237,16 +245,44 @@ export default function KayitPage() {
             </p>
           )}
 
-          <p className="text-xs text-slate-500">
-            Kaydolarak{" "}
-            <Link href="/kvkk" className="underline">
-              KVKK aydınlatma metnini
+          {/* Aracılık sözleşmesi onayı: işaretlenmemiş zorunlu kutu (aktif teyit).
+              KVKK satırı ayrı ve onaysız — aydınlatma "kabul" konusu yapılmaz
+              (Aydınlatma Tebliği md.5/1-f: aydınlatma ile rıza ayrıştırılır). */}
+          <div>
+            <label className="flex items-start gap-2 text-sm text-slate-600">
+              <input
+                type="checkbox"
+                checked={consent}
+                onChange={(e) => setConsent(e.target.checked)}
+                className="mt-0.5 h-5 w-5 shrink-0 accent-brand"
+              />
+              <span>
+                <Link
+                  href="/isletme-sozlesmesi"
+                  target="_blank"
+                  className="font-medium text-brand-dark underline"
+                >
+                  Platform Aracılık ve Üyelik Sözleşmesi
+                </Link>
+                &apos;ni ve{" "}
+                <Link
+                  href="/kosullar"
+                  target="_blank"
+                  className="font-medium text-brand-dark underline"
+                >
+                  Kullanım Koşulları
+                </Link>
+                &apos;nı okudum, kabul ediyorum.
+              </span>
+            </label>
+            {err("consent")}
+          </div>
+          <p className="text-sm text-slate-500">
+            Kişisel verileriniz{" "}
+            <Link href="/kvkk" target="_blank" className="underline">
+              KVKK Aydınlatma Metni
             </Link>{" "}
-            ve{" "}
-            <Link href="/kosullar" className="underline">
-              kullanım koşullarını
-            </Link>{" "}
-            kabul etmiş olursun.
+            kapsamında işlenir.
           </p>
 
           <button

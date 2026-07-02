@@ -8,18 +8,33 @@ export const metadata: Metadata = {
     "En Yakın Halı Yıkama platformunda kişisel verilerinizin hangi amaçla işlendiği, kimlerle paylaşıldığı ve haklarınız.",
 };
 
-// 6698 sayılı KVKK kapsamında aydınlatma metni (jenerik ama platforma özgü).
+// 6698 sayılı KVKK md.10 ve Aydınlatma Yükümlülüğünün Yerine Getirilmesinde
+// Uyulacak Usul ve Esaslar Hakkında Tebliğ'e (RG 10.03.2018/30356) uygun
+// aydınlatma metni: veri sorumlusu kimliği, işleme amaçları, aktarım,
+// toplama yöntemi + hukuki sebep ve md.11 haklarının tam listesi.
 export default function KvkkPage() {
   return (
     <StaticPage
       title="KVKK Aydınlatma Metni"
-      intro="6698 sayılı Kişisel Verilerin Korunması Kanunu (KVKK) uyarınca, platformumuzu kullanırken işlenen kişisel verileriniz hakkında sizi bilgilendirmek isteriz."
+      intro="6698 sayılı Kişisel Verilerin Korunması Kanunu (KVKK) md.10 uyarınca, platformumuzu kullanırken işlenen kişisel verileriniz hakkında sizi bilgilendirmek isteriz."
     >
       <Section title="1. Veri Sorumlusu">
         <p>
           Kişisel verileriniz, veri sorumlusu sıfatıyla{" "}
           <strong>En Yakın Halı Yıkama</strong> (enyakinhaliyikamaservisi.com)
           tarafından aşağıda açıklanan kapsamda işlenmektedir.
+        </p>
+        {/* TODO(künye): tescil tamamlanınca ticari unvan + adres buraya işlenecek. */}
+        <p>
+          Veri sorumlusunun ticari unvanı ve adres bilgisi, işletme tescil
+          işlemleri tamamlandığında bu bölümde yayımlanacaktır. KVKK
+          kapsamındaki başvurularınız için başvuru kanalı:{" "}
+          <a
+            href="mailto:info@enyakinhaliyikamaservisi.com"
+            className="font-medium text-brand-dark hover:underline"
+          >
+            info@enyakinhaliyikamaservisi.com
+          </a>
         </p>
       </Section>
 
@@ -34,7 +49,8 @@ export default function KvkkPage() {
         </ul>
         <p>
           İşletme (halıcı) hesapları için ayrıca e-posta adresi ve işletme
-          bilgileri işlenir.
+          bilgileri; şoför hesapları için ad, telefon ve teslimat sırasında
+          anlık konum bilgisi (bkz. bölüm 6) işlenir.
         </p>
       </Section>
 
@@ -45,49 +61,166 @@ export default function KvkkPage() {
           <li>Halının adresinizden alınması ve teslim edilmesi (operasyon)</li>
           <li>Sipariş durumu hakkında bilgilendirme ve takip bağlantısı gönderimi</li>
           <li>Hizmet kalitesinin izlenmesi ve uyuşmazlıkların çözümü</li>
+          <li>Platformun güvenliğinin sağlanması ve hukuki yükümlülüklerin yerine getirilmesi</li>
         </ul>
       </Section>
 
-      <Section title="4. Verilerin Aktarımı">
+      <Section title="4. Toplama Yöntemi ve Hukuki Sebep">
         <p>
-          Bilgileriniz <strong>yalnızca siparişi verdiğiniz halıcı işletme</strong>{" "}
-          ve teslimatı yapan şoförü ile paylaşılır. Verileriniz pazarlama amacıyla
-          üçüncü kişilere aktarılmaz, satılmaz ve reklam ağlarıyla paylaşılmaz.
+          Kişisel verileriniz şu kanallardan, elektronik ortamda ve kısmen
+          otomatik yollarla toplanır:
+        </p>
+        <ul className="list-disc space-y-1 pl-5">
+          <li>
+            Sitedeki web formları (sipariş talebi formu ve işletme kayıt formu)
+            üzerinden doğrudan sizin ilettiğiniz bilgiler
+          </li>
+          <li>
+            İsteğe bağlı olarak izin vermeniz hâlinde tarayıcınızın konum izni
+            üzerinden alınan konum bilgisi
+          </li>
+          <li>
+            Hizmetin sunulması sırasında otomatik olarak oluşan sunucu erişim
+            kayıtları (log)
+          </li>
+        </ul>
+        <p>
+          Bu işlemenin dayandığı hukuki sebepler (KVKK md.5) şunlardır:
+        </p>
+        <ul className="list-disc space-y-1 pl-5">
+          <li>
+            <strong>KVKK md.5/2-c:</strong> bir sözleşmenin kurulması veya
+            ifasıyla doğrudan doğruya ilgili olması (sipariş ve teslimat
+            sürecinin yürütülmesi)
+          </li>
+          <li>
+            <strong>KVKK md.5/2-ç:</strong> veri sorumlusunun hukuki
+            yükümlülüğünü yerine getirebilmesi için zorunlu olması (yasal
+            saklama ve bildirim yükümlülükleri)
+          </li>
+          <li>
+            <strong>KVKK md.5/2-f:</strong> temel hak ve özgürlüklerinize zarar
+            vermemek kaydıyla meşru menfaat (platform güvenliğinin sağlanması,
+            erişim kayıtlarının tutulması)
+          </li>
+        </ul>
+      </Section>
+
+      <Section title="5. Verilerin Aktarımı">
+        <p>
+          Sipariş bilgileriniz, hizmetin ifası amacıyla{" "}
+          <strong>siparişi verdiğiniz halıcı işletme</strong> ve teslimatı yapan{" "}
+          <strong>şoförü</strong> ile paylaşılır. Ayrıca hizmetin teknik olarak
+          sunulabilmesi için aşağıdaki kategorilerdeki hizmet sağlayıcılara
+          aktarım yapılabilir:
+        </p>
+        <ul className="list-disc space-y-1 pl-5">
+          <li>
+            <strong>SMS gönderim sağlayıcısı</strong> (sipariş bilgilendirme ve
+            takip bağlantısının iletilmesi için telefon numaranız)
+          </li>
+          <li>
+            <strong>Harita / coğrafi kodlama sağlayıcısı</strong> (adresin
+            haritada gösterilmesi ve konumlandırılması için adres/ilçe bilgisi)
+          </li>
+          <li>
+            <strong>Barındırma ve güvenlik (CDN) sağlayıcısı</strong> (sitenin
+            güvenli şekilde sunulması sırasında işlenen trafik verileri)
+          </li>
+          <li>
+            <strong>Ödeme kuruluşu (iyzico)</strong> — yalnızca online ödeme
+            aktif olduğunda, ödemenin gerçekleştirilmesi için gereken bilgiler
+          </li>
+        </ul>
+        <p>
+          Yalnızca hizmetin gerektirdiği asgari veri, ilgili sağlayıcıya
+          aktarılır. Verileriniz pazarlama amacıyla üçüncü kişilere aktarılmaz,
+          satılmaz ve reklam ağlarıyla paylaşılmaz.
         </p>
       </Section>
 
-      <Section title="5. Saklama Süresi">
+      <Section title="6. Şoför ve İşletme Çalışanı Verileri">
+        <p>
+          Teslimatı yürüten şoförlere ait <strong>ad, telefon numarası ve
+          mesai sırasında anlık konum</strong> bilgisi işlenir. Bu işlemenin
+          amaçları; teslimatın yürütülmesi, operasyon güvenliğinin sağlanması
+          ve müşteriye süreç şeffaflığı sunulmasıdır.
+        </p>
+        <p>
+          Şoförün adı ve canlı konumu, <strong>yalnızca teslimata çıkılan
+          siparişin müşterisine</strong> gösterilir; başka kullanıcılarla veya
+          üçüncü kişilerle paylaşılmaz. Şoför hesaplarını platformda işletmeler
+          açtığından, işletmeler çalıştırdıkları şoförleri bu işleme hakkında
+          bilgilendirmekle yükümlüdür.
+        </p>
+      </Section>
+
+      <Section title="7. Saklama Süresi">
         <p>
           Sipariş kayıtları, olası uyuşmazlıklar ve yasal yükümlülükler için
-          mevzuatta öngörülen süreler boyunca saklanır. Anlık konum verileri gibi
-          operasyonel veriler, teslimat tamamlandıktan sonra makul süre içinde
-          silinir veya anonimleştirilir.
+          mevzuatta öngörülen süreler boyunca saklanır. Sipariş ve işlem
+          kayıtları, 6563 sayılı Elektronik Ticaretin Düzenlenmesi Hakkında
+          Kanun md.11/3 uyarınca <strong>10 yıl</strong> süreyle saklanır.
+          Anlık konum verileri gibi operasyonel veriler, teslimat
+          tamamlandıktan sonra makul süre içinde silinir veya anonimleştirilir.
         </p>
       </Section>
 
-      <Section title="6. Hukuki Sebep">
+      <Section title="8. Haklarınız (KVKK md.11)">
         <p>
-          Verileriniz, KVKK m.5/2-c uyarınca &quot;bir sözleşmenin kurulması veya
-          ifasıyla doğrudan doğruya ilgili olması&quot; ve m.5/2-f uyarınca meşru
-          menfaat hukuki sebeplerine dayanılarak işlenir.
+          KVKK md.11 uyarınca veri sorumlusuna başvurarak kendinizle ilgili
+          şu haklara sahipsiniz:
         </p>
+        <ul className="list-disc space-y-1 pl-5">
+          <li>Kişisel verilerinizin işlenip işlenmediğini öğrenme</li>
+          <li>İşlenmişse buna ilişkin bilgi talep etme</li>
+          <li>
+            İşlenme amacını ve verilerin amacına uygun kullanılıp
+            kullanılmadığını öğrenme
+          </li>
+          <li>
+            Yurt içinde veya yurt dışında verilerin aktarıldığı üçüncü kişileri
+            bilme
+          </li>
+          <li>
+            Verilerin eksik veya yanlış işlenmiş olması hâlinde düzeltilmesini
+            isteme
+          </li>
+          <li>
+            KVKK md.7&apos;deki şartlar çerçevesinde verilerin silinmesini veya
+            yok edilmesini isteme
+          </li>
+          <li>
+            Düzeltme, silme ve yok etme işlemlerinin, verilerin aktarıldığı
+            üçüncü kişilere bildirilmesini isteme
+          </li>
+          <li>
+            İşlenen verilerin münhasıran otomatik sistemler vasıtasıyla analiz
+            edilmesi suretiyle aleyhinize bir sonucun ortaya çıkmasına itiraz
+            etme
+          </li>
+          <li>
+            Verilerin kanuna aykırı işlenmesi sebebiyle zarara uğramanız
+            hâlinde zararın giderilmesini talep etme
+          </li>
+        </ul>
       </Section>
 
-      <Section title="7. Haklarınız ve Başvuru">
+      <Section title="9. Başvuru Usulü">
         <p>
-          KVKK m.11 kapsamında; verilerinize erişme, düzeltilmesini veya
-          silinmesini isteme, işlemeye itiraz etme ve zarara uğramanız hâlinde
-          giderilmesini talep etme haklarına sahipsiniz.
-        </p>
-        <p>
-          Başvurularınızı{" "}
+          Yukarıdaki haklarınıza ilişkin taleplerinizi, Veri Sorumlusuna
+          Başvuru Usul ve Esasları Hakkında Tebliğ uyarınca{" "}
+          <strong>yazılı olarak</strong> veya{" "}
           <a
             href="mailto:info@enyakinhaliyikamaservisi.com"
             className="font-medium text-brand-dark hover:underline"
           >
             info@enyakinhaliyikamaservisi.com
           </a>{" "}
-          adresine iletebilirsiniz. Ayrıca{" "}
+          adresine <strong>e-posta</strong> ile iletebilirsiniz. Başvurunuz,
+          talebin niteliğine göre en kısa sürede ve en geç{" "}
+          <strong>30 gün içinde</strong> ücretsiz olarak sonuçlandırılır.
+          Ayrıca{" "}
           <Link href="/gizlilik" className="font-medium text-brand-dark hover:underline">
             Gizlilik Politikamızı
           </Link>{" "}

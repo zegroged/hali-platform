@@ -6,6 +6,7 @@ import { sendTrackingSms } from "@/lib/sms";
 import { createOrderWithCode } from "@/lib/ordercode";
 import { rateLimit, clientIp, tooMany } from "@/lib/ratelimit";
 import { subscriptionActive } from "@/lib/subscription";
+import { CONTRACT_VERSION } from "@/lib/legal";
 
 const Body = z.object({
   businessId: z.string().min(1).max(40),
@@ -17,6 +18,11 @@ const Body = z.object({
   approxM2: z.number().positive().max(100000).optional(),
   note: z.string().max(500).optional(),
   paymentMethod: z.enum(["CASH", "CARD"]),
+  // Mesafeli Sözleşmeler Yönetmeliği md.7: ön bilgilendirme teyidi olmadan
+  // sözleşme kurulmuş sayılmaz → onay kutusu işaretlenmeden sipariş alınmaz.
+  consent: z.literal(true, {
+    message: "Ön bilgilendirme ve sözleşme onayı olmadan sipariş oluşturulamaz.",
+  }),
 });
 
 export async function POST(req: NextRequest) {
@@ -83,6 +89,9 @@ export async function POST(req: NextRequest) {
         note: d.note,
         // Web'de şimdilik YALNIZ nakit (komisyon/kart ertelendi; app'te geri açılacak).
         paymentMethod: "CASH",
+        // md.7 teyit kaydı: onay anı + o an yayında olan metin sürümü (ispat).
+        consentAt: new Date(),
+        contractVersion: CONTRACT_VERSION,
         events: { create: { status: "CREATED", note: "Talep oluşturuldu" } },
       },
     }),

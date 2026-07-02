@@ -233,11 +233,20 @@ export default async function PanelHome() {
             )}
           </div>
 
-          {/* Sözleşme onayı */}
+          {/* Sözleşme onayı — buton kayıt-checkbox'ı öncesi açılan eski hesaplar için */}
           <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-3">
-            <span className="text-sm font-medium text-slate-700">
-              Platform sözleşmesi
-            </span>
+            <div>
+              <span className="block text-sm font-medium text-slate-700">
+                Platform sözleşmesi
+              </span>
+              <Link
+                href="/isletme-sozlesmesi"
+                target="_blank"
+                className="text-sm text-brand-dark hover:underline"
+              >
+                Sözleşme metnini oku
+              </Link>
+            </div>
             {b.contractAcceptedAt ? (
               <span className="inline-flex items-center gap-1 text-sm font-medium text-green-600">
                 <IconCheck size={15} /> Onaylandı

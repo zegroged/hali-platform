@@ -52,6 +52,11 @@ export default function Footer() {
             </h2>
             <ul className="mt-3 space-y-2 text-sm">
               <li>
+                <Link href="/hakkimizda" className="hover:text-white">
+                  Hakkımızda
+                </Link>
+              </li>
+              <li>
                 <Link href="/iletisim" className="hover:text-white">
                   İletişim
                 </Link>
@@ -69,6 +74,11 @@ export default function Footer() {
               <li>
                 <Link href="/kosullar" className="hover:text-white">
                   Kullanım Koşulları
+                </Link>
+              </li>
+              <li>
+                <Link href="/isletme-sozlesmesi" className="hover:text-white">
+                  İşletme Sözleşmesi
                 </Link>
               </li>
               <li>
@@ -93,15 +103,22 @@ export default function Footer() {
           <p className="text-xs text-slate-500">
             © 2026 En Yakın Halı Yıkama. Tüm hakları saklıdır.
           </p>
-          {/* iyzico logo bandı (resmî paket, beyaz sürüm) — ödeme güven işareti */}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/iyzico-band-white.svg"
-            alt="iyzico ile güvenli ödeme — Visa, Mastercard, Troy"
-            loading="lazy"
-            decoding="async"
-            className="h-6 w-auto max-w-full opacity-90 sm:h-7"
-          />
+          <div className="flex flex-col gap-1.5 sm:items-end">
+            {/* iyzico logo bandı (resmî paket, beyaz sürüm) — ödeme güven işareti */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/iyzico-band-white.svg"
+              alt="iyzico ile güvenli ödeme — Visa, Mastercard, Troy"
+              loading="lazy"
+              decoding="async"
+              className="h-6 w-auto max-w-full opacity-90 sm:h-7"
+            />
+            {/* Yanıltıcılık önlemi: kart logoları var ama tahsilat şimdilik nakit */}
+            <p className="text-xs text-slate-500">
+              Online kartlı ödeme çok yakında — şu an ödeme teslimde nakit
+              alınır.
+            </p>
+          </div>
         </div>
       </div>
     </footer>

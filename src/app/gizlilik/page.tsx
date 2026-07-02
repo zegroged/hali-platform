@@ -16,10 +16,12 @@ export default function GizlilikPage() {
     >
       <Section title="Çerezler">
         <p>
-          Sitemizde reklam, analitik veya izleme çerezi <strong>kullanılmaz</strong>.
-          Yalnızca işletme paneline giriş yapan halıcı ve şoför hesapları için
-          zorunlu bir oturum çerezi tutulur; bu çerez sizi sayfalar arasında
-          oturumda tutmaktan başka bir iş yapmaz.
+          Giriş yapan tüm hesaplar (işletme, şoför, yönetici ve varsa müşteri)
+          için zorunlu bir oturum çerezi kullanılır; bu çerez sizi sayfalar
+          arasında oturumda tutmaktan başka bir iş yapmaz. Altyapı/güvenlik
+          sağlayıcımız (CDN), hizmetin güvenli sunumu için zorunlu teknik
+          çerezler bırakabilir; analitik veya reklam/izleme çerezi{" "}
+          <strong>kullanılmaz</strong>.
         </p>
       </Section>
 
@@ -27,16 +29,17 @@ export default function GizlilikPage() {
         <p>
           Verileriniz üçüncü taraf reklam ağlarıyla, sosyal medya
           platformlarıyla veya veri simsarlarıyla paylaşılmaz. Sipariş
-          bilgileriniz yalnızca seçtiğiniz halıcı işletmeye iletilir (ayrıntı
-          için{" "}
+          bilgileriniz yalnızca seçtiğiniz halıcı işletmeye ve teslimatı yapan
+          şoförüne iletilir; aktarım kategorilerinin tam listesi için{" "}
           <Link href="/kvkk" className="font-medium text-brand-dark hover:underline">
             KVKK Aydınlatma Metni
           </Link>
-          ).
+          &apos;ne bakabilirsiniz.
         </p>
         <p>
-          Harita görüntüleme gibi teknik hizmetlerde kullanılan sağlayıcılar
-          yalnızca haritanın çizilmesi için gereken asgari veriyi işler.
+          SMS gönderimi, harita görüntüleme ve barındırma/güvenlik (CDN) gibi
+          teknik hizmetlerde kullanılan sağlayıcılara yalnızca hizmetin
+          gerektirdiği asgari veri aktarılır.
         </p>
       </Section>
 

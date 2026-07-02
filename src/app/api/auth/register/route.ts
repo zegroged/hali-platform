@@ -5,7 +5,7 @@ import { hashPassword, createSession } from "@/lib/auth";
 import { rateLimit, clientIp, tooMany } from "@/lib/ratelimit";
 
 // İşletme self-servis kaydı. Hesap PENDING açılır ve görünmez;
-// panel akışı (e-posta doğrulama → profil → sözleşme → admin onayı) tamamlar.
+// panel akışı (e-posta doğrulama → profil → admin onayı) tamamlar.
 const Body = z.object({
   businessName: z.string().trim().min(2).max(80),
   name: z.string().trim().min(2).max(60),
@@ -14,6 +14,9 @@ const Body = z.object({
   password: z.string().min(8).max(72), // bcrypt 72 bayt sınırı
   city: z.string().trim().min(2).max(40),
   district: z.string().trim().min(2).max(40),
+  // Aracılık sözleşmesi teyidi (işaretlenmemiş zorunlu checkbox) — onaysız
+  // kayıt kurulmaz (ETAHS Yönetmeliği: elektronik aracılık sözleşmesi şartı).
+  consent: z.literal(true),
 });
 
 // Kayıtta profil boş açılır; halıcı panelden düzenler (seed ile aynı varsayılan).
@@ -115,6 +118,8 @@ export async function POST(req: NextRequest) {
           workingHours: DEFAULT_WORKING_HOURS,
           verification: "PENDING",
           isVisible: false,
+          // Sözleşme kayıtta checkbox ile onaylandı — panel adımı otomatik tamam.
+          contractAcceptedAt: new Date(),
           serviceAreas: { create: [{ city, district }] },
         },
       },

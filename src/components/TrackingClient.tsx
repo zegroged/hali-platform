@@ -476,6 +476,22 @@ export function TrackingClient({ token }: { token: string }) {
           {data.paymentMethod === "CARD" ? "Kartla" : "Kapıda nakit"}
         </div>
       )}
+
+      {/* Sözleşme metinlerine sipariş sonrası kalıcı erişim (6563 md.3/1-c) */}
+      <div className="border-t border-slate-100 pt-3 text-sm text-slate-500">
+        Sözleşme ve bilgilendirme metinleri:{" "}
+        <Link href="/on-bilgilendirme" className="underline hover:text-slate-700">
+          Ön Bilgilendirme
+        </Link>{" "}
+        ·{" "}
+        <Link href="/mesafeli-satis" className="underline hover:text-slate-700">
+          Mesafeli Satış Sözleşmesi
+        </Link>{" "}
+        ·{" "}
+        <Link href="/iade" className="underline hover:text-slate-700">
+          İptal ve İade
+        </Link>
+      </div>
     </div>
   );
 }
