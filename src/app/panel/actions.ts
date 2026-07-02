@@ -147,16 +147,21 @@ export async function addDriver(formData: FormData) {
   const b = await biz();
   const name = String(formData.get("name") || "").trim();
   const phone = String(formData.get("phone") || "").trim();
+  const chosen = String(formData.get("password") || "");
   if (!name || phone.length < 10) {
     throw new Error("Geçerli ad ve telefon (05xx...) girin.");
+  }
+  if (chosen && chosen.length < 8) {
+    throw new Error("Şifre en az 8 karakter olmalı.");
   }
   const exists = await prisma.user.findUnique({ where: { phone } });
   if (exists) {
     // Sessiz başarısızlık yerine halıcıya neden eklenemediğini söyle.
     throw new Error("Bu telefon numarası başka bir hesapta zaten kayıtlı.");
   }
-  // Sabit "1234" YOK — her şoföre rastgele geçici şifre üret ve SMS ile gönder.
-  const tempPassword = crypto.randomBytes(6).toString("base64url"); // ~8 karakter
+  // Şifreyi halıcı belirleyebilir (SMS canlı olana kadar tek pratik yol).
+  // Boş bırakılırsa eski davranış: rastgele geçici şifre + SMS. Sabit "1234" YOK.
+  const tempPassword = chosen || crypto.randomBytes(6).toString("base64url");
   const password = await hashPassword(tempPassword);
   const user = await prisma.user.create({
     data: { role: "DRIVER", name, phone, password },
@@ -165,9 +170,12 @@ export async function addDriver(formData: FormData) {
     data: { userId: user.id, businessId: b.id },
   });
   try {
+    // Halıcı şifreyi kendisi belirlediyse SMS'te şifre GEÇMEZ (sözlü iletir).
     await sendSms(
       phone,
-      `${b.name} sizi şoför olarak ekledi. Giriş: ${getAppBaseUrl()}/giris · Telefon: ${phone} · Geçici şifre: ${tempPassword}`,
+      chosen
+        ? `${b.name} sizi şoför olarak ekledi. Giriş: ${getAppBaseUrl()}/giris · Telefon: ${phone} · Şifrenizi işletmenizden alabilirsiniz.`
+        : `${b.name} sizi şoför olarak ekledi. Giriş: ${getAppBaseUrl()}/giris · Telefon: ${phone} · Geçici şifre: ${tempPassword}`,
     );
   } catch (e) {
     console.error("addDriver SMS hatası:", e);
@@ -199,6 +207,24 @@ export async function removeDriver(formData: FormData) {
   await syncVisibility(b.id); // son şoför silindiyse listeden düş
   revalidatePath("/panel/soforler");
   revalidatePath("/panel");
+}
+
+/** Şoför şifresini halıcı belirler/sıfırlar (unutulan şifre + SMS-öncesi dönem). */
+export async function setDriverPassword(formData: FormData) {
+  const b = await biz();
+  const id = String(formData.get("id"));
+  const pw = String(formData.get("password") || "");
+  if (pw.length < 8) {
+    throw new Error("Şifre en az 8 karakter olmalı.");
+  }
+  // sadece bu işletmenin şoförü güncellenebilir
+  const d = await prisma.driver.findFirst({ where: { id, businessId: b.id } });
+  if (!d) return;
+  await prisma.user.update({
+    where: { id: d.userId },
+    data: { password: await hashPassword(pw) },
+  });
+  revalidatePath("/panel/soforler");
 }
 
 export async function acceptContract() {
