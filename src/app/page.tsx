@@ -50,7 +50,7 @@ function Header() {
           <span className="hidden sm:inline">Takip</span>
         </Link>
         <Link
-          href="/giris"
+          href="/kayit"
           className="inline-flex items-center whitespace-nowrap rounded-lg border border-brand px-3 py-2 text-sm font-medium text-brand-dark transition hover:bg-brand-light"
         >
           <span className="sm:hidden">İşletme</span>
@@ -289,7 +289,7 @@ export default async function Home({
                 ulaş.
               </p>
               <Link
-                href="/giris"
+                href="/kayit"
                 className="mt-4 inline-flex items-center justify-center gap-1.5 rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark active:scale-[0.99]"
               >
                 İlk katılanlardan ol

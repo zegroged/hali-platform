@@ -139,15 +139,21 @@ export default function GirisPage() {
             Henüz hesabın yok mu?
           </p>
           <p className="mt-1 text-sm text-slate-600">
-            Halı yıkama işletmeni platforma ücretsiz ekleyelim — aramıza
-            katılmak için bize ulaş.
+            Halı yıkama işletmeni birkaç dakikada ücretsiz kaydet — onay
+            sonrası ilk 30 gün ücretsiz.
           </p>
           <Link
-            href="/iletisim"
-            className="mt-3 inline-flex min-h-[40px] items-center rounded-lg border border-brand px-4 py-2 text-sm font-semibold text-brand-dark transition hover:bg-brand-light/50"
+            href="/kayit"
+            className="mt-3 inline-flex min-h-[40px] items-center rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-dark"
           >
-            Bize ulaş
+            Ücretsiz Kaydol
           </Link>
+          <p className="mt-2 text-xs text-slate-500">
+            Soruların mı var?{" "}
+            <Link href="/iletisim" className="underline">
+              Bize ulaş
+            </Link>
+          </p>
         </div>
 
         {process.env.NODE_ENV !== "production" && (
