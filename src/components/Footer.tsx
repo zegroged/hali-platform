@@ -44,6 +44,13 @@ export default function Footer() {
                   Sık sorulan sorular
                 </Link>
               </li>
+              {/* ETAHS Yön. md.7: ana sayfadan doğrudan ulaşılan "işlem
+                  rehberi" başlığı — içerik on-bilgilendirme'de mevcut. */}
+              <li>
+                <Link href="/on-bilgilendirme" className="hover:text-white">
+                  İşlem Rehberi
+                </Link>
+              </li>
             </ul>
           </div>
           <div>

@@ -31,6 +31,17 @@ export default async function SoforPage() {
   const driver = await prisma.driver.findUnique({ where: { userId: u.id } });
   if (!driver) return null;
 
+  // KVKK Aydınlatma Tebliği md.6/1-b: şoförün verisi kendisinden değil
+  // işletmesinden elde ediliyor → İLK İLETİŞİMDE (bu sayfada DriverShift
+  // altındaki aydınlatma metniyle) bilgilendirilir; ilk gösterim anı ispat
+  // için kaydedilir. updateMany + null koşulu: ilk zaman damgası ezilmez.
+  if (!driver.privacyNoticeAt) {
+    await prisma.driver.updateMany({
+      where: { id: driver.id, privacyNoticeAt: null },
+      data: { privacyNoticeAt: new Date() },
+    });
+  }
+
   const orders = await prisma.order.findMany({
     where: {
       driverId: driver.id,

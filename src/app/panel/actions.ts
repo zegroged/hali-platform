@@ -349,6 +349,59 @@ export async function acceptOrderPanel(formData: FormData) {
   revalidatePath(`/panel/siparisler/${orderId}`);
 }
 
+/**
+ * Kesin fiyat bildirimi (Mesafeli Söz. Yön. md.15/1-h ispatı): halı alınıp
+ * ölçüldükten sonra işletme kesin fiyatı girer → müşteriye SMS + takip
+ * sayfasında onay kartı. Onay gelene kadar fiyat güncellenebilir; müşteri
+ * onayladıktan (priceApprovedAt) sonra değiştirilemez.
+ */
+export async function quoteOrderPrice(formData: FormData) {
+  const b = await biz();
+  const orderId = String(formData.get("orderId"));
+  const price = Number(String(formData.get("price") || "").replace(",", "."));
+  if (!Number.isFinite(price) || price <= 0) {
+    throw new Error("Geçerli bir kesin fiyat girin (0'dan büyük).");
+  }
+  const order = await prisma.order.findFirst({
+    where: { id: orderId, businessId: b.id },
+  });
+  if (!order) return;
+
+  // CAS: yalnız PICKED_UP'ta ve müşteri henüz onaylamamışken bildir/güncelle.
+  const updated = await prisma.order.updateMany({
+    where: {
+      id: orderId,
+      businessId: b.id,
+      status: "PICKED_UP",
+      priceApprovedAt: null,
+    },
+    data: { quotedPrice: price },
+  });
+  if (updated.count === 0) {
+    throw new Error(
+      "Fiyat bildirilemedi: sipariş uygun durumda değil veya müşteri fiyatı zaten onayladı.",
+    );
+  }
+  await prisma.orderEvent.create({
+    data: {
+      orderId,
+      status: "PICKED_UP", // durum değişmez, yalnız kayıt düşülür
+      note: `Kesin fiyat bildirildi: ${price} TL — müşteri onayı bekleniyor`,
+    },
+  });
+  // SMS hatası kaydı bozmasın (fiyat zaten yazıldı, kart takip sayfasında görünür).
+  try {
+    await sendSms(
+      order.customerPhone,
+      `Kesin fiyat ${price} TL. Onaylamak icin: ${trackingLink(order.code ?? order.trackingToken)}`,
+    );
+  } catch (e) {
+    console.error("quoteOrderPrice SMS hatası:", e);
+  }
+  revalidatePath("/panel/siparisler");
+  revalidatePath(`/panel/siparisler/${orderId}`);
+}
+
 /** Ara adımlar: ACCEPTED→PICKED_UP→WASHING→OUT_FOR_DELIVERY (PANEL_NEXT). */
 export async function advanceOrderPanel(formData: FormData) {
   const b = await biz();
@@ -360,6 +413,19 @@ export async function advanceOrderPanel(formData: FormData) {
   const step = PANEL_NEXT[order.status];
   if (!step) return;
 
+  // md.15/1-h: dijital fiyat onayı yokken yıkamaya geçiş, ancak işletmenin
+  // "sözlü onay aldım" beyanıyla mümkündür — beyan zaman damgalı kayda geçer.
+  const verbalConsent = formData.get("verbalConsent") != null;
+  const needsConsentDeclaration =
+    order.status === "PICKED_UP" &&
+    step.next === "WASHING" &&
+    !order.priceApprovedAt;
+  if (needsConsentDeclaration && !verbalConsent) {
+    throw new Error(
+      "Müşterinin dijital fiyat onayı yok. Yıkamaya geçmek için sözlü onay beyanını işaretleyin veya müşterinin takip sayfasından onaylamasını bekleyin.",
+    );
+  }
+
   const updated = await prisma.order.updateMany({
     where: { id: orderId, businessId: b.id, status: order.status },
     data: { status: step.next },
@@ -368,6 +434,15 @@ export async function advanceOrderPanel(formData: FormData) {
   await prisma.orderEvent.create({
     data: { orderId, status: step.next, note: ORDER_STATUS_META[step.next].label },
   });
+  if (needsConsentDeclaration && verbalConsent) {
+    await prisma.orderEvent.create({
+      data: {
+        orderId,
+        status: step.next,
+        note: "İşletme beyanı: müşteriden sözlü fiyat/ifa onayı alındı",
+      },
+    });
+  }
 
   if (step.next === "OUT_FOR_DELIVERY") {
     // Şoför akışıyla aynı: önceki teslimatın konumu sızmasın + canlı takip SMS'i.

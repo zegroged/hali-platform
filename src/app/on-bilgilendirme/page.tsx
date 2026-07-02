@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import StaticPage, { Section } from "../_static/StaticPage";
+import { CONTRACT_VERSION } from "@/lib/legal";
 
 export const metadata: Metadata = {
   title: "Ön Bilgilendirme Formu",
@@ -10,6 +11,8 @@ export const metadata: Metadata = {
 
 // TODO(künye): Şirket bilgileri (unvan, adres, vergi/MERSİS no, KEP)
 // netleşince §1'deki geçici künye ifadesi gerçek bilgilerle değiştirilecek.
+// TODO(iyzico): Ödeme kuruluşu sözleşmesi imzalanınca §3'teki "anlaşmalı
+// ödeme kuruluşu" ifadesi marka adıyla (iyzico) güncellenecek.
 export default function OnBilgilendirmePage() {
   return (
     <StaticPage
@@ -20,7 +23,10 @@ export default function OnBilgilendirmePage() {
         <p>
           Halı yıkama hizmeti, platformda listelenen ve siparişte sizin
           seçtiğiniz bağımsız işletme tarafından verilir; işletmenin ünvanı ve
-          telefonu sipariş takip sayfanızda yer alır.
+          telefonu sipariş takip sayfanızda yer alır. Seçtiğiniz işletmenin
+          açık adresi, telefonu ve vergi kimlik numarası, sipariş vermeden
+          önce işletmenin profil sayfasında yer alır (Mesafeli Sözleşmeler
+          Yönetmeliği md. 5/1-b ve 5/1-c).
         </p>
         <p>
           Platform işleticisinin ticari unvanı, merkez adresi, vergi/MERSİS
@@ -43,8 +49,9 @@ export default function OnBilgilendirmePage() {
           <strong>kesin fiyat halınız ölçüldükten sonra bildirilir</strong> ve
           onayınız alınır. Sipariş oluşturmak ücretsizdir; ön ödeme/kapora
           alınmaz. Ödeme teslimde nakit yapılır (online kartlı ödeme aktif
-          olduğunda iyzico güvencesiyle kartla da ödeyebilirsiniz; olası ek
-          bedeller ödeme adımında ayrıca gösterilir).
+          olduğunda anlaşmalı ödeme kuruluşu aracılığıyla kartla da
+          ödeyebilirsiniz; olası ek bedeller ödeme adımında ayrıca
+          gösterilir).
         </p>
       </Section>
 
@@ -57,6 +64,14 @@ export default function OnBilgilendirmePage() {
       </Section>
 
       <Section title="5. Cayma Hakkı ve İstisnası">
+        <p>
+          Yasal cayma süreniz, sözleşmenin kurulduğu günden itibaren{" "}
+          <strong>14 gündür</strong> (Mesafeli Sözleşmeler Yönetmeliği md. 9).
+          Uygulamamız bundan daha lehinizedir: halı alınmadan her an ücretsiz
+          iptal, kesin fiyatı onaylamadığınız sürece ücretsiz iade hakkınız
+          vardır; kesin fiyat onayınızla yıkamaya başlandığında md. 15/1-h
+          istisnası uygulanır.
+        </p>
         <p>
           Halı alınmadan ücretsiz iptal; kesin fiyat sonrası yıkanmadan
           ücretsiz iade hakkınız vardır.{" "}
@@ -111,6 +126,12 @@ export default function OnBilgilendirmePage() {
           iletebilirsiniz. Ayrıca Tüketici Hakem Heyetleri ve Tüketici
           Mahkemelerine başvuru hakkınız saklıdır.
         </p>
+        <p>
+          Tüketici Hakem Heyeti (THH) parasal sınırının üzerindeki
+          uyuşmazlıklarda, Tüketici Mahkemesinde dava açmadan önce arabulucuya
+          başvurulması dava şartıdır (6502 sayılı Kanun md. 73/A). 2026 yılı
+          için THH parasal sınırı 186.000 TL&apos;dir (RG 23.12.2025/33116).
+        </p>
       </Section>
 
       <Section title="9. Diğer Hususlar">
@@ -121,6 +142,8 @@ export default function OnBilgilendirmePage() {
           içermediğinden dijital içeriklere ilişkin hükümler uygulanmaz.
         </p>
       </Section>
+
+      <p className="text-sm text-slate-500">Yürürlük: {CONTRACT_VERSION}</p>
     </StaticPage>
   );
 }

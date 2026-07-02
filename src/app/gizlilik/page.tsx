@@ -41,6 +41,14 @@ export default function GizlilikPage() {
           teknik hizmetlerde kullanılan sağlayıcılara yalnızca hizmetin
           gerektirdiği asgari veri aktarılır.
         </p>
+        {/* KVKK aydınlatma metnindeki (bölüm 5) yurt dışına aktarım
+            açıklamasıyla tutarlı: harita karo sunucusu + IP. */}
+        <p>
+          Harita görüntülenirken tarayıcınız, yurt dışında yerleşik harita
+          karo sunucusuna (CARTO) bağlanır ve bu sırada IP adresiniz bu
+          sunucuya iletilir; ayrıntılar için KVKK Aydınlatma Metni&apos;nin
+          &quot;Verilerin Aktarımı&quot; bölümüne bakabilirsiniz.
+        </p>
       </Section>
 
       <Section title="Verilerin Korunması">

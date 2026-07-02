@@ -33,6 +33,9 @@ type Track = {
   pickupLat: number | null;
   pickupLng: number | null;
   priceTotal: number | null;
+  // md.15/1-h: işletmenin bildirdiği kesin fiyat + müşterinin onay anı
+  quotedPrice: number | null;
+  priceApprovedAt: string | null;
   paymentMethod: string;
   estimatedDays: number | null;
   photos: { id: string; url: string }[];
@@ -43,6 +46,10 @@ type Track = {
 
 // Poll'un durdurulacağı nihai durumlar — teslim edilmiş sipariş sonsuza dek sorgulanmasın.
 const FINAL_STATUSES: OrderStatus[] = ["DELIVERED", "REJECTED", "CANCELED"];
+
+// Platform üzerinden cayma/iptalin mümkün olduğu durumlar (md.11/5) —
+// yıkama başladıktan (WASHING) sonra buton görünmez.
+const CUSTOMER_CANCELABLE: OrderStatus[] = ["CREATED", "ACCEPTED", "PICKED_UP"];
 
 /** Zaman çizelgesiyle aynı iskelette skeleton — içerik gelince zıplama olmaz. */
 function TrackingSkeleton() {
@@ -83,6 +90,12 @@ export function TrackingClient({ token }: { token: string }) {
   const searchParams = useSearchParams();
   const [bannerClosed, setBannerClosed] = useState(false);
   const showBanner = searchParams.get("yeni") === "1" && !bannerClosed;
+  // Kesin fiyat onayı (md.15/1-h) + cayma/iptal (md.11/5) aksiyon durumları
+  const [approvePending, setApprovePending] = useState(false);
+  const [approveError, setApproveError] = useState<string | null>(null);
+  const [cancelPending, setCancelPending] = useState(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
+  const [cancelDone, setCancelDone] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -138,6 +151,55 @@ export function TrackingClient({ token }: { token: string }) {
     } catch {
       // Pano erişilemedi (izin/eski tarayıcı) — sessiz geç.
     }
+  }
+
+  /** Tek seferlik POST aksiyonu; başarıda null, hatada Türkçe mesaj döner. */
+  async function postAction(path: string): Promise<string | null> {
+    try {
+      const res = await fetch(`/api/orders/${token}/${path}`, {
+        method: "POST",
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) {
+        return json && typeof json.error === "string"
+          ? json.error
+          : "İşlem gerçekleştirilemedi. Lütfen tekrar deneyin.";
+      }
+      return null;
+    } catch {
+      return "Bağlantı hatası — lütfen tekrar deneyin.";
+    }
+  }
+
+  // Kesin fiyat onayı (md.15/1-h): onay anı sunucuda kayda geçer,
+  // başarıda veri tazelenir → yeşil teyit satırı görünür.
+  async function approvePrice() {
+    setApprovePending(true);
+    setApproveError(null);
+    const err = await postAction("approve-price");
+    if (err) setApproveError(err);
+    else setRetryKey((k) => k + 1); // veriyi hemen tazele
+    setApprovePending(false);
+  }
+
+  // Platform üzerinden cayma/iptal (md.11/5): bildirim kayda geçer,
+  // işletmeye SMS ile iletilir, müşteriye ekranda + SMS ile teyit verilir.
+  async function cancelOrder() {
+    if (
+      !window.confirm(
+        "Siparişi iptal etmek / cayma hakkını kullanmak istediğine emin misin?",
+      )
+    )
+      return;
+    setCancelPending(true);
+    setCancelError(null);
+    const err = await postAction("cancel");
+    if (err) setCancelError(err);
+    else {
+      setCancelDone(true);
+      setRetryKey((k) => k + 1); // veriyi hemen tazele → iptal ekranı
+    }
+    setCancelPending(false);
   }
 
   if (notFound) {
@@ -292,15 +354,69 @@ export function TrackingClient({ token }: { token: string }) {
           </Link>
         </div>
       ) : canceled ? (
-        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-slate-600">
-          Bu talep iptal edildi.
-        </div>
+        cancelDone ? (
+          /* md.11/5: cayma bildirimine DERHAL teyit — ekranda + SMS ile */
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+            <p className="flex items-center gap-2 font-semibold text-emerald-800">
+              <IconCheck size={16} className="shrink-0" />
+              Cayma bildiriminiz işletmeye iletildi
+            </p>
+            <p className="mt-1 text-sm text-emerald-700">
+              Siparişiniz iptal edildi; teyit SMS'i de gönderildi. Ücret talep
+              edilmez.
+            </p>
+          </div>
+        ) : (
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-slate-600">
+            Bu talep iptal edildi.
+          </div>
+        )
       ) : (
         <>
           {/* Halıcının verdiği tahmini teslim süresi */}
           {data.estimatedDays != null && data.status !== "DELIVERED" && (
             <div className="rounded-lg bg-brand-light px-3 py-2 text-sm font-medium text-brand-dark">
               Tahmini teslim: ~{data.estimatedDays} gün
+            </div>
+          )}
+
+          {/* Kesin fiyat onayı (Mesafeli Söz. Yön. md.15/1-h): onayla birlikte
+              yıkamaya başlanır; onay anı sipariş kaydına işlenir. */}
+          {data.status === "PICKED_UP" &&
+            data.quotedPrice != null &&
+            !data.priceApprovedAt && (
+              <div className="rounded-xl border-2 border-brand bg-brand-light/40 p-4">
+                <p className="text-lg font-bold text-slate-900">
+                  Kesin fiyat: {data.quotedPrice} TL
+                </p>
+                <p className="mt-1 text-sm text-slate-600">
+                  Onayınızla yıkamaya hemen başlanır; hizmet ifa edildikten
+                  sonra cayma hakkınız bulunmaz (Yönetmelik md.15/1-h).
+                </p>
+                {approveError && (
+                  <p className="mt-2 text-sm text-red-600" role="alert">
+                    {approveError}
+                  </p>
+                )}
+                <button
+                  type="button"
+                  onClick={approvePrice}
+                  disabled={approvePending}
+                  className="mt-3 w-full rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark active:scale-[0.99] disabled:opacity-60 sm:w-auto"
+                >
+                  {approvePending ? "İşleniyor…" : "Fiyatı Onayla"}
+                </button>
+              </div>
+            )}
+
+          {/* Onay verildiyse kalıcı bilgi satırı (ispat müşteriye de görünür) */}
+          {data.quotedPrice != null && data.priceApprovedAt && (
+            <div
+              className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-800"
+              role="status"
+            >
+              <IconCheck size={16} className="shrink-0" />
+              Kesin fiyatı onayladınız: {data.quotedPrice} TL
             </div>
           )}
 
@@ -474,6 +590,30 @@ export function TrackingClient({ token }: { token: string }) {
         <div className="rounded-lg bg-brand-light px-3 py-2 text-sm font-medium text-brand-dark">
           Tutar: {data.priceTotal} TL ·{" "}
           {data.paymentMethod === "CARD" ? "Kartla" : "Kapıda nakit"}
+        </div>
+      )}
+
+      {/* Platform üzerinden cayma/iptal (md.11/5) — yıkama başlamadan ve kesin
+          fiyat onaylanmadan her an; sonrasında buton görünmez. */}
+      {CUSTOMER_CANCELABLE.includes(data.status) && !data.priceApprovedAt && (
+        <div className="border-t border-slate-100 pt-3">
+          {cancelError && (
+            <p className="mb-2 text-sm text-red-600" role="alert">
+              {cancelError}
+            </p>
+          )}
+          <button
+            type="button"
+            onClick={cancelOrder}
+            disabled={cancelPending}
+            className="text-sm text-slate-500 underline transition hover:text-slate-700 disabled:opacity-60"
+          >
+            {cancelPending ? "İşleniyor…" : "Siparişi iptal et / cayma bildir"}
+          </button>
+          <p className="mt-1 text-xs text-slate-400">
+            Yıkamaya başlanmadan iptal/cayma ücretsizdir; bildiriminiz
+            işletmeye anında iletilir ve kayda geçer.
+          </p>
         </div>
       )}
 

@@ -3,6 +3,7 @@ import { cache } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getBusinessById } from "@/lib/businesses";
+import { prisma } from "@/lib/prisma";
 import { Badges } from "@/components/Badges";
 import { IconStar, IconTruck } from "@/components/icons";
 import EmptyState from "@/components/EmptyState";
@@ -59,6 +60,17 @@ export default async function HaliciProfile({
   const b = await getBusiness(id);
   if (!b) notFound();
 
+  // ETAHS Yön. md.5/2-b: esnaf/tacirin vergi kimlik numarasının kendisine
+  // tahsis edilen alanda gösterimi — getBusinessById bu alanı döndürmediği
+  // için yalnız taxNumber ayrıca okunur.
+  const taxNumber =
+    (
+      await prisma.cleanerBusiness.findUnique({
+        where: { id: b.id },
+        select: { taxNumber: true },
+      })
+    )?.taxNumber ?? null;
+
   const main = b.pricing.filter((p) => !p.isAddon);
   const addons = b.pricing.filter((p) => p.isAddon);
   const hours = (b.workingHours ?? {}) as Record<
@@ -74,6 +86,7 @@ export default async function HaliciProfile({
     name: b.name,
     address: {
       "@type": "PostalAddress",
+      streetAddress: b.address,
       addressLocality: b.district,
       addressRegion: b.city,
       addressCountry: "TR",
@@ -223,6 +236,42 @@ export default async function HaliciProfile({
               )}
               <p className="mt-2 text-xs text-slate-600">
                 Kesin fiyat, halı alındıktan ve görüldükten sonra netleşir.
+              </p>
+            </section>
+
+            {/* İşletme bilgileri — ETAHS Yön. md.5/2 (VKN) + md.6/4 (doğrulama
+                ibaresi) ve Mesafeli Söz. Yön. md.5/1-c (sipariş ÖNCESİ açık
+                adres + telefon): tüketici sipariş vermeden ulaşabilmeli. */}
+            <section className="mt-6">
+              <h2 className="mb-2 font-semibold text-slate-900">
+                İşletme Bilgileri
+              </h2>
+              <div className="rounded-lg border border-slate-200 bg-white text-sm">
+                <div className="border-b border-slate-100 px-3 py-2 last:border-0">
+                  <div className="text-slate-600">Açık adres</div>
+                  <div className="text-slate-900">
+                    {b.address}, {b.district} / {b.city}
+                  </div>
+                </div>
+                <div className="border-b border-slate-100 px-3 py-2 last:border-0">
+                  <div className="text-slate-600">Telefon</div>
+                  <a
+                    href={`tel:${b.phone}`}
+                    className="font-medium text-brand-dark hover:underline"
+                  >
+                    {b.phone}
+                  </a>
+                </div>
+                {taxNumber && (
+                  <div className="border-b border-slate-100 px-3 py-2 last:border-0">
+                    <div className="text-slate-600">Vergi kimlik no</div>
+                    <div className="text-slate-900">{taxNumber}</div>
+                  </div>
+                )}
+              </div>
+              <p className="mt-2 text-xs text-slate-600">
+                Bu işletmenin doğrulanmış iletişim bilgileri ve merkez adresi
+                platform kayıtlarında mevcuttur.
               </p>
             </section>
 

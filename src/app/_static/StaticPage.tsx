@@ -51,7 +51,9 @@ export default function StaticPage({
   );
 }
 
-/** İçerik bölümü: küçük başlık + prose benzeri paragraf stili. */
+/** İçerik bölümü: küçük başlık + prose benzeri paragraf stili.
+ *  Gövde en az text-base (16px = 12 punto): 6502 md.4/1 ve Mesafeli Sözleşmeler
+ *  Yönetmeliği md.6/1 "en az on iki punto" şartı — text-sm'e DÜŞÜRME. */
 export function Section({
   title,
   children,
@@ -62,7 +64,7 @@ export function Section({
   return (
     <section>
       <h2 className="text-base font-semibold text-slate-900">{title}</h2>
-      <div className="mt-2 space-y-2 text-sm leading-relaxed text-slate-600">
+      <div className="mt-2 space-y-2 text-base leading-relaxed text-slate-600">
         {children}
       </div>
     </section>

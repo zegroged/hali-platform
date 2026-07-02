@@ -23,6 +23,7 @@ import {
   advanceOrderPanel,
   deliverOrderPanel,
   setOrderEta,
+  quoteOrderPrice,
   rejectOrder,
   cancelOrder,
   reassignOrder,
@@ -238,6 +239,22 @@ export default async function OrderManagePage({
             className="mt-4 border-t border-slate-100 pt-4"
           >
             <input type="hidden" name="orderId" value={o.id} />
+            {/* md.15/1-h: dijital fiyat onayı yoksa yıkamaya geçiş, işletmenin
+                sözlü onay BEYANINA bağlı — beyan zaman damgalı kayda geçer. */}
+            {o.status === "PICKED_UP" && !o.priceApprovedAt && (
+              <label className="mb-3 flex items-start gap-2 text-sm text-slate-700">
+                <input
+                  type="checkbox"
+                  name="verbalConsent"
+                  required
+                  className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 accent-brand"
+                />
+                <span>
+                  Müşterinin kesin fiyata sözlü onayını aldım; bu beyan kayda
+                  geçer.
+                </span>
+              </label>
+            )}
             <PendingButton className="w-full rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark active:scale-[0.99] disabled:opacity-60 sm:w-auto">
               {step.action} →
             </PendingButton>
@@ -291,6 +308,67 @@ export default async function OrderManagePage({
           </form>
         )}
       </div>
+
+      {/* Kesin fiyat — Mesafeli Söz. Yön. md.15/1-h: müşterinin ifaya başlama
+          onayı ispatlı olsun diye fiyat bildirilir, müşteri takipten onaylar. */}
+      {!closed && (o.status === "PICKED_UP" || o.quotedPrice != null) && (
+        <div className={card}>
+          <h2 className="font-semibold text-slate-900">Kesin Fiyat</h2>
+          {o.priceApprovedAt ? (
+            <p className="mt-2 flex items-center gap-1.5 rounded-lg bg-green-50 px-3 py-2 text-sm font-medium text-green-700">
+              <IconCheck size={14} className="shrink-0" />
+              Müşteri onayladı: {Number(o.quotedPrice)} TL (
+              {fmt(o.priceApprovedAt)})
+            </p>
+          ) : (
+            <>
+              {o.quotedPrice != null ? (
+                <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-sm font-medium text-amber-700">
+                  Bildirilen fiyat: {Number(o.quotedPrice)} TL — müşteri onayı
+                  bekleniyor.
+                </p>
+              ) : (
+                <p className="mt-1 text-sm text-slate-600">
+                  Ölçüm sonrası kesin fiyatı bildir — müşteriye SMS gider,
+                  takip sayfasından onaylar ve onay kayda geçer.
+                </p>
+              )}
+              {o.status === "PICKED_UP" && (
+                <form
+                  action={quoteOrderPrice}
+                  className="mt-3 flex items-end gap-2"
+                >
+                  <input type="hidden" name="orderId" value={o.id} />
+                  <div>
+                    <label
+                      htmlFor="kesin-fiyat"
+                      className="block text-xs font-medium text-slate-500"
+                    >
+                      Kesin fiyat (TL)
+                    </label>
+                    <input
+                      id="kesin-fiyat"
+                      name="price"
+                      type="number"
+                      min="1"
+                      step="0.01"
+                      required
+                      defaultValue={
+                        o.quotedPrice != null ? Number(o.quotedPrice) : ""
+                      }
+                      placeholder="Ör. 850"
+                      className="mt-0.5 w-36 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand"
+                    />
+                  </div>
+                  <PendingButton className="rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark active:scale-[0.99] disabled:opacity-60">
+                    {o.quotedPrice != null ? "Fiyatı güncelle" : "Fiyatı bildir"}
+                  </PendingButton>
+                </form>
+              )}
+            </>
+          )}
+        </div>
+      )}
 
       {/* Tahmini teslim + şoför */}
       {!closed && (

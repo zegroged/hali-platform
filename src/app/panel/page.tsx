@@ -6,7 +6,10 @@ import {
   verificationReady,
 } from "@/lib/panel";
 import { verifMeta } from "@/lib/verifMeta";
-import { submitForVerification, acceptContract } from "./actions";
+import { submitForVerification } from "./actions";
+import { acceptContractVersioned } from "./contract-actions";
+import { CONTRACT_VERSION } from "@/lib/legal";
+import { PendingButton } from "@/components/PendingButton";
 import { EmailVerify } from "@/components/EmailVerify";
 import {
   IconCheck,
@@ -21,6 +24,16 @@ function fmtTarih(dt: Date) {
     month: "2-digit",
     hour: "2-digit",
     minute: "2-digit",
+    timeZone: "Europe/Istanbul",
+  });
+}
+
+// Sözleşme onay tarihi yıl ile gösterilir (hangi yılın sürümü olduğu önemli).
+function fmtGun(dt: Date) {
+  return new Date(dt).toLocaleDateString("tr-TR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
     timeZone: "Europe/Istanbul",
   });
 }
@@ -57,6 +70,12 @@ export default async function PanelHome() {
   const checklist = completenessChecklist(b);
   const ready = verificationReady(b);
   const verif = verifMeta(b.verification);
+
+  // Sözleşme "güncel onaylı" sayılır: onay VAR ve onaylanan sürüm yürürlükteki
+  // sürümle aynı. Sürüm farklı/boşsa yeniden onay istenir (ETAHS Yön. md.16 +
+  // Geçici md.1/2: güncellenmeyen sözleşmenin ilgili hükümleri geçersizdir).
+  const contractCurrent =
+    b.contractAcceptedAt != null && b.contractVersion === CONTRACT_VERSION;
 
   // İstatistik kartları: üçü de tıklanabilir, hover + chevron ile bunu belli eder.
   const statCard =
@@ -170,6 +189,38 @@ export default async function PanelHome() {
         </div>
       )}
 
+      {/* Sözleşme sürümü uyarısı (doğrulanmış işletmeler): aşağıdaki profil
+          kartı yalnız doğrulanmamışlara görünür — sözleşme güncellenince
+          MEVCUT işletmelerden yeniden onay buradan alınır (Geçici md.1/2). */}
+      {b.verification === "VERIFIED" && !contractCurrent && (
+        <div className="rounded-xl border border-amber-300 bg-amber-50 p-4">
+          <p className="font-medium text-amber-900">
+            Platform sözleşmesi güncellendi
+          </p>
+          <p className="mt-1 text-sm text-amber-800">
+            {b.contractAcceptedAt
+              ? `Onayınız eski bir sürüme ait (Onaylanan sürüm: ${
+                  b.contractVersion ?? "kayıtlı değil"
+                } · Tarih: ${fmtGun(b.contractAcceptedAt)}). Aracılık hizmetinin kesintisiz sürmesi için güncel sürümü onaylayın.`
+              : "Platform sözleşmesi henüz onaylanmadı. Devam etmek için güncel sürümü onaylayın."}
+          </p>
+          <div className="mt-2 flex items-center gap-3">
+            <form action={acceptContractVersioned}>
+              <PendingButton className="rounded-lg bg-brand px-3 py-2 text-sm font-semibold text-white transition hover:bg-brand-dark">
+                Güncel sözleşmeyi onayla
+              </PendingButton>
+            </form>
+            <Link
+              href="/isletme-sozlesmesi"
+              target="_blank"
+              className="text-sm font-medium text-amber-900 underline"
+            >
+              Sözleşme metnini oku
+            </Link>
+          </div>
+        </div>
+      )}
+
       {/* Abonelik */}
       <div className="rounded-xl border border-slate-200 bg-white p-4">
         <div className="flex items-center justify-between">
@@ -233,30 +284,47 @@ export default async function PanelHome() {
             )}
           </div>
 
-          {/* Sözleşme onayı — buton kayıt-checkbox'ı öncesi açılan eski hesaplar için */}
-          <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-3">
-            <div>
-              <span className="block text-sm font-medium text-slate-700">
-                Platform sözleşmesi
-              </span>
-              <Link
-                href="/isletme-sozlesmesi"
-                target="_blank"
-                className="text-sm text-brand-dark hover:underline"
-              >
-                Sözleşme metnini oku
-              </Link>
+          {/* Sözleşme onayı — sürümlü kayıt: onay tarihi + onaylanan sürüm
+              (ETAHS Yön. md.11/2-c ispatı; eski/boş sürümde yeniden onay). */}
+          <div className="mt-3 border-t border-slate-100 pt-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <span className="block text-sm font-medium text-slate-700">
+                  Platform sözleşmesi
+                </span>
+                <Link
+                  href="/isletme-sozlesmesi"
+                  target="_blank"
+                  className="text-sm text-brand-dark hover:underline"
+                >
+                  Sözleşme metnini oku
+                </Link>
+                {b.contractAcceptedAt && (
+                  <p className="mt-0.5 text-xs text-slate-500">
+                    Onaylanan sürüm: {b.contractVersion ?? "kayıtlı değil"} ·
+                    Tarih: {fmtGun(b.contractAcceptedAt)}
+                  </p>
+                )}
+              </div>
+              {contractCurrent && (
+                <span className="inline-flex items-center gap-1 text-sm font-medium text-green-600">
+                  <IconCheck size={15} /> Onaylandı
+                </span>
+              )}
             </div>
-            {b.contractAcceptedAt ? (
-              <span className="inline-flex items-center gap-1 text-sm font-medium text-green-600">
-                <IconCheck size={15} /> Onaylandı
-              </span>
-            ) : (
-              <form action={acceptContract}>
-                <button className="rounded-lg border border-brand px-3 py-2 text-sm font-medium text-brand-dark transition hover:bg-brand-light">
-                  Sözleşmeyi onayla
-                </button>
-              </form>
+            {!contractCurrent && (
+              <div className="mt-2 rounded-lg border border-amber-300 bg-amber-50 p-3">
+                <p className="text-sm text-amber-800">
+                  {b.contractAcceptedAt
+                    ? "Sözleşme güncellendi: onayınız eski bir sürüme ait. Aracılık hizmetinin kesintisiz sürmesi için güncel sürümü onaylayın."
+                    : "Platform sözleşmesi henüz onaylanmadı."}
+                </p>
+                <form action={acceptContractVersioned} className="mt-2">
+                  <PendingButton className="rounded-lg border border-brand bg-white px-3 py-2 text-sm font-medium text-brand-dark transition hover:bg-brand-light">
+                    Güncel sözleşmeyi onayla
+                  </PendingButton>
+                </form>
+              </div>
             )}
           </div>
 

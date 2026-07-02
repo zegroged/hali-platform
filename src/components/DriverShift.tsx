@@ -128,6 +128,24 @@ export function DriverShift({ initialOnShift }: { initialOnShift: boolean }) {
           {on ? "Mesaiyi Bitir" : "Mesaiye Başla"}
         </button>
       </div>
+
+      {/* KVKK Aydınlatma Tebliği md.5/1-a: konum işlemeye dair KALICI katmanlı
+          aydınlatma — konum paylaşımı başlamadan önce de görünür (KVKK
+          md.5/2-f meşru menfaat dengesini güçlendirir). İlk gösterim anı
+          sunucuda Driver.privacyNoticeAt'e kaydedilir (Tebliğ md.6). */}
+      <p className="mt-3 border-t border-slate-900/10 pt-2.5 text-sm text-slate-500">
+        Mesai açıkken konumun, teslimat takibi ve güvenlik amacıyla işlenir;
+        yalnızca teslimatını beklediğin müşteri canlı konumunu görür. Ayrıntı:{" "}
+        <a
+          href="/kvkk"
+          target="_blank"
+          rel="noreferrer"
+          className="font-medium text-brand-dark underline"
+        >
+          KVKK Aydınlatma Metni
+        </a>
+        . Mesaiyi kapattığında izleme durur.
+      </p>
     </div>
   );
 }

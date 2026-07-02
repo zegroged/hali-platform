@@ -286,12 +286,12 @@ export function OrderForm({
       {/* Mesafeli Sözleşmeler Yönetmeliği md.6/2: (a) temel nitelikler, (d) fiyat
           hesaplama usulü, (g)-(h) cayma bilgileri, ödeme yükümlülüğü altına
           girilmeden hemen önce bir bütün olarak gösterilir. md.6/1 "en az on
-          iki punto" gereği bu blokta text-xs KULLANMA (min. text-sm). */}
+          iki punto" = 16px gereği bu blokta text-base ALTINA İNME. */}
       <section className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-        <h2 className="text-sm font-semibold text-slate-800">
+        <h2 className="text-base font-semibold text-slate-800">
           Sipariş Özeti — Önemli Bilgiler
         </h2>
-        <ul className="mt-2 list-disc space-y-2 pl-5 text-sm text-slate-700">
+        <ul className="mt-2 list-disc space-y-2 pl-5 text-base text-slate-700">
           <li>
             <span className="font-medium">Hizmet:</span> halının adresinizden
             alınması, yıkanması ve adresinize teslim edilmesi
@@ -313,6 +313,13 @@ export function OrderForm({
             iptal edebilirsiniz; kesin fiyatı onaylamanız ifaya başlama
             onayıdır, yıkama sonrası cayma hakkı yoktur (Yönetmelik md.15/1-h).
           </li>
+          {/* md.8/1: sipariş onayından hemen önce, siparişin ödeme yükümlülüğü
+              doğurduğunun açık bildirimi — iki aşamalı modele bağlanmış hali. */}
+          <li>
+            <span className="font-medium">Ödeme yükümlülüğü:</span> kesin
+            fiyatı onaylamanız hâlinde bu sipariş, teslimde ödeme yükümlülüğü
+            doğurur (Yönetmelik md.8/1).
+          </li>
         </ul>
       </section>
 
@@ -327,7 +334,7 @@ export function OrderForm({
             onChange={(e) => setConsent(e.target.checked)}
             className="mt-0.5 h-5 w-5 shrink-0 accent-brand"
           />
-          <label htmlFor="siparis-onay" className="text-sm text-slate-700">
+          <label htmlFor="siparis-onay" className="text-base text-slate-700">
             <Link
               href="/on-bilgilendirme"
               className="font-medium text-brand-dark underline"
@@ -352,14 +359,17 @@ export function OrderForm({
       </div>
 
       {/* KVKK aydınlatması: Aydınlatma Tebliği md.5/1-f gereği bilgilendirmedir,
-          onaya bağlanmaz — bu yüzden checkbox metninden AYRI tutulur. */}
-      <p className="text-sm text-slate-500">
+          onaya bağlanmaz — bu yüzden checkbox metninden AYRI tutulur.
+          Tebliğ md.5/1-j: eksik/yanıltıcı bilgi verilmez — şoför paylaşımı ve
+          teknik aktarımlar açıkça söylenir. */}
+      <p className="text-base text-slate-500">
         Kişisel verileriniz{" "}
         <Link href="/kvkk" className="text-brand-dark underline">
           KVKK Aydınlatma Metni
         </Link>{" "}
-        kapsamında işlenir; bilgileriniz yalnızca seçtiğiniz işletmeyle
-        paylaşılır.
+        kapsamında işlenir; bilgileriniz yalnızca seçtiğiniz işletme ve
+        teslimatı yapan şoförle paylaşılır. Teknik hizmet aktarımları için
+        KVKK Aydınlatma Metni&apos;ne bakınız.
       </p>
 
       <button

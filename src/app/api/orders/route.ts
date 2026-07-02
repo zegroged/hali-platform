@@ -102,6 +102,20 @@ export async function POST(req: NextRequest) {
     await sendTrackingSms(d.customerPhone, d.customerName, order.code ?? order.trackingToken);
   } catch (e) {
     console.error("order tracking SMS hatası:", e);
+    // 6563 Yön. md.9: teyidin "ayrıca" bacağı (SMS) düştü — işletme panelinde
+    // görünür iz bırak ki müşteri telefonla bilgilendirilsin. Event yazımı da
+    // başarısız olursa yanıtı bozma (sipariş oluştu, müşteri takipte).
+    try {
+      await prisma.orderEvent.create({
+        data: {
+          orderId: order.id,
+          status: "CREATED",
+          note: "Teyit SMS gönderilemedi — müşteriyi telefonla bilgilendirin",
+        },
+      });
+    } catch (evErr) {
+      console.error("teyit SMS uyarı kaydı yazılamadı:", evErr);
+    }
   }
 
   return NextResponse.json({

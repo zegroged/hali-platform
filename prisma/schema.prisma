@@ -113,6 +113,7 @@ model CleanerBusiness {
 
   taxNumber          String? // vergi no (doğrulama için)
   contractAcceptedAt DateTime? // platform sözleşmesi onay zamanı
+  contractVersion    String? // onaylanan aracılık sözleşmesi sürümü (ETAHS Yön. md.11/2-c)
   verification       VerificationStatus @default(PENDING)
   isVisible          Boolean            @default(false) // profil tam + doğrulanmış olunca true
 
@@ -180,9 +181,10 @@ model Driver {
 
   createdAt DateTime @default(now())
 
-  orders Order[]
-  pings  DriverLocationPing[]
-  stops  DriverStop[]
+  orders          Order[]
+  pings           DriverLocationPing[]
+  stops           DriverStop[]
+  privacyNoticeAt DateTime? // KVKK aydınlatmasının şoföre ilk gösterim anı (Tebliğ md.6)
 }
 
 // ham konum akışı — halıcının canlı izlemesi için
@@ -251,6 +253,10 @@ model Order {
   // işaretlendiği an + o an geçerli sözleşme sürümü (ispat yükü platformda).
   consentAt       DateTime?
   contractVersion String?
+
+  // md.15/1-h: kesin fiyat bildirimi + müşterinin ifaya başlama ONAYI (ispatlı).
+  quotedPrice     Decimal?  @db.Decimal(10, 2) // işletmenin ölçüm sonrası bildirdiği kesin fiyat
+  priceApprovedAt DateTime? // müşterinin takip sayfasından onay anı
   estimatedDays   Int? // halıcının verdiği tahmini teslim süresi (gün)
 
   createdAt DateTime @default(now())
@@ -262,6 +268,18 @@ model Order {
   stops  DriverStop[]
 
   @@index([businessId, status])
+}
+
+// SMS gönderim kaydı — bilgilendirme/teyitlerin ispatı (Mesafeli Yön. md.20).
+model SmsLog {
+  id        String   @id @default(cuid())
+  to        String
+  body      String
+  ok        Boolean
+  error     String?
+  createdAt DateTime @default(now())
+
+  @@index([to, createdAt])
 }
 
 model OrderEvent {

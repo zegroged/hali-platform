@@ -13,7 +13,7 @@ export default function KosullarPage() {
   return (
     <StaticPage
       title="Kullanım Koşulları"
-      intro="Bu koşullar, enyakinhaliyikamaservisi.com üzerinden sipariş oluşturan müşteriler ile platformda listelenen işletmeler için geçerlidir. Siteyi kullanarak bu koşulları okuduğunuzu ve kabul ettiğinizi beyan etmiş olursunuz."
+      intro="Bu koşullar, enyakinhaliyikamaservisi.com üzerinden sipariş oluşturan müşteriler ile platformda listelenen işletmeler için geçerlidir. Sipariş oluştururken veya kayıt olurken bu koşulları elektronik onayınızla kabul edersiniz."
     >
       <Section title="1. Tanımlar">
         <p>Bu metinde geçen kavramlar aşağıdaki anlamlarda kullanılır:</p>
@@ -106,8 +106,14 @@ export default function KosullarPage() {
           Platform; kötüye kullanım, sahte veya yanıltıcı sipariş oluşturma,
           işbu koşullara ya da yürürlükteki mevzuata aykırı davranış tespit
           ettiğinde, ilgili müşteri erişimini veya işletme/şoför hesabını
-          önceden bildirimde bulunarak ya da ağır ihlal hâllerinde derhâl{" "}
-          <strong>askıya alabilir veya sona erdirebilir</strong>. Askıya alma,
+          önceden bildirimde bulunarak{" "}
+          <strong>askıya alabilir veya sona erdirebilir</strong>. İşletme ve
+          şoför hesapları bakımından önceden bildirim yapılmaksızın{" "}
+          <strong>derhâl</strong> askıya alma yalnızca; mevzuattan kaynaklanan
+          sebepler, kamu düzeninin korunması, gecikmesinde sakınca bulunan
+          hâller ile dolandırıcılık, veri ihlali veya diğer siber güvenlik
+          riski şüphesi hâlleriyle sınırlıdır (ETAHS Yönetmeliği md.17/7).
+          Askıya alma,
           devam eden siparişlerden doğan hak ve borçları ortadan kaldırmaz.
           Platformun, ihlal nedeniyle uğradığı zararların tazminini talep etme
           ve yasal yollara başvurma hakkı saklıdır.
@@ -127,7 +133,9 @@ export default function KosullarPage() {
             sözleşmesi
           </strong>{" "}
           niteliğinde olduğunu ve geçerli delil olarak kabul edileceğini kabul
-          eder.
+          eder. Bu kayıtlar <strong>münhasır delil değildir</strong>;
+          tüketicinin her türlü yasal delille ispat hakkı saklıdır (6100
+          sayılı HMK md.193/2; 6502 sayılı Kanun md.5).
         </p>
       </Section>
 
@@ -159,10 +167,13 @@ export default function KosullarPage() {
 
       <Section title="12. Değişiklikler ve İletişim">
         <p>
-          Bu koşullar gerektiğinde güncellenebilir; metin güncellendiğinde
-          tarihli yeni sürüm bu sayfada yayımlanır ve yayım anından itibaren
-          geçerli olur. Yürürlükteki sürüm: <strong>{CONTRACT_VERSION}</strong>.
-          Sorularınız için{" "}
+          Bu koşullar ancak haklı sebeplerle güncellenebilir; metin
+          güncellendiğinde tarihli yeni sürüm bu sayfada yayımlanır.
+          Değişiklikler <strong>geçmişe yürümez</strong>; yalnızca yayımdan
+          sonra oluşturulan siparişlere uygulanır. Mevcut siparişlere, onay
+          anında yürürlükte olan ve sipariş kaydınızla ilişkilendirilen sürüm
+          uygulanır (6502 sayılı Kanun md.4/2). Yürürlükteki sürüm:{" "}
+          <strong>{CONTRACT_VERSION}</strong>. Sorularınız için{" "}
           <Link href="/iletisim" className="font-medium text-brand-dark hover:underline">
             iletişim sayfamızı
           </Link>{" "}
@@ -173,6 +184,8 @@ export default function KosullarPage() {
           &apos;nde yer alır.
         </p>
       </Section>
+
+      <p className="text-sm text-slate-500">Yürürlük: {CONTRACT_VERSION}</p>
     </StaticPage>
   );
 }

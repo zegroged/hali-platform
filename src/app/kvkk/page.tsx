@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { CONTRACT_VERSION } from "@/lib/legal";
 import StaticPage, { Section } from "../_static/StaticPage";
 
 export const metadata: Metadata = {
@@ -137,6 +138,21 @@ export default function KvkkPage() {
           aktarılır. Verileriniz pazarlama amacıyla üçüncü kişilere aktarılmaz,
           satılmaz ve reklam ağlarıyla paylaşılmaz.
         </p>
+        {/* KVKK md.9 + md.10/1-c ve Aydınlatma Tebliği md.5/1-ı: yurt dışına
+            aktarım ihtimali olan alıcı grupları açıkça belirtilir. */}
+        <p>
+          <strong>Yurt Dışına Aktarım:</strong> Harita ve coğrafi kodlama
+          hizmeti yurt dışında yerleşik sağlayıcılardan alınır: konum araması
+          yaptığınızda girdiğiniz arama metni{" "}
+          <strong>OpenStreetMap Nominatim</strong> servisine iletilebilir;
+          harita görüntülenirken tarayıcınız yurt dışındaki{" "}
+          <strong>CARTO</strong> karo sunucusuna bağlanır ve bu sırada IP
+          adresiniz bu sunucuya iletilir. Barındırma ve güvenlik (CDN)
+          sağlayıcımız da yurt dışında yerleşik olabilir. SMS gönderimi ise
+          Türkiye&apos;de yerleşik sağlayıcı üzerinden yapılır. Yurt dışına
+          yapılan aktarımlar bakımından KVKK md.9 kapsamındaki güvence
+          (standart sözleşme vb.) çalışmaları sürdürülmektedir.
+        </p>
       </Section>
 
       <Section title="6. Şoför ve İşletme Çalışanı Verileri">
@@ -153,6 +169,14 @@ export default function KvkkPage() {
           açtığından, işletmeler çalıştırdıkları şoförleri bu işleme hakkında
           bilgilendirmekle yükümlüdür.
         </p>
+        {/* KVKK md.4/2-d (ölçülülük) ve md.5/2-f denge testi: izlemenin
+            mesaiyle sınırlı olduğu ve durak kayıtlarının saklama süresi. */}
+        <p>
+          Konum izleme <strong>yalnızca şoförün mesaisi açıkken</strong>{" "}
+          yapılır; mesai kapatıldığında izleme durur. Teslimat duraklarına
+          ilişkin özet kayıtlar, operasyon raporlaması için <strong>12 ay</strong>{" "}
+          saklanır; bu sürenin sonunda silinir veya anonimleştirilir.
+        </p>
       </Section>
 
       <Section title="7. Saklama Süresi">
@@ -163,6 +187,11 @@ export default function KvkkPage() {
           Kanun md.11/3 uyarınca <strong>10 yıl</strong> süreyle saklanır.
           Anlık konum verileri gibi operasyonel veriler, teslimat
           tamamlandıktan sonra makul süre içinde silinir veya anonimleştirilir.
+        </p>
+        <p>
+          Olası bir veri ihlalinde, KVKK md.12/5 uyarınca ilgili kişiler ve
+          Kişisel Verileri Koruma Kurulu mevzuattaki süreler içinde
+          bilgilendirilir.
         </p>
       </Section>
 
@@ -226,7 +255,21 @@ export default function KvkkPage() {
           </Link>{" "}
           da inceleyebilirsiniz.
         </p>
+        {/* Veri Sorumlusuna Başvuru Tebliği md.5/2: başvuruda bulunması
+            zorunlu asgari içerik. */}
+        <p>
+          Başvurunuzda ad-soyad, (yazılı başvuruda) imza, T.C. kimlik /
+          pasaport numarası, tebligata esas adres, varsa bildirime esas
+          e-posta/telefon ve talep konusunun bulunması zorunludur (Veri
+          Sorumlusuna Başvuru Tebliği md.5/2).
+        </p>
       </Section>
+
+      {/* Aydınlatma Tebliği md.5/1-e: hangi sürümün yürürlükte olduğunun
+          ispatı — sürüm no, sipariş kaydındaki contractVersion ile eşleşir. */}
+      <p className="text-sm text-slate-500">
+        Yürürlük tarihi: 02.07.2026 · Sürüm: {CONTRACT_VERSION}
+      </p>
     </StaticPage>
   );
 }

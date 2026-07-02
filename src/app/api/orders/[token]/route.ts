@@ -43,6 +43,9 @@ export async function GET(
     pickupLat: order.pickupLat,
     pickupLng: order.pickupLng,
     priceTotal: order.priceTotal != null ? Number(order.priceTotal) : null,
+    // md.15/1-h: işletmenin bildirdiği kesin fiyat + müşterinin onay anı
+    quotedPrice: order.quotedPrice != null ? Number(order.quotedPrice) : null,
+    priceApprovedAt: order.priceApprovedAt,
     paymentMethod: order.paymentMethod,
     estimatedDays: order.estimatedDays,
     photos: order.photos,

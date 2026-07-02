@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import StaticPage, { Section } from "../_static/StaticPage";
+import { CONTRACT_VERSION } from "@/lib/legal";
 
 export const metadata: Metadata = {
   title: "Mesafeli Satış Sözleşmesi",
@@ -11,6 +12,8 @@ export const metadata: Metadata = {
 // TODO(künye): Şirket ünvanı, adres, vergi dairesi/no ve MERSİS bilgileri
 // netleşince §1'deki geçici künye ifadesi gerçek bilgilerle değiştirilecek
 // (iyzico başvurusu öncesi ŞART).
+// TODO(iyzico): Ödeme kuruluşu sözleşmesi imzalanınca §3'teki "anlaşmalı
+// ödeme kuruluşu" ifadesi marka adıyla (iyzico) güncellenecek.
 export default function MesafeliSatisPage() {
   return (
     <StaticPage
@@ -57,7 +60,7 @@ export default function MesafeliSatisPage() {
           sonra ALICI&apos;ya bildirilir. ALICI kesin bedeli kabul etmezse halı
           yıkanmadan ücretsiz iade edilir. Ödeme, hizmet tesliminde{" "}
           <strong>nakit</strong> olarak hizmet sağlayıcıya yapılır; online
-          kartlı ödeme aktif edildiğinde tahsilat, iyzico ödeme kuruluşu
+          kartlı ödeme aktif edildiğinde tahsilat, anlaşmalı ödeme kuruluşu
           aracılığıyla platform üzerinden hizmet sağlayıcı nam ve hesabına
           gerçekleştirilir.
         </p>
@@ -70,9 +73,22 @@ export default function MesafeliSatisPage() {
           bildirdiği adreste ifa edilir (alım ve teslim aynı adrese yapılır;
           farklı adres, işletmeyle telefonla kararlaştırılabilir).
         </p>
+        <p>
+          İşletme, halının alınmasından itibaren profilinde taahhüt ettiği
+          azami süre içinde ifa eder; taahhüt edilen sürede ifa edilmezse
+          ALICI sözleşmeyi feshedebilir (6502 sayılı Kanun md. 48/3).
+        </p>
       </Section>
 
       <Section title="5. Cayma Hakkı">
+        <p>
+          ALICI&apos;nın yasal cayma süresi, sözleşmenin kurulduğu günden
+          itibaren <strong>14 gündür</strong> (Mesafeli Sözleşmeler
+          Yönetmeliği md. 9). Uygulamamız bundan daha lehinizedir: halı
+          alınmadan her an ücretsiz iptal, kesin fiyatı onaylamadığınız
+          sürece ücretsiz iade hakkınız vardır; kesin fiyat onayınızla
+          yıkamaya başlandığında md. 15/1-h istisnası uygulanır.
+        </p>
         <p>
           ALICI; halı adresten alınmadan önce ücretsiz iptal, kesin fiyat
           bildirildikten sonra yıkama başlamadan ücretsiz iade hakkına
@@ -126,6 +142,12 @@ export default function MesafeliSatisPage() {
           <strong>kendi yerleşim yerinin bulunduğu</strong> veya tüketici
           işleminin yapıldığı yerdeki Tüketici Hakem Heyetine yapabilir.
         </p>
+        <p>
+          Tüketici Hakem Heyeti (THH) parasal sınırının üzerindeki
+          uyuşmazlıklarda, Tüketici Mahkemesinde dava açmadan önce arabulucuya
+          başvurulması dava şartıdır (6502 sayılı Kanun md. 73/A). 2026 yılı
+          için THH parasal sınırı 186.000 TL&apos;dir (RG 23.12.2025/33116).
+        </p>
       </Section>
 
       <Section title="9. Yürürlük">
@@ -141,6 +163,8 @@ export default function MesafeliSatisPage() {
           kaydınızla ilişkilendirilir.
         </p>
       </Section>
+
+      <p className="text-sm text-slate-500">Yürürlük: {CONTRACT_VERSION}</p>
     </StaticPage>
   );
 }

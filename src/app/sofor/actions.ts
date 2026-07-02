@@ -103,6 +103,22 @@ export async function advanceOrder(formData: FormData) {
     data: { orderId: id, status: next, note: ORDER_STATUS_META[next].label },
   });
 
+  // md.15/1-h ispat kaydı: müşterinin dijital fiyat onayı yokken yıkamaya
+  // geçiliyorsa bu, zaman damgalı olarak kayda düşer (şoför akışı bloklanmaz;
+  // işletme sözlü onayı panelden beyan edebilir).
+  if (o.status === "PICKED_UP" && next === "WASHING" && !o.priceApprovedAt) {
+    const verbalConsent = formData.get("verbalConsent") != null;
+    await prisma.orderEvent.create({
+      data: {
+        orderId: id,
+        status: next,
+        note: verbalConsent
+          ? "İşletme beyanı: müşteriden sözlü fiyat/ifa onayı alındı"
+          : "Dijital fiyat onayı alınmadan yıkamaya geçildi",
+      },
+    });
+  }
+
   if (next === "OUT_FOR_DELIVERY") {
     // B9: önceki teslimatın konumu sızmasın — sonraki ping'e kadar konumu temizle.
     await prisma.driver.update({

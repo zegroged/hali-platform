@@ -19,11 +19,13 @@ type FieldErrors = Partial<Record<Field, string>>;
 
 // Kayıt sonrası panel yol haritası — beklentiyi baştan kur.
 // (Sözleşme onayı artık kayıt formundaki checkbox ile alınıyor.)
+// 6502 md.61 (dürüst reklam): "ücretsiz" vurgusu, devamındaki abonelik
+// bedelini gizlemesin — tutar burada da açıkça yazılır.
 const STEPS = [
   "E-postanı doğrula",
   "Profilini tamamla (fiyat, fotoğraf, bölge)",
   "Doğrulamaya gönder",
-  "Onaydan sonra 30 gün ücretsiz yayında kal",
+  "Onaydan sonra ilk 30 gün ücretsiz yayında kal; sonrasında 2.000 TL/ay abonelik",
 ];
 
 export default function KayitPage() {
@@ -112,7 +114,8 @@ export default function KayitPage() {
         </h1>
         <p className="mt-1 text-sm text-slate-600">
           Müşteriler seni konumuna göre bulsun; siparişlerini ve şoförlerini
-          tek panelden yönet. Onay sonrası ilk 30 gün ücretsiz.
+          tek panelden yönet. Onay sonrası ilk 30 gün ücretsiz; sonrasında
+          2.000 TL/ay abonelik.
         </p>
 
         <ul className="mt-4 space-y-1.5">

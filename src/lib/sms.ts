@@ -1,6 +1,10 @@
 // SMS gönderimi. SMS_MODE=live + sağlayıcı anahtarları varsa GERÇEK gönderir,
 // yoksa mock (konsola yazar). Sağlayıcı: SMS_PROVIDER=netgsm (TR) | twilio.
+// Her gönderim denemesi (mock dahil) SmsLog'a yazılır: bilgilendirme/teyit
+// SMS'lerinin İSPATI (Mesafeli Sözleşmeler Yönetmeliği md.20/1-2 — işlem
+// kayıtlarının 3 yıl saklanması; kosullar §9'daki kayıt beyanının karşılığı).
 import { getAppBaseUrl } from "@/lib/config";
+import { prisma } from "@/lib/prisma";
 
 async function sendNetgsm(to: string, body: string) {
   const params = new URLSearchParams({
@@ -39,14 +43,35 @@ async function sendTwilio(to: string, body: string) {
   if (!res.ok) throw new Error("Twilio SMS hatası: " + (await res.text()));
 }
 
+// Delil kaydı: DB yazımı başarısız olsa bile SMS akışını BOZMAZ (yalnız loglar) —
+// sendSms'in hata fırlatma düzeni değişmesin diye kendi içinde yutulur.
+async function logSms(to: string, body: string, ok: boolean, error?: string) {
+  try {
+    await prisma.smsLog.create({
+      data: { to, body, ok, error: error ?? null },
+    });
+  } catch (e) {
+    console.error("SmsLog yazılamadı:", e);
+  }
+}
+
 export async function sendSms(to: string, body: string): Promise<void> {
   if (process.env.SMS_MODE !== "live") {
     console.log(`\n[MOCK SMS] -> ${to}\n${body}\n`);
+    // Mock modda da ok=true loglanır: geliştirme/test dönemindeki teyitlerin
+    // de izi kalsın (Yön. md.20/2 — aracı hizmet sağlayıcının işlem kayıtları).
+    await logSms(to, body, true);
     return;
   }
   const provider = (process.env.SMS_PROVIDER ?? "netgsm").toLowerCase();
-  if (provider === "twilio") return sendTwilio(to, body);
-  return sendNetgsm(to, body);
+  try {
+    if (provider === "twilio") await sendTwilio(to, body);
+    else await sendNetgsm(to, body);
+  } catch (e) {
+    await logSms(to, body, false, e instanceof Error ? e.message : String(e));
+    throw e; // mevcut davranış: hata çağırana aynen fırlatılır
+  }
+  await logSms(to, body, true);
 }
 
 export function trackingLink(token: string): string {
@@ -58,8 +83,12 @@ export async function sendTrackingSms(
   customerName: string,
   token: string,
 ): Promise<void> {
+  // ASCII bırakıldı (Türkçe karakter SMS'i UCS-2'ye düşürüp krediyi katlar).
+  // "Siparisiniz alindi" → 6563 Yön. md.9 teyidi; "Sozlesme ve cayma bilgileri
+  // takip sayfanizdadir" → Mesafeli Yön. md.10 ispatı (SMS kalıcı veri
+  // saklayıcısıdır, md.4/1-c) — cayma bilgilendirmesinin SMS ile de iletilmesi.
   await sendSms(
     to,
-    `Merhaba ${customerName}, halı talebiniz alındı. Takip: ${trackingLink(token)}`,
+    `Merhaba ${customerName}, siparisiniz alindi. Sozlesme ve cayma bilgileri takip sayfanizdadir. Takip: ${trackingLink(token)}`,
   );
 }

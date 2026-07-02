@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import StaticPage, { Section } from "../_static/StaticPage";
+import { CONTRACT_VERSION } from "@/lib/legal";
 
 export const metadata: Metadata = {
   title: "İptal ve İade Koşulları",
@@ -8,6 +9,8 @@ export const metadata: Metadata = {
     "En Yakın Halı Yıkama iptal ve iade koşulları: ücretsiz iptal, yıkanmadan iade, kusurlu hizmette çözüm.",
 };
 
+// TODO(iyzico): Ödeme kuruluşu sözleşmesi imzalanınca §5'teki "anlaşmalı
+// ödeme kuruluşu" ifadesi marka adıyla (iyzico) güncellenecek.
 export default function IadePage() {
   return (
     <StaticPage
@@ -66,10 +69,13 @@ export default function IadePage() {
 
       <Section title="5. Kartla Ödemede İade (online ödeme aktif olduğunda)">
         <p>
-          Online kartlı ödeme kullanıma açıldığında; iade gereken tutarlar,
-          ödemenin yapıldığı karta iyzico ödeme altyapısı üzerinden iade
-          edilir. Kart iadelerinin hesabınıza yansıması bankanıza bağlı olarak
-          2-10 iş günü sürebilir.
+          Online kartlı ödeme kullanıma açıldığında; iade gereken tutar,
+          cayma/iptal bildiriminin ulaşmasından itibaren en geç{" "}
+          <strong>14 gün içinde</strong>, ödemeyi yaptığınız karta anlaşmalı
+          ödeme kuruluşu aracılığıyla <strong>tek seferde</strong> iade
+          edilmek üzere başlatılır (Mesafeli Sözleşmeler Yönetmeliği md.
+          12/3-4). Kart iadelerinin hesabınıza yansıması bankanıza bağlı
+          olarak 2-10 iş günü sürebilir.
         </p>
       </Section>
 
@@ -98,6 +104,8 @@ export default function IadePage() {
           </p>
         </div>
       </Section>
+
+      <p className="text-sm text-slate-500">Yürürlük: {CONTRACT_VERSION}</p>
     </StaticPage>
   );
 }
