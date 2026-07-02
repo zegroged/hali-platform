@@ -5,7 +5,10 @@ const BASE =
   process.env.APP_BASE_URL ?? "https://enyakinhaliyikamaservisi.com";
 
 // Statik sayfalar + görünür/doğrulanmış halıcı profilleri.
-// Halıcılar kaydoldukça sitemap otomatik büyür (build değil, istek anında üretilir).
+// force-dynamic ŞART: bu olmadan Next sitemap'i BUILD anında prerender ediyor;
+// Docker build'de DB erişilemediği için catch dalının statik-yalnız çıktısı
+// kalıcı gömülüyordu (canlıda yakalandı, 2026-07-02). Artık her istek DB'den okur.
+export const dynamic = "force-dynamic";
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const statics: MetadataRoute.Sitemap = [
     { url: `${BASE}/`, changeFrequency: "daily", priority: 1 },
