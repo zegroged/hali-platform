@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import sharp from "sharp";
 import { prisma } from "@/lib/prisma";
-import { getCurrentBusiness } from "@/lib/panel";
+import { getCurrentBusiness, syncVisibility } from "@/lib/panel";
 import { saveObject } from "@/lib/storage";
 
 const MAX = 5 * 1024 * 1024; // 5 MB
@@ -74,5 +74,8 @@ export async function POST(req: NextRequest) {
       { status: 400 },
     );
   }
+  // Fotoğraf, profili tamamlayan son parça olabilir — görünürlüğü yeniden değerlendir
+  // (addPhoto server action'ı bunu yapıyordu, dosya yükleme ucu atlıyordu).
+  await syncVisibility(b.id);
   return NextResponse.json({ ok: true, count });
 }
