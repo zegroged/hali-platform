@@ -1,0 +1,4 @@
+# Sunucuya scp/tar ile giden dosyalar Windows'ta da LF kalmalı
+# (CRLF'li bash betiği sunucuda kırılır)
+*.sh text eol=lf
+*.conf text eol=lf
