@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { sendVerificationEmail } from "@/lib/email";
-import { mockNotifyAllowed } from "@/lib/config";
+import { emailLive } from "@/lib/config";
 import { rateLimit, clientIp, tooMany } from "@/lib/ratelimit";
 import { isDisposableEmail } from "@/lib/emailGuard";
 
@@ -70,6 +70,7 @@ export async function POST(req: NextRequest) {
 
   // Panel OTP'siyle aynı soft-launch deseni: SMTP canlı değilken kod yanıtta
   // döner ve ekranda gösterilir; EMAIL_MODE=live olunca otomatik gizlenir.
-  const showCode = process.env.NODE_ENV !== "production" || mockNotifyAllowed;
+  // Kod yalnız e-posta gerçekten GÖNDERİLEMİYORKEN ekranda gösterilir.
+  const showCode = process.env.NODE_ENV !== "production" || !emailLive;
   return NextResponse.json({ sent: true, devCode: showCode ? code : undefined });
 }

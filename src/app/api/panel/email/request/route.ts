@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { getSessionUser } from "@/lib/auth";
 import { sendVerificationEmail } from "@/lib/email";
 import { syncVisibility } from "@/lib/panel";
-import { mockNotifyAllowed } from "@/lib/config";
+import { emailLive } from "@/lib/config";
 import { rateLimit, tooMany } from "@/lib/ratelimit";
 
 const Body = z.object({ email: z.string().email().max(200) });
@@ -61,6 +61,7 @@ export async function POST(req: NextRequest) {
   await sendVerificationEmail(email, code);
 
   // Kodu yanıtta yalnız geliştirmede VEYA soft-launch'ta (Brevo yokken test için) göster.
-  const showCode = process.env.NODE_ENV !== "production" || mockNotifyAllowed;
+  // Kod yalnız e-posta gerçekten GÖNDERİLEMİYORKEN ekranda gösterilir.
+  const showCode = process.env.NODE_ENV !== "production" || !emailLive;
   return NextResponse.json({ sent: true, devCode: showCode ? code : undefined });
 }
