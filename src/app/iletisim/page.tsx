@@ -34,19 +34,25 @@ export default function IletisimPage() {
           </span>
         </a>
 
-        {/* WhatsApp — numara netleşince aktive edilecek */}
-        {/* TODO: gerçek numara — aşağıdaki karta wa.me linki eklenip yayına alınacak */}
-        <div className="flex items-center gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        {/* Telefon / WhatsApp destek hattı */}
+        <a
+          href="https://wa.me/9[TELEFON]"
+          target="_blank"
+          rel="noreferrer"
+          className="flex items-center gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-brand"
+        >
           <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-brand-light text-brand-dark">
             <IconPhone size={20} />
           </span>
           <span className="min-w-0">
             <span className="block text-sm font-semibold text-slate-900">
-              WhatsApp destek hattı
+              Telefon / WhatsApp
             </span>
-            <span className="block text-sm text-slate-500">Çok yakında</span>
+            <span className="block text-sm text-brand-dark">
+              [TELEFON]
+            </span>
           </span>
-        </div>
+        </a>
 
         {/* Sipariş takibi yönlendirmesi */}
         <Link
@@ -84,6 +90,10 @@ export default function IletisimPage() {
           <div>
             <dt className="inline font-medium">Vergi Dairesi/No: </dt>
             <dd className="inline">Meram / ***KALDIRILDI***</dd>
+          </div>
+          <div>
+            <dt className="inline font-medium">Telefon: </dt>
+            <dd className="inline">[TELEFON]</dd>
           </div>
           <div>
             <dt className="inline font-medium">E-posta: </dt>
