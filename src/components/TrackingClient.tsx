@@ -3,14 +3,22 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
+import { useSearchParams } from "next/navigation";
 import { ORDER_STATUS_META, CUSTOMER_FLOW } from "@/lib/orderStatus";
-import { OrderStatusIcon, IconTruck } from "@/components/icons";
+import {
+  OrderStatusIcon,
+  IconTruck,
+  IconPhone,
+  IconCheck,
+  IconMapPin,
+  IconX,
+} from "@/components/icons";
 import type { OrderStatus } from "@prisma/client";
 
 const LiveMap = dynamic(() => import("@/components/LiveMap"), {
   ssr: false,
   loading: () => (
-    <div className="flex h-[260px] items-center justify-center rounded-xl bg-slate-100 text-sm text-slate-400">
+    <div className="flex h-[260px] items-center justify-center rounded-xl bg-slate-100 text-sm text-slate-500">
       Harita yükleniyor…
     </div>
   ),
@@ -31,50 +39,240 @@ type Track = {
   driver: { name: string; lat: number; lng: number } | null;
 };
 
+// Poll'un durdurulacağı nihai durumlar — teslim edilmiş sipariş sonsuza dek sorgulanmasın.
+const FINAL_STATUSES: OrderStatus[] = ["DELIVERED", "REJECTED", "CANCELED"];
+
+/** Zaman çizelgesiyle aynı iskelette skeleton — içerik gelince zıplama olmaz. */
+function TrackingSkeleton() {
+  return (
+    <div className="animate-pulse space-y-5" aria-hidden>
+      <div className="space-y-2">
+        <div className="h-3 w-28 rounded bg-slate-200" />
+        <div className="h-6 w-44 rounded bg-slate-200" />
+        <div className="h-3 w-36 rounded bg-slate-200" />
+      </div>
+      <div className="space-y-0">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="flex gap-3">
+            <div className="flex flex-col items-center">
+              <div className="h-8 w-8 rounded-full bg-slate-200" />
+              {i < 5 && (
+                <div className="w-0.5 flex-1 bg-slate-100" style={{ minHeight: 18 }} />
+              )}
+            </div>
+            <div className="pb-4 pt-2">
+              <div className="h-3 w-32 rounded bg-slate-200" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function TrackingClient({ token }: { token: string }) {
   const [data, setData] = useState<Track | null>(null);
   const [notFound, setNotFound] = useState(false);
+  // Ardışık 3 başarısız denemeden sonra hata durumuna geçilir.
+  const [failed, setFailed] = useState(false);
+  const [retryKey, setRetryKey] = useState(0);
+  const [copied, setCopied] = useState(false);
+  // ?yeni=1 → sipariş sonrası onay bandı (kapatılabilir)
+  const searchParams = useSearchParams();
+  const [bannerClosed, setBannerClosed] = useState(false);
+  const showBanner = searchParams.get("yeni") === "1" && !bannerClosed;
 
   useEffect(() => {
     let active = true;
+    let failCount = 0;
+    let id: ReturnType<typeof setInterval> | null = null;
+
     async function load() {
-      const res = await fetch(`/api/orders/${token}`, { cache: "no-store" });
-      if (!active) return;
-      if (res.status === 404) {
-        setNotFound(true);
-        return;
+      try {
+        const res = await fetch(`/api/orders/${token}`, { cache: "no-store" });
+        if (!active) return;
+        if (res.status === 404) {
+          setNotFound(true);
+          if (id) clearInterval(id);
+          return;
+        }
+        // 404 dışındaki başarısız yanıtlar (429/500…) da hata dalına düşer.
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const json: Track = await res.json();
+        if (!active) return;
+        failCount = 0;
+        setFailed(false);
+        setData(json);
+        // Nihai durumda poll'u durdur.
+        if (FINAL_STATUSES.includes(json.status) && id) clearInterval(id);
+      } catch {
+        if (!active) return;
+        failCount += 1;
+        if (failCount >= 3) {
+          setFailed(true);
+          if (id) clearInterval(id);
+        }
       }
-      if (res.ok) setData(await res.json());
     }
+
     load();
-    const id = setInterval(load, 5000);
+    id = setInterval(load, 5000);
     return () => {
       active = false;
-      clearInterval(id);
+      if (id) clearInterval(id);
     };
-  }, [token]);
+  }, [token, retryKey]);
+
+  function retry() {
+    setFailed(false);
+    setRetryKey((k) => k + 1);
+  }
+
+  async function copyCode() {
+    try {
+      await navigator.clipboard.writeText(token.toUpperCase());
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Pano erişilemedi (izin/eski tarayıcı) — sessiz geç.
+    }
+  }
 
   if (notFound) {
     return (
-      <div className="rounded-xl border border-dashed border-slate-300 p-8 text-center text-slate-500">
-        Takip bulunamadı. Bağlantıyı kontrol edin.
+      <div className="rounded-xl border border-dashed border-slate-300 p-8 text-center">
+        <p className="font-semibold text-slate-700">
+          Bu koda ait sipariş bulunamadı
+        </p>
+        <p className="mt-1 text-sm text-slate-500">
+          Kodu halıcından aldığın SMS/mesajdan kontrol et.
+        </p>
+        <Link
+          href="/takip"
+          className="mt-4 inline-block rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark active:scale-[0.99]"
+        >
+          Kodu yeniden gir
+        </Link>
+        <p className="mt-3 text-xs text-slate-500">
+          İpucu: 0 (sıfır) ile O harfi kodlarda kullanılmaz.
+        </p>
+        <p className="mt-2">
+          <Link href="/" className="text-sm text-brand-dark hover:underline">
+            ← Ana sayfa
+          </Link>
+        </p>
       </div>
     );
   }
+
+  if (failed && !data) {
+    return (
+      <div className="rounded-xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+        <p className="font-semibold text-slate-700">Takip bilgisi alınamadı</p>
+        <p className="mt-1 text-sm text-slate-500">
+          Bağlantını kontrol edip tekrar dene.
+        </p>
+        <button
+          type="button"
+          onClick={retry}
+          className="mt-4 rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark active:scale-[0.99]"
+        >
+          Tekrar dene
+        </button>
+      </div>
+    );
+  }
+
   if (!data) {
-    return <div className="py-10 text-center text-slate-400">Yükleniyor…</div>;
+    return <TrackingSkeleton />;
   }
 
   const rejected = data.status === "REJECTED";
   const canceled = data.status === "CANCELED";
   const currentIdx = CUSTOMER_FLOW.indexOf(data.status);
+  const shortAddress =
+    data.pickupAddress.length > 40
+      ? `${data.pickupAddress.slice(0, 40)}…`
+      : data.pickupAddress;
 
   return (
     <div className="space-y-5">
+      {showBanner && (
+        <div
+          role="status"
+          className="flex items-start justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800"
+        >
+          <p>
+            <span className="font-semibold">Talebin alındı!</span> Bu sayfayı
+            kaydet — durumu buradan takip edebilirsin.
+          </p>
+          <button
+            type="button"
+            onClick={() => setBannerClosed(true)}
+            aria-label="Bildirimi kapat"
+            className="shrink-0 rounded-lg p-1.5 text-emerald-700 transition hover:bg-emerald-100"
+          >
+            <IconX size={16} />
+          </button>
+        </div>
+      )}
+
+      {failed && (
+        <div
+          role="alert"
+          className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800"
+        >
+          <p>Takip bilgisi alınamadı — bağlantını kontrol et.</p>
+          <button
+            type="button"
+            onClick={retry}
+            className="rounded-lg border border-amber-300 px-3 py-1.5 text-sm font-medium text-amber-800 transition hover:bg-amber-100"
+          >
+            Tekrar dene
+          </button>
+        </div>
+      )}
+
       <div>
         <p className="text-sm text-slate-500">{data.business.name}</p>
-        <h1 className="text-xl font-bold text-slate-900">Halı Takibi</h1>
+        <div className="mt-0.5 flex flex-wrap items-center gap-2">
+          <h1 className="text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">
+            Halı Takibi
+          </h1>
+          {/* Kopyalanabilir sipariş kodu chip'i */}
+          <button
+            type="button"
+            onClick={copyCode}
+            aria-label="Sipariş kodunu kopyala"
+            title="Kodu kopyala"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-2.5 py-1 font-mono text-sm font-semibold tracking-wider text-slate-700 transition hover:bg-slate-50"
+          >
+            {token.toUpperCase()}
+            {copied && <IconCheck size={14} className="text-emerald-600" />}
+          </button>
+          {copied && (
+            <span className="text-xs font-medium text-emerald-600" role="status">
+              Kopyalandı
+            </span>
+          )}
+        </div>
+        <p className="mt-1 text-sm text-slate-600">
+          Merhaba {data.customerName}
+        </p>
+        <p className="mt-0.5 inline-flex items-center gap-1 text-sm text-slate-500">
+          <IconMapPin size={14} /> {shortAddress}
+        </p>
       </div>
+
+      {/* Halıcıyla iletişim — reddedilmiş/iptal siparişte de görünür */}
+      {data.business.phone && (
+        <a
+          href={`tel:${data.business.phone}`}
+          className="inline-flex items-center gap-2 rounded-lg border border-brand px-4 py-2.5 text-sm font-semibold text-brand-dark transition hover:bg-brand-light/50 active:scale-[0.99]"
+        >
+          <IconPhone size={16} /> Halıcıyı Ara · {data.business.phone}
+        </a>
+      )}
 
       {rejected ? (
         <div className="rounded-xl border border-red-200 bg-red-50 p-4">
@@ -86,7 +284,7 @@ export function TrackingClient({ token }: { token: string }) {
           )}
           <Link
             href="/"
-            className="mt-3 inline-block rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark"
+            className="mt-3 inline-block rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark active:scale-[0.99]"
           >
             Başka halıcı seç
           </Link>
@@ -101,19 +299,28 @@ export function TrackingClient({ token }: { token: string }) {
           <div className="space-y-0">
             {CUSTOMER_FLOW.map((s, i) => {
               const meta = ORDER_STATUS_META[s];
-              const done = i <= currentIdx;
+              const done = i < currentIdx;
               const active = i === currentIdx;
+              // Aktif adımın zaman damgası — aynı durumdan birden çok event varsa sonuncusu
+              const stepEvents = data.events.filter((e) => e.status === s);
+              const evt = stepEvents[stepEvents.length - 1];
               return (
                 <div key={s} className="flex gap-3">
                   <div className="flex flex-col items-center">
                     <div
                       className={`flex h-8 w-8 items-center justify-center rounded-full ${
-                        done
-                          ? "bg-brand text-white"
-                          : "bg-slate-200 text-slate-400"
+                        active
+                          ? "animate-pulse bg-brand text-white ring-4 ring-brand/25"
+                          : done
+                            ? "bg-brand text-white"
+                            : "bg-slate-200 text-slate-400"
                       }`}
                     >
-                      <OrderStatusIcon status={s} size={16} />
+                      {done ? (
+                        <IconCheck size={16} />
+                      ) : (
+                        <OrderStatusIcon status={s} size={16} />
+                      )}
                     </div>
                     {i < CUSTOMER_FLOW.length - 1 && (
                       <div
@@ -125,17 +332,34 @@ export function TrackingClient({ token }: { token: string }) {
                     )}
                   </div>
                   <div className="pb-4">
-                    <p
-                      className={`text-sm font-medium ${
-                        active
-                          ? "text-brand-dark"
-                          : done
-                            ? "text-slate-800"
-                            : "text-slate-400"
-                      }`}
-                    >
-                      {meta.label}
-                    </p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p
+                        className={`text-sm font-medium ${
+                          active
+                            ? "text-brand-dark"
+                            : done
+                              ? "text-slate-800"
+                              : "text-slate-500"
+                        }`}
+                      >
+                        {meta.label}
+                      </p>
+                      {active && (
+                        <span className="rounded-full bg-brand-light px-2 py-0.5 text-xs font-semibold text-brand-dark">
+                          Şu anda
+                        </span>
+                      )}
+                    </div>
+                    {active && evt && (
+                      <p className="mt-0.5 text-xs text-slate-500">
+                        {new Date(evt.at).toLocaleString("tr-TR", {
+                          day: "2-digit",
+                          month: "2-digit",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </p>
+                    )}
                   </div>
                 </div>
               );
@@ -143,7 +367,7 @@ export function TrackingClient({ token }: { token: string }) {
           </div>
 
           {/* Şoför haritası (yolda iken) */}
-          {data.driver && data.driver.lat != null && (
+          {data.driver && data.driver.lat != null ? (
             <div>
               <p className="mb-1 inline-flex items-center gap-1 text-sm font-medium text-slate-700">
                 {data.driver.name} yolda <IconTruck size={16} />
@@ -171,7 +395,15 @@ export function TrackingClient({ token }: { token: string }) {
                 ]}
               />
             </div>
-          )}
+          ) : data.status === "OUT_FOR_DELIVERY" ? (
+            /* Şoför konumu henüz gelmediyse harita yüksekliğinde placeholder */
+            <div className="flex h-[260px] flex-col items-center justify-center gap-2 rounded-xl bg-slate-100 px-4 text-center">
+              <IconTruck size={28} className="text-slate-500" />
+              <p className="text-sm font-medium text-slate-600">
+                Şoför yola çıktı — canlı konum birazdan burada görünecek.
+              </p>
+            </div>
+          ) : null}
         </>
       )}
 
@@ -193,7 +425,7 @@ export function TrackingClient({ token }: { token: string }) {
                   <OrderStatusIcon status={e.status} size={14} />
                   {e.note ?? ORDER_STATUS_META[e.status].label}
                 </span>
-                <span className="text-slate-400">
+                <span className="text-slate-500">
                   {new Date(e.at).toLocaleString("tr-TR", {
                     day: "2-digit",
                     month: "2-digit",

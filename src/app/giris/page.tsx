@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import Footer from "@/components/Footer";
 
 const ROLE_HOME: Record<string, string> = {
   CLEANER: "/panel",
@@ -11,73 +12,154 @@ const ROLE_HOME: Record<string, string> = {
   CUSTOMER: "/",
 };
 
+/** Alan bazlı doğrulama hataları (alan adı → mesaj). */
+type FieldErrors = Partial<Record<"phone" | "password", string>>;
+
 export default function GirisPage() {
   const router = useRouter();
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [loading, setLoading] = useState(false);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+
+    // Alan bazlı doğrulama — hatalı alan işaretlenir, mesajı altında gösterilir.
+    const errs: FieldErrors = {};
+    if (phone.length < 10)
+      errs.phone = "Telefon 05xx ile başlamalı ve 11 hane olmalı.";
+    if (!password) errs.password = "Şifre gerekli.";
+    setFieldErrors(errs);
+    if (Object.keys(errs).length > 0) return;
+
     setLoading(true);
-    const res = await fetch("/api/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ phone, password }),
-    });
-    setLoading(false);
-    if (!res.ok) {
-      setError("Telefon veya şifre hatalı.");
-      return;
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone, password }),
+      });
+      if (!res.ok) {
+        setError("Telefon veya şifre hatalı.");
+        return;
+      }
+      const data = await res.json();
+      router.push(ROLE_HOME[data.role] ?? "/");
+      router.refresh();
+    } catch {
+      setError("Bağlantı hatası, lütfen tekrar deneyin.");
+    } finally {
+      setLoading(false);
     }
-    const data = await res.json();
-    router.push(ROLE_HOME[data.role] ?? "/");
-    router.refresh();
   }
 
+  const inputCls = (bad?: string) =>
+    `w-full rounded-lg border px-3 py-2 focus:border-brand ${
+      bad ? "border-red-500" : "border-slate-300"
+    }`;
+  const labelCls = "mb-1 block text-sm font-medium text-slate-700";
+
   return (
-    <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center px-6">
-      <Link href="/" className="mb-6 text-sm text-brand-dark hover:underline">
-        ← Ana sayfa
-      </Link>
-      <h1 className="text-2xl font-bold text-slate-900">Giriş Yap</h1>
-      <p className="mt-1 text-sm text-slate-500">
-        Halıcı, şoför veya admin hesabınızla girin.
-      </p>
+    <div className="flex min-h-screen flex-col">
+      <main className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center px-6 py-10">
+        <Link href="/" className="mb-6 text-sm text-brand-dark hover:underline">
+          ← Ana sayfa
+        </Link>
+        <h1 className="text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">
+          İşletme Girişi
+        </h1>
+        <p className="mt-1 text-sm text-slate-500">
+          Halıcı veya şoför hesabınla giriş yap.
+        </p>
 
-      <form onSubmit={submit} className="mt-6 space-y-3">
-        <input
-          value={phone}
-          onChange={(e) => setPhone(e.target.value)}
-          placeholder="Telefon (05xx...)"
-          className="w-full rounded-lg border border-slate-300 px-3 py-2"
-          autoComplete="username"
-        />
-        <input
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder="Şifre"
-          className="w-full rounded-lg border border-slate-300 px-3 py-2"
-          autoComplete="current-password"
-        />
-        {error && <p className="text-sm text-red-600">{error}</p>}
-        <button
-          disabled={loading}
-          className="w-full rounded-lg bg-brand px-4 py-2 font-semibold text-white hover:bg-brand-dark disabled:opacity-60"
-        >
-          {loading ? "Giriş yapılıyor…" : "Giriş Yap"}
-        </button>
-      </form>
+        <form onSubmit={submit} noValidate className="mt-6 space-y-3">
+          <div>
+            <label htmlFor="giris-telefon" className={labelCls}>
+              Telefon
+            </label>
+            <input
+              id="giris-telefon"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))}
+              type="tel"
+              inputMode="tel"
+              maxLength={11}
+              placeholder="05xxxxxxxxx"
+              className={inputCls(fieldErrors.phone)}
+              autoComplete="username"
+            />
+            {fieldErrors.phone && (
+              <p className="mt-1 text-xs text-red-600">{fieldErrors.phone}</p>
+            )}
+          </div>
+          <div>
+            <label htmlFor="giris-sifre" className={labelCls}>
+              Şifre
+            </label>
+            <input
+              id="giris-sifre"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className={inputCls(fieldErrors.password)}
+              autoComplete="current-password"
+            />
+            {fieldErrors.password && (
+              <p className="mt-1 text-xs text-red-600">
+                {fieldErrors.password}
+              </p>
+            )}
+          </div>
+          {error && (
+            <p role="alert" className="text-sm text-red-600">
+              {error}
+            </p>
+          )}
+          <button
+            disabled={loading}
+            className="w-full rounded-lg bg-brand px-4 py-2.5 font-semibold text-white transition hover:bg-brand-dark active:scale-[0.99] disabled:opacity-60"
+          >
+            {loading ? "Giriş yapılıyor…" : "Giriş Yap"}
+          </button>
+        </form>
 
-      {process.env.NODE_ENV !== "production" && (
-        <div className="mt-6 rounded-lg bg-slate-100 p-3 text-xs text-slate-600">
-          <p className="font-semibold">Demo hesaplar (şifre: 1234) — yalnız geliştirme</p>
-          <p>Halıcı: 05321112201 · Şoför: 05331112202 · Admin: 05320000000</p>
+        <p className="mt-4 text-sm text-slate-500">
+          Siparişini mi arıyorsun? Takip koduyla{" "}
+          <Link href="/takip" className="text-brand-dark underline">
+            takip sayfasını
+          </Link>{" "}
+          kullan.
+        </p>
+
+        <div className="mt-6 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <p className="text-sm font-medium text-slate-700">
+            Henüz hesabın yok mu?
+          </p>
+          <p className="mt-1 text-sm text-slate-600">
+            Halı yıkama işletmeni platforma ücretsiz ekleyelim — aramıza
+            katılmak için bize ulaş.
+          </p>
+          <Link
+            href="/iletisim"
+            className="mt-3 inline-flex min-h-[40px] items-center rounded-lg border border-brand px-4 py-2 text-sm font-semibold text-brand-dark transition hover:bg-brand-light/50"
+          >
+            Bize ulaş
+          </Link>
         </div>
-      )}
-    </main>
+
+        {process.env.NODE_ENV !== "production" && (
+          <div className="mt-6 rounded-lg bg-slate-100 p-3 text-xs text-slate-600">
+            <p className="font-semibold">
+              Demo hesaplar (şifre: 1234) — yalnız geliştirme
+            </p>
+            <p>Halıcı: 05321112201 · Şoför: 05331112202 · Admin: 05320000000</p>
+          </div>
+        )}
+      </main>
+      <Footer />
+    </div>
   );
 }

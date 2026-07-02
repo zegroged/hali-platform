@@ -1,8 +1,10 @@
 import { prisma } from "@/lib/prisma";
 import { getCurrentBusiness } from "@/lib/panel";
 import { ORDER_STATUS_META, REJECT_REASONS } from "@/lib/orderStatus";
-import { OrderStatusIcon } from "@/components/icons";
+import { OrderStatusIcon, IconReceipt } from "@/components/icons";
+import EmptyState from "@/components/EmptyState";
 import { reassignOrder, cancelOrder, rejectOrder } from "../actions";
+import { ConfirmButton } from "../ConfirmButton";
 
 const STATUS_CLS: Record<string, string> = {
   CREATED: "bg-amber-100 text-amber-700",
@@ -30,9 +32,13 @@ export default async function PanelOrders() {
       <h1 className="text-lg font-semibold text-slate-900">Siparişler</h1>
 
       {orders.length === 0 && (
-        <p className="rounded-xl border border-dashed border-slate-300 p-8 text-center text-slate-400">
-          Henüz sipariş yok.
-        </p>
+        <EmptyState
+          icon={<IconReceipt size={22} />}
+          title="Henüz sipariş yok"
+          description="Dükkânına gelen ilk müşterin için kayıt oluştur; sistem otomatik bir takip kodu üretir."
+          actionHref="/panel/yeni-siparis"
+          actionLabel="İlk kaydını oluştur"
+        />
       )}
 
       {orders.map((o) => {
@@ -41,7 +47,7 @@ export default async function PanelOrders() {
         return (
           <div
             key={o.id}
-            className="rounded-xl border border-slate-200 bg-white p-4"
+            className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
           >
             <div className="flex items-start justify-between gap-3">
               <div>
@@ -49,7 +55,7 @@ export default async function PanelOrders() {
                 <p className="text-sm text-slate-500">{o.customerPhone}</p>
                 <p className="mt-1 text-sm text-slate-600">{o.pickupAddress}</p>
                 {o.approxM2 && (
-                  <p className="text-xs text-slate-400">~{o.approxM2} m²</p>
+                  <p className="text-xs text-slate-500">~{o.approxM2} m²</p>
                 )}
                 {o.note && (
                   <p className="mt-1 text-xs italic text-slate-500">
@@ -69,58 +75,81 @@ export default async function PanelOrders() {
               </span>
             </div>
 
-            <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
-              <span className="text-sm text-slate-500">
+            {/* Aksiyonlar: mobilde alt alta, geniş ekranda yan yana.
+                Renk hiyerarşisi — Ata: dolgulu marka, İptal: nötr gri, Reddet: kırmızı. */}
+            <div className="mt-3 flex flex-col gap-2 border-t border-slate-100 pt-3 sm:flex-row sm:flex-wrap sm:items-end">
+              <span className="text-sm text-slate-500 sm:self-center">
                 Şoför: {o.driver?.user.name ?? "—"}
               </span>
 
               {!closed && (
                 <>
-                  <form action={reassignOrder} className="flex items-center gap-1">
+                  <form
+                    action={reassignOrder}
+                    className="flex items-end gap-1.5"
+                  >
                     <input type="hidden" name="orderId" value={o.id} />
-                    <select
-                      name="driverId"
-                      defaultValue={o.driverId ?? ""}
-                      className="rounded border border-slate-300 px-2 py-1 text-sm"
-                    >
-                      <option value="">(atanmamış)</option>
-                      {b.drivers.map((d) => (
-                        <option key={d.id} value={d.id}>
-                          {d.user.name}
-                        </option>
-                      ))}
-                    </select>
-                    <button className="rounded bg-slate-800 px-2 py-1 text-xs font-medium text-white">
+                    <div className="min-w-0 flex-1 sm:flex-none">
+                      <span className="block text-xs font-medium text-slate-500">
+                        Şoför ata
+                      </span>
+                      <select
+                        name="driverId"
+                        defaultValue={o.driverId ?? ""}
+                        aria-label="Şoför ata"
+                        className="mt-0.5 w-full rounded-lg border border-slate-300 px-2 py-2 text-sm sm:w-auto"
+                      >
+                        <option value="">(atanmamış)</option>
+                        {b.drivers.map((d) => (
+                          <option key={d.id} value={d.id}>
+                            {d.user.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <button className="rounded-lg bg-brand px-3 py-2 text-sm font-semibold text-white transition hover:bg-brand-dark">
                       Ata
                     </button>
                   </form>
 
                   <form action={cancelOrder}>
                     <input type="hidden" name="orderId" value={o.id} />
-                    <button className="rounded border border-red-300 px-2 py-1 text-xs font-medium text-red-600">
+                    <ConfirmButton
+                      message="Sipariş iptal edilsin mi?"
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 sm:w-auto"
+                    >
                       İptal
-                    </button>
+                    </ConfirmButton>
                   </form>
 
                   {(o.status === "CREATED" || o.status === "ACCEPTED") && (
-                    <form action={rejectOrder} className="flex items-center gap-1">
+                    <form
+                      action={rejectOrder}
+                      className="flex items-end gap-1.5"
+                    >
                       <input type="hidden" name="orderId" value={o.id} />
-                      <select
-                        name="reason"
-                        defaultValue=""
-                        required
-                        className="rounded border border-slate-300 px-2 py-1 text-sm"
-                      >
-                        <option value="" disabled>
+                      <div className="min-w-0 flex-1 sm:flex-none">
+                        <span className="block text-xs font-medium text-slate-500">
                           Ret sebebi
-                        </option>
-                        {REJECT_REASONS.map((r) => (
-                          <option key={r} value={r}>
-                            {r}
+                        </span>
+                        <select
+                          name="reason"
+                          defaultValue=""
+                          required
+                          aria-label="Ret sebebi"
+                          className="mt-0.5 w-full rounded-lg border border-slate-300 px-2 py-2 text-sm sm:w-auto"
+                        >
+                          <option value="" disabled>
+                            Seç…
                           </option>
-                        ))}
-                      </select>
-                      <button className="rounded border border-red-400 px-2 py-1 text-xs font-medium text-red-700">
+                          {REJECT_REASONS.map((r) => (
+                            <option key={r} value={r}>
+                              {r}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <button className="rounded-lg border border-red-300 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50">
                         Reddet
                       </button>
                     </form>

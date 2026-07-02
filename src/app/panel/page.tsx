@@ -5,15 +5,10 @@ import {
   completenessChecklist,
   verificationReady,
 } from "@/lib/panel";
+import { verifMeta } from "@/lib/verifMeta";
 import { submitForVerification, acceptContract } from "./actions";
 import { EmailVerify } from "@/components/EmailVerify";
-import { IconCheck } from "@/components/icons";
-
-const VERIF_META: Record<string, { label: string; cls: string }> = {
-  VERIFIED: { label: "Doğrulanmış ✓", cls: "bg-green-100 text-green-700" },
-  PENDING: { label: "Onay bekliyor", cls: "bg-amber-100 text-amber-700" },
-  REJECTED: { label: "Reddedildi", cls: "bg-red-100 text-red-700" },
-};
+import { IconCheck, IconChevronRight, IconWallet } from "@/components/icons";
 
 export default async function PanelHome() {
   const b = await getCurrentBusiness();
@@ -31,38 +26,57 @@ export default async function PanelHome() {
   const onShift = b.drivers.filter((d) => d.isOnShift).length;
   const checklist = completenessChecklist(b);
   const ready = verificationReady(b);
-  const verif = VERIF_META[b.verification];
+  const verif = verifMeta(b.verification);
+
+  // İstatistik kartları: üçü de tıklanabilir, hover + chevron ile bunu belli eder.
+  const statCard =
+    "relative block rounded-xl border border-slate-200 bg-white p-4 transition hover:border-brand hover:shadow-sm";
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <span className={`rounded-full px-3 py-1 text-sm font-medium ${verif.cls}`}>
-          {verif.label}
-        </span>
-        {b.isVisible ? (
-          <span className="text-sm text-green-700">Müşterilere görünür</span>
-        ) : (
-          <span className="text-sm text-slate-400">Henüz görünmüyor</span>
-        )}
+      <div>
+        <h1 className="text-lg font-semibold text-slate-900">
+          Hoş geldin, {b.name}
+        </h1>
+        <div className="mt-2 flex items-center gap-3">
+          <span
+            className={`rounded-full px-3 py-1 text-sm font-medium ${verif.cls}`}
+          >
+            {verif.label}
+          </span>
+          {b.isVisible ? (
+            <span className="text-sm text-green-700">Müşterilere görünür</span>
+          ) : (
+            <span className="text-sm text-slate-500">Henüz görünmüyor</span>
+          )}
+        </div>
       </div>
 
       {/* İstatistikler */}
       <div className="grid grid-cols-3 gap-3">
-        <Link
-          href="/panel/siparisler"
-          className="rounded-xl border border-slate-200 bg-white p-4"
-        >
-          <div className="text-2xl font-bold text-brand-dark">{pendingOrders}</div>
+        <Link href="/panel/siparisler" className={statCard}>
+          <IconChevronRight
+            size={16}
+            className="absolute right-2.5 top-2.5 text-slate-400"
+          />
+          <div className="text-2xl font-bold text-brand-dark">
+            {pendingOrders}
+          </div>
           <div className="text-xs text-slate-500">Yeni talep</div>
         </Link>
-        <div className="rounded-xl border border-slate-200 bg-white p-4">
+        <Link href="/panel/siparisler" className={statCard}>
+          <IconChevronRight
+            size={16}
+            className="absolute right-2.5 top-2.5 text-slate-400"
+          />
           <div className="text-2xl font-bold text-slate-900">{activeOrders}</div>
           <div className="text-xs text-slate-500">Süren iş</div>
-        </div>
-        <Link
-          href="/panel/soforler"
-          className="rounded-xl border border-slate-200 bg-white p-4"
-        >
+        </Link>
+        <Link href="/panel/soforler" className={statCard}>
+          <IconChevronRight
+            size={16}
+            className="absolute right-2.5 top-2.5 text-slate-400"
+          />
           <div className="text-2xl font-bold text-slate-900">
             {onShift}/{b.drivers.length}
           </div>
@@ -76,13 +90,15 @@ export default async function PanelHome() {
           <div>
             <p className="font-medium text-slate-900">Abonelik</p>
             <p className="text-sm text-slate-500">
-              {b.subscription?.status === "ACTIVE"
-                ? "Aktif"
-                : b.subscription?.status ?? "Yok"}{" "}
+              {b.subscription
+                ? b.subscription.status === "ACTIVE"
+                  ? "Aktif"
+                  : "Pasif"
+                : "Yok"}{" "}
               · {b.subscription ? Number(b.subscription.priceMonthly) : 2000} TL/ay
             </p>
           </div>
-          <span className="text-2xl">💳</span>
+          <IconWallet size={26} className="text-brand-dark" />
         </div>
       </div>
 
@@ -105,7 +121,7 @@ export default async function PanelHome() {
                 >
                   {c.done && <IconCheck size={11} />}
                 </span>
-                <span className={c.done ? "text-slate-700" : "text-slate-400"}>
+                <span className={c.done ? "text-slate-700" : "text-slate-600"}>
                   {c.label}
                 </span>
               </li>
@@ -142,7 +158,7 @@ export default async function PanelHome() {
               </span>
             ) : (
               <form action={acceptContract}>
-                <button className="rounded-lg border border-brand px-3 py-1.5 text-sm font-medium text-brand-dark">
+                <button className="rounded-lg border border-brand px-3 py-2 text-sm font-medium text-brand-dark transition hover:bg-brand-light">
                   Sözleşmeyi onayla
                 </button>
               </form>
@@ -152,19 +168,19 @@ export default async function PanelHome() {
           <div className="mt-4 flex items-center gap-3 border-t border-slate-100 pt-3">
             <Link
               href="/panel/profil"
-              className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700"
+              className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
             >
               Profili düzenle
             </Link>
             {ready && b.verification !== "PENDING" ? (
               <form action={submitForVerification}>
-                <button className="rounded-lg bg-brand px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-dark">
+                <button className="rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark active:scale-[0.99]">
                   Doğrulamaya gönder
                 </button>
               </form>
             ) : (
               b.verification !== "PENDING" && (
-                <span className="text-xs text-slate-400">
+                <span className="text-xs text-slate-500">
                   Tümünü tamamlayınca gönderebilirsin
                 </span>
               )

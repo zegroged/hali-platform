@@ -1,14 +1,36 @@
 import { NextRequest, NextResponse } from "next/server";
+import sharp from "sharp";
 import { prisma } from "@/lib/prisma";
 import { getCurrentBusiness } from "@/lib/panel";
 import { saveObject } from "@/lib/storage";
 
 const MAX = 5 * 1024 * 1024; // 5 MB
+const MAX_EDGE = 1600; // uzun kenar üst sınırı (px)
+const WEBP_QUALITY = 82;
 const ALLOWED: Record<string, string> = {
   "image/jpeg": "jpg",
   "image/png": "png",
   "image/webp": "webp",
 };
+
+// Görseli kaydetmeden önce küçült + WebP'ye çevir (kart raylarında orijinal
+// 5MB dosyalar inmesin). Sharp hata verirse orijinal dosyaya geri düşülür.
+async function optimizeImage(
+  buf: Buffer,
+  ext: string,
+  contentType: string,
+): Promise<{ buf: Buffer; ext: string; contentType: string }> {
+  try {
+    const out = await sharp(buf)
+      .rotate() // EXIF yönünü uygula (telefon fotoğrafları yan gelmesin)
+      .resize(MAX_EDGE, MAX_EDGE, { fit: "inside", withoutEnlargement: true })
+      .webp({ quality: WEBP_QUALITY })
+      .toBuffer();
+    return { buf: out, ext: "webp", contentType: "image/webp" };
+  } catch {
+    return { buf, ext, contentType };
+  }
+}
 
 // Çoklu fotoğraf yükleme. AWS_S3_BUCKET varsa S3'e, yoksa yerel diske (saveObject seçer).
 export async function POST(req: NextRequest) {
@@ -29,11 +51,12 @@ export async function POST(req: NextRequest) {
 
   let count = 0;
   for (const file of files) {
-    const ext = ALLOWED[file.type];
-    if (!ext || file.size > MAX) continue;
-    const name = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-    const buf = Buffer.from(await file.arrayBuffer());
-    const url = await saveObject(`uploads/${b.id}/${name}`, buf, file.type);
+    const rawExt = ALLOWED[file.type];
+    if (!rawExt || file.size > MAX) continue;
+    const original = Buffer.from(await file.arrayBuffer());
+    const img = await optimizeImage(original, rawExt, file.type);
+    const name = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${img.ext}`;
+    const url = await saveObject(`uploads/${b.id}/${name}`, img.buf, img.contentType);
     await prisma.businessPhoto.create({
       data: {
         businessId: b.id,

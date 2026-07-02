@@ -1,6 +1,10 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { LogoutButton } from "@/components/LogoutButton";
+
+// Şoför sayfaları arama motorlarına kapalı.
+export const metadata: Metadata = { robots: { index: false, follow: false } };
 
 export default async function SoforLayout({
   children,
@@ -15,7 +19,7 @@ export default async function SoforLayout({
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-lg items-center justify-between px-4 py-3">
           <div>
-            <p className="text-xs text-slate-400">Şoför</p>
+            <p className="text-xs text-slate-500">Şoför</p>
             <p className="font-semibold text-slate-900">{u.name}</p>
           </div>
           <LogoutButton />

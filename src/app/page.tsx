@@ -4,6 +4,8 @@ import { BusinessCard } from "@/components/BusinessCard";
 import { BusinessRow } from "@/components/BusinessRow";
 import { SearchBar } from "@/components/SearchBar";
 import { BusinessesMapView } from "@/components/BusinessesMapView";
+import Footer from "@/components/Footer";
+import { DISTRICTS } from "@/components/districts";
 import {
   Logo,
   IconPackage,
@@ -12,6 +14,7 @@ import {
   IconStar,
   IconTruck,
   IconSparkles,
+  IconWallet,
 } from "@/components/icons";
 
 export const dynamic = "force-dynamic";
@@ -40,21 +43,66 @@ function Header() {
       <div className="flex shrink-0 items-center gap-3 sm:gap-4">
         <Link
           href="/takip"
-          className="inline-flex items-center gap-1 text-sm font-medium text-slate-600 hover:text-brand-dark"
+          aria-label="Sipariş takibi"
+          className="inline-flex items-center gap-1 py-2 text-sm font-medium text-slate-600 hover:text-brand-dark"
         >
           <IconPackage size={17} />
           <span className="hidden sm:inline">Takip</span>
         </Link>
         <Link
           href="/giris"
-          className="inline-flex items-center gap-1 whitespace-nowrap text-sm font-medium text-slate-600 hover:text-brand-dark"
+          className="inline-flex items-center whitespace-nowrap rounded-lg border border-brand px-3 py-2 text-sm font-medium text-brand-dark transition hover:bg-brand-light"
         >
-          <span className="sm:hidden">Giriş</span>
-          <span className="hidden sm:inline">İşletme girişi</span>
-          <IconArrowRight size={15} />
+          <span className="sm:hidden">İşletme</span>
+          <span className="hidden sm:inline">İşletmeni ekle</span>
         </Link>
       </div>
     </header>
+  );
+}
+
+/** 3 adımlı "Nasıl çalışır?" şeridi — güven katmanı; footer'dan da linklenir. */
+function HowItWorks() {
+  const steps = [
+    {
+      icon: <IconMapPin size={20} />,
+      title: "Halıcını seç",
+      desc: "Konumunu kullan ya da semtini yaz, yakınındaki halıcıları karşılaştır.",
+    },
+    {
+      icon: <IconTruck size={20} />,
+      title: "Halın kapından alınsın",
+      desc: "Halıcı halını adresinden teslim alır — ön ödeme yok, ödeme teslimde.",
+    },
+    {
+      icon: <IconPackage size={20} />,
+      title: "Adım adım takip et",
+      desc: "Yıkamadan teslimata kadar her adımı takip kodunla canlı izle.",
+    },
+  ];
+  return (
+    <section id="nasil-calisir" className="mt-8 scroll-mt-4">
+      <h2 className="font-semibold text-slate-900">Nasıl çalışır?</h2>
+      <div className="mt-3 grid gap-3 sm:grid-cols-3">
+        {steps.map((s, i) => (
+          <div
+            key={s.title}
+            className="relative rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
+          >
+            <span className="absolute right-3.5 top-3.5 text-xs font-semibold text-slate-500">
+              {i + 1}. adım
+            </span>
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-light text-brand-dark">
+              {s.icon}
+            </div>
+            <h3 className="mt-3 text-sm font-semibold text-slate-900">
+              {s.title}
+            </h3>
+            <p className="mt-1 text-sm text-slate-600">{s.desc}</p>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -79,19 +127,17 @@ export default async function Home({
       (sp.sort && sp.sort !== "nearest"),
   );
 
-  const searchBar = (
-    <SearchBar
-      q={sp.q}
-      district={sp.district}
-      lat={sp.lat}
-      lng={sp.lng}
-      sort={sp.sort}
-      maxPrice={sp.maxPrice}
-      minRating={sp.minRating}
-      openNow={sp.openNow}
-      view={sp.view}
-    />
-  );
+  const searchProps = {
+    q: sp.q,
+    district: sp.district,
+    lat: sp.lat,
+    lng: sp.lng,
+    sort: sp.sort,
+    maxPrice: sp.maxPrice,
+    minRating: sp.minRating,
+    openNow: sp.openNow,
+    view: sp.view,
+  };
 
   // ---- Sonuç modu (arama/filtre/semt/harita) ----
   if (hasQuery) {
@@ -114,86 +160,192 @@ export default async function Home({
         : "Sonuçlar";
 
     return (
-      <main className="mx-auto w-full max-w-lg px-4 pb-12 md:max-w-3xl lg:max-w-5xl">
-        <Header />
-        {searchBar}
-        <div className="mb-3 mt-5 flex items-baseline justify-between">
-          <h1 className="text-lg font-semibold text-slate-900">{heading}</h1>
-          <span className="text-sm text-slate-400">
-            {businesses.length} sonuç
-          </span>
-        </div>
-        {view === "map" ? (
-          <BusinessesMapView businesses={businesses} center={userCenter} />
-        ) : businesses.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-slate-300 p-8 text-center text-slate-500">
-            Bu aramada halıcı bulunamadı. Filtreleri gevşetin ya da farklı semt
-            deneyin.
+      <>
+        <main className="mx-auto w-full max-w-lg px-4 pb-12 md:max-w-3xl lg:max-w-5xl">
+          <Header />
+          <SearchBar {...searchProps} />
+          <div className="mb-3 mt-5 flex items-baseline justify-between">
+            <h1 className="text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">
+              {heading}
+            </h1>
+            {businesses.length > 0 && (
+              <span className="text-sm text-slate-500">
+                {businesses.length} sonuç
+              </span>
+            )}
           </div>
-        ) : (
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {businesses.map((b) => (
-              <BusinessCard key={b.id} b={b} />
-            ))}
-          </div>
-        )}
-      </main>
+          {view === "map" ? (
+            <BusinessesMapView businesses={businesses} center={userCenter} />
+          ) : businesses.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-slate-300 bg-white px-6 py-10 text-center">
+              <p className="text-sm font-semibold text-slate-900">
+                Bu aramada halıcı bulunamadı
+              </p>
+              <p className="mx-auto mt-1 max-w-sm text-sm text-slate-600">
+                Filtreleri gevşetmeyi ya da farklı bir semtte aramayı
+                deneyebilirsin.
+              </p>
+              <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+                {DISTRICTS.map((d) => (
+                  <Link
+                    key={d}
+                    href={`/?district=${encodeURIComponent(d)}`}
+                    className="rounded-full border border-slate-200 px-3 py-2 text-sm text-slate-600 hover:border-brand hover:text-brand-dark"
+                  >
+                    {d}
+                  </Link>
+                ))}
+              </div>
+              <Link
+                href="/"
+                className="mt-4 inline-flex items-center justify-center rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark active:scale-[0.99]"
+              >
+                Filtreleri temizle
+              </Link>
+            </div>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {businesses.map((b) => (
+                <BusinessCard key={b.id} b={b} />
+              ))}
+            </div>
+          )}
+        </main>
+        <Footer />
+      </>
     );
   }
 
   // ---- Keşif modu (Çiçek Sepeti tarzı sıralı yatay satırlar) ----
   const all = await getBusinesses({ lat, lng });
-  const nearest = lat != null ? all.filter((b) => b.distanceKm != null).slice(0, 10) : [];
+  const nearest =
+    lat != null ? all.filter((b) => b.distanceKm != null).slice(0, 10) : [];
   const topRated = [...all]
     .filter((b) => b.ratingCount > 0)
     .sort((a, b) => b.ratingAvg - a.ratingAvg)
     .slice(0, 10);
   const fastest = [...all]
     .filter((b) => b.deliveryMaxDays != null)
-    .sort((a, b) => (a.deliveryMaxDays as number) - (b.deliveryMaxDays as number))
+    .sort(
+      (a, b) => (a.deliveryMaxDays as number) - (b.deliveryMaxDays as number),
+    )
     .slice(0, 10);
   const fresh = all.filter((b) => b.isNew).slice(0, 10);
+  const anyRow =
+    nearest.length > 0 ||
+    topRated.length > 0 ||
+    fastest.length > 0 ||
+    fresh.length > 0;
 
   return (
-    <main className="mx-auto w-full max-w-lg px-4 pb-12 md:max-w-3xl lg:max-w-5xl">
-      <Header />
-      <p className="mb-3 text-sm text-slate-500">
-        Halıcını seç, halını kapından aldır, adım adım takip et.
-      </p>
-      {searchBar}
+    <>
+      <main className="mx-auto w-full max-w-lg px-4 pb-12 md:max-w-3xl lg:max-w-5xl">
+        <Header />
 
-      {all.length === 0 ? (
-        <div className="mt-6 rounded-xl border border-dashed border-slate-300 p-8 text-center text-slate-500">
-          Henüz halıcı yok.
-        </div>
-      ) : (
-        <>
-          <BusinessRow
-            title="Sana en yakın"
-            icon={<IconMapPin size={18} />}
-            businesses={nearest}
-            seeAllHref={lat != null ? `/?lat=${lat}&lng=${lng}&view=list` : undefined}
-          />
-          <BusinessRow
-            title="En çok tercih edilenler"
-            icon={<IconStar size={18} filled />}
-            businesses={topRated}
-            seeAllHref="/?sort=rating"
-          />
-          <BusinessRow
-            title="Hızlı teslim"
-            icon={<IconTruck size={18} />}
-            businesses={fastest}
-            seeAllHref="/?sort=fastest"
-          />
-          <BusinessRow
-            title="Yeni halıcılar"
-            icon={<IconSparkles size={18} />}
-            businesses={fresh}
-            seeAllHref="/?view=list"
-          />
-        </>
-      )}
-    </main>
+        {/* Hero: marka bandı — değer önerisi + güven rozetleri + arama kartı */}
+        <section className="rounded-2xl bg-gradient-to-br from-brand to-brand-dark p-4 sm:p-6">
+          <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
+            En yakın halı yıkamacıyı bul
+          </h1>
+          <p className="mt-1.5 text-sm text-teal-50 sm:text-base">
+            Halıcını seç, halın kapından alınsın, adım adım takip et.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-white">
+              <IconWallet size={14} /> Ödeme teslimde · Ön ödeme yok
+            </span>
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-white">
+              <IconTruck size={14} /> Canlı takip
+            </span>
+          </div>
+          <div className="mt-4">
+            <SearchBar {...searchProps} totalCount={all.length} />
+          </div>
+        </section>
+
+        {all.length === 0 ? (
+          <>
+            {/* Lansman ekranı: müşteriye "çok yakında" + nasıl çalışır + işletme CTA'sı */}
+            <section className="mt-10 text-center">
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-brand-light text-brand-dark">
+                <IconSparkles size={26} />
+              </div>
+              <h2 className="mt-4 text-lg font-semibold text-slate-900 sm:text-xl">
+                Bölgendeki halıcılar çok yakında burada
+              </h2>
+              <p className="mx-auto mt-1 max-w-md text-sm text-slate-600">
+                Platform yepyeni — halı yıkama işletmeleri şu anda ekleniyor.
+                Açılışta en yakın halıcıyı buradan seçip halını kapından
+                aldırabileceksin.
+              </p>
+            </section>
+            <HowItWorks />
+            <section className="mt-8 rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm">
+              <h2 className="text-base font-semibold text-slate-900">
+                Halı yıkama işletmen mi var?
+              </h2>
+              <p className="mx-auto mt-1 max-w-md text-sm text-slate-600">
+                İlk katılan işletmelerden ol, bölgendeki müşterilere ilk sen
+                ulaş.
+              </p>
+              <Link
+                href="/giris"
+                className="mt-4 inline-flex items-center justify-center gap-1.5 rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark active:scale-[0.99]"
+              >
+                İlk katılanlardan ol
+                <IconArrowRight size={15} />
+              </Link>
+            </section>
+          </>
+        ) : (
+          <>
+            {anyRow ? (
+              <>
+                <BusinessRow
+                  title="Sana en yakın"
+                  icon={<IconMapPin size={18} />}
+                  businesses={nearest}
+                  seeAllHref={
+                    lat != null ? `/?lat=${lat}&lng=${lng}&view=list` : undefined
+                  }
+                />
+                <BusinessRow
+                  title="En çok tercih edilenler"
+                  icon={<IconStar size={18} filled />}
+                  businesses={topRated}
+                  seeAllHref="/?sort=rating"
+                />
+                <BusinessRow
+                  title="Hızlı teslim"
+                  icon={<IconTruck size={18} />}
+                  businesses={fastest}
+                  seeAllHref="/?sort=fastest"
+                />
+                <BusinessRow
+                  title="Yeni halıcılar"
+                  icon={<IconSparkles size={18} />}
+                  businesses={fresh}
+                  seeAllHref="/?view=list"
+                />
+              </>
+            ) : (
+              /* Dört keşif satırı da boşsa mevcut halıcılar görünmez kalmasın. */
+              <section className="mt-6">
+                <h2 className="mb-2.5 font-semibold text-slate-900">
+                  Tüm halıcılar
+                </h2>
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {all.map((b) => (
+                    <BusinessCard key={b.id} b={b} />
+                  ))}
+                </div>
+              </section>
+            )}
+            <HowItWorks />
+          </>
+        )}
+      </main>
+      <Footer />
+    </>
   );
 }
