@@ -19,6 +19,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${BASE}/kvkk`, changeFrequency: "yearly", priority: 0.2 },
     { url: `${BASE}/gizlilik`, changeFrequency: "yearly", priority: 0.2 },
     { url: `${BASE}/kosullar`, changeFrequency: "yearly", priority: 0.2 },
+    { url: `${BASE}/mesafeli-satis`, changeFrequency: "yearly", priority: 0.2 },
+    { url: `${BASE}/iade`, changeFrequency: "yearly", priority: 0.3 },
+    { url: `${BASE}/on-bilgilendirme`, changeFrequency: "yearly", priority: 0.2 },
   ];
 
   // DB'ye ulaşılamazsa sitemap yine de statik sayfalarla dönsün (500 yerine).

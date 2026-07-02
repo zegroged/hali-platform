@@ -71,12 +71,38 @@ export default function Footer() {
                   Kullanım Koşulları
                 </Link>
               </li>
+              <li>
+                <Link href="/mesafeli-satis" className="hover:text-white">
+                  Mesafeli Satış Sözleşmesi
+                </Link>
+              </li>
+              <li>
+                <Link href="/iade" className="hover:text-white">
+                  İptal ve İade Koşulları
+                </Link>
+              </li>
+              <li>
+                <Link href="/on-bilgilendirme" className="hover:text-white">
+                  Ön Bilgilendirme Formu
+                </Link>
+              </li>
             </ul>
           </div>
         </div>
-        <p className="mt-8 border-t border-slate-800 pt-6 text-xs text-slate-500">
-          © 2026 En Yakın Halı Yıkama. Tüm hakları saklıdır.
-        </p>
+        <div className="mt-8 flex flex-col gap-4 border-t border-slate-800 pt-6 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-xs text-slate-500">
+            © 2026 En Yakın Halı Yıkama. Tüm hakları saklıdır.
+          </p>
+          {/* iyzico logo bandı (resmî paket, beyaz sürüm) — ödeme güven işareti */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/iyzico-band-white.svg"
+            alt="iyzico ile güvenli ödeme — Visa, Mastercard, Troy"
+            loading="lazy"
+            decoding="async"
+            className="h-6 w-auto max-w-full opacity-90 sm:h-7"
+          />
+        </div>
       </div>
     </footer>
   );

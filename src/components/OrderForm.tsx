@@ -276,12 +276,23 @@ export function OrderForm({
 
       <p className="text-xs text-slate-500">
         Talebi oluşturarak{" "}
-        <Link href="/kvkk" className="underline hover:text-slate-700">
-          KVKK aydınlatma metnini
-        </Link>{" "}
-        ve{" "}
+        <Link
+          href="/on-bilgilendirme"
+          className="underline hover:text-slate-700"
+        >
+          Ön Bilgilendirme Formu
+        </Link>
+        &apos;nu,{" "}
+        <Link href="/mesafeli-satis" className="underline hover:text-slate-700">
+          Mesafeli Satış Sözleşmesi
+        </Link>
+        &apos;ni,{" "}
         <Link href="/kosullar" className="underline hover:text-slate-700">
           kullanım koşullarını
+        </Link>{" "}
+        ve{" "}
+        <Link href="/kvkk" className="underline hover:text-slate-700">
+          KVKK aydınlatma metnini
         </Link>{" "}
         kabul etmiş olursun. Bilgilerin yalnızca seçtiğin halıcı ile paylaşılır.
       </p>
