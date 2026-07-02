@@ -18,10 +18,10 @@ function parseM2(v: string): number | null {
 
 export function OrderForm({
   businessId,
-  businessName,
 }: {
   businessId: string;
-  businessName: string;
+  // businessName sayfa başlığında gösterildiği için form içinde kullanılmıyor.
+  businessName?: string;
 }) {
   const router = useRouter();
   const [form, setForm] = useState({
@@ -127,11 +127,7 @@ export function OrderForm({
 
   return (
     <form onSubmit={submit} noValidate className="mt-4 space-y-4">
-      <p className="text-sm text-slate-600">
-        <span className="font-medium text-slate-700">{businessName}</span>{" "}
-        halıcısına talep oluşturuyorsun.
-      </p>
-
+      {/* İşletme adı sayfa başlığında zaten var; burada tekrarlanmaz. */}
       {/* Blok 1 — iletişim bilgileri */}
       <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
         <h2 className="text-sm font-semibold text-slate-800">

@@ -4,10 +4,16 @@ import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import type { MapMarker } from "@/components/LiveMap";
 
+// Panel haritası: mobilde 360px, geniş ekranda 480px. Placeholder aynı
+// sınıfları kullanır ki yükleme geçişinde zıplama olmasın.
+const MAP_H = "h-[360px] lg:h-[480px]";
+
 const LiveMap = dynamic(() => import("@/components/LiveMap"), {
   ssr: false,
   loading: () => (
-    <div className="flex h-[360px] items-center justify-center rounded-xl bg-slate-100 text-sm text-slate-400">
+    <div
+      className={`flex ${MAP_H} items-center justify-center rounded-xl bg-slate-100 text-sm text-slate-500`}
+    >
       Harita yükleniyor…
     </div>
   ),
@@ -60,9 +66,11 @@ export function PanelTrackingClient() {
       <h1 className="text-lg font-semibold text-slate-900">Canlı Takip</h1>
 
       {markers.length > 0 ? (
-        <LiveMap markers={markers} paths={paths} height={360} />
+        <div className={`${MAP_H} [&>div]:!h-full`}>
+          <LiveMap markers={markers} paths={paths} />
+        </div>
       ) : (
-        <div className="flex h-[200px] items-center justify-center rounded-xl bg-slate-100 text-center text-sm text-slate-400">
+        <div className="flex h-[200px] items-center justify-center rounded-xl bg-slate-100 text-center text-sm text-slate-500">
           Şu an mesaide konum gönderen şoför yok.
         </div>
       )}

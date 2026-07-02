@@ -3,10 +3,15 @@
 import { useCallback, useState } from "react";
 import dynamic from "next/dynamic";
 
+// Rota haritası: mobilde 360px, geniş ekranda 480px (PanelTrackingClient ile aynı desen).
+const MAP_H = "h-[360px] lg:h-[480px]";
+
 const RouteMap = dynamic(() => import("@/components/RouteMap"), {
   ssr: false,
   loading: () => (
-    <div className="flex h-[360px] items-center justify-center rounded-xl bg-slate-100 text-sm text-slate-400">
+    <div
+      className={`flex ${MAP_H} items-center justify-center rounded-xl bg-slate-100 text-sm text-slate-500`}
+    >
       Harita yükleniyor…
     </div>
   ),
@@ -117,14 +122,15 @@ export function RouteHistory({
 
           {data.points.length > 0 ? (
             <>
-              <RouteMap
-                key={`${driverId}-${date}`}
-                points={data.points}
-                stops={data.stops}
-                playing={playing}
-                onDone={stopPlaying}
-                height={360}
-              />
+              <div className={`${MAP_H} [&>div]:!h-full`}>
+                <RouteMap
+                  key={`${driverId}-${date}`}
+                  points={data.points}
+                  stops={data.stops}
+                  playing={playing}
+                  onDone={stopPlaying}
+                />
+              </div>
               <div className="flex gap-2">
                 {!playing ? (
                   <button

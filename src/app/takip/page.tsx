@@ -20,7 +20,10 @@ export default function TakipIndex() {
   return (
     <div className="flex min-h-dvh flex-col">
       <main className="mx-auto w-full max-w-sm flex-1 px-6 py-16">
-        <Link href="/" className="text-sm text-brand-dark hover:underline">
+        <Link
+          href="/"
+          className="block text-sm text-brand-dark hover:underline"
+        >
           ← Ana sayfa
         </Link>
         <h1 className="mt-6 inline-flex items-center gap-2 text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">
