@@ -8,18 +8,48 @@ import {
 import { verifMeta } from "@/lib/verifMeta";
 import { submitForVerification, acceptContract } from "./actions";
 import { EmailVerify } from "@/components/EmailVerify";
-import { IconCheck, IconChevronRight, IconWallet } from "@/components/icons";
+import {
+  IconCheck,
+  IconChevronRight,
+  IconWallet,
+  IconPackage,
+} from "@/components/icons";
+
+function fmtTarih(dt: Date) {
+  return new Date(dt).toLocaleString("tr-TR", {
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "Europe/Istanbul",
+  });
+}
 
 export default async function PanelHome() {
   const b = await getCurrentBusiness();
   if (!b) return null;
 
-  const [pendingOrders, activeOrders] = await Promise.all([
+  const [pendingOrders, activeOrders, delivered] = await Promise.all([
     prisma.order.count({ where: { businessId: b.id, status: "CREATED" } }),
     prisma.order.count({
       where: {
         businessId: b.id,
         status: { in: ["ACCEPTED", "PICKED_UP", "WASHING", "OUT_FOR_DELIVERY"] },
+      },
+    }),
+    // Son teslimatlar: tahsilat + adres + teslim kanıtı fotoğrafı bir arada.
+    prisma.order.findMany({
+      where: { businessId: b.id, status: "DELIVERED" },
+      orderBy: { updatedAt: "desc" },
+      take: 5,
+      select: {
+        id: true,
+        customerName: true,
+        pickupAddress: true,
+        priceTotal: true,
+        deliveryPhotoUrl: true,
+        pickupPhotoUrl: true,
+        updatedAt: true,
       },
     }),
   ]);
@@ -83,6 +113,62 @@ export default async function PanelHome() {
           <div className="text-xs text-slate-500">Mesaide şoför</div>
         </Link>
       </div>
+
+      {/* Son teslimatlar — tutar + adres + teslim fotoğrafı (şoför çeker) */}
+      {delivered.length > 0 && (
+        <div className="rounded-xl border border-slate-200 bg-white p-4">
+          <div className="flex items-center justify-between">
+            <h2 className="font-semibold text-slate-900">Son teslimatlar</h2>
+            <Link
+              href="/panel/siparisler"
+              className="text-sm text-brand-dark hover:underline"
+            >
+              Tümü
+            </Link>
+          </div>
+          <ul className="mt-2 divide-y divide-slate-100">
+            {delivered.map((o) => (
+              <li key={o.id}>
+                <Link
+                  href={`/panel/siparisler/${o.id}`}
+                  className="-mx-1 flex items-center gap-3 rounded-lg px-1 py-2.5 transition hover:bg-slate-50"
+                >
+                  {o.deliveryPhotoUrl || o.pickupPhotoUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={(o.deliveryPhotoUrl ?? o.pickupPhotoUrl)!}
+                      alt="Teslim fotoğrafı"
+                      loading="lazy"
+                      decoding="async"
+                      className="h-12 w-12 shrink-0 rounded-lg border border-slate-200 object-cover"
+                    />
+                  ) : (
+                    <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-400">
+                      <IconPackage size={18} />
+                    </span>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-slate-900">
+                      {o.customerName}
+                    </p>
+                    <p className="truncate text-xs text-slate-500">
+                      {o.pickupAddress}
+                    </p>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <p className="text-sm font-semibold text-brand-dark">
+                      {o.priceTotal != null ? `${Number(o.priceTotal)} TL` : "—"}
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      {fmtTarih(o.updatedAt)}
+                    </p>
+                  </div>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* Abonelik */}
       <div className="rounded-xl border border-slate-200 bg-white p-4">

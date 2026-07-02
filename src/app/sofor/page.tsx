@@ -151,11 +151,16 @@ export default async function SoforPage() {
               {o.status === "ACCEPTED" && (
                 <form action={savePickup} className="space-y-2">
                   <input type="hidden" name="orderId" value={o.id} />
-                  <input
-                    name="photoUrl"
-                    placeholder="Halı fotoğrafı URL (opsiyonel)"
-                    className={inp}
-                  />
+                  <label className="block text-xs font-medium text-slate-600">
+                    Halının fotoğrafını çek (opsiyonel)
+                    <input
+                      name="photo"
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      capture="environment"
+                      className="mt-1 w-full text-sm text-slate-600 file:mr-2 file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-sm"
+                    />
+                  </label>
                   <PendingButton className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-brand py-2 text-sm font-semibold text-white hover:bg-brand-dark">
                     <IconPackage size={16} /> Halıyı Aldım
                   </PendingButton>
@@ -196,6 +201,17 @@ export default async function SoforPage() {
                     placeholder="Tahsil edilen tutar (TL)"
                     className={inp}
                   />
+                  <label className="block text-xs font-medium text-slate-600">
+                    Teslim ettiğin halının fotoğrafını çek (kanıt — patron ve
+                    müşteri görür)
+                    <input
+                      name="photo"
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      capture="environment"
+                      className="mt-1 w-full text-sm text-slate-600 file:mr-2 file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-sm"
+                    />
+                  </label>
                   <p className="text-xs text-slate-500">
                     Kapıda nakit tahsil et — teslim anında.
                   </p>

@@ -7,6 +7,7 @@ import { getSessionUser } from "@/lib/auth";
 import { sendSms, trackingLink } from "@/lib/sms";
 import { getAppBaseUrl } from "@/lib/config";
 import { DRIVER_NEXT } from "@/lib/orderStatus";
+import { saveOrderPhotoFile } from "@/lib/orderPhoto";
 import { ORDER_STATUS_META } from "@/lib/orderStatus";
 
 async function currentDriver() {
@@ -64,15 +65,21 @@ export async function rejectOrder(formData: FormData) {
 export async function savePickup(formData: FormData) {
   const d = await currentDriver();
   const id = String(formData.get("orderId"));
-  const photoUrl = String(formData.get("photoUrl") || "");
   const o = await prisma.order.findFirst({
     where: { id, driverId: d.id, status: "ACCEPTED" },
   });
   if (!o) return;
 
+  // Gerçek dosya yüklemesi (kamera/galeri) — geçersizse null, akış bloklanmaz.
+  const photoUrl = await saveOrderPhotoFile(
+    formData.get("photo"),
+    o.businessId,
+    o.id,
+  );
+
   await prisma.order.update({
     where: { id },
-    data: { status: "PICKED_UP", pickupPhotoUrl: photoUrl || null },
+    data: { status: "PICKED_UP", pickupPhotoUrl: photoUrl },
   });
   await prisma.orderEvent.create({
     data: { orderId: id, status: "PICKED_UP", note: "Halı alındı" },
@@ -150,6 +157,19 @@ export async function deliverOrder(formData: FormData) {
     },
   });
   if (updated.count === 0) return; // başka istek önce teslim etti
+
+  // Teslim kanıtı fotoğrafı: patron Özet'te görür, müşteri takipte görür.
+  const deliveryPhotoUrl = await saveOrderPhotoFile(
+    formData.get("photo"),
+    o.businessId,
+    id,
+  );
+  if (deliveryPhotoUrl) {
+    await prisma.order.update({
+      where: { id },
+      data: { deliveryPhotoUrl },
+    });
+  }
 
   const note =
     o.paymentMethod === "CASH"
