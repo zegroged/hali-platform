@@ -9,9 +9,7 @@ export const metadata: Metadata = {
     "En Yakın Halı Yıkama üzerinden verilen siparişlerde geçerli mesafeli satış sözleşmesi.",
 };
 
-// TODO(künye): Şirket ünvanı, adres, vergi dairesi/no ve MERSİS bilgileri
-// netleşince §1'deki geçici künye ifadesi gerçek bilgilerle değiştirilecek
-// (iyzico başvurusu öncesi ŞART).
+// Künye işlendi (2026-07-02, vergi levhasından — şahıs işletmesi, MERSİS yok).
 // TODO(iyzico): Ödeme kuruluşu sözleşmesi imzalanınca §3'teki "anlaşmalı
 // ödeme kuruluşu" ifadesi marka adıyla (iyzico) güncellenecek.
 export default function MesafeliSatisPage() {
@@ -32,9 +30,10 @@ export default function MesafeliSatisPage() {
         </p>
         <p>
           <strong>ARACI HİZMET SAĞLAYICI (PLATFORM):</strong>{" "}
-          enyakinhaliyikamaservisi.com. Platform işleticisinin ticari unvanı,
-          merkez adresi, vergi/MERSİS numarası ve KEP adresi, işletme tescil
-          işlemleri tamamlandığında bu bölümde yayımlanacaktır. İletişim:
+          enyakinhaliyikamaservisi.com — işleticisi{" "}
+          <strong>[YASAL AD]</strong> (şahıs işletmesi). Adres:
+          [ADRES], Selçuklu/Konya ·
+          Vergi Dairesi/No: Meram / ***KALDIRILDI***. İletişim:
           info@enyakinhaliyikamaservisi.com (
           <Link href="/iletisim" className="text-brand-dark underline">
             iletişim sayfası

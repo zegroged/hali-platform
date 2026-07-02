@@ -27,8 +27,9 @@ export default function IsletmeSozlesmesiPage() {
           <strong>Platform:</strong> enyakinhaliyikamaservisi.com — 6563 sayılı
           Elektronik Ticaretin Düzenlenmesi Hakkında Kanun md.2/1-d anlamında{" "}
           <strong>aracı hizmet sağlayıcıdır</strong>; halı yıkama hizmetinin
-          tarafı değildir. (Ticari unvan ve adres bilgileri tescil
-          tamamlandığında bu bölümde yayımlanacaktır.)
+          tarafı değildir. İşletici: <strong>[YASAL AD]</strong> (şahıs
+          işletmesi), [ADRES],
+          Selçuklu/Konya · Vergi Dairesi/No: Meram / ***KALDIRILDI***.
         </p>
         <p>
           <strong>İşletme:</strong> Platformda profili yayımlanan, halı yıkama

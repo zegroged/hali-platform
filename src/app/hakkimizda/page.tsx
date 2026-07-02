@@ -79,8 +79,9 @@ export default function HakkimizdaPage() {
 
       <Section title="Künye ve İletişim">
         <p>
-          Ticari unvan ve adres bilgileri tescil tamamlandığında burada
-          yayımlanacaktır. Bize ulaşmak için{" "}
+          İşletici: <strong>[YASAL AD]</strong> (şahıs işletmesi) ·
+          [ADRES], Selçuklu/Konya ·
+          Vergi Dairesi/No: Meram / ***KALDIRILDI***. Bize ulaşmak için{" "}
           <Link
             href="/iletisim"
             className="font-medium text-brand-dark hover:underline"

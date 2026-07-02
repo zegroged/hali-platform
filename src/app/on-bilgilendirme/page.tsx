@@ -9,8 +9,7 @@ export const metadata: Metadata = {
     "Mesafeli Sözleşmeler Yönetmeliği uyarınca sipariş öncesi ön bilgilendirme formu.",
 };
 
-// TODO(künye): Şirket bilgileri (unvan, adres, vergi/MERSİS no, KEP)
-// netleşince §1'deki geçici künye ifadesi gerçek bilgilerle değiştirilecek.
+// Künye işlendi (2026-07-02, vergi levhasından). Kalan: telefon + KEP (varsa).
 // TODO(iyzico): Ödeme kuruluşu sözleşmesi imzalanınca §3'teki "anlaşmalı
 // ödeme kuruluşu" ifadesi marka adıyla (iyzico) güncellenecek.
 export default function OnBilgilendirmePage() {
@@ -29,9 +28,11 @@ export default function OnBilgilendirmePage() {
           Yönetmeliği md. 5/1-b ve 5/1-c).
         </p>
         <p>
-          Platform işleticisinin ticari unvanı, merkez adresi, vergi/MERSİS
-          numarası ve KEP adresi, işletme tescil işlemleri tamamlandığında bu
-          bölümde yayımlanacaktır. İletişim: info@enyakinhaliyikamaservisi.com.
+          Platform işleticisi (aracı hizmet sağlayıcı):{" "}
+          <strong>[YASAL AD]</strong> (şahıs işletmesi). Adres:
+          [ADRES], Selçuklu/Konya. Vergi
+          Dairesi/No: Meram / ***KALDIRILDI***. İletişim:
+          info@enyakinhaliyikamaservisi.com.
         </p>
       </Section>
 

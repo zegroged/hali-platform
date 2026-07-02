@@ -25,10 +25,10 @@ export default function KvkkPage() {
           <strong>En Yakın Halı Yıkama</strong> (enyakinhaliyikamaservisi.com)
           tarafından aşağıda açıklanan kapsamda işlenmektedir.
         </p>
-        {/* TODO(künye): tescil tamamlanınca ticari unvan + adres buraya işlenecek. */}
         <p>
-          Veri sorumlusunun ticari unvanı ve adres bilgisi, işletme tescil
-          işlemleri tamamlandığında bu bölümde yayımlanacaktır. KVKK
+          Veri sorumlusu: <strong>[YASAL AD]</strong> (şahıs
+          işletmesi) — [ADRES],
+          Selçuklu/Konya (Vergi Dairesi/No: Meram / ***KALDIRILDI***). KVKK
           kapsamındaki başvurularınız için başvuru kanalı:{" "}
           <a
             href="mailto:info@enyakinhaliyikamaservisi.com"

@@ -67,6 +67,31 @@ export default function IletisimPage() {
         </Link>
       </div>
 
+      {/* Ticari künye — ETAHS Yön. md.6/1 (iletişim başlığı altında tanıtıcı bilgiler) */}
+      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <h2 className="text-sm font-semibold text-slate-900">Ticari Künye</h2>
+        <dl className="mt-2 space-y-1 text-base text-slate-700">
+          <div>
+            <dt className="inline font-medium">İşletici: </dt>
+            <dd className="inline">[YASAL AD] (şahıs işletmesi)</dd>
+          </div>
+          <div>
+            <dt className="inline font-medium">Adres: </dt>
+            <dd className="inline">
+              [ADRES], Selçuklu/Konya
+            </dd>
+          </div>
+          <div>
+            <dt className="inline font-medium">Vergi Dairesi/No: </dt>
+            <dd className="inline">Meram / ***KALDIRILDI***</dd>
+          </div>
+          <div>
+            <dt className="inline font-medium">E-posta: </dt>
+            <dd className="inline">info@enyakinhaliyikamaservisi.com</dd>
+          </div>
+        </dl>
+      </div>
+
       <p className="text-sm text-slate-600">
         Sık karşılaşılan sorular için önce{" "}
         <Link href="/sss" className="font-medium text-brand-dark hover:underline">
