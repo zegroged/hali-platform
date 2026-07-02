@@ -1,9 +1,19 @@
+import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { getCurrentBusiness } from "@/lib/panel";
 import { ORDER_STATUS_META, REJECT_REASONS } from "@/lib/orderStatus";
-import { OrderStatusIcon, IconReceipt } from "@/components/icons";
+import {
+  OrderStatusIcon,
+  IconReceipt,
+  IconChevronRight,
+} from "@/components/icons";
 import EmptyState from "@/components/EmptyState";
-import { reassignOrder, cancelOrder, rejectOrder } from "../actions";
+import {
+  reassignOrder,
+  cancelOrder,
+  rejectOrder,
+  acceptOrderPanel,
+} from "../actions";
 import { ConfirmButton } from "../ConfirmButton";
 
 const STATUS_CLS: Record<string, string> = {
@@ -81,6 +91,23 @@ export default async function PanelOrders() {
               <span className="text-sm text-slate-500 sm:self-center">
                 Şoför: {o.driver?.user.name ?? "—"}
               </span>
+
+              <Link
+                href={`/panel/siparisler/${o.id}`}
+                className="inline-flex items-center justify-center gap-1 rounded-lg border border-brand px-3 py-2 text-sm font-semibold text-brand-dark transition hover:bg-brand-light/50 sm:order-last sm:ml-auto"
+              >
+                Yönet
+                <IconChevronRight size={14} />
+              </Link>
+
+              {o.status === "CREATED" && (
+                <form action={acceptOrderPanel}>
+                  <input type="hidden" name="orderId" value={o.id} />
+                  <button className="w-full rounded-lg bg-brand px-3 py-2 text-sm font-semibold text-white transition hover:bg-brand-dark sm:w-auto">
+                    Onayla
+                  </button>
+                </form>
+              )}
 
               {!closed && (
                 <>

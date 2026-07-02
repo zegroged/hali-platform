@@ -73,20 +73,20 @@ enum PricingUnit {
 // ---------------------------------------------------------------- modeller
 
 model User {
-  id        String   @id @default(cuid())
-  role      UserRole
-  name      String
-  phone     String   @unique
-  email     String?  @unique
-  password  String? // hash; müşteri için opsiyonel
-  phoneVerified Boolean   @default(false)
-  emailVerified Boolean   @default(false) // halıcı hesap doğrulaması e-posta ile
-  otpCode       String? // telefon SMS OTP (ayrı — e-posta ile çakışmasın)
-  otpExpiresAt  DateTime?
+  id                String    @id @default(cuid())
+  role              UserRole
+  name              String
+  phone             String    @unique
+  email             String?   @unique
+  password          String? // hash; müşteri için opsiyonel
+  phoneVerified     Boolean   @default(false)
+  emailVerified     Boolean   @default(false) // halıcı hesap doğrulaması e-posta ile
+  otpCode           String? // telefon SMS OTP (ayrı — e-posta ile çakışmasın)
+  otpExpiresAt      DateTime?
   emailOtpCode      String? // e-posta doğrulama kodu (telefondan bağımsız)
   emailOtpExpiresAt DateTime?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
   ownedBusiness CleanerBusiness? @relation("BusinessOwner")
   driverProfile Driver?
@@ -113,8 +113,8 @@ model CleanerBusiness {
 
   taxNumber          String? // vergi no (doğrulama için)
   contractAcceptedAt DateTime? // platform sözleşmesi onay zamanı
-  verification VerificationStatus @default(PENDING)
-  isVisible    Boolean            @default(false) // profil tam + doğrulanmış olunca true
+  verification       VerificationStatus @default(PENDING)
+  isVisible          Boolean            @default(false) // profil tam + doğrulanmış olunca true
 
   ratingAvg   Float @default(0)
   ratingCount Int   @default(0)
@@ -245,11 +245,13 @@ model Order {
   commission    Decimal?      @db.Decimal(10, 2) // kartla ödemede %3
 
   pickupPhotoUrl String?
+  estimatedDays  Int? // halıcının verdiği tahmini teslim süresi (gün)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   events OrderEvent[]
+  photos OrderPhoto[]
   review Review?
   stops  DriverStop[]
 
@@ -263,6 +265,17 @@ model OrderEvent {
   status    OrderStatus
   note      String?
   createdAt DateTime    @default(now())
+}
+
+// Halıcının siparişe eklediği fotoğraflar (önce/sonra, süreç) — müşteri takipte görür.
+model OrderPhoto {
+  id        String   @id @default(cuid())
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId   String
+  url       String
+  createdAt DateTime @default(now())
+
+  @@index([orderId])
 }
 
 model Review {

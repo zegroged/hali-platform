@@ -34,6 +34,8 @@ type Track = {
   pickupLng: number | null;
   priceTotal: number | null;
   paymentMethod: string;
+  estimatedDays: number | null;
+  photos: { id: string; url: string }[];
   business: { name: string; phone: string };
   events: { status: OrderStatus; note: string | null; at: string }[];
   driver: { name: string; lat: number; lng: number } | null;
@@ -295,6 +297,13 @@ export function TrackingClient({ token }: { token: string }) {
         </div>
       ) : (
         <>
+          {/* Halıcının verdiği tahmini teslim süresi */}
+          {data.estimatedDays != null && data.status !== "DELIVERED" && (
+            <div className="rounded-lg bg-brand-light px-3 py-2 text-sm font-medium text-brand-dark">
+              Tahmini teslim: ~{data.estimatedDays} gün
+            </div>
+          )}
+
           {/* Durum adımları */}
           <div className="space-y-0">
             {CUSTOMER_FLOW.map((s, i) => {
@@ -405,6 +414,29 @@ export function TrackingClient({ token }: { token: string }) {
             </div>
           ) : null}
         </>
+      )}
+
+      {/* Halıcının eklediği fotoğraflar */}
+      {data.photos.length > 0 && (
+        <div>
+          <h2 className="mb-2 text-sm font-semibold text-slate-700">
+            Halınızdan kareler
+          </h2>
+          <div className="grid grid-cols-3 gap-2">
+            {data.photos.map((p) => (
+              <a key={p.id} href={p.url} target="_blank" rel="noreferrer">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={p.url}
+                  alt="Sipariş fotoğrafı"
+                  loading="lazy"
+                  decoding="async"
+                  className="aspect-square w-full rounded-lg border border-slate-200 object-cover"
+                />
+              </a>
+            ))}
+          </div>
+        </div>
       )}
 
       {/* Geçmiş */}

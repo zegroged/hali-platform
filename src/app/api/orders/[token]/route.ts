@@ -21,6 +21,7 @@ export async function GET(
       business: { select: { name: true, phone: true } },
       driver: { select: { lastLat: true, lastLng: true, user: { select: { name: true } } } },
       events: { orderBy: { createdAt: "asc" } },
+      photos: { orderBy: { createdAt: "asc" }, select: { id: true, url: true } },
     },
   });
   if (!order) {
@@ -43,6 +44,8 @@ export async function GET(
     pickupLng: order.pickupLng,
     priceTotal: order.priceTotal != null ? Number(order.priceTotal) : null,
     paymentMethod: order.paymentMethod,
+    estimatedDays: order.estimatedDays,
+    photos: order.photos,
     business: order.business,
     events: order.events.map((e) => ({
       status: e.status,

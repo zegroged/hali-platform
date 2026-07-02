@@ -29,6 +29,17 @@ export const DRIVER_NEXT: Partial<Record<OrderStatus, OrderStatus>> = {
   WASHING: "OUT_FOR_DELIVERY",
 };
 
+// Halıcının panelden ilerletebileceği ara geçişler + buton etiketleri.
+// (CREATED→ACCEPTED acceptOrderPanel'e, OUT_FOR_DELIVERY→DELIVERED tutar
+// gerektirdiği için deliverOrderPanel'e ait — burada YOK.)
+export const PANEL_NEXT: Partial<
+  Record<OrderStatus, { next: OrderStatus; action: string }>
+> = {
+  ACCEPTED: { next: "PICKED_UP", action: "Halı alındı olarak işaretle" },
+  PICKED_UP: { next: "WASHING", action: "Yıkamaya alındı olarak işaretle" },
+  WASHING: { next: "OUT_FOR_DELIVERY", action: "Yola çıktı olarak işaretle" },
+};
+
 // Hazır red sebepleri (dropdown)
 export const REJECT_REASONS = [
   "Yoğunluk / kapasite dolu",

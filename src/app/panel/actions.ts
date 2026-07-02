@@ -6,8 +6,9 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getCurrentBusiness, profileComplete, syncVisibility } from "@/lib/panel";
 import { hashPassword } from "@/lib/auth";
-import { sendSms } from "@/lib/sms";
+import { sendSms, trackingLink } from "@/lib/sms";
 import { getAppBaseUrl } from "@/lib/config";
+import { ORDER_STATUS_META, PANEL_NEXT } from "@/lib/orderStatus";
 import type { PricingUnit } from "@prisma/client";
 
 async function biz() {
@@ -300,4 +301,131 @@ export async function rejectOrder(formData: FormData) {
     console.error("rejectOrder SMS hatası:", e);
   }
   revalidatePath("/panel/siparisler");
+}
+
+// ————— Sipariş yaşam döngüsü (halıcı yönetimi) —————
+// Şoför tarafındaki akışla aynı durum makinesi; tüm geçişler CAS (updateMany +
+// status koşulu) ile — çift tık / yarış durumunda ikinci istek sessizce düşer.
+
+/** CREATED → ACCEPTED. Şoför kabulünün panel muadili. */
+export async function acceptOrderPanel(formData: FormData) {
+  const b = await biz();
+  const orderId = String(formData.get("orderId"));
+  const accepted = await prisma.order.updateMany({
+    where: { id: orderId, businessId: b.id, status: "CREATED" },
+    data: { status: "ACCEPTED" },
+  });
+  if (accepted.count === 0) return;
+  await prisma.orderEvent.create({
+    data: { orderId, status: "ACCEPTED", note: "Halıcı kabul etti" },
+  });
+  revalidatePath("/panel/siparisler");
+  revalidatePath(`/panel/siparisler/${orderId}`);
+}
+
+/** Ara adımlar: ACCEPTED→PICKED_UP→WASHING→OUT_FOR_DELIVERY (PANEL_NEXT). */
+export async function advanceOrderPanel(formData: FormData) {
+  const b = await biz();
+  const orderId = String(formData.get("orderId"));
+  const order = await prisma.order.findFirst({
+    where: { id: orderId, businessId: b.id },
+  });
+  if (!order) return;
+  const step = PANEL_NEXT[order.status];
+  if (!step) return;
+
+  const updated = await prisma.order.updateMany({
+    where: { id: orderId, businessId: b.id, status: order.status },
+    data: { status: step.next },
+  });
+  if (updated.count === 0) return;
+  await prisma.orderEvent.create({
+    data: { orderId, status: step.next, note: ORDER_STATUS_META[step.next].label },
+  });
+
+  if (step.next === "OUT_FOR_DELIVERY") {
+    // Şoför akışıyla aynı: önceki teslimatın konumu sızmasın + canlı takip SMS'i.
+    if (order.driverId) {
+      await prisma.driver.update({
+        where: { id: order.driverId },
+        data: { lastLat: null, lastLng: null },
+      });
+    }
+    try {
+      await sendSms(
+        order.customerPhone,
+        `Haliniz yola cikti! Canli takip: ${trackingLink(order.code ?? order.trackingToken)}`,
+      );
+    } catch (e) {
+      console.error("advanceOrderPanel SMS hatası:", e);
+    }
+  }
+  revalidatePath("/panel/siparisler");
+  revalidatePath(`/panel/siparisler/${orderId}`);
+}
+
+/** OUT_FOR_DELIVERY → DELIVERED + tahsilat tutarı (şoför deliverOrder muadili). */
+export async function deliverOrderPanel(formData: FormData) {
+  const b = await biz();
+  const orderId = String(formData.get("orderId"));
+  const price = Number(String(formData.get("price") || "").replace(",", "."));
+  if (!Number.isFinite(price) || price <= 0) {
+    throw new Error("Geçerli bir teslim tutarı girin (0'dan büyük).");
+  }
+  const order = await prisma.order.findFirst({
+    where: { id: orderId, businessId: b.id, status: "OUT_FOR_DELIVERY" },
+  });
+  if (!order) return;
+
+  const isCash = order.paymentMethod === "CASH";
+  const updated = await prisma.order.updateMany({
+    where: { id: orderId, businessId: b.id, status: "OUT_FOR_DELIVERY" },
+    data: {
+      status: "DELIVERED",
+      priceTotal: price,
+      commission: isCash ? 0 : undefined,
+      paymentStatus: isCash ? "PAID" : order.paymentStatus,
+    },
+  });
+  if (updated.count === 0) return;
+  await prisma.orderEvent.create({
+    data: {
+      orderId,
+      status: "DELIVERED",
+      note: isCash
+        ? `Teslim edildi · ${price} TL nakit tahsil edildi`
+        : `Teslim edildi · ${price} TL (kartla ödeme bekleniyor)`,
+    },
+  });
+  revalidatePath("/panel/siparisler");
+  revalidatePath(`/panel/siparisler/${orderId}`);
+}
+
+/** Tahmini teslim süresi (gün) — müşteri takip sayfasında görür. */
+export async function setOrderEta(formData: FormData) {
+  const b = await biz();
+  const orderId = String(formData.get("orderId"));
+  const days = Math.round(Number(formData.get("days")));
+  if (!Number.isFinite(days) || days < 1 || days > 60) return;
+  const order = await prisma.order.findFirst({
+    where: {
+      id: orderId,
+      businessId: b.id,
+      status: { notIn: ["DELIVERED", "CANCELED", "REJECTED"] },
+    },
+  });
+  if (!order) return;
+  await prisma.order.update({
+    where: { id: orderId },
+    data: { estimatedDays: days },
+  });
+  await prisma.orderEvent.create({
+    data: {
+      orderId,
+      status: order.status,
+      note: `Tahmini teslim güncellendi: ~${days} gün`,
+    },
+  });
+  revalidatePath("/panel/siparisler");
+  revalidatePath(`/panel/siparisler/${orderId}`);
 }
