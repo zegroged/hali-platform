@@ -1,3 +1,4 @@
+import { PendingButton } from "@/components/PendingButton";
 import { prisma } from "@/lib/prisma";
 import { getSessionUser } from "@/lib/auth";
 import { DriverShift } from "@/components/DriverShift";
@@ -82,9 +83,9 @@ export default async function SoforPage() {
                 <div className="space-y-2">
                   <form action={acceptOrder}>
                     <input type="hidden" name="orderId" value={o.id} />
-                    <button className="w-full rounded-lg bg-brand py-2 text-sm font-semibold text-white hover:bg-brand-dark">
+                    <PendingButton className="w-full rounded-lg bg-brand py-2 text-sm font-semibold text-white hover:bg-brand-dark">
                       İşi Kabul Et
-                    </button>
+                    </PendingButton>
                   </form>
                   <form action={rejectOrder} className="space-y-2">
                     <input type="hidden" name="orderId" value={o.id} />
@@ -104,9 +105,9 @@ export default async function SoforPage() {
                         placeholder="Not (opsiyonel)"
                         className={inp}
                       />
-                      <button className="whitespace-nowrap rounded-lg border border-red-300 px-3 py-2 text-sm font-medium text-red-600">
+                      <PendingButton className="whitespace-nowrap rounded-lg border border-red-300 px-3 py-2 text-sm font-medium text-red-600">
                         Reddet
-                      </button>
+                      </PendingButton>
                     </div>
                   </form>
                 </div>
@@ -121,9 +122,9 @@ export default async function SoforPage() {
                     placeholder="Halı fotoğrafı URL (opsiyonel)"
                     className={inp}
                   />
-                  <button className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-brand py-2 text-sm font-semibold text-white hover:bg-brand-dark">
+                  <PendingButton className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-brand py-2 text-sm font-semibold text-white hover:bg-brand-dark">
                     <IconPackage size={16} /> Halıyı Aldım
-                  </button>
+                  </PendingButton>
                   <p className="text-center text-xs text-slate-500">
                     Ödeme teslimde alınır.
                   </p>
@@ -134,12 +135,12 @@ export default async function SoforPage() {
               {(o.status === "PICKED_UP" || o.status === "WASHING") && next && (
                 <form action={advanceOrder}>
                   <input type="hidden" name="orderId" value={o.id} />
-                  <button className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-brand py-2 text-sm font-semibold text-white hover:bg-brand-dark">
+                  <PendingButton className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-brand py-2 text-sm font-semibold text-white hover:bg-brand-dark">
                     <OrderStatusIcon status={next} size={16} />
                     {next === "OUT_FOR_DELIVERY"
                       ? "Teslime çıktım"
                       : `${ORDER_STATUS_META[next].label} olarak işaretle`}
-                  </button>
+                  </PendingButton>
                   {next === "OUT_FOR_DELIVERY" && (
                     <p className="mt-1 text-center text-xs text-slate-500">
                       Müşteri artık seni canlı takip edebilecek.
@@ -164,9 +165,9 @@ export default async function SoforPage() {
                   <p className="text-xs text-slate-500">
                     Kapıda nakit tahsil et — teslim anında.
                   </p>
-                  <button className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-brand py-2 text-sm font-semibold text-white hover:bg-brand-dark">
+                  <PendingButton className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-brand py-2 text-sm font-semibold text-white hover:bg-brand-dark">
                     <IconHome size={16} /> Teslim Et &amp; Tahsilatı Gir
-                  </button>
+                  </PendingButton>
                 </form>
               )}
             </div>

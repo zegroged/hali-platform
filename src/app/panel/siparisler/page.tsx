@@ -15,6 +15,7 @@ import {
   acceptOrderPanel,
 } from "../actions";
 import { ConfirmButton } from "../ConfirmButton";
+import { PendingButton } from "@/components/PendingButton";
 
 const STATUS_CLS: Record<string, string> = {
   CREATED: "bg-amber-100 text-amber-700",
@@ -103,9 +104,9 @@ export default async function PanelOrders() {
               {o.status === "CREATED" && (
                 <form action={acceptOrderPanel}>
                   <input type="hidden" name="orderId" value={o.id} />
-                  <button className="w-full rounded-lg bg-brand px-3 py-2 text-sm font-semibold text-white transition hover:bg-brand-dark sm:w-auto">
+                  <PendingButton className="w-full rounded-lg bg-brand px-3 py-2 text-sm font-semibold text-white transition hover:bg-brand-dark disabled:opacity-60 sm:w-auto">
                     Onayla
-                  </button>
+                  </PendingButton>
                 </form>
               )}
 
@@ -134,9 +135,9 @@ export default async function PanelOrders() {
                         ))}
                       </select>
                     </div>
-                    <button className="rounded-lg bg-brand px-3 py-2 text-sm font-semibold text-white transition hover:bg-brand-dark">
+                    <PendingButton className="rounded-lg bg-brand px-3 py-2 text-sm font-semibold text-white transition hover:bg-brand-dark disabled:opacity-60">
                       Ata
-                    </button>
+                    </PendingButton>
                   </form>
 
                   <form action={cancelOrder}>
@@ -176,9 +177,9 @@ export default async function PanelOrders() {
                           ))}
                         </select>
                       </div>
-                      <button className="rounded-lg border border-red-300 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50">
+                      <PendingButton className="rounded-lg border border-red-300 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-60">
                         Reddet
-                      </button>
+                      </PendingButton>
                     </form>
                   )}
                 </>

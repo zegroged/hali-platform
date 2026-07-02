@@ -16,6 +16,7 @@ import {
   IconMapPin,
 } from "@/components/icons";
 import { OrderPhotoManager } from "@/components/OrderPhotoManager";
+import { PendingButton } from "@/components/PendingButton";
 import { ConfirmButton } from "../../ConfirmButton";
 import {
   acceptOrderPanel,
@@ -197,9 +198,9 @@ export default async function OrderManagePage({
           <div className="mt-4 flex flex-col gap-2 border-t border-slate-100 pt-4 sm:flex-row sm:items-end">
             <form action={acceptOrderPanel} className="sm:mr-2">
               <input type="hidden" name="orderId" value={o.id} />
-              <button className="w-full rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark active:scale-[0.99] sm:w-auto">
+              <PendingButton className="w-full rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark active:scale-[0.99] disabled:opacity-60 sm:w-auto">
                 Siparişi Onayla
-              </button>
+              </PendingButton>
             </form>
             <form action={rejectOrder} className="flex items-end gap-1.5">
               <input type="hidden" name="orderId" value={o.id} />
@@ -224,9 +225,9 @@ export default async function OrderManagePage({
                   ))}
                 </select>
               </div>
-              <button className="rounded-lg border border-red-300 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50">
+              <PendingButton className="rounded-lg border border-red-300 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-60">
                 Reddet
-              </button>
+              </PendingButton>
             </form>
           </div>
         )}
@@ -237,9 +238,9 @@ export default async function OrderManagePage({
             className="mt-4 border-t border-slate-100 pt-4"
           >
             <input type="hidden" name="orderId" value={o.id} />
-            <button className="w-full rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark active:scale-[0.99] sm:w-auto">
+            <PendingButton className="w-full rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark active:scale-[0.99] disabled:opacity-60 sm:w-auto">
               {step.action} →
-            </button>
+            </PendingButton>
             {step.next === "OUT_FOR_DELIVERY" && (
               <p className="mt-2 text-xs text-slate-500">
                 Müşteriye canlı takip bağlantısı gönderilir.
@@ -272,9 +273,9 @@ export default async function OrderManagePage({
                 className="mt-0.5 w-36 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand"
               />
             </div>
-            <button className="rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark active:scale-[0.99]">
+            <PendingButton className="rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark active:scale-[0.99] disabled:opacity-60">
               Teslim Edildi
-            </button>
+            </PendingButton>
           </form>
         )}
 
@@ -321,9 +322,9 @@ export default async function OrderManagePage({
                   className="mt-0.5 w-24 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand"
                 />
               </div>
-              <button className="rounded-lg border border-brand px-4 py-2 text-sm font-semibold text-brand-dark transition hover:bg-brand-light/50">
+              <PendingButton className="rounded-lg border border-brand px-4 py-2 text-sm font-semibold text-brand-dark transition hover:bg-brand-light/50 disabled:opacity-60">
                 Kaydet
-              </button>
+              </PendingButton>
             </form>
           </div>
 
@@ -347,9 +348,9 @@ export default async function OrderManagePage({
                   </option>
                 ))}
               </select>
-              <button className="rounded-lg bg-brand px-3 py-2 text-sm font-semibold text-white transition hover:bg-brand-dark">
+              <PendingButton className="rounded-lg bg-brand px-3 py-2 text-sm font-semibold text-white transition hover:bg-brand-dark disabled:opacity-60">
                 Ata
-              </button>
+              </PendingButton>
             </form>
           </div>
         </div>
