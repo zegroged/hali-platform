@@ -4,8 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { IconMapPin, IconFilter, IconX } from "@/components/icons";
-
-const DISTRICTS = ["Kadıköy", "Üsküdar", "Beşiktaş", "Şişli"];
+import { DISTRICTS } from "@/components/districts";
 
 type Props = {
   q?: string;
@@ -17,6 +16,8 @@ type Props = {
   minRating?: string;
   openNow?: string;
   view?: string;
+  /** Toplam işletme sayısı — 0 iken arama pasifleşir (lansman/boş DB dönemi). */
+  totalCount?: number;
 };
 
 export function SearchBar(p: Props) {
@@ -129,84 +130,108 @@ export function SearchBar(p: Props) {
     p.openNow ||
     (p.sort && p.sort !== "nearest");
   const view = p.view === "map" ? "map" : "list";
+  // Boş DB (lansman) döneminde arama pasif: her etkileşim "bulunamadı"ya çıkmasın.
+  const idle = p.totalCount === 0;
   const inp =
-    "rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand focus:outline-none";
+    "rounded-lg border border-slate-300 px-3 py-2 text-base focus:border-brand disabled:bg-slate-50 sm:text-sm";
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
-      <form onSubmit={searchManual} className="flex gap-2">
+    <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
+      {/* Birincil yol: tek dokunuşla en yakın halıcılar */}
+      <button
+        onClick={useMyLocation}
+        disabled={loading || idle}
+        className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark active:scale-[0.99] disabled:opacity-60"
+      >
+        <IconMapPin size={16} /> Konumumu kullan
+      </button>
+
+      <div className="mt-3 flex items-center gap-2" aria-hidden>
+        <span className="h-px flex-1 bg-slate-200" />
+        <span className="text-xs text-slate-500">veya adres yaz</span>
+        <span className="h-px flex-1 bg-slate-200" />
+      </div>
+
+      {/* İkincil yol: adres/semt yazarak arama */}
+      <form onSubmit={searchManual} className="mt-3 flex gap-2">
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Adres veya semt yaz (ör. Kadıköy, Bağdat Cad.)"
+          aria-label="Adres veya semt ara"
+          disabled={idle}
           className={`w-full ${inp}`}
         />
         <button
-          disabled={loading}
-          className="whitespace-nowrap rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-60"
+          disabled={loading || idle}
+          className="whitespace-nowrap rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-60"
         >
           Ara
         </button>
       </form>
 
-      <div className="mt-2 flex flex-wrap items-center gap-2">
-        <button
-          onClick={useMyLocation}
-          disabled={loading}
-          className="inline-flex items-center gap-1 rounded-full border border-slate-300 px-3 py-1 text-sm text-slate-700 hover:border-brand hover:text-brand-dark"
-        >
-          <IconMapPin size={14} /> Konumumu kullan
-        </button>
-        {DISTRICTS.map((d) => (
-          <button
-            key={d}
-            onClick={() =>
-              nav({ district: d, lat: undefined, lng: undefined, q: undefined })
-            }
-            className={`rounded-full border px-3 py-1 text-sm ${
-              p.district === d
-                ? "border-brand bg-brand-light text-brand-dark"
-                : "border-slate-200 text-slate-600 hover:border-brand"
-            }`}
-          >
-            {d}
-          </button>
-        ))}
-      </div>
-
-      {/* Filtre + görünüm satırı */}
-      <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-2">
-        <button
-          onClick={() => setShowFilters((s) => !s)}
-          className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-3 py-1 text-sm text-slate-700"
-        >
-          <IconFilter size={14} /> Filtreler
-        </button>
-        <div className="ml-auto flex overflow-hidden rounded-lg border border-slate-300 text-sm">
-          <button
-            onClick={() => nav({ view: "list" })}
-            className={`px-3 py-1 ${view === "list" ? "bg-brand text-white" : "text-slate-600"}`}
-          >
-            Liste
-          </button>
-          <button
-            onClick={() => nav({ view: "map" })}
-            className={`px-3 py-1 ${view === "map" ? "bg-brand text-white" : "text-slate-600"}`}
-          >
-            Harita
-          </button>
+      {idle ? (
+        <p className="mt-2.5 text-sm text-slate-600">
+          Arama çok yakında aktif — bölgendeki halıcılar şu anda ekleniyor.
+        </p>
+      ) : (
+        <div className="mt-2.5 flex flex-wrap items-center gap-2">
+          {DISTRICTS.map((d) => (
+            <button
+              key={d}
+              onClick={() =>
+                nav({
+                  district: d,
+                  lat: undefined,
+                  lng: undefined,
+                  q: undefined,
+                })
+              }
+              className={`rounded-full border px-3 py-2 text-sm ${
+                p.district === d
+                  ? "border-brand bg-brand-light text-brand-dark"
+                  : "border-slate-200 text-slate-600 hover:border-brand"
+              }`}
+            >
+              {d}
+            </button>
+          ))}
         </div>
-        {active && (
+      )}
+
+      {/* Filtre + görünüm satırı: yalnız aktif bir sorgu varken görünür */}
+      {active && !idle && (
+        <div className="mt-2.5 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-2.5">
+          <button
+            onClick={() => setShowFilters((s) => !s)}
+            className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+          >
+            <IconFilter size={14} /> Filtreler
+          </button>
+          <div className="ml-auto flex overflow-hidden rounded-lg border border-slate-300 text-sm">
+            <button
+              onClick={() => nav({ view: "list" })}
+              className={`px-3 py-2 ${view === "list" ? "bg-brand font-medium text-white" : "text-slate-600 hover:bg-slate-50"}`}
+            >
+              Liste
+            </button>
+            <button
+              onClick={() => nav({ view: "map" })}
+              className={`px-3 py-2 ${view === "map" ? "bg-brand font-medium text-white" : "text-slate-600 hover:bg-slate-50"}`}
+            >
+              Harita
+            </button>
+          </div>
           <Link
             href="/"
-            className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-sm text-slate-400 hover:text-red-500"
+            className="inline-flex items-center gap-1 rounded-full px-2 py-2 text-sm text-slate-500 hover:text-red-500"
           >
             <IconX size={14} /> Temizle
           </Link>
-        )}
-      </div>
+        </div>
+      )}
 
-      {showFilters && (
+      {active && !idle && showFilters && (
         <div className="mt-2 grid grid-cols-2 gap-2 rounded-lg bg-slate-50 p-3">
           <label className="text-xs text-slate-500">
             Sırala
@@ -242,25 +267,30 @@ export function SearchBar(p: Props) {
               <option value="4.5">4.5+</option>
             </select>
           </label>
-          <label className="flex items-end gap-2 pb-2 text-sm text-slate-600">
+          <label className="flex items-center gap-2 py-2 text-sm text-slate-600">
             <input
               type="checkbox"
               checked={openNow}
               onChange={(e) => setOpenNow(e.target.checked)}
+              className="h-5 w-5 accent-brand"
             />
             Şu an açık
           </label>
           <button
             onClick={applyFilters}
-            className="col-span-2 rounded-lg bg-slate-800 px-4 py-2 text-sm font-semibold text-white"
+            className="col-span-2 rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark"
           >
             Filtreleri uygula
           </button>
         </div>
       )}
 
-      {loading && <p className="mt-2 text-sm text-slate-400">Konum aranıyor…</p>}
-      {err && <p className="mt-2 text-sm text-red-600">{err}</p>}
+      {loading && <p className="mt-2 text-sm text-slate-500">Konum aranıyor…</p>}
+      {err && (
+        <p role="alert" className="mt-2 text-sm text-red-600">
+          {err}
+        </p>
+      )}
     </div>
   );
 }

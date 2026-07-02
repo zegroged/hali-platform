@@ -1,5 +1,7 @@
 import { getCurrentBusiness } from "@/lib/panel";
 import { RouteHistory } from "@/components/RouteHistory";
+import EmptyState from "@/components/EmptyState";
+import { IconMapPin } from "@/components/icons";
 
 export const dynamic = "force-dynamic";
 
@@ -13,8 +15,15 @@ export default async function RotaPage() {
 
   if (drivers.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-slate-300 p-8 text-center text-slate-400">
-        Önce şoför ekleyin.
+      <div className="space-y-4">
+        <h1 className="text-lg font-semibold text-slate-900">Rota Geçmişi</h1>
+        <EmptyState
+          icon={<IconMapPin size={22} />}
+          title="Henüz şoför yok"
+          description="Rota geçmişi, şoförlerin mesaideyken kaydettiği konumlardan oluşur. Önce bir şoför ekle."
+          actionHref="/panel/soforler"
+          actionLabel="Şoför ekle"
+        />
       </div>
     );
   }

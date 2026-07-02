@@ -2,6 +2,8 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { getCurrentBusiness } from "@/lib/panel";
 import { STOP_MIN_SEC } from "@/lib/tracking";
+import EmptyState from "@/components/EmptyState";
+import { IconClock } from "@/components/icons";
 
 export const dynamic = "force-dynamic";
 
@@ -69,7 +71,8 @@ export default async function PanelReport({
         <div className="flex items-center gap-2 text-sm">
           <Link
             href={`/panel/rapor?ym=${prev}`}
-            className="rounded border border-slate-300 px-2 py-1"
+            aria-label="Önceki ay"
+            className="flex h-10 w-10 items-center justify-center rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50"
           >
             ‹
           </Link>
@@ -78,7 +81,8 @@ export default async function PanelReport({
           </span>
           <Link
             href={`/panel/rapor?ym=${next}`}
-            className="rounded border border-slate-300 px-2 py-1"
+            aria-label="Sonraki ay"
+            className="flex h-10 w-10 items-center justify-center rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50"
           >
             ›
           </Link>
@@ -90,9 +94,11 @@ export default async function PanelReport({
       </p>
 
       {stops.length === 0 && (
-        <p className="rounded-xl border border-dashed border-slate-300 p-8 text-center text-slate-400">
-          Bu ay için kayıt yok.
-        </p>
+        <EmptyState
+          icon={<IconClock size={22} />}
+          title="Bu ay için kayıt yok"
+          description="Şoförler mesaideyken konumlar otomatik kaydedilir; duraklamalar burada listelenir."
+        />
       )}
 
       {[...byDriver.entries()].map(([driverId, list]) => {
@@ -100,7 +106,7 @@ export default async function PanelReport({
         return (
           <div
             key={driverId}
-            className="overflow-x-auto rounded-xl border border-slate-200 bg-white"
+            className="no-scrollbar overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm"
           >
             <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 px-4 py-2">
               <span className="font-medium text-slate-800">
@@ -111,7 +117,7 @@ export default async function PanelReport({
               </span>
             </div>
             <table className="w-full text-sm">
-              <thead className="text-left text-xs text-slate-400">
+              <thead className="text-left text-xs text-slate-500">
                 <tr>
                   <th className="px-4 py-2">Tarih / Saat</th>
                   <th className="px-4 py-2">Konum</th>

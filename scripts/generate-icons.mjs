@@ -1,7 +1,8 @@
 // Tek seferlik ikon + OG görseli üretimi: `node scripts/generate-icons.mjs`
 // Kaynak: public/icon.svg → apple-touch-icon (180, beyaz zemin), icon-192/512,
 // favicon.ico (32px PNG gömülü geçerli ICO kabı) ve og.png (1200×630, markalı).
-// sharp yalnız devDependency — üretim imajına girmez.
+// sharp devDependency'dir; upload ucu da kullandığı için standalone build
+// tarafından otomatik izlenip (file tracing) pakete dahil edilir.
 import sharp from "sharp";
 import { readFile, writeFile, stat } from "node:fs/promises";
 import path from "node:path";

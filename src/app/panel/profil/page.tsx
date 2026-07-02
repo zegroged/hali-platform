@@ -8,10 +8,12 @@ import {
   removeServiceArea,
   removePhoto,
 } from "../actions";
+import { ConfirmButton } from "../ConfirmButton";
 import { PhotoUpload } from "@/components/PhotoUpload";
+import { IconX } from "@/components/icons";
 
 const inp =
-  "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand focus:outline-none";
+  "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand";
 const lbl = "text-xs font-medium text-slate-500";
 
 const UNIT_LABEL: Record<string, string> = {
@@ -33,8 +35,18 @@ export default async function PanelProfile() {
 
   return (
     <div className="space-y-8">
+      <div>
+        <h1 className="text-lg font-semibold text-slate-900">
+          Profil &amp; Fiyat
+        </h1>
+        <p className="mt-1 text-sm text-slate-500">
+          İşletme bilgilerin, çalışma saatlerin, fiyatların ve hizmet
+          bölgelerin.
+        </p>
+      </div>
+
       {/* Temel bilgiler */}
-      <section className="rounded-xl border border-slate-200 bg-white p-4">
+      <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
         <h2 className="mb-3 font-semibold text-slate-900">Temel Bilgiler</h2>
         <form action={updateProfileBasics} className="space-y-3">
           <div>
@@ -98,14 +110,14 @@ export default async function PanelProfile() {
               />
             </div>
           </div>
-          <button className="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark">
+          <button className="rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark active:scale-[0.99]">
             Kaydet
           </button>
         </form>
       </section>
 
       {/* Çalışma saatleri */}
-      <section className="rounded-xl border border-slate-200 bg-white p-4">
+      <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
         <h2 className="mb-3 font-semibold text-slate-900">Çalışma Saatleri</h2>
         <form action={setWorkingHours} className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
@@ -146,18 +158,23 @@ export default async function PanelProfile() {
               />
             </div>
           </div>
-          <label className="flex items-center gap-2 text-sm text-slate-600">
-            <input type="checkbox" name="sundayClosed" defaultChecked /> Pazar
-            kapalı
+          <label className="flex items-center gap-2 py-1 text-sm text-slate-600">
+            <input
+              type="checkbox"
+              name="sundayClosed"
+              defaultChecked
+              className="h-5 w-5 accent-brand"
+            />{" "}
+            Pazar kapalı
           </label>
-          <button className="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark">
+          <button className="rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark active:scale-[0.99]">
             Kaydet
           </button>
         </form>
       </section>
 
       {/* Fiyatlandırma */}
-      <section className="rounded-xl border border-slate-200 bg-white p-4">
+      <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
         <h2 className="mb-3 font-semibold text-slate-900">
           Fiyatlandırma (kategori bazlı)
         </h2>
@@ -170,7 +187,7 @@ export default async function PanelProfile() {
               <span className="text-slate-700">
                 {p.label}
                 {p.isAddon && (
-                  <span className="ml-1 text-xs text-slate-400">(ek)</span>
+                  <span className="ml-1 text-xs text-slate-500">(ek)</span>
                 )}
               </span>
               <span className="flex items-center gap-2">
@@ -179,51 +196,66 @@ export default async function PanelProfile() {
                 </span>
                 <form action={removePricingItem}>
                   <input type="hidden" name="id" value={p.id} />
-                  <button className="text-xs text-red-500">sil</button>
+                  <ConfirmButton
+                    message={`"${p.label}" fiyat kalemi silinsin mi?`}
+                    className="-my-1.5 rounded-lg px-2.5 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
+                  >
+                    Sil
+                  </ConfirmButton>
                 </form>
               </span>
             </div>
           ))}
         </div>
-        <form action={addPricingItem} className="mt-3 grid grid-cols-12 gap-2">
+        {/* Mobilde 2 kolonlu katman, sm+ ekranda 12 kolonlu tek satır */}
+        <form
+          action={addPricingItem}
+          className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-12"
+        >
           <input
             name="label"
             placeholder="Etiket (ör. Makine Halısı)"
-            className={`${inp} col-span-5`}
+            className={`${inp} col-span-2 sm:col-span-5`}
           />
           <input
             name="price"
             type="number"
             placeholder="Fiyat"
-            className={`${inp} col-span-2`}
+            className={`${inp} col-span-1 sm:col-span-2`}
           />
-          <select name="unit" className={`${inp} col-span-3`}>
+          <select name="unit" className={`${inp} col-span-1 sm:col-span-3`}>
             <option value="PER_M2">/m²</option>
             <option value="PER_PIECE">/adet</option>
             <option value="FLAT">sabit</option>
           </select>
-          <label className="col-span-2 flex items-center gap-1 text-xs text-slate-500">
-            <input type="checkbox" name="isAddon" /> ek
+          <label className="col-span-2 flex items-center gap-1.5 text-xs text-slate-500 sm:col-span-2">
+            <input type="checkbox" name="isAddon" className="h-4 w-4 accent-brand" /> ek
           </label>
-          <button className="col-span-12 rounded-lg bg-slate-800 px-4 py-2 text-sm font-semibold text-white">
+          <button className="col-span-2 rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark active:scale-[0.99] sm:col-span-12">
             Fiyat ekle
           </button>
         </form>
       </section>
 
       {/* Hizmet bölgeleri */}
-      <section className="rounded-xl border border-slate-200 bg-white p-4">
+      <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
         <h2 className="mb-3 font-semibold text-slate-900">Hizmet Bölgeleri</h2>
         <div className="flex flex-wrap gap-2">
           {b.serviceAreas.map((s) => (
             <span
               key={s.id}
-              className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-sm text-slate-700"
+              className="inline-flex items-center gap-0.5 rounded-full bg-slate-100 py-1 pl-3 pr-1 text-sm text-slate-700"
             >
               {s.district}
-              <form action={removeServiceArea} className="inline">
+              <form action={removeServiceArea} className="inline-flex">
                 <input type="hidden" name="id" value={s.id} />
-                <button className="text-red-500">×</button>
+                <ConfirmButton
+                  message={`"${s.district}" bölgesi silinsin mi?`}
+                  aria-label={`${s.district} bölgesini sil`}
+                  className="-my-1.5 inline-flex h-10 w-10 items-center justify-center rounded-full text-red-600 hover:bg-red-50"
+                >
+                  <IconX size={14} />
+                </ConfirmButton>
               </form>
             </span>
           ))}
@@ -235,14 +267,14 @@ export default async function PanelProfile() {
             className={`${inp} flex-1`}
           />
           <input type="hidden" name="city" value="İstanbul" />
-          <button className="rounded-lg bg-slate-800 px-4 py-2 text-sm font-semibold text-white">
+          <button className="rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark active:scale-[0.99]">
             Ekle
           </button>
         </form>
       </section>
 
       {/* Fotoğraflar */}
-      <section className="rounded-xl border border-slate-200 bg-white p-4">
+      <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
         <h2 className="mb-3 font-semibold text-slate-900">
           Fotoğraflar (before/after)
         </h2>
@@ -257,6 +289,8 @@ export default async function PanelProfile() {
                 <img
                   src={p.url}
                   alt={p.caption ?? ""}
+                  loading="lazy"
+                  decoding="async"
                   className="h-full w-full object-cover"
                 />
                 <span className="absolute left-1 top-1 rounded bg-black/50 px-1 text-[10px] text-white">
@@ -264,15 +298,19 @@ export default async function PanelProfile() {
                 </span>
                 <form action={removePhoto} className="absolute right-1 top-1">
                   <input type="hidden" name="id" value={p.id} />
-                  <button className="rounded bg-black/60 px-1.5 text-xs text-white">
-                    ✕
-                  </button>
+                  <ConfirmButton
+                    message="Fotoğraf silinsin mi?"
+                    aria-label="Fotoğrafı sil"
+                    className="flex h-8 w-8 items-center justify-center rounded-lg bg-black/60 text-white hover:bg-black/80"
+                  >
+                    <IconX size={14} />
+                  </ConfirmButton>
                 </form>
               </div>
             ))}
           </div>
         ) : (
-          <p className="mb-3 text-sm text-slate-400">Henüz fotoğraf yok.</p>
+          <p className="mb-3 text-sm text-slate-500">Henüz fotoğraf yok.</p>
         )}
         <PhotoUpload />
       </section>

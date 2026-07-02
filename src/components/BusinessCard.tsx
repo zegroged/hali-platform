@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Badges } from "@/components/Badges";
-import { IconStar, IconTruck, IconClock, Logo } from "@/components/icons";
+import { IconTruck, IconClock, Logo } from "@/components/icons";
+import { RatingPill } from "@/components/RatingPill";
 import type { BusinessSummary } from "@/lib/businesses";
 
 export function BusinessCard({ b }: { b: BusinessSummary }) {
@@ -11,10 +12,13 @@ export function BusinessCard({ b }: { b: BusinessSummary }) {
         : `${b.distanceKm.toFixed(1)} km`
       : null;
 
+  // ratingCount === 0'da "Yeni" bilgisini RatingPill veriyor; rozet satırında tekrar etme.
+  const showNewChip = b.isNew && b.ratingCount > 0;
+
   return (
     <Link
       href={`/halici/${b.id}`}
-      className="group flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition hover:border-brand hover:shadow-md"
+      className="group flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition hover:border-brand hover:shadow-md active:scale-[0.98]"
     >
       {/* Kapak görseli */}
       <div className="relative aspect-[16/10] overflow-hidden bg-brand-light">
@@ -23,6 +27,8 @@ export function BusinessCard({ b }: { b: BusinessSummary }) {
           <img
             src={b.coverUrl}
             alt={b.name}
+            loading="lazy"
+            decoding="async"
             className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
           />
         ) : (
@@ -49,23 +55,21 @@ export function BusinessCard({ b }: { b: BusinessSummary }) {
             <h3 className="truncate font-semibold text-slate-900">{b.name}</h3>
             <p className="truncate text-sm text-slate-500">
               {b.district}, {b.city}
-              {dist && <span className="font-medium text-brand-dark"> · {dist}</span>}
+              {dist && (
+                <span className="font-medium text-brand-dark"> · {dist}</span>
+              )}
             </p>
           </div>
-          {b.ratingCount > 0 && (
-            <div className="flex shrink-0 items-center gap-1 rounded-lg bg-amber-50 px-1.5 py-0.5 text-sm font-semibold text-amber-700">
-              <IconStar size={13} filled />
-              {b.ratingAvg.toFixed(1)}
-              <span className="text-xs font-normal text-amber-600/80">
-                ({b.ratingCount})
-              </span>
-            </div>
-          )}
+          <RatingPill
+            ratingAvg={b.ratingAvg}
+            ratingCount={b.ratingCount}
+            showCount
+          />
         </div>
 
-        {(b.isNew || b.badges.length > 0) && (
+        {(showNewChip || b.badges.length > 0) && (
           <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-            {b.isNew && (
+            {showNewChip && (
               <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
                 Yeni
               </span>

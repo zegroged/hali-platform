@@ -3,10 +3,16 @@
 import dynamic from "next/dynamic";
 import type { MapMarker } from "@/components/LiveMap";
 
+// Arama haritası: sabit piksel yerine viewport'a duyarlı yükseklik.
+// Loading placeholder da aynı sınıfları kullanır ki geçişte zıplama olmasın.
+const MAP_H = "h-[50vh] max-h-[560px] min-h-[320px]";
+
 const LiveMap = dynamic(() => import("@/components/LiveMap"), {
   ssr: false,
   loading: () => (
-    <div className="flex h-[440px] items-center justify-center rounded-xl bg-slate-100 text-sm text-slate-400">
+    <div
+      className={`flex ${MAP_H} items-center justify-center rounded-xl bg-slate-100 text-sm text-slate-500`}
+    >
       Harita yükleniyor…
     </div>
   ),
@@ -23,7 +29,7 @@ export function BusinessesMapView({
 }) {
   if (!businesses.length && !center) {
     return (
-      <div className="flex h-[200px] items-center justify-center rounded-xl bg-slate-100 text-center text-sm text-slate-400">
+      <div className="flex h-[200px] items-center justify-center rounded-xl bg-slate-100 text-center text-sm text-slate-500">
         Bu aramada halıcı yok.
       </div>
     );
@@ -52,7 +58,11 @@ export function BusinessesMapView({
           Bu konuma yakın halıcı bulunamadı — haritada konumun işaretli.
         </p>
       )}
-      <LiveMap markers={markers} follow={center} height={440} />
+      {/* Harita bileşeni inline piksel yüksekliği bastığı için sarmalayıcı
+          responsive yüksekliği !h-full ile içeriye zorlar. */}
+      <div className={`${MAP_H} [&>div]:!h-full`}>
+        <LiveMap markers={markers} follow={center} />
+      </div>
     </>
   );
 }

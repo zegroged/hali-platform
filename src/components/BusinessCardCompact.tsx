@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { IconStar, IconTruck, Logo } from "@/components/icons";
+import { IconTruck, Logo } from "@/components/icons";
+import { RatingPill } from "@/components/RatingPill";
 import type { BusinessSummary } from "@/lib/businesses";
 
 export function BusinessCardCompact({ b }: { b: BusinessSummary }) {
@@ -13,14 +14,17 @@ export function BusinessCardCompact({ b }: { b: BusinessSummary }) {
   return (
     <Link
       href={`/halici/${b.id}`}
-      className="block w-44 shrink-0 rounded-xl border border-slate-200 bg-white p-3 transition hover:border-brand hover:shadow-md"
+      className="block w-44 shrink-0 rounded-xl border border-slate-200 bg-white p-3 shadow-sm transition hover:border-brand hover:shadow-md active:scale-[0.98]"
     >
-      <div className="mb-2 aspect-[4/3] overflow-hidden rounded-lg bg-brand-light">
+      {/* Kapak oranı BusinessCard ile aynı (16/10) — listeler arası tutarlılık */}
+      <div className="mb-2 aspect-[16/10] overflow-hidden rounded-lg bg-brand-light">
         {b.coverUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={b.coverUrl}
             alt={b.name}
+            loading="lazy"
+            decoding="async"
             className="h-full w-full object-cover"
           />
         ) : (
@@ -29,13 +33,10 @@ export function BusinessCardCompact({ b }: { b: BusinessSummary }) {
           </div>
         )}
       </div>
-      <div className="flex items-center justify-between">
-        <span className="flex items-center gap-1 text-sm font-semibold text-slate-900">
-          <IconStar size={13} filled className="text-amber-500" />
-          {b.ratingCount > 0 ? b.ratingAvg.toFixed(1) : "Yeni"}
-        </span>
+      <div className="flex items-center justify-between gap-1">
+        <RatingPill ratingAvg={b.ratingAvg} ratingCount={b.ratingCount} />
         <span
-          className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium ${
+          className={`shrink-0 whitespace-nowrap rounded-full px-1.5 py-0.5 text-xs font-medium ${
             b.isOpenNow
               ? "bg-green-100 text-green-700"
               : "bg-slate-100 text-slate-500"
@@ -51,15 +52,17 @@ export function BusinessCardCompact({ b }: { b: BusinessSummary }) {
         {b.district}
         {dist ? ` · ${dist}` : ""}
       </p>
-      <p className="mt-1 flex items-center gap-1 truncate text-xs text-slate-600">
-        {b.deliveryMaxDays != null && <IconTruck size={12} />}
-        <span className="truncate">
-          {b.deliveryMaxDays != null
-            ? `${b.deliveryMinDays}-${b.deliveryMaxDays} gün`
-            : ""}
-          {b.minPrice != null ? ` · ${b.minPrice} TL/m²` : ""}
-        </span>
-      </p>
+      {b.deliveryMinDays != null && b.deliveryMaxDays != null && (
+        <p className="mt-1 flex items-center gap-1 text-xs text-slate-600">
+          <IconTruck size={12} />
+          {b.deliveryMinDays}-{b.deliveryMaxDays} iş günü
+        </p>
+      )}
+      {b.minPrice != null && (
+        <p className="mt-1 text-sm font-semibold text-slate-900">
+          {b.minPrice} TL/m²&apos;den
+        </p>
+      )}
     </Link>
   );
 }

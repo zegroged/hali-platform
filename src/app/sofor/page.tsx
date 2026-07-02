@@ -3,6 +3,7 @@ import { getSessionUser } from "@/lib/auth";
 import { DriverShift } from "@/components/DriverShift";
 import { ORDER_STATUS_META, DRIVER_NEXT, REJECT_REASONS } from "@/lib/orderStatus";
 import { OrderStatusIcon, IconPackage, IconTruck, IconHome } from "@/components/icons";
+import EmptyState from "@/components/EmptyState";
 import {
   acceptOrder,
   rejectOrder,
@@ -14,7 +15,7 @@ import {
 export const dynamic = "force-dynamic";
 
 const inp =
-  "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand focus:outline-none";
+  "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand";
 
 export default async function SoforPage() {
   const u = await getSessionUser();
@@ -39,9 +40,11 @@ export default async function SoforPage() {
       </h1>
 
       {orders.length === 0 && (
-        <p className="rounded-xl border border-dashed border-slate-300 p-8 text-center text-slate-400">
-          Şu an aktif iş yok.
-        </p>
+        <EmptyState
+          icon={<IconTruck size={22} />}
+          title="Şu an aktif iş yok"
+          description="Halıcın sana yeni bir iş atadığında burada görünecek."
+        />
       )}
 
       {orders.map((o) => {
@@ -58,7 +61,7 @@ export default async function SoforPage() {
                 <p className="text-sm text-slate-500">{o.customerPhone}</p>
                 <p className="mt-1 text-sm text-slate-600">{o.pickupAddress}</p>
                 {o.approxM2 && (
-                  <p className="text-xs text-slate-400">~{o.approxM2} m²</p>
+                  <p className="text-xs text-slate-500">~{o.approxM2} m²</p>
                 )}
                 {o.note && (
                   <p className="mt-1 text-xs italic text-slate-500">{o.note}</p>
@@ -121,7 +124,7 @@ export default async function SoforPage() {
                   <button className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-brand py-2 text-sm font-semibold text-white hover:bg-brand-dark">
                     <IconPackage size={16} /> Halıyı Aldım
                   </button>
-                  <p className="text-center text-xs text-slate-400">
+                  <p className="text-center text-xs text-slate-500">
                     Ödeme teslimde alınır.
                   </p>
                 </form>
@@ -138,7 +141,7 @@ export default async function SoforPage() {
                       : `${ORDER_STATUS_META[next].label} olarak işaretle`}
                   </button>
                   {next === "OUT_FOR_DELIVERY" && (
-                    <p className="mt-1 text-center text-xs text-slate-400">
+                    <p className="mt-1 text-center text-xs text-slate-500">
                       Müşteri artık seni canlı takip edebilecek.
                     </p>
                   )}

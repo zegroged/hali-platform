@@ -33,12 +33,19 @@ export function BusinessRow({
           </Link>
         )}
       </div>
-      <div className="-mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-2">
-        {businesses.map((b) => (
-          <div key={b.id} className="snap-start">
-            <BusinessCardCompact b={b} />
-          </div>
-        ))}
+      <div className="relative">
+        <div className="no-scrollbar -mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-px-4 px-4">
+          {businesses.map((b) => (
+            <div key={b.id} className="snap-start">
+              <BusinessCardCompact b={b} />
+            </div>
+          ))}
+        </div>
+        {/* Scrollbar gizlendiği için kaydırılabilirlik ipucu: sağ kenarda fade (md+) */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-y-0 -right-4 hidden w-10 bg-gradient-to-l from-slate-50 md:block"
+        />
       </div>
     </section>
   );

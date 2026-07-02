@@ -1,8 +1,11 @@
 import { getCurrentBusiness } from "@/lib/panel";
 import { addDriver, removeDriver } from "../actions";
+import { ConfirmButton } from "../ConfirmButton";
+import EmptyState from "@/components/EmptyState";
+import { IconTruck } from "@/components/icons";
 
 const inp =
-  "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand focus:outline-none";
+  "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand";
 
 export default async function PanelDrivers() {
   const b = await getCurrentBusiness();
@@ -16,13 +19,13 @@ export default async function PanelDrivers() {
         {b.drivers.map((d) => (
           <div
             key={d.id}
-            className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-4"
+            className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
           >
             <div>
               <p className="font-medium text-slate-900">{d.user.name}</p>
               <p className="text-sm text-slate-500">{d.user.phone}</p>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
               <span
                 className={`rounded-full px-2.5 py-1 text-xs font-medium ${
                   d.isOnShift
@@ -34,27 +37,34 @@ export default async function PanelDrivers() {
               </span>
               <form action={removeDriver}>
                 <input type="hidden" name="id" value={d.id} />
-                <button className="text-xs text-red-500">sil</button>
+                <ConfirmButton
+                  message={`${d.user.name} silinsin mi? Bu işlem geri alınamaz.`}
+                  className="rounded-lg px-2.5 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
+                >
+                  Sil
+                </ConfirmButton>
               </form>
             </div>
           </div>
         ))}
         {b.drivers.length === 0 && (
-          <p className="rounded-xl border border-dashed border-slate-300 p-6 text-center text-slate-400">
-            Henüz şoför yok.
-          </p>
+          <EmptyState
+            icon={<IconTruck size={22} />}
+            title="Henüz şoför yok"
+            description="Aşağıdaki formdan ilk şoförünü ekle; mesaiye başladığında canlı takip ve rota geçmişi otomatik çalışır."
+          />
         )}
       </div>
 
-      <section className="rounded-xl border border-slate-200 bg-white p-4">
+      <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
         <h2 className="mb-3 font-semibold text-slate-900">Şoför ekle</h2>
         <form action={addDriver} className="space-y-2">
           <input name="name" placeholder="Ad Soyad" className={inp} />
           <input name="phone" placeholder="Telefon (05xx...)" className={inp} />
-          <p className="text-xs text-slate-400">
+          <p className="text-xs text-slate-500">
             Şoföre, telefonuna <b>SMS ile gönderilen geçici şifre</b> ile giriş bilgisi iletilir.
           </p>
-          <button className="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark">
+          <button className="rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark active:scale-[0.99]">
             Ekle
           </button>
         </form>

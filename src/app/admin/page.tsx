@@ -1,11 +1,6 @@
 import { prisma } from "@/lib/prisma";
+import { verifMeta, subscriptionLabel } from "@/lib/verifMeta";
 import { approveBusiness, rejectBusiness } from "./actions";
-
-const VERIF_CLS: Record<string, string> = {
-  VERIFIED: "bg-green-100 text-green-700",
-  PENDING: "bg-amber-100 text-amber-700",
-  REJECTED: "bg-red-100 text-red-700",
-};
 
 export const dynamic = "force-dynamic";
 
@@ -28,7 +23,7 @@ export default async function AdminHome() {
           Onay Bekleyen İşletmeler ({pending.length})
         </h1>
         {pending.length === 0 ? (
-          <p className="rounded-xl border border-dashed border-slate-300 p-6 text-center text-slate-400">
+          <p className="rounded-xl border border-dashed border-slate-300 bg-white p-6 text-center text-slate-500">
             Bekleyen başvuru yok.
           </p>
         ) : (
@@ -36,7 +31,7 @@ export default async function AdminHome() {
             {pending.map((b) => (
               <div
                 key={b.id}
-                className="rounded-xl border border-slate-200 bg-white p-4"
+                className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
               >
                 <p className="font-medium text-slate-900">{b.name}</p>
                 <p className="text-sm text-slate-500">
@@ -45,13 +40,13 @@ export default async function AdminHome() {
                 <div className="mt-3 flex gap-2">
                   <form action={approveBusiness}>
                     <input type="hidden" name="id" value={b.id} />
-                    <button className="rounded-lg bg-brand px-4 py-1.5 text-sm font-semibold text-white hover:bg-brand-dark">
+                    <button className="rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark active:scale-[0.99]">
                       Onayla ✓
                     </button>
                   </form>
                   <form action={rejectBusiness}>
                     <input type="hidden" name="id" value={b.id} />
-                    <button className="rounded-lg border border-red-300 px-4 py-1.5 text-sm font-medium text-red-600">
+                    <button className="rounded-lg border border-red-300 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50">
                       Reddet
                     </button>
                   </form>
@@ -65,9 +60,9 @@ export default async function AdminHome() {
       {/* Tüm işletmeler */}
       <section>
         <h2 className="mb-3 font-semibold text-slate-900">Tüm İşletmeler</h2>
-        <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+        <div className="no-scrollbar overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
           <table className="w-full min-w-[520px] text-sm">
-            <thead className="bg-slate-50 text-left text-xs text-slate-400">
+            <thead className="bg-slate-50 text-left text-xs text-slate-500">
               <tr>
                 <th className="px-4 py-2">İşletme</th>
                 <th className="px-4 py-2">Durum</th>
@@ -77,28 +72,31 @@ export default async function AdminHome() {
               </tr>
             </thead>
             <tbody>
-              {businesses.map((b) => (
-                <tr key={b.id} className="border-t border-slate-100">
-                  <td className="px-4 py-2">
-                    <div className="font-medium text-slate-800">{b.name}</div>
-                    <div className="text-xs text-slate-400">{b.district}</div>
-                  </td>
-                  <td className="px-4 py-2">
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-xs font-medium ${VERIF_CLS[b.verification]}`}
-                    >
-                      {b.verification}
-                    </span>
-                  </td>
-                  <td className="px-4 py-2">{b.isVisible ? "✓" : "—"}</td>
-                  <td className="px-4 py-2 text-slate-600">
-                    {b.subscription?.status ?? "—"}
-                  </td>
-                  <td className="px-4 py-2 text-right text-slate-600">
-                    {b._count.drivers} / {b._count.orders}
-                  </td>
-                </tr>
-              ))}
+              {businesses.map((b) => {
+                const verif = verifMeta(b.verification);
+                return (
+                  <tr key={b.id} className="border-t border-slate-100">
+                    <td className="px-4 py-2">
+                      <div className="font-medium text-slate-800">{b.name}</div>
+                      <div className="text-xs text-slate-500">{b.district}</div>
+                    </td>
+                    <td className="px-4 py-2">
+                      <span
+                        className={`whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium ${verif.cls}`}
+                      >
+                        {verif.label}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2">{b.isVisible ? "✓" : "—"}</td>
+                    <td className="px-4 py-2 text-slate-600">
+                      {subscriptionLabel(b.subscription?.status)}
+                    </td>
+                    <td className="px-4 py-2 text-right text-slate-600">
+                      {b._count.drivers} / {b._count.orders}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
