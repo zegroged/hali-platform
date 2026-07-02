@@ -8,6 +8,9 @@ export function DriverShift({ initialOnShift }: { initialOnShift: boolean }) {
   const [on, setOn] = useState(initialOnShift);
   const [sent, setSent] = useState(0);
   const [err, setErr] = useState<string | null>(null);
+  // İzin diyaloğu cevapsız kalırsa hiçbir geolocation callback'i tetiklenmez —
+  // 20 sn boyunca tek konum gelmediyse proaktif uyarı göster.
+  const [noFix, setNoFix] = useState(false);
   const watchRef = useRef<number | null>(null);
   const wakeRef = useRef<{ release?: () => void } | null>(null);
   const lastPost = useRef<{ lat: number; lng: number; t: number } | null>(null);
@@ -82,6 +85,15 @@ export function DriverShift({ initialOnShift }: { initialOnShift: boolean }) {
     return stop;
   }, [on]);
 
+  useEffect(() => {
+    if (!on || sent > 0) {
+      setNoFix(false);
+      return;
+    }
+    const t = setTimeout(() => setNoFix(true), 20_000);
+    return () => clearTimeout(t);
+  }, [on, sent]);
+
   return (
     <div
       className={`rounded-xl p-4 ${
@@ -99,6 +111,13 @@ export function DriverShift({ initialOnShift }: { initialOnShift: boolean }) {
               : "Mesaiyi başlat, halıcı seni canlı görsün."}
           </p>
           {err && <p className="mt-1 text-xs text-red-600">{err}</p>}
+          {!err && noFix && sent === 0 && (
+            <p className="mt-1 text-xs text-amber-700">
+              Henüz konum alınamadı. Tarayıcının konum iznini ve cihazın konum
+              servisini (Windows/telefon ayarları) kontrol et; sayfa açık ve
+              önde kalmalı.
+            </p>
+          )}
         </div>
         <button
           onClick={toggle}

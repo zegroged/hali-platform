@@ -23,52 +23,43 @@ export function Spinner({ size = 14 }: { size?: number }) {
 }
 
 /**
- * Bekleme uzarsa (deploy sırasında bayatlayan sayfa, kopan bağlantı...)
- * kullanıcıyı kurtarma moduna geçir: buton "yenile"ye dönüşür.
+ * Bekleme 10 sn'yi aşarsa sayfayı OTOMATİK yenile: aksiyon sunucuda çoktan
+ * tamamlanmıştır (CAS'lı), taze sayfa doğru durumu gösterir. Kullanıcı hiçbir
+ * durumda sonsuz "İşleniyor…"da kalmaz. (Asıl kök neden — deploy sonrası eski
+ * çalışma zamanı — VersionSkewGuard ile anında yakalanır; bu ikinci ağdır.)
  */
-export function usePendingTimeout(pending: boolean, ms = 12000): boolean {
-  const [timedOut, setTimedOut] = useState(false);
+export function useStuckAutoReload(pending: boolean, ms = 10_000): boolean {
+  const [reloading, setReloading] = useState(false);
   useEffect(() => {
     if (!pending) {
-      setTimedOut(false);
+      setReloading(false);
       return;
     }
-    const t = setTimeout(() => setTimedOut(true), ms);
+    const t = setTimeout(() => {
+      setReloading(true);
+      window.location.reload();
+    }, ms);
     return () => clearTimeout(t);
   }, [pending, ms]);
-  return timedOut;
+  return reloading;
 }
 
 /**
  * Server-action formları için gönder butonu: tıklanır tıklanmaz spinner +
- * devre dışı (aksiyon sunucuya gidip gelene kadar "hiçbir şey olmuyor" hissini
- * ve çift gönderimi engeller). Yanıt 12 sn'de gelmezse "yenile" moduna geçer —
- * işlem büyük olasılıkla sunucuda tamamlanmıştır, taze sayfa durumu gösterir.
+ * devre dışı; yanıt uygulanamazsa 10 sn'de sayfa kendini yeniler.
  */
 export function PendingButton({
   children,
   ...rest
 }: ButtonHTMLAttributes<HTMLButtonElement>) {
   const { pending } = useFormStatus();
-  const timedOut = usePendingTimeout(pending);
+  const reloading = useStuckAutoReload(pending);
 
-  if (pending && timedOut) {
-    return (
-      <button
-        type="button"
-        {...rest}
-        disabled={false}
-        onClick={() => window.location.reload()}
-      >
-        Yanıt gecikti — yenile
-      </button>
-    );
-  }
   return (
     <button type="submit" disabled={pending} aria-busy={pending} {...rest}>
       {pending ? (
         <span className="inline-flex items-center justify-center gap-1.5">
-          <Spinner /> İşleniyor…
+          <Spinner /> {reloading ? "Yenileniyor…" : "İşleniyor…"}
         </span>
       ) : (
         children

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { validateConfig } from "@/lib/config";
+import VersionSkewGuard from "@/components/VersionSkewGuard";
 
 // Sunucu render'ında yapılandırmayı doğrula (eksik/zayıf env ile canlıya çıkma).
 validateConfig();
@@ -59,7 +60,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="tr" className={inter.variable}>
-      <body className="font-sans">{children}</body>
+      <body className="font-sans">
+        <VersionSkewGuard />
+        {children}
+      </body>
     </html>
   );
 }
