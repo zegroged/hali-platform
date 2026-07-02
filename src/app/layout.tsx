@@ -12,16 +12,44 @@ const inter = Inter({
   display: "swap",
 });
 
+const SITE_NAME = "En Yakın Halı Yıkama";
+const SITE_DESCRIPTION =
+  "Yakınındaki halı yıkamacıları karşılaştır, halın kapından alınsın, adım adım takip et. Ödeme teslimde — ön ödeme yok.";
+
 export const metadata: Metadata = {
-  title: "En Yakın Halı Yıkama",
-  description: "Yakınındaki halıcıyı seç, halını kapından aldır, adım adım takip et.",
+  metadataBase: new URL(
+    process.env.APP_BASE_URL ?? "https://enyakinhaliyikamaservisi.com"
+  ),
+  title: {
+    default: "En Yakın Halı Yıkama — Kapıdan Halı Yıkama Hizmeti",
+    template: `%s | ${SITE_NAME}`,
+  },
+  description: SITE_DESCRIPTION,
   manifest: "/manifest.json",
-  icons: { icon: "/icon.svg", apple: "/icon.svg" },
-  appleWebApp: { capable: true, title: "Halı Yıkama", statusBarStyle: "default" },
+  icons: {
+    icon: [
+      { url: "/icon.svg", type: "image/svg+xml" },
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: "/apple-touch-icon.png",
+  },
+  openGraph: {
+    type: "website",
+    locale: "tr_TR",
+    siteName: SITE_NAME,
+    title: "En Yakın Halı Yıkama — Kapıdan Halı Yıkama Hizmeti",
+    description: SITE_DESCRIPTION,
+    images: ["/og.png"],
+  },
+  twitter: {
+    card: "summary_large_image",
+  },
+  appleWebApp: { title: "Halı Yıkama", statusBarStyle: "default" },
 };
 
 export const viewport = {
-  themeColor: "#0d9488",
+  themeColor: "#0f766e",
 };
 
 export default function RootLayout({

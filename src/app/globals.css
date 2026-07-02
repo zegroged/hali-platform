@@ -5,6 +5,8 @@
 :root {
   --background: #f8fafc;
   --foreground: #0f172a;
+  /* Yalnız açık tema: Android Chrome'un otomatik koyu teması renkleri ters çevirmesin. */
+  color-scheme: light;
 }
 
 body {
@@ -19,9 +21,29 @@ body {
   button:focus-visible,
   [role="button"]:focus-visible,
   select:focus-visible,
+  input:focus-visible,
+  textarea:focus-visible,
   [tabindex]:focus-visible {
-    outline: 2px solid #0d9488;
+    outline: 2px solid #0f766e;
     outline-offset: 2px;
     border-radius: 6px;
+  }
+
+  /* iOS Safari 16px altındaki input'a odaklanınca sayfayı zorla yakınlaştırır. */
+  input,
+  textarea,
+  select {
+    font-size: max(1rem, 16px);
+  }
+}
+
+@layer utilities {
+  /* Yatay kaydırma raylarında native scrollbar'ı gizle (kaydırma çalışmaya devam eder). */
+  .no-scrollbar {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
   }
 }
