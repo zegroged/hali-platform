@@ -3,7 +3,14 @@ import { prisma } from "@/lib/prisma";
 import { getSessionUser } from "@/lib/auth";
 import { DriverShift } from "@/components/DriverShift";
 import { ORDER_STATUS_META, DRIVER_NEXT, REJECT_REASONS } from "@/lib/orderStatus";
-import { OrderStatusIcon, IconPackage, IconTruck, IconHome } from "@/components/icons";
+import {
+  OrderStatusIcon,
+  IconPackage,
+  IconTruck,
+  IconHome,
+  IconMapPin,
+  IconPhone,
+} from "@/components/icons";
 import EmptyState from "@/components/EmptyState";
 import {
   acceptOrder,
@@ -51,6 +58,13 @@ export default async function SoforPage() {
       {orders.map((o) => {
         const meta = ORDER_STATUS_META[o.status];
         const next = DRIVER_NEXT[o.status];
+        // Navigasyon telefonun harita uygulamasına devredilir: koordinat varsa
+        // (müşteri "Konumumu ekle" dediyse) nokta hedefi, yoksa adres araması.
+        const destination =
+          o.pickupLat != null && o.pickupLng != null
+            ? `${o.pickupLat},${o.pickupLng}`
+            : encodeURIComponent(o.pickupAddress);
+        const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${destination}&travelmode=driving`;
         return (
           <div
             key={o.id}
@@ -75,6 +89,26 @@ export default async function SoforPage() {
               <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">
                 <OrderStatusIcon status={o.status} size={13} /> {meta.label}
               </span>
+            </div>
+
+            {/* Sahada en çok gereken iki aksiyon: adrese navigasyon + müşteriyi arama.
+                Yol tarifi telefonun harita uygulamasında (Google Maps) açılır,
+                rota/navigasyonu o çizer. */}
+            <div className="mt-3 flex gap-2">
+              <a
+                href={mapsUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-brand px-3 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark active:scale-[0.99]"
+              >
+                <IconMapPin size={15} /> Yol Tarifi
+              </a>
+              <a
+                href={`tel:${o.customerPhone}`}
+                className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-slate-300 px-3 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+              >
+                <IconPhone size={15} /> Müşteriyi Ara
+              </a>
             </div>
 
             <div className="mt-3 border-t border-slate-100 pt-3">
