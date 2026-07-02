@@ -2,13 +2,12 @@
 
 import type { ButtonHTMLAttributes } from "react";
 import { useFormStatus } from "react-dom";
-import { Spinner } from "@/components/PendingButton";
+import { Spinner, usePendingTimeout } from "@/components/PendingButton";
 
 /**
  * Yıkıcı form aksiyonları (sil, iptal…) için onay soran gönder butonu.
- * Server component form'larının (action={...}) içinde kullanılır;
- * kullanıcı onaylamazsa form gönderimi engellenir. Onaylanınca spinner +
- * devre dışı — sunucu yanıtı gelene kadar buton tepkisiz görünmesin.
+ * Onaylanınca spinner + devre dışı; yanıt 12 sn'de gelmezse "yenile" moduna
+ * geçer (bkz PendingButton).
  */
 export function ConfirmButton({
   message,
@@ -19,6 +18,20 @@ export function ConfirmButton({
   "onClick" | "type"
 >) {
   const { pending } = useFormStatus();
+  const timedOut = usePendingTimeout(pending);
+
+  if (pending && timedOut) {
+    return (
+      <button
+        type="button"
+        {...rest}
+        disabled={false}
+        onClick={() => window.location.reload()}
+      >
+        Yanıt gecikti — yenile
+      </button>
+    );
+  }
   return (
     <button
       type="submit"
