@@ -1,0 +1,36 @@
+# YALNIZCA GELİŞTİRME / yerel tam-container testi içindir.
+# ÜRETİMDE bu dosyayı kullanma: yönetilen Postgres + secret manager ile
+# (güçlü parola, gerçek SESSION_SECRET/iyzico/SMS/S3, APP_BASE_URL=https://...) deploy et.
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: hali
+      POSTGRES_PASSWORD: hali # yalnız-dev; üretimde yönetilen DB + güçlü parola
+      POSTGRES_DB: hali
+    ports:
+      # Sadece localhost'a bağla — DB'yi internete/LAN'a açma.
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - hali_pgdata:/var/lib/postgresql/data
+
+  # Tam container testi: docker compose up --build
+  # Sırlar host ortamından / .env'den alınır; insecure inline default YOK.
+  # Üretimde gerçek değerlerle bir .env (veya secret injection) sağla; aksi halde
+  # uygulama validateConfig() ile başlangıçta durur (mock ödeme/SMS ile çıkmayı engeller).
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      - db
+    env_file:
+      - .env
+    environment:
+      # Container içi DB adresi host .env'deki localhost:5433'ü ezer.
+      DATABASE_URL: "postgresql://hali:hali@db:5432/hali?schema=public"
+    ports:
+      - "3000:3000"
+
+volumes:
+  hali_pgdata:

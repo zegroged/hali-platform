@@ -1,0 +1,34 @@
+{
+  "expo": {
+    "name": "Halını Aldır",
+    "slug": "hali-customer",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "hali",
+    "userInterfaceStyle": "light",
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Yakınındaki halıcıları göstermek için konumun kullanılır."
+        }
+      ]
+    ],
+    "ios": {
+      "bundleIdentifier": "com.hali.customer",
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Yakınındaki halıcıları göstermek için konumun kullanılır."
+      }
+    },
+    "android": {
+      "package": "com.hali.customer",
+      "permissions": ["ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION"],
+      "config": {
+        "googleMaps": {
+          "apiKey": "ANDROID_GOOGLE_MAPS_ANAHTARI_BURAYA"
+        }
+      }
+    }
+  }
+}

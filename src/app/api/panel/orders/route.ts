@@ -1,0 +1,90 @@
+import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
+import { prisma } from "@/lib/prisma";
+import { getCurrentBusiness } from "@/lib/panel";
+import { createOrderWithCode } from "@/lib/ordercode";
+import { sendTrackingSms, trackingLink } from "@/lib/sms";
+import { subscriptionActive } from "@/lib/subscription";
+
+const Body = z.object({
+  customerName: z.string().min(2).max(100),
+  customerPhone: z.string().min(10).max(20),
+  pickupAddress: z.string().min(3).max(300),
+  approxM2: z.number().positive().max(100000).optional(),
+  note: z.string().max(500).optional(),
+  paymentMethod: z.enum(["CASH", "CARD"]),
+  driverId: z.string().max(40).optional(),
+});
+
+// Halıcının kendi (dükkâna gelen) müşterisi için manuel sipariş/kayıt oluşturma.
+export async function POST(req: NextRequest) {
+  const b = await getCurrentBusiness();
+  if (!b) {
+    return NextResponse.json({ error: "Yetkisiz" }, { status: 401 });
+  }
+  const parsed = Body.safeParse(await req.json().catch(() => null));
+  if (!parsed.success) {
+    return NextResponse.json({ error: "Geçersiz veri" }, { status: 400 });
+  }
+  const d = parsed.data;
+
+  // Aboneliği geçerli olmayan halıcı manuel kayıt da oluşturamaz (gelir tutarlılığı).
+  if (!subscriptionActive(b.subscription)) {
+    return NextResponse.json(
+      { error: "Aboneliğiniz aktif değil. Sipariş oluşturulamıyor." },
+      { status: 410 },
+    );
+  }
+  // Şoför yoksa manuel kayıt da asılı kalır → engelle.
+  if (b.drivers.length === 0) {
+    return NextResponse.json(
+      { error: "Önce en az bir şoför ekleyin." },
+      { status: 409 },
+    );
+  }
+
+  let driverId: string | undefined;
+  if (d.driverId) {
+    // Şoför seçildiyse GEÇERLİ olmalı — sessizce başkasına düşürme (C3).
+    if (!b.drivers.some((x) => x.id === d.driverId)) {
+      return NextResponse.json({ error: "Geçersiz şoför seçimi." }, { status: 400 });
+    }
+    driverId = d.driverId;
+  } else {
+    const dr = b.drivers.find((x) => x.isOnShift) ?? b.drivers[0];
+    driverId = dr.id;
+  }
+
+  const order = await createOrderWithCode((code) =>
+    prisma.order.create({
+      data: {
+        businessId: b.id,
+        driverId,
+        code,
+        customerName: d.customerName,
+        customerPhone: d.customerPhone,
+        pickupAddress: d.pickupAddress,
+        approxM2: d.approxM2,
+        note: d.note,
+        // Web'de şimdilik YALNIZ nakit (komisyon/kart ertelendi; app'te geri açılacak).
+        paymentMethod: "CASH",
+        events: { create: { status: "CREATED", note: "Halıcı kaydı oluşturdu" } },
+      },
+    }),
+  );
+
+  try {
+    await sendTrackingSms(
+      d.customerPhone,
+      d.customerName,
+      order.code ?? order.trackingToken,
+    );
+  } catch (e) {
+    console.error("panel order SMS hatası:", e);
+  }
+
+  return NextResponse.json({
+    code: order.code,
+    trackingUrl: trackingLink(order.code ?? order.trackingToken),
+  });
+}

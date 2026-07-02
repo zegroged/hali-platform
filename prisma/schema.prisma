@@ -1,0 +1,303 @@
+// Halı Yıkama Platformu — veri modeli
+// Kararlar: abonelik (2000 TL/ay) + kartla ödemede %3 komisyon, konum+puan sıralaması,
+// halıcının kendi şoförleri, canlı konum + aylık durak kaydı, doğrulama rozetleri.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------- enum'lar
+
+enum UserRole {
+  CUSTOMER // müşteri
+  CLEANER // halıcı / dükkan sahibi
+  DRIVER // şoför
+  ADMIN
+}
+
+enum VerificationStatus {
+  PENDING // başvurdu, admin onayı bekliyor
+  VERIFIED // doğrulanmış işletme
+  REJECTED
+}
+
+enum SubscriptionStatus {
+  TRIAL
+  ACTIVE
+  PAST_DUE
+  CANCELED
+}
+
+enum BadgeType {
+  VERIFIED // Doğrulanmış İşletme
+  INSURED // Sigortalı
+  FAST_DELIVERY // Hızlı Teslim
+  TOP_RATED // Çok Tercih Edilen
+  FAST_RESPONDER // Hızlı Yanıt
+}
+
+enum OrderStatus {
+  CREATED // müşteri oluşturdu, halıcıya düştü
+  ACCEPTED // halıcı/şoför kabul etti
+  REJECTED // reddedildi (sebep yazılır)
+  PICKED_UP // şoför halıyı aldı
+  WASHING // yıkanıyor
+  OUT_FOR_DELIVERY // yola çıktı
+  DELIVERED // teslim edildi
+  CANCELED
+}
+
+enum PaymentMethod {
+  CASH // kapıda nakit
+  CARD // platform üzerinden (iyzico) — %3 komisyon
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  REFUNDED
+  FAILED
+}
+
+enum PricingUnit {
+  PER_M2 // metrekare başına
+  PER_PIECE // parça/adet başına (el dokuma vs.)
+  FLAT // sabit ücret
+}
+
+// ---------------------------------------------------------------- modeller
+
+model User {
+  id        String   @id @default(cuid())
+  role      UserRole
+  name      String
+  phone     String   @unique
+  email     String?  @unique
+  password  String? // hash; müşteri için opsiyonel
+  phoneVerified Boolean   @default(false)
+  emailVerified Boolean   @default(false) // halıcı hesap doğrulaması e-posta ile
+  otpCode       String? // telefon SMS OTP (ayrı — e-posta ile çakışmasın)
+  otpExpiresAt  DateTime?
+  emailOtpCode      String? // e-posta doğrulama kodu (telefondan bağımsız)
+  emailOtpExpiresAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  ownedBusiness CleanerBusiness? @relation("BusinessOwner")
+  driverProfile Driver?
+  orders        Order[]          @relation("CustomerOrders")
+  reviews       Review[]
+}
+
+model CleanerBusiness {
+  id          String  @id @default(cuid())
+  owner       User    @relation("BusinessOwner", fields: [ownerId], references: [id])
+  ownerId     String  @unique
+  name        String
+  description String?
+  address     String
+  city        String
+  district    String
+  lat         Float
+  lng         Float
+  phone       String
+
+  workingHours            Json? // {"mon":{"open":"09:00","close":"19:00"}, ...}
+  deliveryEstimateMinDays Int? // örn 2
+  deliveryEstimateMaxDays Int? // örn 3
+
+  taxNumber          String? // vergi no (doğrulama için)
+  contractAcceptedAt DateTime? // platform sözleşmesi onay zamanı
+  verification VerificationStatus @default(PENDING)
+  isVisible    Boolean            @default(false) // profil tam + doğrulanmış olunca true
+
+  ratingAvg   Float @default(0)
+  ratingCount Int   @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  serviceAreas ServiceArea[]
+  photos       BusinessPhoto[]
+  pricing      PricingItem[]
+  drivers      Driver[]
+  orders       Order[]
+  reviews      Review[]
+  badges       Badge[]
+  subscription Subscription?
+
+  @@index([city, district])
+}
+
+model ServiceArea {
+  id         String          @id @default(cuid())
+  business   CleanerBusiness @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  businessId String
+  city       String
+  district   String
+
+  @@index([city, district])
+}
+
+model BusinessPhoto {
+  id         String          @id @default(cuid())
+  business   CleanerBusiness @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  businessId String
+  url        String
+  isBefore   Boolean         @default(false)
+  isAfter    Boolean         @default(false)
+  caption    String?
+  createdAt  DateTime        @default(now())
+}
+
+model PricingItem {
+  id         String          @id @default(cuid())
+  business   CleanerBusiness @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  businessId String
+  label      String // "Makine Halısı", "Yün/El Dokuma", "Saçak Onarımı" vb.
+  unit       PricingUnit     @default(PER_M2)
+  price      Decimal         @db.Decimal(10, 2)
+  isAddon    Boolean         @default(false) // ek hizmet mi
+  createdAt  DateTime        @default(now())
+}
+
+model Driver {
+  id         String          @id @default(cuid())
+  user       User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId     String          @unique
+  business   CleanerBusiness @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  businessId String
+
+  isOnShift  Boolean   @default(false) // mesaide mi
+  lastLat    Float? // en güncel canlı konum
+  lastLng    Float?
+  lastSeenAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  orders Order[]
+  pings  DriverLocationPing[]
+  stops  DriverStop[]
+}
+
+// ham konum akışı — halıcının canlı izlemesi için
+model DriverLocationPing {
+  id         String   @id @default(cuid())
+  driver     Driver   @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  driverId   String
+  lat        Float
+  lng        Float
+  recordedAt DateTime @default(now())
+
+  @@index([driverId, recordedAt])
+}
+
+// durak kaydı — "şu saatte, şu konumda, şu kadar durdu"; aylık raporlanır
+model DriverStop {
+  id          String    @id @default(cuid())
+  driver      Driver    @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  driverId    String
+  lat         Float
+  lng         Float
+  address     String? // ters-geocode (opsiyonel)
+  startedAt   DateTime
+  endedAt     DateTime?
+  durationSec Int? // ne kadar durdu
+  periodYear  Int // aylık raporlama için
+  periodMonth Int
+  order       Order?    @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  orderId     String?
+
+  @@index([driverId, periodYear, periodMonth])
+}
+
+model Order {
+  id            String  @id @default(cuid())
+  trackingToken String  @unique @default(cuid()) // SMS takip linki
+  code          String? @unique // kısa, müşteri-dostu takip kodu (ör. HLK-4F2A9)
+
+  customer      User?   @relation("CustomerOrders", fields: [customerId], references: [id], onDelete: SetNull)
+  customerId    String?
+  customerName  String // kayıtsız müşteri de sipariş verebilir
+  customerPhone String
+  pickupAddress String
+  pickupLat     Float?
+  pickupLng     Float?
+  approxM2      Float?
+  note          String?
+
+  business   CleanerBusiness @relation(fields: [businessId], references: [id])
+  businessId String
+  driver     Driver?         @relation(fields: [driverId], references: [id], onDelete: SetNull)
+  driverId   String?
+
+  status       OrderStatus @default(CREATED)
+  rejectReason String?
+
+  paymentMethod PaymentMethod @default(CASH)
+  paymentStatus PaymentStatus @default(PENDING)
+  priceTotal    Decimal?      @db.Decimal(10, 2)
+  commission    Decimal?      @db.Decimal(10, 2) // kartla ödemede %3
+
+  pickupPhotoUrl String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  events OrderEvent[]
+  review Review?
+  stops  DriverStop[]
+
+  @@index([businessId, status])
+}
+
+model OrderEvent {
+  id        String      @id @default(cuid())
+  order     Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId   String
+  status    OrderStatus
+  note      String?
+  createdAt DateTime    @default(now())
+}
+
+model Review {
+  id         String          @id @default(cuid())
+  order      Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId    String          @unique // yorum sadece tamamlanmış siparişten
+  business   CleanerBusiness @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  businessId String
+  customer   User            @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customerId String
+  rating     Int // 1-5
+  comment    String?
+  createdAt  DateTime        @default(now())
+
+  @@index([businessId])
+}
+
+model Subscription {
+  id                 String             @id @default(cuid())
+  business           CleanerBusiness    @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  businessId         String             @unique
+  status             SubscriptionStatus @default(TRIAL)
+  priceMonthly       Decimal            @default(2000) @db.Decimal(10, 2)
+  currentPeriodStart DateTime           @default(now())
+  currentPeriodEnd   DateTime?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+}
+
+model Badge {
+  id         String          @id @default(cuid())
+  business   CleanerBusiness @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  businessId String
+  type       BadgeType
+  grantedAt  DateTime        @default(now())
+
+  @@unique([businessId, type])
+}

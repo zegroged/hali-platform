@@ -1,0 +1,175 @@
+import { prisma } from "@/lib/prisma";
+import { getSessionUser } from "@/lib/auth";
+import { DriverShift } from "@/components/DriverShift";
+import { ORDER_STATUS_META, DRIVER_NEXT, REJECT_REASONS } from "@/lib/orderStatus";
+import { OrderStatusIcon, IconPackage, IconTruck, IconHome } from "@/components/icons";
+import {
+  acceptOrder,
+  rejectOrder,
+  savePickup,
+  advanceOrder,
+  deliverOrder,
+} from "./actions";
+
+export const dynamic = "force-dynamic";
+
+const inp =
+  "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand focus:outline-none";
+
+export default async function SoforPage() {
+  const u = await getSessionUser();
+  if (!u) return null;
+  const driver = await prisma.driver.findUnique({ where: { userId: u.id } });
+  if (!driver) return null;
+
+  const orders = await prisma.order.findMany({
+    where: {
+      driverId: driver.id,
+      status: { notIn: ["DELIVERED", "CANCELED", "REJECTED"] },
+    },
+    orderBy: { createdAt: "asc" },
+  });
+
+  return (
+    <div className="space-y-4">
+      <DriverShift initialOnShift={driver.isOnShift} />
+
+      <h1 className="text-lg font-semibold text-slate-900">
+        İşlerim ({orders.length})
+      </h1>
+
+      {orders.length === 0 && (
+        <p className="rounded-xl border border-dashed border-slate-300 p-8 text-center text-slate-400">
+          Şu an aktif iş yok.
+        </p>
+      )}
+
+      {orders.map((o) => {
+        const meta = ORDER_STATUS_META[o.status];
+        const next = DRIVER_NEXT[o.status];
+        return (
+          <div
+            key={o.id}
+            className="rounded-xl border border-slate-200 bg-white p-4"
+          >
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="font-medium text-slate-900">{o.customerName}</p>
+                <p className="text-sm text-slate-500">{o.customerPhone}</p>
+                <p className="mt-1 text-sm text-slate-600">{o.pickupAddress}</p>
+                {o.approxM2 && (
+                  <p className="text-xs text-slate-400">~{o.approxM2} m²</p>
+                )}
+                {o.note && (
+                  <p className="mt-1 text-xs italic text-slate-500">{o.note}</p>
+                )}
+                <p className="mt-1 text-xs text-slate-500">
+                  Ödeme:{" "}
+                  {o.paymentMethod === "CARD" ? "Kartla (platform)" : "Kapıda nakit"}
+                </p>
+              </div>
+              <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">
+                <OrderStatusIcon status={o.status} size={13} /> {meta.label}
+              </span>
+            </div>
+
+            <div className="mt-3 border-t border-slate-100 pt-3">
+              {/* CREATED: kabul / ret */}
+              {o.status === "CREATED" && (
+                <div className="space-y-2">
+                  <form action={acceptOrder}>
+                    <input type="hidden" name="orderId" value={o.id} />
+                    <button className="w-full rounded-lg bg-brand py-2 text-sm font-semibold text-white hover:bg-brand-dark">
+                      İşi Kabul Et
+                    </button>
+                  </form>
+                  <form action={rejectOrder} className="space-y-2">
+                    <input type="hidden" name="orderId" value={o.id} />
+                    <select name="reason" defaultValue="" className={inp} required>
+                      <option value="" disabled>
+                        Ret sebebi seç
+                      </option>
+                      {REJECT_REASONS.map((r) => (
+                        <option key={r} value={r}>
+                          {r}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="flex gap-2">
+                      <input
+                        name="note"
+                        placeholder="Not (opsiyonel)"
+                        className={inp}
+                      />
+                      <button className="whitespace-nowrap rounded-lg border border-red-300 px-3 py-2 text-sm font-medium text-red-600">
+                        Reddet
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              )}
+
+              {/* ACCEPTED: halıyı aldım — sadece foto, PARA YOK */}
+              {o.status === "ACCEPTED" && (
+                <form action={savePickup} className="space-y-2">
+                  <input type="hidden" name="orderId" value={o.id} />
+                  <input
+                    name="photoUrl"
+                    placeholder="Halı fotoğrafı URL (opsiyonel)"
+                    className={inp}
+                  />
+                  <button className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-brand py-2 text-sm font-semibold text-white hover:bg-brand-dark">
+                    <IconPackage size={16} /> Halıyı Aldım
+                  </button>
+                  <p className="text-center text-xs text-slate-400">
+                    Ödeme teslimde alınır.
+                  </p>
+                </form>
+              )}
+
+              {/* PICKED_UP / WASHING: ara adımlar (para yok) */}
+              {(o.status === "PICKED_UP" || o.status === "WASHING") && next && (
+                <form action={advanceOrder}>
+                  <input type="hidden" name="orderId" value={o.id} />
+                  <button className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-brand py-2 text-sm font-semibold text-white hover:bg-brand-dark">
+                    <OrderStatusIcon status={next} size={16} />
+                    {next === "OUT_FOR_DELIVERY"
+                      ? "Teslime çıktım"
+                      : `${ORDER_STATUS_META[next].label} olarak işaretle`}
+                  </button>
+                  {next === "OUT_FOR_DELIVERY" && (
+                    <p className="mt-1 text-center text-xs text-slate-400">
+                      Müşteri artık seni canlı takip edebilecek.
+                    </p>
+                  )}
+                </form>
+              )}
+
+              {/* OUT_FOR_DELIVERY: teslim + TAHSİLAT (para burada alınır) */}
+              {o.status === "OUT_FOR_DELIVERY" && (
+                <form action={deliverOrder} className="space-y-2">
+                  <input type="hidden" name="orderId" value={o.id} />
+                  <input
+                    name="price"
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    required
+                    placeholder="Tahsil edilen tutar (TL)"
+                    className={inp}
+                  />
+                  <p className="text-xs text-slate-500">
+                    Kapıda nakit tahsil et — teslim anında.
+                  </p>
+                  <button className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-brand py-2 text-sm font-semibold text-white hover:bg-brand-dark">
+                    <IconHome size={16} /> Teslim Et &amp; Tahsilatı Gir
+                  </button>
+                </form>
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}

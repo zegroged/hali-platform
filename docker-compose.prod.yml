@@ -1,0 +1,65 @@
+# Üretim — tek sunucu (app + Postgres). 8 vCPU / 23 GB RAM kutusu için ayarlı.
+# Çalıştırma: docker compose -f docker-compose.prod.yml up -d --build
+# Sırlar aynı dizindeki .env dosyasından gelir (POSTGRES_PASSWORD, DATABASE_URL, ...).
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: hali
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD} # .env'den — GÜÇLÜ olmalı
+      POSTGRES_DB: hali
+    # DB portu DIŞARI AÇILMAZ — yalnız docker iç ağında erişilir.
+    volumes:
+      - hali_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hali -d hali"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    # 23 GB RAM kutusu için Postgres ayarları (app hafif → Postgres'e bol pay).
+    command:
+      - "postgres"
+      - "-c"
+      - "shared_buffers=6GB"
+      - "-c"
+      - "effective_cache_size=14GB"
+      - "-c"
+      - "maintenance_work_mem=1GB"
+      - "-c"
+      - "work_mem=32MB"
+      - "-c"
+      - "max_connections=100"
+      - "-c"
+      - "wal_buffers=16MB"
+      - "-c"
+      - "max_wal_size=4GB"
+      - "-c"
+      - "checkpoint_completion_target=0.9"
+      - "-c"
+      - "random_page_cost=1.1" # SSD/NVMe için
+      - "-c"
+      - "effective_io_concurrency=200" # SSD/NVMe için
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      # Container içi DB adresi (.env'deki DATABASE_URL'i bununla aynı tut).
+      DATABASE_URL: "postgresql://hali:${POSTGRES_PASSWORD}@db:5432/hali?schema=public"
+    volumes:
+      # Fotoğraflar yerel diskte kalıcı olsun (container yeniden kurulsa da durur).
+      - hali_uploads:/app/public/uploads
+    # Yalnız localhost'a yayınla (test için). Dışarıya mevcut kafe-nginx (HTTPS)
+    # docker-network üzerinden bağlanır. Host 3005 → container 3000.
+    ports:
+      - "127.0.0.1:3005:3000"
+
+volumes:
+  hali_pgdata:
+  hali_uploads:

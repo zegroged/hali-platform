@@ -1,0 +1,41 @@
+{
+  "expo": {
+    "name": "Halı Şoför",
+    "slug": "hali-driver",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "halidriver",
+    "userInterfaceStyle": "light",
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Mesai boyunca konumun, işini takip eden halıcına iletilir.",
+          "locationWhenInUsePermission": "Konumun halıcına iletilir.",
+          "isIosBackgroundLocationEnabled": true,
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true
+        }
+      ]
+    ],
+    "ios": {
+      "bundleIdentifier": "com.hali.driver",
+      "supportsTablet": false,
+      "infoPlist": {
+        "UIBackgroundModes": ["location"],
+        "NSLocationWhenInUseUsageDescription": "Konumun halıcına iletilir.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Mesai boyunca konumun, uygulama kapalıyken bile halıcına iletilir."
+      }
+    },
+    "android": {
+      "package": "com.hali.driver",
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_LOCATION"
+      ]
+    }
+  }
+}
