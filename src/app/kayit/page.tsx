@@ -152,7 +152,7 @@ export default function KayitPage() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <main className="mx-auto w-full max-w-sm flex-1 px-6 py-10">
+      <main className="mx-auto w-full max-w-sm flex-1 px-6 py-10 md:max-w-4xl">
         <Link href="/" className="mb-6 block text-sm text-brand-dark hover:underline">
           ← Ana sayfa
         </Link>
@@ -165,29 +165,27 @@ export default function KayitPage() {
         </p>
 
         {/* Funnel 1. adım: yalnız paket kartı; "Hemen Başla" formu açar */}
-        <div className={started ? "hidden" : "mt-7"}>
+        <div className={started ? "hidden" : "mt-7 max-w-sm"}>
           <PlanCard onCta={() => setStarted(true)} />
         </div>
 
-        {/* Funnel 2. adım: kayıt bilgileri + ödeme alanı */}
+        {/* Funnel 2. adım: SOLDA kayıt + ödeme alanları, SAĞDA sipariş özeti
+            (bedel + KDV + toplam) ve "Ödemeyi Tamamla ve Kayıt Ol" butonu */}
         <div className={started ? "" : "hidden"}>
-        <div className="mt-5 flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3">
-          <p className="text-sm">
-            <span className="font-semibold text-slate-900">{PLAN.name}</span>{" "}
-            <span className="text-slate-500">
-              ₺{PLAN.priceAmount}/ay · ilk {PLAN.trialDays} gün ücretsiz
-            </span>
-          </p>
-          <button
-            type="button"
-            onClick={() => setStarted(false)}
-            className="shrink-0 text-sm font-medium text-brand-dark hover:underline"
-          >
-            Paketi gör
-          </button>
-        </div>
-        <h2 className="mt-6 font-semibold text-slate-900">Kayıt bilgileri</h2>
-        <form onSubmit={submit} noValidate className="mt-3 space-y-3">
+        <button
+          type="button"
+          onClick={() => setStarted(false)}
+          className="mt-4 text-sm font-medium text-brand-dark hover:underline"
+        >
+          ← Paketi gör
+        </button>
+        <form
+          onSubmit={submit}
+          noValidate
+          className="mt-3 md:grid md:grid-cols-[minmax(0,1fr)_300px] md:items-start md:gap-8"
+        >
+        <div className="space-y-3">
+        <h2 className="font-semibold text-slate-900">Kayıt bilgileri</h2>
           <div>
             <label htmlFor="kayit-isletme" className={labelCls}>
               İşletme adı
@@ -428,60 +426,95 @@ export default function KayitPage() {
             </p>
           </div>
         </section>
+        </div>
 
-          {error && (
-            <p role="alert" className="text-sm text-red-600">
-              {error}
+          {/* SAĞ SÜTUN: sipariş özeti — bedel dökümü + onay + ödeme butonu */}
+          <aside className="mt-6 h-fit rounded-2xl border border-slate-200 bg-white p-5 md:sticky md:top-6 md:mt-0">
+            <h2 className="font-semibold text-slate-900">Sipariş Özeti</h2>
+            <dl className="mt-4 space-y-2 text-sm">
+              <div className="flex justify-between gap-2">
+                <dt className="text-slate-600">{PLAN.name} (aylık)</dt>
+                <dd className="whitespace-nowrap text-slate-900">
+                  {PLAN.priceNetMonthly} TL
+                </dd>
+              </div>
+              <div className="flex justify-between gap-2">
+                <dt className="text-slate-600">KDV (%{PLAN.kdvRate})</dt>
+                <dd className="whitespace-nowrap text-slate-900">
+                  {PLAN.kdvMonthly} TL
+                </dd>
+              </div>
+              <div className="flex justify-between gap-2 border-t border-slate-200 pt-2">
+                <dt className="font-semibold text-slate-900">Aylık toplam</dt>
+                <dd className="whitespace-nowrap font-semibold text-slate-900">
+                  {PLAN.priceGrossMonthly} TL
+                </dd>
+              </div>
+              <div className="flex justify-between gap-2 rounded-lg bg-brand-light px-3 py-2">
+                <dt className="font-medium text-brand-dark">Bugün ödenecek</dt>
+                <dd className="whitespace-nowrap font-semibold text-brand-dark">
+                  0,00 TL
+                </dd>
+              </div>
+            </dl>
+            <p className="mt-2 text-xs text-slate-500">
+              İlk {PLAN.trialDays} gün ücretsiz; deneme bitiminde aylık{" "}
+              {PLAN.priceGrossMonthly} TL (KDV dahil) tahsil edilir.
+              Dilediğinde iptal edebilirsin.
             </p>
-          )}
 
-          {/* Aracılık sözleşmesi onayı — imza gibi EN SONDA, Kayıt Ol'un hemen
-              üstünde. İşaretlenmemiş zorunlu kutu (aktif teyit). KVKK satırı
-              ayrı ve onaysız — aydınlatma "kabul" konusu yapılmaz
-              (Aydınlatma Tebliği md.5/1-f: aydınlatma ile rıza ayrıştırılır). */}
-          <div>
-            <label className="flex items-start gap-2 text-sm text-slate-600">
-              <input
-                type="checkbox"
-                checked={consent}
-                onChange={(e) => setConsent(e.target.checked)}
-                className="mt-0.5 h-5 w-5 shrink-0 accent-brand"
-              />
-              <span>
-                <Link
-                  href="/isletme-sozlesmesi"
-                  target="_blank"
-                  className="font-medium text-brand-dark underline"
-                >
-                  Platform Aracılık ve Üyelik Sözleşmesi
-                </Link>
-                &apos;ni ve{" "}
-                <Link
-                  href="/kosullar"
-                  target="_blank"
-                  className="font-medium text-brand-dark underline"
-                >
-                  Kullanım Koşulları
-                </Link>
-                &apos;nı okudum, kabul ediyorum.
-              </span>
-            </label>
-            {err("consent")}
-          </div>
-          <p className="text-sm text-slate-500">
-            Kişisel verileriniz{" "}
-            <Link href="/kvkk" target="_blank" className="underline">
-              KVKK Aydınlatma Metni
-            </Link>{" "}
-            kapsamında işlenir.
-          </p>
+            {error && (
+              <p role="alert" className="mt-3 text-sm text-red-600">
+                {error}
+              </p>
+            )}
 
-          <button
-            disabled={loading}
-            className="w-full rounded-lg bg-brand px-4 py-2.5 font-semibold text-white transition hover:bg-brand-dark active:scale-[0.99] disabled:opacity-60"
-          >
-            {loading ? "Hesap açılıyor…" : "Kayıt Ol"}
-          </button>
+            {/* Aracılık sözleşmesi onayı — imza gibi butonun hemen üstünde.
+                KVKK satırı ayrı ve onaysız (Aydınlatma Tebliği md.5/1-f). */}
+            <div className="mt-4">
+              <label className="flex items-start gap-2 text-sm text-slate-600">
+                <input
+                  type="checkbox"
+                  checked={consent}
+                  onChange={(e) => setConsent(e.target.checked)}
+                  className="mt-0.5 h-5 w-5 shrink-0 accent-brand"
+                />
+                <span>
+                  <Link
+                    href="/isletme-sozlesmesi"
+                    target="_blank"
+                    className="font-medium text-brand-dark underline"
+                  >
+                    Platform Aracılık ve Üyelik Sözleşmesi
+                  </Link>
+                  &apos;ni ve{" "}
+                  <Link
+                    href="/kosullar"
+                    target="_blank"
+                    className="font-medium text-brand-dark underline"
+                  >
+                    Kullanım Koşulları
+                  </Link>
+                  &apos;nı okudum, kabul ediyorum.
+                </span>
+              </label>
+              {err("consent")}
+            </div>
+            <p className="mt-2 text-xs text-slate-500">
+              Kişisel verileriniz{" "}
+              <Link href="/kvkk" target="_blank" className="underline">
+                KVKK Aydınlatma Metni
+              </Link>{" "}
+              kapsamında işlenir.
+            </p>
+
+            <button
+              disabled={loading}
+              className="mt-4 w-full rounded-lg bg-brand px-4 py-2.5 font-semibold text-white transition hover:bg-brand-dark active:scale-[0.99] disabled:opacity-60"
+            >
+              {loading ? "Hesap açılıyor…" : "Ödemeyi Tamamla ve Kayıt Ol"}
+            </button>
+          </aside>
         </form>
         </div>
 

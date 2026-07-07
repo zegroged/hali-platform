@@ -6,6 +6,13 @@ export const PLAN = {
   priceAmount: "2.000", // kart görünümünde "₺2.000" olarak basılır
   priceMonthly: "2.000 TL",
   trialDays: 30,
+  // Sipariş özeti dökümü — 2.000 TL KDV DAHİL kabul edildi (sözleşme §3
+  // "2.000 TL/ay" der, hariç demez). KDV hariç olacaksa: net 2.000,00 /
+  // KDV 400,00 / toplam 2.400,00 yap + sözleşme metnini güncelle.
+  kdvRate: 20,
+  priceNetMonthly: "1.666,67",
+  kdvMonthly: "333,33",
+  priceGrossMonthly: "2.000,00",
   features: [
     "Keşif sayfalarında bölgendeki müşterilere görünürlük",
     "Sınırsız sipariş talebi — sipariş başına komisyon yok",
