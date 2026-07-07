@@ -5,6 +5,7 @@ import { BusinessRow } from "@/components/BusinessRow";
 import { SearchBar } from "@/components/SearchBar";
 import { BusinessesMapView } from "@/components/BusinessesMapView";
 import Footer from "@/components/Footer";
+import TrackingBar from "@/components/TrackingBar";
 import { DISTRICTS } from "@/components/districts";
 import {
   Logo,
@@ -60,6 +61,70 @@ function Header() {
   );
 }
 
+
+/** Ana sayfa SSS — müşteri odaklı 6 soru, açılır-kapanır (tümü /sss'te). */
+function HomeFaq() {
+  const faqs: { q: string; a: React.ReactNode }[] = [
+    {
+      q: "Siparişimi nasıl takip ederim?",
+      a: "Halıcı siparişi oluşturduğunda sana 6 haneli bir takip kodu ve bağlantı verir. Yukarıdaki takip kutusuna kodu girerek halının hangi aşamada olduğunu (alındı, yıkanıyor, yolda, teslim) anlık görürsün.",
+    },
+    {
+      q: "Fiyat nasıl netleşir?",
+      a: "Profillerdeki fiyatlar m² başına tahminidir. Halın kapından alınıp ölçüldükten sonra kesin fiyat sana bildirilir; uygun bulmazsan halın yıkanmadan ücretsiz geri getirilir.",
+    },
+    {
+      q: "Ödemeyi ne zaman yapıyorum?",
+      a: "Ödeme teslimatta yapılır — sipariş verirken hiçbir ön ödeme veya kapora alınmaz. Halın temiz şekilde kapına geldiğinde ücretini doğrudan halıcıya ödersin.",
+    },
+    {
+      q: "Halım kaç günde teslim edilir?",
+      a: "Süre işletmeye ve yoğunluğa göre değişir; her halıcının profilinde tahmini teslim süresi (örn. 2-4 iş günü) yazar. Süre, halın alındığında netleşir.",
+    },
+    {
+      q: "Halım kaybolursa veya zarar görürse ne olur?",
+      a: "Her sipariş kayıt altındadır; hangi işletmenin ne zaman aldığı ve teslim ettiği adım adım izlenir. Hasar/kayıp durumunda hizmeti veren işletme sorumludur, platform olarak çözüm sürecine aracılık ederiz.",
+    },
+    {
+      q: "Hangi bölgelerde hizmet var?",
+      a: "Platform yeni ve bölge bölge açılıyoruz. Yukarıdan adresini aratarak veya konumunu kullanarak bölgende hizmet veren halıcıları görebilirsin; listede işletme yoksa bölgende henüz açılmamışız demektir.",
+    },
+  ];
+  return (
+    <section className="mt-10">
+      <div className="mb-3 flex items-baseline justify-between gap-3">
+        <h2 className="font-semibold text-slate-900">Sık sorulan sorular</h2>
+        <Link
+          href="/sss"
+          className="shrink-0 text-sm font-medium text-brand-dark hover:underline"
+        >
+          Tümünü gör
+        </Link>
+      </div>
+      <div className="space-y-2.5">
+        {faqs.map((f, i) => (
+          <details
+            key={i}
+            className="group rounded-xl border border-slate-200 bg-white shadow-sm"
+          >
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3.5 text-sm font-semibold text-slate-900 [&::-webkit-details-marker]:hidden">
+              {f.q}
+              <span
+                aria-hidden
+                className="shrink-0 text-slate-500 transition-transform group-open:rotate-90"
+              >
+                ›
+              </span>
+            </summary>
+            <p className="border-t border-slate-100 px-4 py-3 text-sm leading-relaxed text-slate-600">
+              {f.a}
+            </p>
+          </details>
+        ))}
+      </div>
+    </section>
+  );
+}
 
 /** 3 adımlı "Nasıl çalışır?" şeridi — güven katmanı; footer'dan da linklenir. */
 function HowItWorks() {
@@ -263,6 +328,9 @@ export default async function Home({
           </div>
         </section>
 
+        {/* Mevcut siparişi olan müşteri için belirgin takip girişi */}
+        <TrackingBar />
+
         {all.length === 0 ? (
           <>
             {/* Lansman ekranı: müşteriye "çok yakında" + nasıl çalışır + işletme CTA'sı */}
@@ -328,6 +396,8 @@ export default async function Home({
             <HowItWorks />
           </>
         )}
+
+        <HomeFaq />
       </main>
       <Footer />
     </>
