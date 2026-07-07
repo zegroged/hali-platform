@@ -5,12 +5,10 @@ import { BusinessRow } from "@/components/BusinessRow";
 import { SearchBar } from "@/components/SearchBar";
 import { BusinessesMapView } from "@/components/BusinessesMapView";
 import Footer from "@/components/Footer";
-import PlanCard from "@/components/PlanCard";
 import { DISTRICTS } from "@/components/districts";
 import {
   Logo,
   IconPackage,
-  IconArrowRight,
   IconMapPin,
   IconStar,
   IconTruck,
@@ -62,26 +60,6 @@ function Header() {
   );
 }
 
-/**
- * İşletme kazanım kartı — abonelik fiyatı burada da şeffaf yazılır
- * (iyzico "paketleri sitede sergile" kriteri + 6502 md.61 dürüst reklam).
- */
-function SubscriptionCta() {
-  return (
-    <section className="mt-10">
-      <h2 className="text-center font-semibold text-slate-900">
-        Halı yıkama işletmen mi var?
-      </h2>
-      <p className="mx-auto mt-1 max-w-md text-center text-sm text-slate-600">
-        Bölgendeki müşterilere ulaş; siparişi, şoförü ve teslimatı tek panelden
-        yönet.
-      </p>
-      <div className="mx-auto mt-6 max-w-md">
-        <PlanCard ctaHref="/kayit" />
-      </div>
-    </section>
-  );
-}
 
 /** 3 adımlı "Nasıl çalışır?" şeridi — güven katmanı; footer'dan da linklenir. */
 function HowItWorks() {
@@ -302,7 +280,6 @@ export default async function Home({
               </p>
             </section>
             <HowItWorks />
-            <SubscriptionCta />
           </>
         ) : (
           <>
@@ -349,7 +326,6 @@ export default async function Home({
               </section>
             )}
             <HowItWorks />
-            <SubscriptionCta />
           </>
         )}
       </main>
