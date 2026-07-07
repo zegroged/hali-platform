@@ -6,7 +6,7 @@ import PlanCard from "@/components/PlanCard";
 export const metadata: Metadata = {
   title: "Abonelik ve Paketler",
   description:
-    "En Yakın Halı Yıkama işletme aboneliği: ilk 30 gün ücretsiz, sonrasında 2.000 TL/ay. Müşteriler için platform tamamen ücretsizdir.",
+    "En Yakın Halı Yıkama işletme aboneliği: aylık 2.000 TL + KDV. Müşteriler için platform tamamen ücretsizdir.",
 };
 
 export default function AbonelikPage() {
@@ -22,11 +22,13 @@ export default function AbonelikPage() {
 
       <Section title="Ödeme ve Faturalandırma">
         <p>
-          Abonelik bedeli, ücretsiz deneme süresinin bitiminden itibaren{" "}
-          <strong>aylık olarak</strong> tahakkuk eder. Online kartlı ödeme
+          Abonelik bedeli <strong>aylık 2.000 TL + KDV (%20)</strong>, yani
+          toplam <strong>2.400,00 TL</strong>&apos;dir ve kayıt sırasında
+          tahsil edilir; ödemesi alınmayan işletme yayına alınmaz. Bedel
+          karşılığında e-arşiv fatura düzenlenir. Online kartlı ödeme
           altyapımız (anlaşmalı ödeme kuruluşu ile){" "}
           <strong>çok yakında</strong> aktif olacaktır; o zamana kadar ödeme,
-          onay sürecinde tarafınıza iletilen havale/EFT bilgileriyle yapılır.
+          kayıt sonrası tarafınıza iletilen havale/EFT bilgileriyle yapılır.
         </p>
         <p>
           Müşteri siparişlerinden ayrıca <strong>komisyon alınmaz</strong>;

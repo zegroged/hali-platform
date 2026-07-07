@@ -358,8 +358,8 @@ export default function KayitPage() {
           <section className="!mt-6 rounded-2xl border border-slate-200 bg-white p-5">
           <h2 className="font-semibold text-slate-900">Ödeme bilgileri</h2>
           <p className="mt-1 text-sm text-slate-600">
-            İlk {PLAN.trialDays} gün ücretsiz — deneme süresi bitmeden kartından
-            ücret çekilmez.
+            Abonelik bedeli kayıt sırasında tahsil edilir; ödemesi alınmayan
+            hesap yayına açılmaz.
           </p>
           <div className="mt-4 space-y-3" aria-disabled="true">
             <div>
@@ -419,10 +419,10 @@ export default function KayitPage() {
               className="h-6 w-auto max-w-full"
             />
             <p className="text-sm text-slate-500">
-              Kartla online ödeme, anlaşmalı ödeme kuruluşumuzun (iyzico) onay
-              süreci tamamlandığında burada aktifleşecek. Ödeme adımı
-              tamamlanmadan hesabın yayına alınmaz; ödemen tamamlanır
-              tamamlanmaz aboneliğin otomatik aktifleşir.
+              Kartla online ödeme, anlaşmalı ödeme kuruluşumuzun onay süreci
+              tamamlandığında burada aktifleşecek. Şimdilik ödeme havale/EFT
+              ile alınır: kayıttan sonra ödeme bilgileri e-posta adresine
+              gönderilir, ödemen doğrulanır doğrulanmaz hesabın yayına açılır.
             </p>
           </div>
         </section>
@@ -453,14 +453,13 @@ export default function KayitPage() {
               <div className="flex justify-between gap-2 rounded-lg bg-brand-light px-3 py-2">
                 <dt className="font-medium text-brand-dark">Bugün ödenecek</dt>
                 <dd className="whitespace-nowrap font-semibold text-brand-dark">
-                  0,00 TL
+                  {PLAN.priceGrossMonthly} TL
                 </dd>
               </div>
             </dl>
             <p className="mt-2 text-xs text-slate-500">
-              İlk {PLAN.trialDays} gün ücretsiz; deneme bitiminde aylık{" "}
-              {PLAN.priceGrossMonthly} TL (KDV dahil) tahsil edilir.
-              Dilediğinde iptal edebilirsin.
+              Abonelik aylık yenilenir; dilediğinde feshedebilirsin, ileriye
+              dönük borç doğmaz. Bedel karşılığında e-arşiv fatura düzenlenir.
             </p>
 
             {error && (

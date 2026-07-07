@@ -1,18 +1,17 @@
 // Abonelik paketi TEK yerde tanımlanır — /abonelik sayfası ve /kayit funnel'ı
 // aynı kaynağı okur; fiyat/kapsam değişince iki sayfa birden güncel kalır.
 // (Fiyat sözleşmeyle uyumlu olmalı: isletme-sozlesmesi §3.)
+// ÜCRETSİZ DENEME YOK (2026-07-07 kararı): abonelik ödemeyle başlar,
+// ödemesi alınmayan işletme yayına alınmaz. Fiyat KDV HARİÇ anılır
+// (kartta "₺2.000 + KDV / ay"), sözleşme §3 ile birebir aynı.
 export const PLAN = {
   name: "İşletme Aboneliği",
-  priceAmount: "2.000", // kart görünümünde "₺2.000" olarak basılır
-  priceMonthly: "2.000 TL",
-  trialDays: 30,
-  // Sipariş özeti dökümü — 2.000 TL KDV DAHİL kabul edildi (sözleşme §3
-  // "2.000 TL/ay" der, hariç demez). KDV hariç olacaksa: net 2.000,00 /
-  // KDV 400,00 / toplam 2.400,00 yap + sözleşme metnini güncelle.
+  priceAmount: "2.000", // kart görünümünde "₺2.000 + KDV" olarak basılır
+  priceMonthly: "2.000 TL + KDV",
   kdvRate: 20,
-  priceNetMonthly: "1.666,67",
-  kdvMonthly: "333,33",
-  priceGrossMonthly: "2.000,00",
+  priceNetMonthly: "2.000,00",
+  kdvMonthly: "400,00",
+  priceGrossMonthly: "2.400,00",
   features: [
     "Keşif sayfalarında bölgendeki müşterilere görünürlük",
     "Sınırsız sipariş talebi — sipariş başına komisyon yok",

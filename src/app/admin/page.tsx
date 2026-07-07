@@ -1,6 +1,10 @@
 import { prisma } from "@/lib/prisma";
 import { verifMeta, subscriptionLabel } from "@/lib/verifMeta";
-import { approveBusiness, rejectBusiness } from "./actions";
+import {
+  activateSubscription,
+  approveBusiness,
+  rejectBusiness,
+} from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -89,7 +93,24 @@ export default async function AdminHome() {
                     </td>
                     <td className="px-4 py-2">{b.isVisible ? "✓" : "—"}</td>
                     <td className="px-4 py-2 text-slate-600">
-                      {subscriptionLabel(b.subscription?.status)}
+                      <div className="whitespace-nowrap">
+                        {subscriptionLabel(b.subscription?.status)}
+                        {b.subscription?.currentPeriodEnd && (
+                          <span className="ml-1 text-xs text-slate-400">
+                            →{" "}
+                            {b.subscription.currentPeriodEnd.toLocaleDateString(
+                              "tr-TR",
+                            )}
+                          </span>
+                        )}
+                      </div>
+                      {/* Ödeme (havale/EFT) doğrulanınca 1 aylık dönem aç/uzat */}
+                      <form action={activateSubscription} className="mt-1">
+                        <input type="hidden" name="id" value={b.id} />
+                        <button className="whitespace-nowrap rounded border border-brand px-2 py-0.5 text-xs font-medium text-brand-dark hover:bg-brand-light/50">
+                          Ödeme alındı — 1 ay aktifleştir
+                        </button>
+                      </form>
                     </td>
                     <td className="px-4 py-2 text-right text-slate-600">
                       {b._count.drivers} / {b._count.orders}

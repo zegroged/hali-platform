@@ -66,10 +66,11 @@ export default function IsletmeSozlesmesiPage() {
 
       <Section title="3. Ücretler ve Ödemelerin Aktarımı">
         <p>
-          Yönetici (admin) onayının tamamlanmasından itibaren ilk{" "}
-          <strong>30 gün ücretsiz deneme</strong> dönemidir. Deneme süresinin
-          ardından aylık abonelik bedeli <strong>2.000 TL/ay</strong>&apos;dır.
-          Müşteri siparişlerinden ayrıca komisyon alınmaz.
+          Aylık abonelik bedeli <strong>2.000 TL + KDV</strong>&apos;dir ve
+          kayıt sırasında peşin tahsil edilir. Abonelik, bedelin ödenmesiyle
+          başlar; ödemesi alınmayan işletme yayına alınmaz. Bedel karşılığında
+          e-arşiv fatura düzenlenir. Müşteri siparişlerinden ayrıca komisyon
+          alınmaz.
         </p>
         <p>
           Online kartlı ödeme tahsilatı aktif hâle geldiğinde sipariş bedeli;

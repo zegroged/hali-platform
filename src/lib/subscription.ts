@@ -1,25 +1,27 @@
 // Abonelik durumu — halıcı sipariş alabilir mi / keşifte görünür mü.
-// Gelir modeli: 2000 TL/ay. Onayda 30 gün TRIAL verilir; sonra ACTIVE olmalı.
+// Gelir modeli (2026-07-07): 2.000 TL + KDV/ay, PEŞİN; ücretsiz deneme YOK.
+// Ödeme alınınca admin (ileride iyzico callback'i) 1 aylık ACTIVE dönem açar;
+// dönem uzatılmazsa süre bitiminde işletme otomatik yayından düşer.
+// (TRIAL dalı yalnız eski kayıtların geriye uyumu için duruyor.)
 
-export const TRIAL_DAYS = 30;
+export const PERIOD_DAYS = 30;
 
 type SubLike = { status: string; currentPeriodEnd: Date | null } | null | undefined;
 
-/** ACTIVE, veya TRIAL süresi DOLMAMIŞ ise sipariş alabilir. PAST_DUE/CANCELED/süresi geçmiş TRIAL: hayır. */
+/** Dönemi DOLMAMIŞ ACTIVE (veya eski TRIAL) ise sipariş alabilir. */
 export function subscriptionActive(sub: SubLike): boolean {
   if (!sub) return false;
-  if (sub.status === "ACTIVE") return true;
-  if (sub.status === "TRIAL") {
+  if (sub.status === "ACTIVE" || sub.status === "TRIAL") {
     return sub.currentPeriodEnd != null && sub.currentPeriodEnd.getTime() > Date.now();
   }
   return false;
 }
 
-/** Prisma where filtresi: keşifte yalnız aktif/geçerli-trial abonelikli işletmeler. */
+/** Prisma where filtresi: keşifte yalnız dönemi geçerli abonelikli işletmeler. */
 export function activeSubscriptionWhere() {
   return {
     OR: [
-      { status: "ACTIVE" as const },
+      { status: "ACTIVE" as const, currentPeriodEnd: { gt: new Date() } },
       { status: "TRIAL" as const, currentPeriodEnd: { gt: new Date() } },
     ],
   };

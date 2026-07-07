@@ -139,14 +139,14 @@ export default function GirisPage() {
             Henüz hesabın yok mu?
           </p>
           <p className="mt-1 text-sm text-slate-600">
-            Halı yıkama işletmeni birkaç dakikada ücretsiz kaydet — onay
-            sonrası ilk 30 gün ücretsiz.
+            Halı yıkama işletmeni birkaç dakikada kaydet, bölgendeki
+            müşterilere ulaş.
           </p>
           <Link
             href="/kayit"
             className="mt-3 inline-flex min-h-[40px] items-center rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-dark"
           >
-            Ücretsiz Kaydol
+            İşletmeni Ekle
           </Link>
           <p className="mt-2 text-xs text-slate-500">
             Soruların mı var?{" "}
