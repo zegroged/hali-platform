@@ -165,8 +165,8 @@ export default function KayitPage() {
         </p>
 
         {/* Funnel 1. adım: yalnız paket kartı; "Hemen Başla" formu açar */}
-        <div className={started ? "hidden" : "mt-7 max-w-sm"}>
-          <PlanCard onCta={() => setStarted(true)} />
+        <div className={started ? "hidden" : "mt-7"}>
+          <PlanCard wide onCta={() => setStarted(true)} ctaLabel="Hemen Başla" />
         </div>
 
         {/* Funnel 2. adım: SOLDA kayıt + ödeme alanları, SAĞDA sipariş özeti

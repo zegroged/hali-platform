@@ -17,7 +17,7 @@ export default function AbonelikPage() {
     >
       {/* Paket kartı — iyzico "abonelik paketlerini sitenizde sergileyin" kriteri */}
       <div className="mt-2">
-        <PlanCard ctaHref="/kayit" />
+        <PlanCard wide ctaHref="/kayit" ctaLabel="İşletmeni Ekle" />
       </div>
 
       <Section title="Ödeme ve Faturalandırma">
