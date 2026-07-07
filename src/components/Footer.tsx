@@ -84,6 +84,11 @@ export default function Footer() {
                 </Link>
               </li>
               <li>
+                <Link href="/abonelik" className="hover:text-white">
+                  Abonelik ve Paketler
+                </Link>
+              </li>
+              <li>
                 <Link href="/isletme-sozlesmesi" className="hover:text-white">
                   İşletme Sözleşmesi
                 </Link>
