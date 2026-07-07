@@ -4,7 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Footer from "@/components/Footer";
-import { IconCheck } from "@/components/icons";
+import PlanCard from "@/components/PlanCard";
+import { PLAN } from "@/lib/plan";
 
 /** Alan bazlı doğrulama hataları (alan adı → mesaj). */
 type Field =
@@ -18,16 +19,9 @@ type Field =
   | "consent";
 type FieldErrors = Partial<Record<Field, string>>;
 
-// Kayıt sonrası panel yol haritası — beklentiyi baştan kur.
-// (Sözleşme onayı artık kayıt formundaki checkbox ile alınıyor.)
+// Funnel: paket kartı (fiyat + faydalar) → kayıt formu → ödeme yöntemleri.
 // 6502 md.61 (dürüst reklam): "ücretsiz" vurgusu, devamındaki abonelik
-// bedelini gizlemesin — tutar burada da açıkça yazılır.
-const STEPS = [
-  "E-postanı doğrula",
-  "Profilini tamamla (fiyat, fotoğraf, bölge)",
-  "Doğrulamaya gönder",
-  "Onaydan sonra ilk 30 gün ücretsiz yayında kal; sonrasında 2.000 TL/ay abonelik",
-];
+// bedelini gizlemesin — tutar formun üstündeki paket kartında açıkça yazılır.
 
 export default function KayitPage() {
   const router = useRouter();
@@ -51,6 +45,9 @@ export default function KayitPage() {
   const [cooldown, setCooldown] = useState(0);
   // Honeypot: görünmez alan; botlar doldurur, insanlar görmez.
   const [website, setWebsite] = useState("");
+  // Funnel adımı: önce YALNIZ paket kartı; "Hemen Başla" formu açar.
+  // (hidden ile gizlenir, unmount edilmez — geri dönüşte yazılanlar kaybolmaz)
+  const [started, setStarted] = useState(false);
 
   async function sendCode() {
     setError(null);
@@ -160,29 +157,37 @@ export default function KayitPage() {
           ← Ana sayfa
         </Link>
         <h1 className="text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">
-          İşletmeni Ücretsiz Kaydet
+          İşletmeni Ekle
         </h1>
         <p className="mt-1 text-sm text-slate-600">
           Müşteriler seni konumuna göre bulsun; siparişlerini ve şoförlerini
-          tek panelden yönet. Onay sonrası ilk 30 gün ücretsiz; sonrasında
-          2.000 TL/ay abonelik.
+          tek panelden yönet.
         </p>
 
-        <ul className="mt-4 space-y-1.5">
-          {STEPS.map((s, i) => (
-            <li
-              key={i}
-              className="flex items-start gap-2 text-sm text-slate-600"
-            >
-              <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-brand-light text-brand-dark">
-                <IconCheck size={10} />
-              </span>
-              {s}
-            </li>
-          ))}
-        </ul>
+        {/* Funnel 1. adım: yalnız paket kartı; "Hemen Başla" formu açar */}
+        <div className={started ? "hidden" : "mt-7"}>
+          <PlanCard onCta={() => setStarted(true)} />
+        </div>
 
-        <form onSubmit={submit} noValidate className="mt-6 space-y-3">
+        {/* Funnel 2. adım: kayıt bilgileri + ödeme alanı */}
+        <div className={started ? "" : "hidden"}>
+        <div className="mt-5 flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3">
+          <p className="text-sm">
+            <span className="font-semibold text-slate-900">{PLAN.name}</span>{" "}
+            <span className="text-slate-500">
+              ₺{PLAN.priceAmount}/ay · ilk {PLAN.trialDays} gün ücretsiz
+            </span>
+          </p>
+          <button
+            type="button"
+            onClick={() => setStarted(false)}
+            className="shrink-0 text-sm font-medium text-brand-dark hover:underline"
+          >
+            Paketi gör
+          </button>
+        </div>
+        <h2 className="mt-6 font-semibold text-slate-900">Kayıt bilgileri</h2>
+        <form onSubmit={submit} noValidate className="mt-3 space-y-3">
           <div>
             <label htmlFor="kayit-isletme" className={labelCls}>
               İşletme adı
@@ -346,14 +351,93 @@ export default function KayitPage() {
             aria-hidden="true"
           />
 
+          {/* Ödeme bilgileri — Kayıt Ol butonu bunun ALTINDA: ödeme adımı
+              tamamlanmadan hesap yayına açılmaz. TODO(iyzico): anahtarlar
+              gelince bu alan gerçek tahsilata bağlanacak (iyzico Checkout/
+              abonelik) ve kayıt, ödemenin tamamlanmasıyla sonuçlanıp hesabı
+              OTOMATİK aktifleştirecek. O güne kadar alanlar disabled — veri
+              girilemez/toplanmaz (PCI). */}
+          <section className="!mt-6 rounded-2xl border border-slate-200 bg-white p-5">
+          <h2 className="font-semibold text-slate-900">Ödeme bilgileri</h2>
+          <p className="mt-1 text-sm text-slate-600">
+            İlk {PLAN.trialDays} gün ücretsiz — deneme süresi bitmeden kartından
+            ücret çekilmez.
+          </p>
+          <div className="mt-4 space-y-3" aria-disabled="true">
+            <div>
+              <label htmlFor="odeme-isim" className={labelCls}>
+                Kart üzerindeki isim
+              </label>
+              <input
+                id="odeme-isim"
+                disabled
+                placeholder="Ad Soyad"
+                className={`${inputCls()} bg-slate-50 text-slate-400`}
+                autoComplete="off"
+              />
+            </div>
+            <div>
+              <label htmlFor="odeme-kart" className={labelCls}>
+                Kart numarası
+              </label>
+              <input
+                id="odeme-kart"
+                disabled
+                placeholder="•••• •••• •••• ••••"
+                className={`${inputCls()} bg-slate-50 text-slate-400`}
+                autoComplete="off"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label htmlFor="odeme-skt" className={labelCls}>
+                  Son kullanma
+                </label>
+                <input
+                  id="odeme-skt"
+                  disabled
+                  placeholder="AA/YY"
+                  className={`${inputCls()} bg-slate-50 text-slate-400`}
+                  autoComplete="off"
+                />
+              </div>
+              <div>
+                <label htmlFor="odeme-cvv" className={labelCls}>
+                  CVV
+                </label>
+                <input
+                  id="odeme-cvv"
+                  disabled
+                  placeholder="•••"
+                  className={`${inputCls()} bg-slate-50 text-slate-400`}
+                  autoComplete="off"
+                />
+              </div>
+            </div>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/iyzico-band-colored.svg"
+              alt="iyzico ile güvenli ödeme — Visa, Mastercard, Troy"
+              className="h-6 w-auto max-w-full"
+            />
+            <p className="text-sm text-slate-500">
+              Kartla online ödeme, anlaşmalı ödeme kuruluşumuzun (iyzico) onay
+              süreci tamamlandığında burada aktifleşecek. Ödeme adımı
+              tamamlanmadan hesabın yayına alınmaz; ödemen tamamlanır
+              tamamlanmaz aboneliğin otomatik aktifleşir.
+            </p>
+          </div>
+        </section>
+
           {error && (
             <p role="alert" className="text-sm text-red-600">
               {error}
             </p>
           )}
 
-          {/* Aracılık sözleşmesi onayı: işaretlenmemiş zorunlu kutu (aktif teyit).
-              KVKK satırı ayrı ve onaysız — aydınlatma "kabul" konusu yapılmaz
+          {/* Aracılık sözleşmesi onayı — imza gibi EN SONDA, Kayıt Ol'un hemen
+              üstünde. İşaretlenmemiş zorunlu kutu (aktif teyit). KVKK satırı
+              ayrı ve onaysız — aydınlatma "kabul" konusu yapılmaz
               (Aydınlatma Tebliği md.5/1-f: aydınlatma ile rıza ayrıştırılır). */}
           <div>
             <label className="flex items-start gap-2 text-sm text-slate-600">
@@ -396,9 +480,10 @@ export default function KayitPage() {
             disabled={loading}
             className="w-full rounded-lg bg-brand px-4 py-2.5 font-semibold text-white transition hover:bg-brand-dark active:scale-[0.99] disabled:opacity-60"
           >
-            {loading ? "Hesap açılıyor…" : "Ücretsiz Kaydol"}
+            {loading ? "Hesap açılıyor…" : "Kayıt Ol"}
           </button>
         </form>
+        </div>
 
         <p className="mt-4 text-sm text-slate-500">
           Zaten hesabın var mı?{" "}

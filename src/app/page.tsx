@@ -5,6 +5,7 @@ import { BusinessRow } from "@/components/BusinessRow";
 import { SearchBar } from "@/components/SearchBar";
 import { BusinessesMapView } from "@/components/BusinessesMapView";
 import Footer from "@/components/Footer";
+import PlanCard from "@/components/PlanCard";
 import { DISTRICTS } from "@/components/districts";
 import {
   Logo,
@@ -58,6 +59,27 @@ function Header() {
         </Link>
       </div>
     </header>
+  );
+}
+
+/**
+ * İşletme kazanım kartı — abonelik fiyatı burada da şeffaf yazılır
+ * (iyzico "paketleri sitede sergile" kriteri + 6502 md.61 dürüst reklam).
+ */
+function SubscriptionCta() {
+  return (
+    <section className="mt-10">
+      <h2 className="text-center font-semibold text-slate-900">
+        Halı yıkama işletmen mi var?
+      </h2>
+      <p className="mx-auto mt-1 max-w-md text-center text-sm text-slate-600">
+        Bölgendeki müşterilere ulaş; siparişi, şoförü ve teslimatı tek panelden
+        yönet.
+      </p>
+      <div className="mx-auto mt-6 max-w-md">
+        <PlanCard ctaHref="/kayit" />
+      </div>
+    </section>
   );
 }
 
@@ -280,22 +302,7 @@ export default async function Home({
               </p>
             </section>
             <HowItWorks />
-            <section className="mt-8 rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm">
-              <h2 className="text-base font-semibold text-slate-900">
-                Halı yıkama işletmen mi var?
-              </h2>
-              <p className="mx-auto mt-1 max-w-md text-sm text-slate-600">
-                İlk katılan işletmelerden ol, bölgendeki müşterilere ilk sen
-                ulaş.
-              </p>
-              <Link
-                href="/kayit"
-                className="mt-4 inline-flex items-center justify-center gap-1.5 rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark active:scale-[0.99]"
-              >
-                İlk katılanlardan ol
-                <IconArrowRight size={15} />
-              </Link>
-            </section>
+            <SubscriptionCta />
           </>
         ) : (
           <>
@@ -342,6 +349,7 @@ export default async function Home({
               </section>
             )}
             <HowItWorks />
+            <SubscriptionCta />
           </>
         )}
       </main>
