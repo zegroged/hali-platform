@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { getSessionUser } from "@/lib/auth";
+import crypto from "node:crypto";
+import { getSessionUser, hashPassword } from "@/lib/auth";
 import { profileComplete, syncVisibility } from "@/lib/panel";
 import { PERIOD_DAYS } from "@/lib/subscription";
 
@@ -156,4 +157,120 @@ export async function unbanUser(formData: FormData) {
   if (owned) await syncVisibility(owned.id);
   revalidatePath("/admin");
   if (businessId) revalidatePath(`/admin/isletme/${businessId}`);
+}
+
+/** "Doğrulanmış" rozetini geri al (yayını etkilemez — rozet ayrı işaret). */
+export async function revokeBadge(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("id"));
+  await prisma.cleanerBusiness.update({
+    where: { id },
+    data: { verification: "PENDING" },
+  });
+  await prisma.badge.deleteMany({ where: { businessId: id, type: "VERIFIED" } });
+  await syncVisibility(id);
+  revalidatePath("/admin");
+  revalidatePath(`/admin/isletme/${id}`);
+}
+
+/** Yayından kaldırmayı geri al (REJECTED → PENDING; görünürlük yeniden hesaplanır). */
+export async function unrejectBusiness(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("id"));
+  await prisma.cleanerBusiness.update({
+    where: { id },
+    data: { verification: "PENDING" },
+  });
+  await syncVisibility(id);
+  revalidatePath("/admin");
+  revalidatePath(`/admin/isletme/${id}`);
+}
+
+/** Aboneliği durdur: dönem hemen biter, işletme keşiften düşer (iade vb.). */
+export async function suspendSubscription(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("id"));
+  await prisma.subscription.updateMany({
+    where: { businessId: id },
+    data: { status: "CANCELED", currentPeriodEnd: new Date() },
+  });
+  revalidatePath("/admin");
+  revalidatePath(`/admin/isletme/${id}`);
+}
+
+/** İşletme sahibinin şifresini sıfırla: geçici şifre üretir, admin'e gösterir. */
+export async function resetOwnerPassword(formData: FormData) {
+  await requireAdmin();
+  const businessId = String(formData.get("businessId"));
+  const b = await prisma.cleanerBusiness.findUnique({
+    where: { id: businessId },
+    select: { ownerId: true },
+  });
+  if (!b) return;
+  const temp = "Gecici-" + crypto.randomBytes(4).toString("hex");
+  await prisma.user.update({
+    where: { id: b.ownerId },
+    data: { password: await hashPassword(temp) },
+  });
+  redirect(
+    `/admin/isletme/${businessId}?mesaj=` +
+      encodeURIComponent(
+        `Geçici şifre: ${temp} — sahibine telefonla ilet, girişten sonra panelden değiştirsin.`,
+      ),
+  );
+}
+
+/** Uygunsuz fotoğrafı sil (moderasyon); foto şartı bozulursa yayından düşer. */
+export async function deletePhoto(formData: FormData) {
+  await requireAdmin();
+  const photoId = String(formData.get("photoId"));
+  const businessId = String(formData.get("businessId"));
+  await prisma.businessPhoto.deleteMany({
+    where: { id: photoId, businessId },
+  });
+  await syncVisibility(businessId);
+  revalidatePath(`/admin/isletme/${businessId}`);
+}
+
+/** Uygunsuz yorumu sil (moderasyon) + işletme puan ortalamasını yeniden hesapla. */
+export async function deleteReview(formData: FormData) {
+  await requireAdmin();
+  const reviewId = String(formData.get("reviewId"));
+  const businessId = String(formData.get("businessId"));
+  await prisma.review.deleteMany({ where: { id: reviewId, businessId } });
+  const agg = await prisma.review.aggregate({
+    where: { businessId },
+    _avg: { rating: true },
+    _count: true,
+  });
+  await prisma.cleanerBusiness.update({
+    where: { id: businessId },
+    data: { ratingAvg: agg._avg.rating ?? 0, ratingCount: agg._count },
+  });
+  revalidatePath(`/admin/isletme/${businessId}`);
+}
+
+/** Şoförü zorla mesaiden düşür (canlı konum akışı kesilir). */
+export async function forceOffShift(formData: FormData) {
+  await requireAdmin();
+  const driverId = String(formData.get("driverId"));
+  const businessId = String(formData.get("businessId") ?? "");
+  await prisma.driver.updateMany({
+    where: { id: driverId },
+    data: { isOnShift: false },
+  });
+  if (businessId) revalidatePath(`/admin/isletme/${businessId}`);
+  revalidatePath("/admin");
+}
+
+/** Admin içi not (işletme görmez): denetim gerekçeleri, görüşme kayıtları vb. */
+export async function saveAdminNote(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("id"));
+  const note = String(formData.get("note") ?? "").slice(0, 2000);
+  await prisma.cleanerBusiness.update({
+    where: { id },
+    data: { adminNote: note || null },
+  });
+  revalidatePath(`/admin/isletme/${id}`);
 }

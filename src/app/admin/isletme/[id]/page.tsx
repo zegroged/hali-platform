@@ -8,8 +8,16 @@ import {
   activateSubscription,
   approveBusiness,
   banUser,
+  deletePhoto,
+  deleteReview,
+  forceOffShift,
   rejectBusiness,
+  resetOwnerPassword,
+  revokeBadge,
+  saveAdminNote,
+  suspendSubscription,
   unbanUser,
+  unrejectBusiness,
 } from "../../actions";
 
 export const dynamic = "force-dynamic";
@@ -53,10 +61,13 @@ const tl = (v: unknown) =>
 // siparişler, fiyatlar, bölgeler, fotoğraflar — hepsi tek ekranda.
 export default async function AdminBusinessDetail({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ mesaj?: string; hata?: string }>;
 }) {
   const { id } = await params;
+  const { mesaj, hata } = await searchParams;
   const b = await prisma.cleanerBusiness.findUnique({
     where: { id },
     include: {
@@ -67,6 +78,7 @@ export default async function AdminBusinessDetail({
       photos: { orderBy: { createdAt: "desc" } },
       drivers: { include: { user: true } },
       orders: { orderBy: { createdAt: "desc" }, take: 10 },
+      reviews: { orderBy: { createdAt: "desc" }, take: 5 },
       _count: { select: { orders: true, reviews: true } },
     },
   });
@@ -97,6 +109,24 @@ export default async function AdminBusinessDetail({
         ← Panele dön
       </Link>
 
+      {/* Aksiyonlardan dönen mesajlar (örn. geçici şifre) */}
+      {mesaj && (
+        <p
+          role="status"
+          className="rounded-xl border border-green-300 bg-green-50 px-4 py-3 text-sm font-medium text-green-800"
+        >
+          {mesaj}
+        </p>
+      )}
+      {hata && (
+        <p
+          role="alert"
+          className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800"
+        >
+          {hata}
+        </p>
+      )}
+
       {/* Başlık + durum */}
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="text-xl font-bold tracking-tight text-slate-900">
@@ -121,23 +151,25 @@ export default async function AdminBusinessDetail({
         </span>
       </div>
 
-      {/* Aksiyonlar */}
+      {/* Aksiyonlar — rozet + abonelik yönetimi (yayından kaldırma/engel en
+          altta, Tehlikeli Bölge'de) */}
       <div className="flex flex-wrap gap-2">
-        {b.verification !== "VERIFIED" && (
-          <form action={approveBusiness}>
+        {b.verification === "VERIFIED" ? (
+          <form action={revokeBadge}>
             <input type="hidden" name="id" value={b.id} />
-            <button className="rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark active:scale-[0.99]">
-              Onayla ✓
+            <button className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+              Doğrulanmış rozetini geri al
             </button>
           </form>
-        )}
-        {b.verification !== "REJECTED" && (
-          <form action={rejectBusiness}>
-            <input type="hidden" name="id" value={b.id} />
-            <button className="rounded-lg border border-red-300 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50">
-              Reddet
-            </button>
-          </form>
+        ) : (
+          b.verification !== "REJECTED" && (
+            <form action={approveBusiness}>
+              <input type="hidden" name="id" value={b.id} />
+              <button className="rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark active:scale-[0.99]">
+                Doğrulanmış rozeti ver ✓
+              </button>
+            </form>
+          )
         )}
         {/* Havale/EFT dönemi köprüsü — iyzico canlıya alınınca ödeme callback'i
             bunu otomatik yapacak, buton yedek kalacak. */}
@@ -147,6 +179,14 @@ export default async function AdminBusinessDetail({
             Ödeme alındı — 1 ay aktifleştir/uzat
           </button>
         </form>
+        {subOk && (
+          <form action={suspendSubscription}>
+            <input type="hidden" name="id" value={b.id} />
+            <button className="rounded-lg border border-amber-400 px-4 py-2 text-sm font-medium text-amber-700 hover:bg-amber-50">
+              Aboneliği durdur
+            </button>
+          </form>
+        )}
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
@@ -186,6 +226,13 @@ export default async function AdminBusinessDetail({
                 : "Yok"
             }
           />
+          {/* Destek yetkisi: sahibin şifresini sıfırla, geçici şifre üstte görünür */}
+          <form action={resetOwnerPassword} className="mt-3">
+            <input type="hidden" name="businessId" value={b.id} />
+            <button className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50">
+              Şifreyi sıfırla (geçici şifre üret)
+            </button>
+          </form>
         </Card>
 
         <Card title="İşletme Bilgileri">
@@ -293,6 +340,15 @@ export default async function AdminBusinessDetail({
                     >
                       {d.isOnShift ? "Mesaide" : "Mesai dışı"}
                     </span>
+                    {d.isOnShift && (
+                      <form action={forceOffShift}>
+                        <input type="hidden" name="driverId" value={d.id} />
+                        <input type="hidden" name="businessId" value={b.id} />
+                        <button className="rounded border border-amber-400 px-2 py-0.5 text-xs font-medium text-amber-700 hover:bg-amber-50">
+                          Mesaiden düşür
+                        </button>
+                      </form>
+                    )}
                     <form action={d.user.bannedAt ? unbanUser : banUser}>
                       <input type="hidden" name="userId" value={d.user.id} />
                       <input type="hidden" name="businessId" value={b.id} />
@@ -385,23 +441,89 @@ export default async function AdminBusinessDetail({
         </Card>
       </div>
 
-      {/* Fotoğraflar */}
-      {b.photos.length > 0 && (
-        <Card title={`Fotoğraflar (${b.photos.length})`}>
-          <div className="flex flex-wrap gap-2">
-            {b.photos.map((p) => (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                key={p.id}
-                src={p.url}
-                alt={p.caption ?? b.name}
-                className="h-24 w-32 rounded-lg border border-slate-200 object-cover"
-                loading="lazy"
-              />
+      {/* Yorum moderasyonu */}
+      {b.reviews.length > 0 && (
+        <Card title={`Son Yorumlar (toplam ${b._count.reviews})`}>
+          <ul className="space-y-3">
+            {b.reviews.map((r) => (
+              <li
+                key={r.id}
+                className="flex items-start justify-between gap-3 text-sm"
+              >
+                <span className="min-w-0">
+                  <span className="font-medium text-slate-900">
+                    {r.rating}/5
+                  </span>{" "}
+                  <span className="text-slate-600">
+                    {r.comment ?? "(yorum metni yok)"}
+                  </span>
+                  <span className="ml-2 text-xs text-slate-400">
+                    {tr(r.createdAt)}
+                  </span>
+                </span>
+                <form action={deleteReview} className="shrink-0">
+                  <input type="hidden" name="reviewId" value={r.id} />
+                  <input type="hidden" name="businessId" value={b.id} />
+                  <button className="rounded border border-red-300 px-2 py-0.5 text-xs font-medium text-red-600 hover:bg-red-50">
+                    Sil
+                  </button>
+                </form>
+              </li>
             ))}
-          </div>
+          </ul>
+          <p className="mt-2 text-xs text-slate-400">
+            Silinen yorum geri gelmez; puan ortalaması otomatik güncellenir.
+          </p>
         </Card>
       )}
+
+      {/* Fotoğraf moderasyonu */}
+      {b.photos.length > 0 && (
+        <Card title={`Fotoğraflar (${b.photos.length})`}>
+          <div className="flex flex-wrap gap-3">
+            {b.photos.map((p) => (
+              <div key={p.id} className="flex flex-col items-center gap-1">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={p.url}
+                  alt={p.caption ?? b.name}
+                  className="h-24 w-32 rounded-lg border border-slate-200 object-cover"
+                  loading="lazy"
+                />
+                <form action={deletePhoto}>
+                  <input type="hidden" name="photoId" value={p.id} />
+                  <input type="hidden" name="businessId" value={b.id} />
+                  <button className="rounded border border-red-300 px-2 py-0.5 text-xs font-medium text-red-600 hover:bg-red-50">
+                    Sil
+                  </button>
+                </form>
+              </div>
+            ))}
+          </div>
+          <p className="mt-2 text-xs text-slate-400">
+            Uygunsuz fotoğrafı sil — fotoğraf şartı bozulursa ilan otomatik
+            yayından düşer.
+          </p>
+        </Card>
+      )}
+
+      {/* Admin içi not — işletme GÖRMEZ (denetim gerekçeleri, görüşmeler) */}
+      <Card title="Admin Notu (işletme görmez)">
+        <form action={saveAdminNote} className="space-y-2">
+          <input type="hidden" name="id" value={b.id} />
+          <textarea
+            name="note"
+            defaultValue={b.adminNote ?? ""}
+            rows={3}
+            maxLength={2000}
+            placeholder="Denetim gerekçesi, telefon görüşmesi, ödeme kaydı…"
+            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand"
+          />
+          <button className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+            Notu kaydet
+          </button>
+        </form>
+      </Card>
 
       {/* Tehlikeli Bölge — kısıtlama/engelleme yetkileri (sözleşme §4 askıya
           alma usulüne uygun: gerekçeyi işletmeye ayrıca bildir) */}
@@ -414,7 +536,14 @@ export default async function AdminBusinessDetail({
           Sözleşme gereği gerekçeyi işletmeye bildirmeyi unutma.
         </p>
         <div className="flex flex-wrap gap-2">
-          {b.verification !== "REJECTED" && (
+          {b.verification === "REJECTED" ? (
+            <form action={unrejectBusiness}>
+              <input type="hidden" name="id" value={b.id} />
+              <button className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+                Yayına geri al
+              </button>
+            </form>
+          ) : (
             <form action={rejectBusiness}>
               <input type="hidden" name="id" value={b.id} />
               <button className="rounded-lg border border-red-300 bg-white px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50">

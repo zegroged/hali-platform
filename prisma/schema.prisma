@@ -121,6 +121,8 @@ model CleanerBusiness {
   ratingAvg   Float @default(0)
   ratingCount Int   @default(0)
 
+  adminNote String? // yalnız admin görür: denetim/gerekçe notları
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

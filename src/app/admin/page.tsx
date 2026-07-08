@@ -2,7 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { verifMeta, subscriptionLabel } from "@/lib/verifMeta";
 import { subscriptionActive } from "@/lib/subscription";
-import { approveBusiness, rejectBusiness } from "./actions";
+import { approveBusiness } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -69,14 +69,15 @@ export default async function AdminHome({
         ))}
       </section>
 
-      {/* Onay bekleyenler */}
+      {/* Rozet bekleyenler — yayın onaya bağlı DEĞİL (otomatik); burası yalnız
+          "Doğrulanmış" rozeti incelemesi. Yayından kaldırma/engel: İncele sayfası. */}
       <section>
         <h1 className="mb-3 text-lg font-semibold text-slate-900">
-          Onay Bekleyen İşletmeler ({pending.length})
+          Doğrulanmış Rozeti Bekleyenler ({pending.length})
         </h1>
         {pending.length === 0 ? (
           <p className="rounded-xl border border-dashed border-slate-300 bg-white p-6 text-center text-slate-500">
-            Bekleyen başvuru yok.
+            Bekleyen rozet başvurusu yok.
           </p>
         ) : (
           <div className="space-y-3">
@@ -98,13 +99,7 @@ export default async function AdminHome({
                   <form action={approveBusiness}>
                     <input type="hidden" name="id" value={b.id} />
                     <button className="rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark active:scale-[0.99]">
-                      Onayla ✓
-                    </button>
-                  </form>
-                  <form action={rejectBusiness}>
-                    <input type="hidden" name="id" value={b.id} />
-                    <button className="rounded-lg border border-red-300 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50">
-                      Reddet
+                      Rozet ver ✓
                     </button>
                   </form>
                   <Link
