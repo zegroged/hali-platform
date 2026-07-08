@@ -5,7 +5,7 @@ import {
   completenessChecklist,
   verificationReady,
 } from "@/lib/panel";
-import { verifMeta } from "@/lib/verifMeta";
+import { subscriptionActive } from "@/lib/subscription";
 import { submitForVerification } from "./actions";
 import { acceptContractVersioned } from "./contract-actions";
 import { CONTRACT_VERSION } from "@/lib/legal";
@@ -67,9 +67,22 @@ export default async function PanelHome() {
     }),
   ]);
   const onShift = b.drivers.filter((d) => d.isOnShift).length;
-  const checklist = completenessChecklist(b);
   const ready = verificationReady(b);
-  const verif = verifMeta(b.verification);
+
+  // Otomatik yayın koşulları — her eksik, panelde ilgili sayfaya link verir.
+  const checklist: { label: string; done: boolean; href: string }[] = [
+    ...completenessChecklist(b).map((c) => ({ ...c, href: "/panel/profil" })),
+    {
+      label: "En az bir şoför",
+      done: b.drivers.length > 0,
+      href: "/panel/soforler",
+    },
+  ];
+  const subOk = subscriptionActive(b.subscription);
+  const missingCount =
+    checklist.filter((c) => !c.done).length +
+    (b.owner.emailVerified ? 0 : 1) +
+    (b.contractAcceptedAt ? 0 : 1);
 
   // Sözleşme "güncel onaylı" sayılır: onay VAR ve onaylanan sürüm yürürlükteki
   // sürümle aynı. Sürüm farklı/boşsa yeniden onay istenir (ETAHS Yön. md.16 +
@@ -87,16 +100,29 @@ export default async function PanelHome() {
         <h1 className="text-lg font-semibold text-slate-900">
           Hoş geldin, {b.name}
         </h1>
-        <div className="mt-2 flex items-center gap-3">
-          <span
-            className={`rounded-full px-3 py-1 text-sm font-medium ${verif.cls}`}
-          >
-            {verif.label}
-          </span>
-          {b.isVisible ? (
-            <span className="text-sm text-green-700">Müşterilere görünür</span>
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          {/* Yayın durumu — tek bakışta: yayında / ödeme bekliyor / eksik var */}
+          {b.verification === "REJECTED" ? (
+            <span className="rounded-full bg-red-100 px-3 py-1 text-sm font-medium text-red-700">
+              Hesap yayından kaldırıldı — bizimle iletişime geçin
+            </span>
+          ) : b.isVisible && subOk ? (
+            <span className="rounded-full bg-green-100 px-3 py-1 text-sm font-medium text-green-700">
+              Yayındasın — müşterilere görünüyorsun ✓
+            </span>
+          ) : b.isVisible ? (
+            <span className="rounded-full bg-amber-100 px-3 py-1 text-sm font-medium text-amber-700">
+              Ödeme bekleniyor — abonelik ödemen alınınca yayına girersin
+            </span>
           ) : (
-            <span className="text-sm text-slate-500">Henüz görünmüyor</span>
+            <span className="rounded-full bg-amber-100 px-3 py-1 text-sm font-medium text-amber-700">
+              Yayında değil — {missingCount} eksik var, aşağıyı doldur
+            </span>
+          )}
+          {b.verification === "VERIFIED" && (
+            <span className="rounded-full bg-green-100 px-3 py-1 text-sm font-medium text-green-700">
+              Doğrulanmış ✓
+            </span>
           )}
         </div>
       </div>
@@ -227,25 +253,34 @@ export default async function PanelHome() {
           <div>
             <p className="font-medium text-slate-900">Abonelik</p>
             <p className="text-sm text-slate-500">
-              {b.subscription
-                ? b.subscription.status === "ACTIVE"
-                  ? "Aktif"
-                  : "Pasif"
-                : "Yok"}{" "}
-              · {b.subscription ? Number(b.subscription.priceMonthly) : 2000} TL/ay
+              {subOk ? "Aktif" : "Yok"} · 2.000 TL + KDV/ay
             </p>
+            {!subOk && (
+              <p className="mt-1 text-xs text-amber-700">
+                Ödemen alındığında hesabın yayına girer — ödeme bilgileri
+                e-posta adresine gönderilir.
+              </p>
+            )}
           </div>
           <IconWallet size={26} className="text-brand-dark" />
         </div>
       </div>
 
-      {/* Profil tamamlama */}
-      {b.verification !== "VERIFIED" && (
+      {/* Yayın koşulları — eksik varsa "burayı doldur" listesi. Tümü dolunca
+          hesap OTOMATİK yayına alınır (onay beklemez); yayında kalmak için
+          abonelik ödemesi gerekir. */}
+      {(missingCount > 0 || b.verification !== "VERIFIED") && (
         <div className="rounded-xl border border-slate-200 bg-white p-4">
-          <p className="font-medium text-slate-900">Profilini tamamla</p>
-          <p className="mt-1 text-sm text-slate-500">
-            Doğrulanıp müşterilere görünmek için aşağıdakileri tamamla:
+          <p className="font-medium text-slate-900">
+            {missingCount > 0 ? "Yayına girmek için doldur" : "Doğrulanmış İşletme rozeti"}
           </p>
+          {missingCount > 0 && (
+            <p className="mt-1 text-sm text-slate-500">
+              Aşağıdakilerin tümü tamamlanınca hesabın{" "}
+              <strong>otomatik yayına alınır</strong> — onay beklemezsin.
+              Eksik maddeye tıkla, ilgili sayfaya git.
+            </p>
+          )}
           <ul className="mt-3 space-y-1.5">
             {checklist.map((c) => (
               <li key={c.label} className="flex items-center gap-2 text-sm">
@@ -253,14 +288,21 @@ export default async function PanelHome() {
                   className={`flex h-4 w-4 items-center justify-center rounded-full ${
                     c.done
                       ? "bg-green-100 text-green-600"
-                      : "border border-slate-300"
+                      : "border border-amber-400"
                   }`}
                 >
                   {c.done && <IconCheck size={11} />}
                 </span>
-                <span className={c.done ? "text-slate-700" : "text-slate-600"}>
-                  {c.label}
-                </span>
+                {c.done ? (
+                  <span className="text-slate-700">{c.label}</span>
+                ) : (
+                  <Link
+                    href={c.href}
+                    className="font-medium text-amber-700 hover:underline"
+                  >
+                    {c.label} — burayı doldur →
+                  </Link>
+                )}
               </li>
             ))}
           </ul>
@@ -335,18 +377,25 @@ export default async function PanelHome() {
             >
               Profili düzenle
             </Link>
-            {ready && b.verification !== "PENDING" ? (
+            {/* Rozet başvurusu — yayın için ZORUNLU DEĞİL; vergi kaydının
+                incelendiğini gösteren güven işareti. */}
+            {b.verification === "VERIFIED" ? null : ready &&
+              b.verification !== "PENDING" ? (
               <form action={submitForVerification}>
                 <button className="rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark active:scale-[0.99]">
-                  Doğrulamaya gönder
+                  Doğrulanmış rozeti için başvur
                 </button>
               </form>
+            ) : b.verification === "PENDING" ? (
+              <span className="text-xs text-slate-500">
+                Rozet başvurun incelemede — yayına girmek için beklemene gerek
+                yok.
+              </span>
             ) : (
-              b.verification !== "PENDING" && (
-                <span className="text-xs text-slate-500">
-                  Tümünü tamamlayınca gönderebilirsin
-                </span>
-              )
+              <span className="text-xs text-slate-500">
+                Eksikleri tamamlayınca &quot;Doğrulanmış&quot; rozetine
+                başvurabilirsin (yayın için zorunlu değil).
+              </span>
             )}
           </div>
         </div>

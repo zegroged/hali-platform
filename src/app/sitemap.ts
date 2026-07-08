@@ -34,7 +34,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // DB'ye ulaşılamazsa sitemap yine de statik sayfalarla dönsün (500 yerine).
   try {
     const businesses = await prisma.cleanerBusiness.findMany({
-      where: { isVisible: true, verification: "VERIFIED" },
+      where: { isVisible: true, verification: { not: "REJECTED" } },
       select: { id: true, updatedAt: true },
     });
     const profiles: MetadataRoute.Sitemap = businesses.map((b) => ({

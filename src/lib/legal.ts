@@ -3,4 +3,6 @@
 // metnin teyit edildiğinin ispatı (Mesafeli Sözleşmeler Yönetmeliği md.7).
 // 2026-07-07.1: ücretsiz deneme kaldırıldı; işletme aboneliği "2.000 TL + KDV,
 // peşin, ödeme olmadan yayın yok" oldu (işletme sözleşmesi §3).
-export const CONTRACT_VERSION = "2026-07-07.1";
+// 2026-07-08.1: yönetici onayı yayın şartı olmaktan çıktı — profil tam +
+// ödeme = OTOMATİK yayın; onay yalnız "Doğrulanmış" rozeti verir (§4).
+export const CONTRACT_VERSION = "2026-07-08.1";

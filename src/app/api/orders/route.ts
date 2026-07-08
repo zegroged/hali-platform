@@ -40,7 +40,11 @@ export async function POST(req: NextRequest) {
   if (!phoneRl.ok) return tooMany(phoneRl.retryAfterSec);
 
   const business = await prisma.cleanerBusiness.findFirst({
-    where: { id: d.businessId, isVisible: true, verification: "VERIFIED" },
+    where: {
+      id: d.businessId,
+      isVisible: true,
+      verification: { not: "REJECTED" },
+    },
     select: {
       id: true,
       subscription: { select: { status: true, currentPeriodEnd: true } },

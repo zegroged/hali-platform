@@ -40,10 +40,12 @@ type ProfileCheckable = {
   photos: unknown[];
 };
 
-// Görünürlüğü mevcut duruma göre senkronla: bir işletme müşteriye ancak
-// DOĞRULANMIŞ + profil tam + e-posta doğrulanmış + en az 1 şoförü varsa görünür.
-// Fotoğraf/fiyat/bölge silinince veya e-posta değişince otomatik gizlenir;
-// tekrar tamamlanınca (VERIFIED ise) geri görünür olur. Admin onayını bypass etmez.
+// Görünürlüğü mevcut duruma göre senkronla — OTOMATİK YAYIN (2026-07-08):
+// profil tam + e-posta doğrulanmış + sözleşme onaylı + en az 1 şoför varsa
+// işletme admin ONAYI BEKLEMEDEN görünür olur (yayında kalmak ayrıca aktif
+// abonelik ister — o filtre sorgu tarafında). Admin onayı artık yalnız
+// "Doğrulanmış" rozetini verir; REJECTED = yayından düşürme (kill switch).
+// Fotoğraf/fiyat/bölge silinince veya e-posta değişince otomatik gizlenir.
 export async function syncVisibility(businessId: string): Promise<void> {
   const b = await prisma.cleanerBusiness.findUnique({
     where: { id: businessId },
@@ -57,9 +59,10 @@ export async function syncVisibility(businessId: string): Promise<void> {
   });
   if (!b) return;
   const ok =
-    b.verification === "VERIFIED" &&
+    b.verification !== "REJECTED" &&
     profileComplete(b) &&
     b.owner.emailVerified &&
+    b.contractAcceptedAt != null &&
     b.drivers.length > 0;
   if (b.isVisible !== ok) {
     await prisma.cleanerBusiness.update({

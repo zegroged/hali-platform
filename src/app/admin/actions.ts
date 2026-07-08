@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getSessionUser } from "@/lib/auth";
-import { profileComplete } from "@/lib/panel";
+import { profileComplete, syncVisibility } from "@/lib/panel";
 import { PERIOD_DAYS } from "@/lib/subscription";
 
 async function requireAdmin() {
@@ -33,14 +33,14 @@ export async function approveBusiness(formData: FormData) {
     );
   }
 
+  // Onay = yalnız "Doğrulanmış" ROZETİ (2026-07-08): yayına çıkma artık
+  // otomatiktir (profil tam + ödeme — bkz syncVisibility). REJECTED'dan
+  // dönüşte görünürlük yeniden hesaplansın diye syncVisibility çağrılır.
   await prisma.cleanerBusiness.update({
     where: { id },
-    data: { verification: "VERIFIED", isVisible: true },
+    data: { verification: "VERIFIED" },
   });
-
-  // DİKKAT: onay artık abonelik BAŞLATMAZ (ücretsiz deneme kaldırıldı,
-  // 2026-07-07). Yayına çıkma = onay + ödemesi alınmış abonelik dönemi;
-  // ödeme gelince aşağıdaki activateSubscription çalıştırılır.
+  await syncVisibility(id);
 
   await prisma.badge.upsert({
     where: { businessId_type: { businessId: id, type: "VERIFIED" } },

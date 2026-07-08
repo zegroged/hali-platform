@@ -111,8 +111,10 @@ export async function getBusinesses(
 ): Promise<BusinessSummary[]> {
   const where: Record<string, unknown> = {
     isVisible: true,
-    verification: "VERIFIED",
-    // Yalnız aktif/geçerli-trial abonelikli halıcılar keşifte görünür.
+    // Otomatik yayın: admin onayı şart değil; yalnız REJECTED (yayından
+    // düşürülmüş) hariç. "Doğrulanmış" rozeti ayrı bir güven işareti.
+    verification: { not: "REJECTED" },
+    // Yalnız aktif abonelikli (ödemesi alınmış) halıcılar keşifte görünür.
     subscription: activeSubscriptionWhere(),
   };
   if (filter.district) {
@@ -226,7 +228,7 @@ export type PricingRow = {
 
 export async function getBusinessById(id: string) {
   const b = await prisma.cleanerBusiness.findFirst({
-    where: { id, isVisible: true, verification: "VERIFIED" },
+    where: { id, isVisible: true, verification: { not: "REJECTED" } },
     include: {
       badges: true,
       pricing: true,

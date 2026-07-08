@@ -85,17 +85,22 @@ export default function IsletmeSozlesmesiPage() {
 
       <Section title="4. Doğrulama, Görünürlük ve Askıya Alma">
         <p>
-          İşletmenin müşterilere görünür olması şu adımların tamamına
-          bağlıdır: vergi kimlik numarası beyanı, e-posta doğrulaması, eksiksiz
-          profil (fiyat, hizmet bölgesi, iletişim), bu sözleşmenin onayı ve
-          yönetici onayı. Platform, işletmenin tanıtıcı bilgilerini (unvan,
-          vergi no, iletişim) ilgili kurumların erişime açık elektronik
-          sistemleri veya işletmece sunulan belgeler üzerinden{" "}
-          <strong>doğrulamakla yükümlüdür</strong>; bu bilgilerin güncelliği{" "}
+          İşletme profili; vergi kimlik numarası beyanı, e-posta doğrulaması,
+          eksiksiz profil (fiyat, hizmet bölgesi, teslim süresi, fotoğraf,
+          çalışma saatleri), en az bir şoför kaydı, bu sözleşmenin onayı ve
+          abonelik bedelinin ödenmesi şartlarının <strong>tamamı</strong>{" "}
+          sağlandığında <strong>kendiliğinden (otomatik) yayına alınır</strong>;
+          ayrıca bir yönetici onayı beklenmez. Platform, işletmenin tanıtıcı
+          bilgilerini (unvan, vergi no, iletişim) ilgili kurumların erişime
+          açık elektronik sistemleri veya işletmece sunulan belgeler üzerinden{" "}
+          <strong>doğrulamakla yükümlüdür</strong>; doğrulaması tamamlanan
+          işletmeye &quot;Doğrulanmış İşletme&quot; işareti verilir ve bu
+          bilgilerin güncelliği{" "}
           <strong>her takvim yılında en az bir kez</strong> kontrol edilir
-          (ETAHS Yönetmeliği md.6/3). Bilgilerini süresinde güncellemeyen
-          işletmeye, güncelleme yapılana kadar yalnızca mevcut siparişleri
-          için aracılık hizmeti sunulur.
+          (ETAHS Yönetmeliği md.6/3). Doğrulamada aykırılık veya eksiklik
+          tespit edilen işletmenin profili yayından kaldırılabilir;
+          bilgilerini süresinde güncellemeyen işletmeye, güncelleme yapılana
+          kadar yalnızca mevcut siparişleri için aracılık hizmeti sunulur.
         </p>
         <p>
           Görünürlük şartlarından biri sonradan eksilirse (örn. profil
