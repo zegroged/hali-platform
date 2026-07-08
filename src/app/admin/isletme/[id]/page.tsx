@@ -1,0 +1,376 @@
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { prisma } from "@/lib/prisma";
+import { verifMeta } from "@/lib/verifMeta";
+import { subscriptionActive } from "@/lib/subscription";
+import { ORDER_STATUS_META } from "@/lib/orderStatus";
+import {
+  activateSubscription,
+  approveBusiness,
+  rejectBusiness,
+} from "../../actions";
+
+export const dynamic = "force-dynamic";
+
+function Card({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">
+        {title}
+      </h2>
+      {children}
+    </section>
+  );
+}
+
+function Row({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="flex items-start justify-between gap-3 py-1 text-sm">
+      <span className="shrink-0 text-slate-500">{label}</span>
+      <span className="text-right font-medium text-slate-900">{value}</span>
+    </div>
+  );
+}
+
+const tr = (d: Date) =>
+  d.toLocaleDateString("tr-TR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+const tl = (v: unknown) =>
+  Number(v).toLocaleString("tr-TR", { minimumFractionDigits: 2 }) + " TL";
+
+// Tam denetim sayfası: sahip, iletişim, profil eksikleri, abonelik, şoförler,
+// siparişler, fiyatlar, bölgeler, fotoğraflar — hepsi tek ekranda.
+export default async function AdminBusinessDetail({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  const b = await prisma.cleanerBusiness.findUnique({
+    where: { id },
+    include: {
+      owner: true,
+      subscription: true,
+      serviceAreas: true,
+      pricing: { orderBy: { createdAt: "asc" } },
+      photos: { orderBy: { createdAt: "desc" } },
+      drivers: { include: { user: true } },
+      orders: { orderBy: { createdAt: "desc" }, take: 10 },
+      _count: { select: { orders: true, reviews: true } },
+    },
+  });
+  if (!b) notFound();
+
+  const verif = verifMeta(b.verification);
+  const subOk = subscriptionActive(b.subscription);
+  const checklist = [
+    { label: "Vergi numarası", done: Boolean(b.taxNumber) },
+    {
+      label: "Teslim süresi",
+      done: Boolean(b.deliveryEstimateMinDays && b.deliveryEstimateMaxDays),
+    },
+    { label: "Hizmet bölgesi", done: b.serviceAreas.length > 0 },
+    { label: "Fiyatlandırma", done: b.pricing.some((p) => !p.isAddon) },
+    { label: "Fotoğraflar", done: b.photos.length > 0 },
+    { label: "Çalışma saatleri", done: Boolean(b.workingHours) },
+    { label: "E-posta doğrulandı", done: b.owner.emailVerified },
+    { label: "Sözleşme onayı", done: Boolean(b.contractAcceptedAt) },
+  ];
+
+  return (
+    <div className="space-y-6">
+      <Link
+        href="/admin"
+        className="text-sm font-medium text-brand-dark hover:underline"
+      >
+        ← Panele dön
+      </Link>
+
+      {/* Başlık + durum */}
+      <div className="flex flex-wrap items-center gap-3">
+        <h1 className="text-xl font-bold tracking-tight text-slate-900">
+          {b.name}
+        </h1>
+        <span
+          className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${verif.cls}`}
+        >
+          {verif.label}
+        </span>
+        <span
+          className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
+            b.isVisible && subOk
+              ? "bg-green-100 text-green-700"
+              : "bg-slate-100 text-slate-600"
+          }`}
+        >
+          {b.isVisible && subOk ? "Müşteriye görünür" : "Yayında değil"}
+        </span>
+        <span className="text-xs text-slate-400">
+          Kayıt: {tr(b.createdAt)}
+        </span>
+      </div>
+
+      {/* Aksiyonlar */}
+      <div className="flex flex-wrap gap-2">
+        {b.verification !== "VERIFIED" && (
+          <form action={approveBusiness}>
+            <input type="hidden" name="id" value={b.id} />
+            <button className="rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark active:scale-[0.99]">
+              Onayla ✓
+            </button>
+          </form>
+        )}
+        {b.verification !== "REJECTED" && (
+          <form action={rejectBusiness}>
+            <input type="hidden" name="id" value={b.id} />
+            <button className="rounded-lg border border-red-300 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50">
+              Reddet
+            </button>
+          </form>
+        )}
+        {/* Havale/EFT dönemi köprüsü — iyzico canlıya alınınca ödeme callback'i
+            bunu otomatik yapacak, buton yedek kalacak. */}
+        <form action={activateSubscription}>
+          <input type="hidden" name="id" value={b.id} />
+          <button className="rounded-lg border border-brand px-4 py-2 text-sm font-medium text-brand-dark hover:bg-brand-light/50">
+            Ödeme alındı — 1 ay aktifleştir/uzat
+          </button>
+        </form>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card title="İşletme Sahibi">
+          <Row label="Ad Soyad" value={b.owner.name} />
+          <Row label="Telefon" value={b.owner.phone} />
+          <Row
+            label="E-posta"
+            value={
+              <>
+                {b.owner.email ?? "—"}{" "}
+                {b.owner.email && (
+                  <span
+                    className={
+                      b.owner.emailVerified
+                        ? "text-green-600"
+                        : "text-amber-600"
+                    }
+                  >
+                    {b.owner.emailVerified ? "✓ doğrulandı" : "(doğrulanmadı)"}
+                  </span>
+                )}
+              </>
+            }
+          />
+          <Row
+            label="Sözleşme onayı"
+            value={
+              b.contractAcceptedAt
+                ? `${tr(b.contractAcceptedAt)} · sürüm ${b.contractVersion ?? "—"}`
+                : "Yok"
+            }
+          />
+        </Card>
+
+        <Card title="İşletme Bilgileri">
+          <Row label="Telefon" value={b.phone} />
+          <Row label="İl / İlçe" value={`${b.city} / ${b.district}`} />
+          <Row label="Adres" value={b.address || "—"} />
+          <Row label="Vergi No" value={b.taxNumber ?? "—"} />
+          <Row
+            label="Teslim süresi"
+            value={
+              b.deliveryEstimateMinDays && b.deliveryEstimateMaxDays
+                ? `${b.deliveryEstimateMinDays}-${b.deliveryEstimateMaxDays} iş günü`
+                : "—"
+            }
+          />
+          <Row
+            label="Puan"
+            value={
+              b.ratingCount > 0
+                ? `${b.ratingAvg.toFixed(1)} (${b.ratingCount} yorum)`
+                : "Henüz yorum yok"
+            }
+          />
+        </Card>
+
+        <Card title="Profil Durumu">
+          <ul className="space-y-1.5">
+            {checklist.map((c) => (
+              <li key={c.label} className="flex items-center gap-2 text-sm">
+                <span
+                  className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
+                    c.done
+                      ? "bg-green-100 text-green-700"
+                      : "bg-slate-100 text-slate-400"
+                  }`}
+                >
+                  {c.done ? "✓" : "○"}
+                </span>
+                <span className={c.done ? "text-slate-700" : "text-slate-400"}>
+                  {c.label}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </Card>
+
+        <Card title="Abonelik">
+          <Row
+            label="Durum"
+            value={
+              subOk ? (
+                <span className="text-green-600">Aktif</span>
+              ) : (
+                <span className="text-slate-500">Yok / süresi dolmuş</span>
+              )
+            }
+          />
+          {b.subscription?.currentPeriodEnd && (
+            <>
+              <Row
+                label="Dönem sonu"
+                value={tr(b.subscription.currentPeriodEnd)}
+              />
+              <Row
+                label="Kalan gün"
+                value={Math.max(
+                  0,
+                  Math.ceil(
+                    (b.subscription.currentPeriodEnd.getTime() - Date.now()) /
+                      (24 * 60 * 60 * 1000),
+                  ),
+                )}
+              />
+            </>
+          )}
+          <Row label="Aylık bedel" value="2.000 TL + KDV" />
+        </Card>
+
+        <Card title={`Şoförler (${b.drivers.length})`}>
+          {b.drivers.length === 0 ? (
+            <p className="text-sm text-slate-500">Kayıtlı şoför yok.</p>
+          ) : (
+            <ul className="space-y-2">
+              {b.drivers.map((d) => (
+                <li key={d.id} className="flex justify-between gap-2 text-sm">
+                  <span className="font-medium text-slate-900">
+                    {d.user.name}
+                    <span className="ml-2 font-normal text-slate-500">
+                      {d.user.phone}
+                    </span>
+                  </span>
+                  <span
+                    className={
+                      d.isOnShift ? "text-green-600" : "text-slate-400"
+                    }
+                  >
+                    {d.isOnShift ? "Mesaide" : "Mesai dışı"}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+
+        <Card title="Hizmet Bölgeleri">
+          {b.serviceAreas.length === 0 ? (
+            <p className="text-sm text-slate-500">Bölge eklenmemiş.</p>
+          ) : (
+            <div className="flex flex-wrap gap-1.5">
+              {b.serviceAreas.map((a) => (
+                <span
+                  key={a.id}
+                  className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700"
+                >
+                  {a.district}, {a.city}
+                </span>
+              ))}
+            </div>
+          )}
+        </Card>
+
+        <Card title="Fiyatlar">
+          {b.pricing.length === 0 ? (
+            <p className="text-sm text-slate-500">Fiyat girilmemiş.</p>
+          ) : (
+            <ul className="space-y-1">
+              {b.pricing.map((p) => (
+                <li key={p.id} className="flex justify-between gap-2 text-sm">
+                  <span className="text-slate-700">
+                    {p.label}
+                    {p.isAddon && (
+                      <span className="ml-1 text-xs text-slate-400">
+                        (ek hizmet)
+                      </span>
+                    )}
+                  </span>
+                  <span className="whitespace-nowrap font-medium text-slate-900">
+                    {tl(p.price)}
+                    {p.unit === "PER_M2" ? "/m²" : ""}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+
+        <Card title={`Son Siparişler (toplam ${b._count.orders})`}>
+          {b.orders.length === 0 ? (
+            <p className="text-sm text-slate-500">Henüz sipariş yok.</p>
+          ) : (
+            <ul className="space-y-2">
+              {b.orders.map((o) => (
+                <li key={o.id} className="flex justify-between gap-2 text-sm">
+                  <span className="min-w-0">
+                    <span className="font-mono text-xs text-slate-500">
+                      {o.code ?? o.id.slice(-6)}
+                    </span>{" "}
+                    <span className="text-slate-700">{o.customerName}</span>
+                  </span>
+                  <span className="shrink-0 text-right">
+                    <span className="text-slate-500">
+                      {ORDER_STATUS_META[o.status]?.label ?? o.status}
+                    </span>
+                    {o.priceTotal != null && (
+                      <span className="ml-2 font-medium text-slate-900">
+                        {tl(o.priceTotal)}
+                      </span>
+                    )}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+      </div>
+
+      {/* Fotoğraflar */}
+      {b.photos.length > 0 && (
+        <Card title={`Fotoğraflar (${b.photos.length})`}>
+          <div className="flex flex-wrap gap-2">
+            {b.photos.map((p) => (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                key={p.id}
+                src={p.url}
+                alt={p.caption ?? b.name}
+                className="h-24 w-32 rounded-lg border border-slate-200 object-cover"
+                loading="lazy"
+              />
+            ))}
+          </div>
+        </Card>
+      )}
+    </div>
+  );
+}

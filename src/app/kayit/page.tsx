@@ -15,6 +15,7 @@ type Field =
   | "email"
   | "emailCode"
   | "password"
+  | "password2"
   | "district"
   | "consent";
 type FieldErrors = Partial<Record<Field, string>>;
@@ -43,6 +44,9 @@ export default function KayitPage() {
   const [devCode, setDevCode] = useState<string | null>(null);
   const [sendingCode, setSendingCode] = useState(false);
   const [cooldown, setCooldown] = useState(0);
+  // Şifre tekrarı: yanlış yazılan şifreyle boşuna uğraşılmasın (yalnız
+  // istemci doğrulaması, API'ye gönderilmez).
+  const [password2, setPassword2] = useState("");
   // Honeypot: görünmez alan; botlar doldurur, insanlar görmez.
   const [website, setWebsite] = useState("");
   // Funnel adımı: önce YALNIZ paket kartı; "Hemen Başla" formu açar.
@@ -117,6 +121,8 @@ export default function KayitPage() {
       errs.email = "Geçerli bir e-posta adresi gir.";
     if (form.password.length < 8)
       errs.password = "Şifre en az 8 karakter olmalı.";
+    else if (password2 !== form.password)
+      errs.password2 = "Şifreler eşleşmiyor.";
     if (form.district.trim().length < 2) errs.district = "İlçe gerekli.";
     if (emailCode.trim().length !== 6)
       errs.emailCode = "E-postana gönderilen 6 haneli kodu gir.";
@@ -313,6 +319,21 @@ export default function KayitPage() {
               autoComplete="new-password"
             />
             {err("password")}
+          </div>
+          <div>
+            <label htmlFor="kayit-sifre2" className={labelCls}>
+              Şifre (tekrar)
+            </label>
+            <input
+              id="kayit-sifre2"
+              type="password"
+              value={password2}
+              onChange={(e) => setPassword2(e.target.value)}
+              maxLength={72}
+              className={inputCls(fieldErrors.password2)}
+              autoComplete="new-password"
+            />
+            {err("password2")}
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>

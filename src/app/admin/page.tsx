@@ -1,26 +1,74 @@
+import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { verifMeta, subscriptionLabel } from "@/lib/verifMeta";
-import {
-  activateSubscription,
-  approveBusiness,
-  rejectBusiness,
-} from "./actions";
+import { subscriptionActive } from "@/lib/subscription";
+import { approveBusiness, rejectBusiness } from "./actions";
 
 export const dynamic = "force-dynamic";
 
-export default async function AdminHome() {
-  const businesses = await prisma.cleanerBusiness.findMany({
-    orderBy: { createdAt: "desc" },
-    include: {
-      subscription: true,
-      _count: { select: { drivers: true, orders: true } },
-    },
-  });
+export default async function AdminHome({
+  searchParams,
+}: {
+  searchParams: Promise<{ hata?: string }>;
+}) {
+  const { hata } = await searchParams;
+
+  const [businesses, driverCount, orderCount] = await Promise.all([
+    prisma.cleanerBusiness.findMany({
+      orderBy: { createdAt: "desc" },
+      include: {
+        subscription: true,
+        _count: { select: { drivers: true, orders: true } },
+      },
+    }),
+    prisma.driver.count(),
+    prisma.order.count(),
+  ]);
 
   const pending = businesses.filter((b) => b.verification === "PENDING");
+  const live = businesses.filter(
+    (b) =>
+      b.verification === "VERIFIED" &&
+      b.isVisible &&
+      subscriptionActive(b.subscription),
+  ).length;
+
+  // Gözetim sayaçları — platformun bir bakışta durumu
+  const stats = [
+    { label: "İşletme", value: businesses.length },
+    { label: "Onay bekleyen", value: pending.length },
+    { label: "Yayında", value: live },
+    { label: "Şoför", value: driverCount },
+    { label: "Sipariş", value: orderCount },
+  ];
 
   return (
     <div className="space-y-6">
+      {/* Server action'lardan dönen dostane hata (örn. eksik profille onay) */}
+      {hata && (
+        <p
+          role="alert"
+          className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800"
+        >
+          {hata}
+        </p>
+      )}
+
+      {/* Sayaçlar */}
+      <section className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+        {stats.map((s) => (
+          <div
+            key={s.label}
+            className="rounded-xl border border-slate-200 bg-white p-4 text-center shadow-sm"
+          >
+            <p className="text-2xl font-bold tracking-tight text-slate-900">
+              {s.value}
+            </p>
+            <p className="mt-0.5 text-xs text-slate-500">{s.label}</p>
+          </div>
+        ))}
+      </section>
+
       {/* Onay bekleyenler */}
       <section>
         <h1 className="mb-3 text-lg font-semibold text-slate-900">
@@ -37,11 +85,16 @@ export default async function AdminHome() {
                 key={b.id}
                 className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
               >
-                <p className="font-medium text-slate-900">{b.name}</p>
+                <Link
+                  href={`/admin/isletme/${b.id}`}
+                  className="font-medium text-slate-900 hover:text-brand-dark hover:underline"
+                >
+                  {b.name}
+                </Link>
                 <p className="text-sm text-slate-500">
                   {b.district}, {b.city} · Vergi No: {b.taxNumber ?? "—"}
                 </p>
-                <div className="mt-3 flex gap-2">
+                <div className="mt-3 flex flex-wrap gap-2">
                   <form action={approveBusiness}>
                     <input type="hidden" name="id" value={b.id} />
                     <button className="rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark active:scale-[0.99]">
@@ -54,6 +107,12 @@ export default async function AdminHome() {
                       Reddet
                     </button>
                   </form>
+                  <Link
+                    href={`/admin/isletme/${b.id}`}
+                    className="inline-flex items-center rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:border-brand hover:text-brand-dark"
+                  >
+                    İncele →
+                  </Link>
                 </div>
               </div>
             ))}
@@ -61,11 +120,11 @@ export default async function AdminHome() {
         )}
       </section>
 
-      {/* Tüm işletmeler */}
+      {/* Tüm işletmeler — satıra tıkla → tam denetim sayfası */}
       <section>
         <h2 className="mb-3 font-semibold text-slate-900">Tüm İşletmeler</h2>
         <div className="no-scrollbar overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
-          <table className="w-full min-w-[520px] text-sm">
+          <table className="w-full min-w-[560px] text-sm">
             <thead className="bg-slate-50 text-left text-xs text-slate-500">
               <tr>
                 <th className="px-4 py-2">İşletme</th>
@@ -73,6 +132,7 @@ export default async function AdminHome() {
                 <th className="px-4 py-2">Görünür</th>
                 <th className="px-4 py-2">Abonelik</th>
                 <th className="px-4 py-2 text-right">Şoför / Sipariş</th>
+                <th className="px-4 py-2" />
               </tr>
             </thead>
             <tbody>
@@ -80,40 +140,44 @@ export default async function AdminHome() {
                 const verif = verifMeta(b.verification);
                 return (
                   <tr key={b.id} className="border-t border-slate-100">
-                    <td className="px-4 py-2">
-                      <div className="font-medium text-slate-800">{b.name}</div>
+                    <td className="px-4 py-2.5">
+                      <Link
+                        href={`/admin/isletme/${b.id}`}
+                        className="font-medium text-slate-800 hover:text-brand-dark hover:underline"
+                      >
+                        {b.name}
+                      </Link>
                       <div className="text-xs text-slate-500">{b.district}</div>
                     </td>
-                    <td className="px-4 py-2">
+                    <td className="px-4 py-2.5">
                       <span
                         className={`whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium ${verif.cls}`}
                       >
                         {verif.label}
                       </span>
                     </td>
-                    <td className="px-4 py-2">{b.isVisible ? "✓" : "—"}</td>
-                    <td className="px-4 py-2 text-slate-600">
-                      <div className="whitespace-nowrap">
-                        {subscriptionLabel(b.subscription?.status)}
-                        {b.subscription?.currentPeriodEnd && (
-                          <span className="ml-1 text-xs text-slate-400">
-                            →{" "}
-                            {b.subscription.currentPeriodEnd.toLocaleDateString(
-                              "tr-TR",
-                            )}
-                          </span>
-                        )}
-                      </div>
-                      {/* Ödeme (havale/EFT) doğrulanınca 1 aylık dönem aç/uzat */}
-                      <form action={activateSubscription} className="mt-1">
-                        <input type="hidden" name="id" value={b.id} />
-                        <button className="whitespace-nowrap rounded border border-brand px-2 py-0.5 text-xs font-medium text-brand-dark hover:bg-brand-light/50">
-                          Ödeme alındı — 1 ay aktifleştir
-                        </button>
-                      </form>
+                    <td className="px-4 py-2.5">{b.isVisible ? "✓" : "—"}</td>
+                    <td className="whitespace-nowrap px-4 py-2.5 text-slate-600">
+                      {subscriptionLabel(b.subscription?.status)}
+                      {b.subscription?.currentPeriodEnd && (
+                        <span className="ml-1 text-xs text-slate-400">
+                          →{" "}
+                          {b.subscription.currentPeriodEnd.toLocaleDateString(
+                            "tr-TR",
+                          )}
+                        </span>
+                      )}
                     </td>
-                    <td className="px-4 py-2 text-right text-slate-600">
+                    <td className="px-4 py-2.5 text-right text-slate-600">
                       {b._count.drivers} / {b._count.orders}
+                    </td>
+                    <td className="px-4 py-2.5 text-right">
+                      <Link
+                        href={`/admin/isletme/${b.id}`}
+                        className="whitespace-nowrap text-sm font-medium text-brand-dark hover:underline"
+                      >
+                        İncele →
+                      </Link>
                     </td>
                   </tr>
                 );

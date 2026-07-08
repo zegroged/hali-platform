@@ -23,7 +23,14 @@ export async function approveBusiness(formData: FormData) {
   });
   if (!business) return;
   if (!profileComplete(business)) {
-    throw new Error("Profili tamamlanmamış işletme onaylanamaz.");
+    // Çıplak throw hata sayfasına düşürüyordu ("Bir şeyler ters gitti") —
+    // bunun yerine panele dostane mesajla dön; eksikler detay sayfasında.
+    redirect(
+      "/admin?hata=" +
+        encodeURIComponent(
+          `"${business.name}" onaylanamadı: profili eksik (detay sayfasındaki eksik listesine bak).`,
+        ),
+    );
   }
 
   await prisma.cleanerBusiness.update({
@@ -41,6 +48,7 @@ export async function approveBusiness(formData: FormData) {
     update: {},
   });
   revalidatePath("/admin");
+  revalidatePath(`/admin/isletme/${id}`);
 }
 
 /**
@@ -71,6 +79,7 @@ export async function activateSubscription(formData: FormData) {
     update: { status: "ACTIVE", currentPeriodEnd: end },
   });
   revalidatePath("/admin");
+  revalidatePath(`/admin/isletme/${id}`);
 }
 
 export async function rejectBusiness(formData: FormData) {
@@ -81,4 +90,5 @@ export async function rejectBusiness(formData: FormData) {
     data: { verification: "REJECTED", isVisible: false },
   });
   revalidatePath("/admin");
+  revalidatePath(`/admin/isletme/${id}`);
 }
