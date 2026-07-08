@@ -64,7 +64,12 @@ export default function KayitPage() {
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) {
-        setError(data?.error ?? "Kod gönderilemedi, tekrar deneyin.");
+        // Hata e-posta alanının HEMEN ALTINDA gösterilsin (sağdaki uzak özet
+        // kutusunda değil) — mobilde kullanıcı "kayıtlı/geçersiz" uyarısını görsün.
+        setFieldErrors((f) => ({
+          ...f,
+          email: data?.error ?? "Kod gönderilemedi, tekrar deneyin.",
+        }));
         return;
       }
       setCodeSent(true);
@@ -82,7 +87,10 @@ export default function KayitPage() {
         });
       }, 1000);
     } catch {
-      setError("Bağlantı hatası, lütfen tekrar deneyin.");
+      setFieldErrors((f) => ({
+        ...f,
+        email: "Bağlantı hatası, lütfen tekrar deneyin.",
+      }));
     } finally {
       setSendingCode(false);
     }
