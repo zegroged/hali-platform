@@ -29,6 +29,13 @@ export async function POST(req: NextRequest) {
   if (!ok) {
     return NextResponse.json({ error: "Geçersiz" }, { status: 401 });
   }
+  // Admin engeli: şifre doğru olsa da giriş yok.
+  if (user.bannedAt) {
+    return NextResponse.json(
+      { error: "Hesabınız kısıtlandı. Bizimle iletişime geçin." },
+      { status: 403 },
+    );
+  }
   await createSession(user.id);
   // token: native şoför uygulaması için (web çerezi de ayrıca set edildi)
   return NextResponse.json({

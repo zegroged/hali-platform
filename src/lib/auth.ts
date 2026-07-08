@@ -82,10 +82,13 @@ export async function getSessionUser(): Promise<SessionUser | null> {
   if (!token) return null;
   const userId = readToken(token);
   if (!userId) return null;
-  return prisma.user.findUnique({
+  const u = await prisma.user.findUnique({
     where: { id: userId },
-    select: { id: true, role: true, name: true },
+    select: { id: true, role: true, name: true, bannedAt: true },
   });
+  // Engellenen kullanıcının MEVCUT oturumu da geçersizdir (yalnız yeni giriş değil).
+  if (!u || u.bannedAt) return null;
+  return { id: u.id, role: u.role, name: u.name };
 }
 
 /** Belirli bir rol gerektirir; yoksa null döner (çağıran yönlendirir). */
@@ -109,10 +112,12 @@ async function getBearerUser(): Promise<SessionUser | null> {
   if (!auth || !auth.startsWith("Bearer ")) return null;
   const userId = readToken(auth.slice(7).trim());
   if (!userId) return null;
-  return prisma.user.findUnique({
+  const u = await prisma.user.findUnique({
     where: { id: userId },
-    select: { id: true, role: true, name: true },
+    select: { id: true, role: true, name: true, bannedAt: true },
   });
+  if (!u || u.bannedAt) return null; // engelli: native token da geçersiz
+  return { id: u.id, role: u.role, name: u.name };
 }
 
 // Çerez (web) VEYA Bearer token (native) — ikisini de kabul eder.

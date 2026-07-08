@@ -92,3 +92,68 @@ export async function rejectBusiness(formData: FormData) {
   revalidatePath("/admin");
   revalidatePath(`/admin/isletme/${id}`);
 }
+
+/**
+ * Kullanıcı engelle (ban): giriş + mevcut oturum/token kilitlenir
+ * (auth.ts bannedAt kontrolü). Şoförse mesaisi kapatılır; işletme
+ * sahibiyse ilanı da yayından düşer. Admin kendini/başka admini engelleyemez.
+ */
+export async function banUser(formData: FormData) {
+  const admin = await getSessionUser();
+  if (!admin || admin.role !== "ADMIN") redirect("/giris");
+  const userId = String(formData.get("userId"));
+  const businessId = String(formData.get("businessId") ?? "");
+
+  const target = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, role: true },
+  });
+  if (!target || target.role === "ADMIN" || target.id === admin.id) {
+    redirect(
+      "/admin?hata=" +
+        encodeURIComponent("Bu kullanıcı engellenemez (admin hesabı)."),
+    );
+  }
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: { bannedAt: new Date() },
+  });
+  // Şoförse: mesaiden düşür (canlı konum akışı kesilsin)
+  await prisma.driver.updateMany({
+    where: { userId },
+    data: { isOnShift: false },
+  });
+  // İşletme sahibiyse: ilan yayından düşsün
+  const owned = await prisma.cleanerBusiness.findUnique({
+    where: { ownerId: userId },
+    select: { id: true },
+  });
+  if (owned) {
+    await prisma.cleanerBusiness.update({
+      where: { id: owned.id },
+      data: { isVisible: false },
+    });
+  }
+  revalidatePath("/admin");
+  if (businessId) revalidatePath(`/admin/isletme/${businessId}`);
+}
+
+/** Engeli kaldır; işletme sahibiyse görünürlük yeniden hesaplanır. */
+export async function unbanUser(formData: FormData) {
+  await requireAdmin();
+  const userId = String(formData.get("userId"));
+  const businessId = String(formData.get("businessId") ?? "");
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: { bannedAt: null },
+  });
+  const owned = await prisma.cleanerBusiness.findUnique({
+    where: { ownerId: userId },
+    select: { id: true },
+  });
+  if (owned) await syncVisibility(owned.id);
+  revalidatePath("/admin");
+  if (businessId) revalidatePath(`/admin/isletme/${businessId}`);
+}

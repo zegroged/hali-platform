@@ -85,6 +85,7 @@ model User {
   otpExpiresAt      DateTime?
   emailOtpCode      String? // e-posta doğrulama kodu (telefondan bağımsız)
   emailOtpExpiresAt DateTime?
+  bannedAt          DateTime? // admin engeli: doluysa giriş + mevcut oturum kilitli
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 

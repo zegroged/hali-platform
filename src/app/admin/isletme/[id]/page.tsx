@@ -7,7 +7,9 @@ import { ORDER_STATUS_META } from "@/lib/orderStatus";
 import {
   activateSubscription,
   approveBusiness,
+  banUser,
   rejectBusiness,
+  unbanUser,
 } from "../../actions";
 
 export const dynamic = "force-dynamic";
@@ -149,6 +151,12 @@ export default async function AdminBusinessDetail({
 
       <div className="grid gap-4 md:grid-cols-2">
         <Card title="İşletme Sahibi">
+          {b.owner.bannedAt && (
+            <p className="mb-2 rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-700">
+              Bu hesap {tr(b.owner.bannedAt)} tarihinde engellendi — giriş
+              yapamaz.
+            </p>
+          )}
           <Row label="Ad Soyad" value={b.owner.name} />
           <Row label="Telefon" value={b.owner.phone} />
           <Row
@@ -262,19 +270,42 @@ export default async function AdminBusinessDetail({
           ) : (
             <ul className="space-y-2">
               {b.drivers.map((d) => (
-                <li key={d.id} className="flex justify-between gap-2 text-sm">
-                  <span className="font-medium text-slate-900">
+                <li
+                  key={d.id}
+                  className="flex items-center justify-between gap-2 text-sm"
+                >
+                  <span className="min-w-0 font-medium text-slate-900">
                     {d.user.name}
                     <span className="ml-2 font-normal text-slate-500">
                       {d.user.phone}
                     </span>
+                    {d.user.bannedAt && (
+                      <span className="ml-2 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
+                        Engelli
+                      </span>
+                    )}
                   </span>
-                  <span
-                    className={
-                      d.isOnShift ? "text-green-600" : "text-slate-400"
-                    }
-                  >
-                    {d.isOnShift ? "Mesaide" : "Mesai dışı"}
+                  <span className="flex shrink-0 items-center gap-2">
+                    <span
+                      className={
+                        d.isOnShift ? "text-green-600" : "text-slate-400"
+                      }
+                    >
+                      {d.isOnShift ? "Mesaide" : "Mesai dışı"}
+                    </span>
+                    <form action={d.user.bannedAt ? unbanUser : banUser}>
+                      <input type="hidden" name="userId" value={d.user.id} />
+                      <input type="hidden" name="businessId" value={b.id} />
+                      <button
+                        className={`rounded border px-2 py-0.5 text-xs font-medium ${
+                          d.user.bannedAt
+                            ? "border-slate-300 text-slate-600 hover:bg-slate-50"
+                            : "border-red-300 text-red-600 hover:bg-red-50"
+                        }`}
+                      >
+                        {d.user.bannedAt ? "Engeli kaldır" : "Engelle"}
+                      </button>
+                    </form>
                   </span>
                 </li>
               ))}
@@ -371,6 +402,49 @@ export default async function AdminBusinessDetail({
           </div>
         </Card>
       )}
+
+      {/* Tehlikeli Bölge — kısıtlama/engelleme yetkileri (sözleşme §4 askıya
+          alma usulüne uygun: gerekçeyi işletmeye ayrıca bildir) */}
+      <section className="rounded-xl border border-red-200 bg-red-50/50 p-4">
+        <h2 className="mb-1 text-sm font-semibold uppercase tracking-wide text-red-700">
+          Tehlikeli Bölge
+        </h2>
+        <p className="mb-3 text-sm text-red-700/80">
+          Bu işlemler işletmeyi yayından düşürür veya hesap girişini kilitler.
+          Sözleşme gereği gerekçeyi işletmeye bildirmeyi unutma.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {b.verification !== "REJECTED" && (
+            <form action={rejectBusiness}>
+              <input type="hidden" name="id" value={b.id} />
+              <button className="rounded-lg border border-red-300 bg-white px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50">
+                İlanı yayından kaldır
+              </button>
+            </form>
+          )}
+          {b.owner.bannedAt ? (
+            <form action={unbanUser}>
+              <input type="hidden" name="userId" value={b.owner.id} />
+              <input type="hidden" name="businessId" value={b.id} />
+              <button className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+                Sahibin engelini kaldır
+              </button>
+            </form>
+          ) : (
+            <form action={banUser}>
+              <input type="hidden" name="userId" value={b.owner.id} />
+              <input type="hidden" name="businessId" value={b.id} />
+              <button className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700">
+                Hesabı engelle (sahip)
+              </button>
+            </form>
+          )}
+        </div>
+        <p className="mt-2 text-xs text-red-700/70">
+          Engel: giriş + açık oturumlar + şoför uygulaması anında kilitlenir;
+          işletme sahibi engellenirse ilan da yayından düşer. Geri alınabilir.
+        </p>
+      </section>
     </div>
   );
 }
