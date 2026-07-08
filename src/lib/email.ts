@@ -4,7 +4,6 @@
 import nodemailer from "nodemailer";
 
 const SITE_URL = "https://enyakinhaliyikamaservisi.com";
-const SUPPORT_EMAIL = "info@enyakinhaliyikamaservisi.com";
 
 function transport() {
   return nodemailer.createTransport({
@@ -44,7 +43,7 @@ export function wrapEmail(contentHtml: string): string {
           <tr>
             <td style="padding:20px 32px;background-color:#f8fafc;border-top:1px solid #e2e8f0;font-size:12px;color:#64748b;line-height:1.6;">
               <a href="${SITE_URL}" style="color:#0f766e;text-decoration:none;font-weight:bold;">enyakinhaliyikamaservisi.com</a><br>
-              Sorunuz mu var? <a href="mailto:${SUPPORT_EMAIL}" style="color:#0f766e;">${SUPPORT_EMAIL}</a> adresinden bize ulaşın.<br>
+              Sorunuz olursa bu e-posta adresine yanıt yazarak bize ulaşabilirsiniz.<br>
               &copy; 2026 En Yakın Halı Yıkama. Tüm hakları saklıdır.
             </td>
           </tr>
