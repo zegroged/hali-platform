@@ -42,7 +42,11 @@ services:
       - "effective_io_concurrency=200" # SSD/NVMe için
 
   app:
-    build: .
+    build:
+      context: .
+      args:
+        # Google Maps anahtarı (.env'den) — build'e gömülür; boşsa OSM kullanılır.
+        NEXT_PUBLIC_GOOGLE_MAPS_KEY: ${NEXT_PUBLIC_GOOGLE_MAPS_KEY:-}
     restart: unless-stopped
     depends_on:
       db:

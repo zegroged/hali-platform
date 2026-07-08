@@ -10,6 +10,11 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npx prisma generate
+# NEXT_PUBLIC_* anahtarlar derleme ANINDA istemci koduna gömülür (.env
+# .dockerignore'da olduğu için build bunu ancak arg olarak görebilir).
+# Boş gelirse LiveMap ücretsiz OSM'ye düşer — güvenli varsayılan.
+ARG NEXT_PUBLIC_GOOGLE_MAPS_KEY
+ENV NEXT_PUBLIC_GOOGLE_MAPS_KEY=$NEXT_PUBLIC_GOOGLE_MAPS_KEY
 RUN npm run build
 
 # --- çalıştırma ---
