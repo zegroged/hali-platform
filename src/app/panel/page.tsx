@@ -320,6 +320,12 @@ export default async function PanelHome({
             </p>
           )
         )}
+        <Link
+          href="/panel/abonelik"
+          className="mt-3 inline-block text-sm font-medium text-brand-dark hover:underline"
+        >
+          Aboneliği yönet (geçmiş, iptal) →
+        </Link>
       </div>
 
       {/* Yayın koşulları — eksik varsa "burayı doldur" listesi. Tümü dolunca

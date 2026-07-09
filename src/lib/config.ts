@@ -52,6 +52,16 @@ export const emailLive = process.env.EMAIL_MODE === "live";
 // SMS/e-postaya izin ver. Sağlayıcılar kurulunca bu bayrağı KALDIR.
 export const mockNotifyAllowed = process.env.ALLOW_MOCK_NOTIFY === "1";
 
+/** iyzico tekrarlayan abonelik ödeme planı referans kodu (panelde/script'le
+ * oluşturulan "2.400 TL/ay" planı). Boşsa tekrarlayan abonelik UI'ı GÖSTERİLMEZ
+ * (havale akışı kalır) — yanlışlıkla yarım kurulu düzenli-ödeme açılmaz. */
+export function getIyzicoPlanReference(): string {
+  return process.env.IYZICO_PLAN_REFERENCE ?? "";
+}
+/** Tekrarlayan abonelik gerçekten kullanılabilir mi: canlı + plan tanımlı. */
+export const recurringEnabled =
+  paymentsLive && (process.env.IYZICO_PLAN_REFERENCE ?? "").length > 0;
+
 /** iyzico API tabanı; canlı modda sandbox'a düşmesini engelle. */
 export function getIyzicoBaseUrl(): string {
   const v = process.env.IYZICO_BASE_URL ?? "https://sandbox-api.iyzipay.com";

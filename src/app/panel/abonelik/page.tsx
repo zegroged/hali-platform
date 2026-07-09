@@ -1,0 +1,221 @@
+import Link from "next/link";
+import { prisma } from "@/lib/prisma";
+import { getCurrentBusiness } from "@/lib/panel";
+import { subscriptionActive } from "@/lib/subscription";
+import { recurringEnabled, paymentsLive } from "@/lib/config";
+import { PendingButton } from "@/components/PendingButton";
+import {
+  startSubscriptionPayment,
+  cancelRecurringSubscription,
+} from "../subscription-actions";
+
+export const dynamic = "force-dynamic";
+
+const tr = (d: Date) =>
+  new Date(d).toLocaleDateString("tr-TR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+const tl = (v: unknown) =>
+  Number(v).toLocaleString("tr-TR", { minimumFractionDigits: 2 }) + " TL";
+
+const DURUM: Record<string, { cls: string; text: string }> = {
+  basladi: {
+    cls: "border-green-300 bg-green-50 text-green-800",
+    text: "Aboneliğin başladı — düzenli ödeme talimatın aktif. Her ay otomatik yenilenir.",
+  },
+  "iptal-ok": {
+    cls: "border-green-300 bg-green-50 text-green-800",
+    text: "Otomatik yenileme iptal edildi. Mevcut dönem sonuna kadar yayında kalırsın; sonrasında yenilenmez.",
+  },
+  "iptal-hata": {
+    cls: "border-red-300 bg-red-50 text-red-700",
+    text: "İptal sırasında bir sorun oldu. Tekrar dene veya bize ulaş.",
+  },
+  "talimat-yok": {
+    cls: "border-amber-300 bg-amber-50 text-amber-800",
+    text: "Aktif bir otomatik ödeme talimatın yok.",
+  },
+  "hazir-degil": {
+    cls: "border-amber-300 bg-amber-50 text-amber-800",
+    text: "Otomatik ödeme henüz aktif değil; şimdilik ödeme onay sürecinde alınır.",
+  },
+  hata: {
+    cls: "border-red-300 bg-red-50 text-red-700",
+    text: "Ödeme tamamlanamadı. Tekrar deneyebilirsin.",
+  },
+};
+
+export default async function AbonelikYonetim({
+  searchParams,
+}: {
+  searchParams: Promise<{ durum?: string }>;
+}) {
+  const b = await getCurrentBusiness();
+  if (!b) return null;
+  const { durum } = await searchParams;
+  const banner = durum ? DURUM[durum] : undefined;
+
+  const sub = b.subscription;
+  const active = subscriptionActive(sub);
+  const autoRenew = Boolean(sub?.autoRenew && sub?.iyzicoSubRef);
+
+  const history = await prisma.subscriptionPayment.findMany({
+    where: { businessId: b.id },
+    orderBy: { createdAt: "desc" },
+    take: 24,
+  });
+
+  return (
+    <div className="space-y-6">
+      <Link href="/panel" className="text-sm font-medium text-brand-dark hover:underline">
+        ← Panele dön
+      </Link>
+      <h1 className="text-lg font-semibold text-slate-900">Abonelik</h1>
+
+      {banner && (
+        <p className={`rounded-xl border px-4 py-3 text-sm ${banner.cls}`}>
+          {banner.text}
+        </p>
+      )}
+
+      {/* Durum kartı */}
+      <section className="rounded-2xl border border-slate-200 bg-white p-5">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-sm text-slate-500">İşletme Aboneliği</p>
+            <p className="text-2xl font-bold tracking-tight text-slate-900">
+              ₺2.000{" "}
+              <span className="text-sm font-medium text-slate-500">
+                + KDV / ay
+              </span>
+            </p>
+          </div>
+          <span
+            className={`rounded-full px-3 py-1 text-xs font-medium ${
+              active
+                ? "bg-green-100 text-green-700"
+                : "bg-amber-100 text-amber-700"
+            }`}
+          >
+            {active ? "Aktif" : "Pasif"}
+          </span>
+        </div>
+        <dl className="mt-4 space-y-1.5 text-sm">
+          {sub?.currentPeriodEnd && (
+            <div className="flex justify-between">
+              <dt className="text-slate-500">
+                {autoRenew ? "Sonraki yenileme" : "Dönem sonu"}
+              </dt>
+              <dd className="font-medium text-slate-900">
+                {tr(sub.currentPeriodEnd)}
+              </dd>
+            </div>
+          )}
+          <div className="flex justify-between">
+            <dt className="text-slate-500">Otomatik yenileme</dt>
+            <dd className="font-medium text-slate-900">
+              {autoRenew
+                ? "Açık (her ay otomatik)"
+                : sub?.canceledAt
+                  ? "İptal edildi"
+                  : "Kapalı"}
+            </dd>
+          </div>
+        </dl>
+
+        {/* Aksiyon: aktif talimat varsa iptal; yoksa başlat/öde */}
+        <div className="mt-5">
+          {autoRenew ? (
+            <form action={cancelRecurringSubscription}>
+              <PendingButton className="rounded-lg border border-red-300 px-4 py-2.5 text-sm font-medium text-red-600 transition hover:bg-red-50">
+                Otomatik yenilemeyi iptal et
+              </PendingButton>
+            </form>
+          ) : recurringEnabled ? (
+            <Link
+              href="/panel/abonelik/ode"
+              className="inline-flex rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark active:scale-[0.99]"
+            >
+              Aboneliği başlat — düzenli ödeme talimatı
+            </Link>
+          ) : paymentsLive ? (
+            <form action={startSubscriptionPayment}>
+              <PendingButton className="rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark active:scale-[0.99]">
+                Aboneliğini öde — 2.400 TL (iyzico ile)
+              </PendingButton>
+            </form>
+          ) : (
+            <p className="text-sm text-amber-700">
+              Online ödeme yakında; şu an ödeme onay sürecinde havale/EFT ile
+              alınır. Ödemen doğrulanınca hesabın yayına girer.
+            </p>
+          )}
+        </div>
+
+        {/* Düzenli ödeme talimatı bilgilendirmesi (yasal) */}
+        {recurringEnabled && !autoRenew && (
+          <p className="mt-3 text-xs text-slate-500">
+            <strong>Düzenli ödeme talimatı:</strong> Kartın iyzico&apos;nun
+            güvenli sistemine bir kez kaydedilir; <strong>iptal edene kadar
+            her ay 2.400 TL (KDV dahil)</strong> otomatik çekilir. İstediğin
+            zaman bu sayfadan iptal edebilirsin; iptalde mevcut dönem sonuna
+            kadar yayında kalırsın.
+          </p>
+        )}
+      </section>
+
+      {/* Ödeme geçmişi */}
+      <section className="rounded-2xl border border-slate-200 bg-white p-5">
+        <h2 className="mb-3 font-semibold text-slate-900">Ödeme Geçmişi</h2>
+        {history.length === 0 ? (
+          <p className="text-sm text-slate-500">Henüz ödeme kaydın yok.</p>
+        ) : (
+          <div className="no-scrollbar overflow-x-auto">
+            <table className="w-full min-w-[360px] text-sm">
+              <thead className="text-left text-xs text-slate-500">
+                <tr>
+                  <th className="py-2">Tarih</th>
+                  <th className="py-2">Tutar</th>
+                  <th className="py-2">Durum</th>
+                  <th className="py-2">Dönem</th>
+                </tr>
+              </thead>
+              <tbody>
+                {history.map((p) => (
+                  <tr key={p.id} className="border-t border-slate-100">
+                    <td className="py-2 text-slate-700">
+                      {tr(p.paidAt ?? p.createdAt)}
+                    </td>
+                    <td className="py-2 text-slate-900">{tl(p.amount)}</td>
+                    <td className="py-2">
+                      <span
+                        className={
+                          p.status === "PAID"
+                            ? "text-green-600"
+                            : p.status === "FAILED"
+                              ? "text-red-600"
+                              : "text-slate-500"
+                        }
+                      >
+                        {p.status === "PAID"
+                          ? "Ödendi"
+                          : p.status === "FAILED"
+                            ? "Başarısız"
+                            : "Bekliyor"}
+                      </span>
+                    </td>
+                    <td className="py-2 text-slate-500">
+                      {p.periodEnd ? tr(p.periodEnd) : "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}

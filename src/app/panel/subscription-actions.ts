@@ -1,9 +1,10 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getCurrentBusiness } from "@/lib/panel";
-import { initSubscriptionCheckout } from "@/lib/iyzico";
+import { initSubscriptionCheckout, cancelRecurring } from "@/lib/iyzico";
 import { getAppBaseUrl } from "@/lib/config";
 import { PLAN } from "@/lib/plan";
 
@@ -60,4 +61,29 @@ export async function startSubscriptionPayment() {
 
   // iyzico'nun barındırdığı güvenli ödeme sayfasına git.
   redirect(r.paymentPageUrl!);
+}
+
+/**
+ * Düzenli ödeme talimatını (tekrarlayan abonelik) iptal et. iyzico gelecek
+ * çekimleri durdurur; mevcut dönem currentPeriodEnd'e kadar açık kalır
+ * (para iadesi yok — tüketici lehine, ödenmiş dönem kullanılır).
+ */
+export async function cancelRecurringSubscription() {
+  const b = await getCurrentBusiness();
+  if (!b) redirect("/giris");
+  const sub = b.subscription;
+  if (!sub?.iyzicoSubRef || !sub.autoRenew) {
+    redirect("/panel/abonelik?durum=talimat-yok");
+  }
+  const r = await cancelRecurring(sub.iyzicoSubRef!);
+  if (!r.ok) {
+    redirect("/panel/abonelik?durum=iptal-hata");
+  }
+  await prisma.subscription.update({
+    where: { businessId: b.id },
+    data: { autoRenew: false, canceledAt: new Date() },
+  });
+  revalidatePath("/panel/abonelik");
+  revalidatePath("/panel");
+  redirect("/panel/abonelik?durum=iptal-ok");
 }

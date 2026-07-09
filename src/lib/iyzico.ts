@@ -203,6 +203,134 @@ export type RetrieveResult = {
   paymentId?: string; // iyzico ödeme kimliği — idempotency
 };
 
+/* ============================================================================
+ * TEKRARLAYAN ABONELİK (iyzico Subscription) — düzenli ödeme talimatı.
+ * Ürün + ödeme planı bir kez oluşturulur (panel/script); planReferenceCode
+ * .env'de IYZICO_PLAN_REFERENCE. Kart bir kez girilir, iyzico her ay otomatik
+ * çeker, webhook bildirir, iptal edilene kadar sürer.
+ * ========================================================================== */
+
+export type SubCheckoutParams = {
+  conversationId: string; // bizim referansımız (SubscriptionPayment.id)
+  planReferenceCode: string;
+  callbackUrl: string;
+  name: string;
+  surname: string;
+  email: string;
+  gsmNumber: string;
+  identityNumber: string;
+  address: string;
+  city: string;
+};
+export type SubCheckoutResult = {
+  ok: boolean;
+  token?: string;
+  checkoutFormContent?: string; // iyzico'nun sayfaya gömülen script'i
+  paymentPageUrl?: string; // varsa hosted sayfa
+  error?: string;
+  mock?: boolean;
+};
+
+/** Tekrarlayan abonelik Checkout Form başlat — müşteri kartını iyzico'da girer. */
+export async function initRecurringCheckout(
+  p: SubCheckoutParams,
+): Promise<SubCheckoutResult> {
+  if (!client) {
+    return { ok: true, mock: true, token: "MOCK-SUB-" + p.conversationId };
+  }
+  const addr = {
+    contactName: `${p.name} ${p.surname}`,
+    city: p.city || "Istanbul",
+    country: "Turkey",
+    address: p.address,
+  };
+  const request = {
+    locale: "tr",
+    conversationId: p.conversationId,
+    pricingPlanReferenceCode: p.planReferenceCode,
+    subscriptionInitialStatus: "ACTIVE",
+    callbackUrl: p.callbackUrl,
+    customer: {
+      name: p.name,
+      surname: p.surname,
+      identityNumber: p.identityNumber,
+      email: p.email,
+      gsmNumber: p.gsmNumber,
+      billingAddress: addr,
+      shippingAddress: addr,
+    },
+  };
+  return new Promise((resolve) => {
+    client.subscriptionCheckoutForm.initialize(request, (err: any, result: any) => {
+      if (err || result?.status !== "success") {
+        resolve({ ok: false, error: result?.errorMessage ?? String(err) });
+      } else {
+        resolve({
+          ok: true,
+          token: result.token ?? result.data?.token,
+          checkoutFormContent: result.checkoutFormContent ?? result.data?.checkoutFormContent,
+          paymentPageUrl: result.paymentPageUrl ?? result.data?.paymentPageUrl,
+        });
+      }
+    });
+  });
+}
+
+export type SubRetrieveResult = {
+  ok: boolean;
+  active: boolean;
+  subscriptionRef?: string; // iyzico subscriptionReferenceCode (iptal için saklanır)
+  customerRef?: string;
+  conversationId?: string; // bizim SubscriptionPayment.id — KESİN bağ için
+};
+
+/** Checkout dönüşünde abonelik sonucunu doğrula (iyzico'ya sunucu-sunucu). */
+export async function retrieveRecurringResult(
+  token: string,
+): Promise<SubRetrieveResult> {
+  if (!client)
+    return { ok: true, active: true, subscriptionRef: "MOCK-SUB", conversationId: "" };
+  return new Promise((resolve) => {
+    client.subscriptionCheckoutForm.retrieve(
+      { token },
+      (err: any, result: any) => {
+        const data = result?.data ?? result;
+        if (err || result?.status !== "success") {
+          resolve({ ok: false, active: false });
+        } else {
+          const status = data?.subscriptionStatus ?? data?.status;
+          resolve({
+            ok: true,
+            active: status === "ACTIVE" || data?.parentReferenceCode != null,
+            subscriptionRef: data?.referenceCode ?? data?.subscriptionReferenceCode,
+            customerRef: data?.customerReferenceCode,
+            conversationId: result?.conversationId ?? data?.conversationId,
+          });
+        }
+      },
+    );
+  });
+}
+
+/** Düzenli ödeme talimatını iptal et — iyzico gelecek çekimleri durdurur. */
+export async function cancelRecurring(
+  subscriptionRef: string,
+): Promise<{ ok: boolean; error?: string }> {
+  if (!client) return { ok: true };
+  return new Promise((resolve) => {
+    client.subscription.cancel(
+      { subscriptionReferenceCode: subscriptionRef },
+      (err: any, result: any) => {
+        if (err || result?.status !== "success") {
+          resolve({ ok: false, error: result?.errorMessage ?? String(err) });
+        } else {
+          resolve({ ok: true });
+        }
+      },
+    );
+  });
+}
+
 // iyzico retrieve yanıtının imzasını doğrula (defense-in-depth). retrieve zaten
 // kimlik-doğrulamalı sunucu-sunucu çağrı olduğundan asıl güven sınırı odur; imza
 // ek bir tamper kanıtıdır. ALAN SIRASI iyzico dökümanına göredir — canlıya

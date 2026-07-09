@@ -1,0 +1,77 @@
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+import { retrieveRecurringResult } from "@/lib/iyzico";
+import { getAppBaseUrl, paymentsLive } from "@/lib/config";
+import { extendSubscription } from "@/lib/subscription";
+import { syncVisibility } from "@/lib/panel";
+
+// Tekrarlayan abonelik Checkout dönüşü. iyzico'nun sunucu-sunucu doğrulamasıyla
+// abonelik referansını alır, işletmenin aboneliğine yazar, ilk dönemi açar.
+export async function POST(req: NextRequest) {
+  const base = getAppBaseUrl();
+  const ok = () =>
+    NextResponse.redirect(new URL(`/panel/abonelik?durum=basladi`, base), 303);
+  const fail = () =>
+    NextResponse.redirect(new URL(`/panel/abonelik?durum=hata`, base), 303);
+
+  if (!paymentsLive) return fail();
+
+  let token = "";
+  try {
+    const form = await req.formData();
+    token = String(form.get("token") ?? "");
+  } catch {
+    const body = await req.json().catch(() => ({}));
+    token = String(body?.token ?? "");
+  }
+  if (!token) return fail();
+
+  const r = await retrieveRecurringResult(token);
+  if (!r.ok || !r.active || !r.subscriptionRef || !r.conversationId) return fail();
+
+  // İdempotent: bu abonelik referansı zaten bağlanmışsa tekrar işleme.
+  const existing = await prisma.subscription.findFirst({
+    where: { iyzicoSubRef: r.subscriptionRef },
+    select: { businessId: true },
+  });
+  if (existing) return ok();
+
+  // KESİN BAĞ: conversationId = ode sayfasının oluşturduğu SubscriptionPayment.id.
+  // "En son PENDING" tahminine düşmüyoruz (eşzamanlı abonelerde karışırdı).
+  const marker = await prisma.subscriptionPayment.findUnique({
+    where: { id: r.conversationId },
+  });
+  if (!marker || marker.status !== "PENDING") return fail();
+
+  await prisma.$transaction(async (tx) => {
+    await tx.subscription.upsert({
+      where: { businessId: marker.businessId },
+      create: {
+        businessId: marker.businessId,
+        status: "ACTIVE",
+        iyzicoSubRef: r.subscriptionRef,
+        iyzicoCustomerRef: r.customerRef ?? null,
+        autoRenew: true,
+      },
+      update: {
+        status: "ACTIVE",
+        iyzicoSubRef: r.subscriptionRef,
+        iyzicoCustomerRef: r.customerRef ?? null,
+        autoRenew: true,
+        canceledAt: null,
+      },
+    });
+    const end = await extendSubscription(tx, marker.businessId);
+    await tx.subscriptionPayment.update({
+      where: { id: marker.id },
+      data: {
+        status: "PAID",
+        paidAt: new Date(),
+        periodStart: new Date(),
+        periodEnd: end,
+      },
+    });
+  });
+  await syncVisibility(marker.businessId);
+  return ok();
+}

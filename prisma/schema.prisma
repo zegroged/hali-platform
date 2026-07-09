@@ -341,6 +341,12 @@ model Subscription {
   currentPeriodEnd   DateTime?
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
+
+  // iyzico tekrarlayan abonelik (düzenli ödeme talimatı) — her ay otomatik çekim.
+  iyzicoSubRef      String? @unique // iyzico subscriptionReferenceCode
+  iyzicoCustomerRef String? // iyzico customerReferenceCode (kart saklı)
+  autoRenew         Boolean   @default(false) // aktif düzenli ödeme talimatı var mı
+  canceledAt        DateTime? // talimat iptal anı (dönem sonuna kadar açık kalır)
 }
 
 // Abonelik ödemesi kaydı — iyzico Checkout. Idempotency (çift callback/replay)
