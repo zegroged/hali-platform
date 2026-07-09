@@ -109,12 +109,15 @@ async function main() {
   await prisma.cleanerBusiness.deleteMany();
   await prisma.user.deleteMany();
 
+  // Giriş kimliği: kullanıcı adı veya DOĞRULANMIŞ e-posta (telefon DEĞİL).
   await prisma.user.create({
     data: {
       role: UserRole.ADMIN,
       name: "Platform Admin",
       phone: "05320000000",
+      username: "mert123",
       email: "admin@hali.local",
+      emailVerified: true,
       password,
     },
   });
@@ -125,18 +128,20 @@ async function main() {
       role: UserRole.CUSTOMER,
       name: "Deniz Müşteri",
       phone: "05340001122",
+      username: "musteri1",
       password,
     },
   });
 
   const created: { businessId: string; driverId: string; name: string }[] = [];
 
-  for (const s of SEEDS) {
+  for (const [i, s] of SEEDS.entries()) {
     const owner = await prisma.user.create({
       data: {
         role: UserRole.CLEANER,
         name: s.ownerName,
         phone: s.ownerPhone,
+        username: `halici${i + 1}`,
         password,
         phoneVerified: true,
       },
@@ -183,6 +188,7 @@ async function main() {
         role: UserRole.DRIVER,
         name: s.driverName,
         phone: s.driverPhone,
+        username: `sofor${i + 1}`,
         password,
       },
     });
@@ -281,6 +287,7 @@ async function main() {
       role: UserRole.CLEANER,
       name: "Yeni Halıcı",
       phone: "05321119999",
+      username: "yenihalici",
       password,
       phoneVerified: false,
     },
@@ -308,7 +315,9 @@ async function main() {
   console.log(
     `✓ Tohumlama tamam: ${created.length} doğrulanmış halıcı + 1 onay bekleyen, ${created.length} şoför, 1 admin, 1 müşteri, 1 demo sipariş, ${demoStops.length} durak, ${routePts.length} konum izi.`,
   );
-  console.log("  Giriş: şifre 1234 · Onay bekleyen halıcı: 05321119999");
+  console.log(
+    "  Giriş (şifre 1234) — kullanıcı adıyla: halici1/halici2/halici3 · sofor1/sofor2/sofor3 · mert123 (admin) · yenihalici (onay bekleyen)",
+  );
 }
 
 main()

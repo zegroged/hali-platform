@@ -12,6 +12,7 @@ type Field =
   | "businessName"
   | "name"
   | "phone"
+  | "username"
   | "email"
   | "emailCode"
   | "password"
@@ -30,6 +31,7 @@ export default function KayitPage() {
     businessName: "",
     name: "",
     phone: "",
+    username: "",
     email: "",
     password: "",
     city: "İstanbul",
@@ -117,6 +119,16 @@ export default function KayitPage() {
     if (form.name.trim().length < 2) errs.name = "Ad soyad gerekli.";
     if (!/^05\d{9}$/.test(form.phone))
       errs.phone = "Telefon 05xx ile başlamalı ve 11 hane olmalı.";
+    {
+      // Sunucudakiyle aynı kural (src/lib/username.ts) — erken geri bildirim.
+      const u = form.username.trim().toLowerCase();
+      if (u.length < 3) errs.username = "Kullanıcı adı en az 3 karakter olmalı.";
+      else if (!/^[a-z0-9çğıöşü._-]+$/.test(u))
+        errs.username =
+          "Yalnız harf, rakam ve . _ - kullanılabilir (boşluk ve @ olamaz).";
+      else if (/^\d+$/.test(u))
+        errs.username = "Kullanıcı adı yalnız rakamlardan oluşamaz.";
+    }
     if (!/^\S+@\S+\.\S+$/.test(form.email))
       errs.email = "Geçerli bir e-posta adresi gir.";
     if (form.password.length < 8)
@@ -244,7 +256,30 @@ export default function KayitPage() {
               className={inputCls(fieldErrors.phone)}
               autoComplete="tel"
             />
+            <p className="mt-1 text-xs text-slate-500">
+              Müşterilerin sana ulaşacağı numara — girişte kullanılmaz.
+            </p>
             {err("phone")}
+          </div>
+          <div>
+            <label htmlFor="kayit-kullanici-adi" className={labelCls}>
+              Kullanıcı adı
+            </label>
+            <input
+              id="kayit-kullanici-adi"
+              value={form.username}
+              onChange={(e) => set("username", e.target.value)}
+              type="text"
+              maxLength={30}
+              placeholder="orn: mehmet.hali"
+              className={inputCls(fieldErrors.username)}
+              autoComplete="username"
+            />
+            <p className="mt-1 text-xs text-slate-500">
+              Girişte bunu veya e-postanı kullanacaksın. Harf, rakam ve . _ -
+              (büyük/küçük harf farketmez).
+            </p>
+            {err("username")}
           </div>
           <div>
             <label htmlFor="kayit-eposta" className={labelCls}>

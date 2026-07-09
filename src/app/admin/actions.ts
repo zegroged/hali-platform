@@ -2,12 +2,15 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import sharp from "sharp";
 import { prisma } from "@/lib/prisma";
 import crypto from "node:crypto";
 import { getSessionUser, hashPassword } from "@/lib/auth";
 import { profileComplete, syncVisibility } from "@/lib/panel";
 import { extendSubscription } from "@/lib/subscription";
 import { isValidTaxOrTckn } from "@/lib/taxId";
+import { normalizeUsername, validateUsername } from "@/lib/username";
+import { saveObject } from "@/lib/storage";
 import { CONTRACT_VERSION } from "@/lib/legal";
 
 async function requireAdmin() {
@@ -55,12 +58,26 @@ export async function createBusinessByAdmin(formData: FormData) {
   const ownerName = String(formData.get("ownerName") || "").trim();
   const phone = String(formData.get("phone") || "").replace(/\D/g, "");
   const email = String(formData.get("email") || "").trim().toLowerCase();
+  // Giriş bilgileri oluşturan kişi tarafından belirlenir (sahibine iletir).
+  const password = String(formData.get("password") || "");
+  const usernameRaw = String(formData.get("username") || "").trim();
   const city = String(formData.get("city") || "").trim();
   const district = String(formData.get("district") || "").trim();
   const taxNumber = String(formData.get("taxNumber") || "").replace(/\D/g, "");
   const pricePerM2 = Number(formData.get("pricePerM2")) || null;
   const minDays = Number(formData.get("minDays")) || null;
   const maxDays = Number(formData.get("maxDays")) || null;
+  // Opsiyonel ilk şoför — yayın şartı (foto + ≥1 şoför) tek ekranda tamamlansın.
+  const dName = String(formData.get("driverName") || "").trim();
+  const dPhone = String(formData.get("driverPhone") || "").replace(/\D/g, "");
+  const dUsername = normalizeUsername(String(formData.get("driverUsername") || ""));
+  const dPassword = String(formData.get("driverPassword") || "");
+  const wantsDriver = Boolean(dName || dPhone || dUsername || dPassword);
+  // İşletme fotoğrafları (jpg/png/webp, ≤5MB/adet; action gövdesi toplam 8MB).
+  const photos = formData
+    .getAll("photos")
+    .filter((f): f is File => f instanceof File && f.size > 0)
+    .slice(0, 10);
 
   const err = (msg: string) =>
     redirect(formPath + "?hata=" + encodeURIComponent(msg));
@@ -69,18 +86,54 @@ export async function createBusinessByAdmin(formData: FormData) {
     err("İşletme adı ve yetkili adı gerekli.");
   if (!/^05\d{9}$/.test(phone)) err("Telefon 05xx ile 11 hane olmalı.");
   if (!/^\S+@\S+\.\S+$/.test(email)) err("Geçerli bir e-posta gerekli.");
+  if (password.length < 8) err("Şifre en az 8 karakter olmalı.");
+  const username = usernameRaw ? normalizeUsername(usernameRaw) : null;
+  if (username) {
+    const uErr = validateUsername(username);
+    if (uErr) err(uErr);
+  }
   if (city.length < 2 || district.length < 2) err("İl ve ilçe gerekli.");
   if (taxNumber && !isValidTaxOrTckn(taxNumber))
     err("Vergi/kimlik no geçersiz (11 hane TC veya 10 hane VKN).");
+  if (wantsDriver) {
+    // Şoför alanlarından biri doldurulduysa hepsi gerekli (yarım hesap olmasın).
+    if (dName.length < 2) err("Şoför adı gerekli.");
+    if (!/^05\d{9}$/.test(dPhone))
+      err("Şoför telefonu 05xx ile 11 hane olmalı.");
+    const dErr = validateUsername(dUsername);
+    if (dErr) err("Şoför kullanıcı adı: " + dErr);
+    if (dPassword.length < 8) err("Şoför şifresi en az 8 karakter olmalı.");
+    if (dUsername === username)
+      err("Şoförün kullanıcı adı işletme sahibininkiyle aynı olamaz.");
+    if (dPhone === phone) err("Şoför telefonu işletme telefonuyla aynı olamaz.");
+  }
 
   const exists = await prisma.user.findFirst({
     where: { OR: [{ phone }, { email }] },
     select: { id: true },
   });
   if (exists) err("Bu telefon veya e-posta ile zaten bir hesap var.");
+  if (username) {
+    const taken = await prisma.user.findUnique({
+      where: { username },
+      select: { id: true },
+    });
+    if (taken) err("Bu kullanıcı adı alınmış. Başka bir tane seçin.");
+  }
+  if (wantsDriver) {
+    const dTaken = await prisma.user.findFirst({
+      where: { OR: [{ phone: dPhone }, { username: dUsername }] },
+      select: { phone: true },
+    });
+    if (dTaken)
+      err(
+        dTaken.phone === dPhone
+          ? "Şoför telefonu başka bir hesapta kayıtlı."
+          : "Şoför kullanıcı adı alınmış. Başka bir tane seçin.",
+      );
+  }
 
   const { lat, lng } = await geocodeDistrict(district, city);
-  const tempPassword = "Gecici-" + crypto.randomBytes(4).toString("hex");
   const farFuture = new Date("2099-12-31T00:00:00.000Z"); // süresiz ücretsiz
 
   const owner = await prisma.user.create({
@@ -88,9 +141,10 @@ export async function createBusinessByAdmin(formData: FormData) {
       role: "CLEANER",
       name: ownerName,
       phone,
+      username, // opsiyonel — yoksa sahibi ilk girişte belirler (/kullanici-adi)
       email,
       emailVerified: true, // admin açtı — e-posta doğrulaması atlanır
-      password: await hashPassword(tempPassword),
+      password: await hashPassword(password),
       ownedBusiness: {
         create: {
           name: businessName,
@@ -136,10 +190,64 @@ export async function createBusinessByAdmin(formData: FormData) {
   });
 
   const businessId = owner.ownedBusiness!.id;
+
+  // Opsiyonel ilk şoför (yayın şartı) — panel addDriver ile aynı mantık.
+  if (wantsDriver) {
+    const driverUser = await prisma.user.create({
+      data: {
+        role: "DRIVER",
+        name: dName,
+        phone: dPhone,
+        username: dUsername,
+        password: await hashPassword(dPassword),
+      },
+    });
+    await prisma.driver.create({
+      data: { userId: driverUser.id, businessId },
+    });
+  }
+
+  // Fotoğraflar — /api/panel/upload ile aynı işlem (küçült + WebP; hata → orijinal).
+  const PHOTO_TYPES: Record<string, string> = {
+    "image/jpeg": "jpg",
+    "image/png": "png",
+    "image/webp": "webp",
+  };
+  for (const file of photos) {
+    const rawExt = PHOTO_TYPES[file.type];
+    if (!rawExt || file.size > 5 * 1024 * 1024) continue;
+    const original = Buffer.from(await file.arrayBuffer());
+    let buf = original;
+    let contentType = file.type;
+    try {
+      buf = await sharp(original)
+        .rotate()
+        .resize(1600, 1600, { fit: "inside", withoutEnlargement: true })
+        .webp({ quality: 82 })
+        .toBuffer();
+      contentType = "image/webp";
+    } catch {
+      // sharp hata verirse orijinal dosyaya düş
+    }
+    const ext = contentType === "image/webp" ? "webp" : rawExt;
+    const name = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+    const url = await saveObject(`uploads/${businessId}/${name}`, buf, contentType);
+    await prisma.businessPhoto.create({
+      data: { businessId, url, isBefore: false, isAfter: true },
+    });
+  }
+
   await syncVisibility(businessId); // foto+şoför varsa hemen yayına al
   revalidatePath("/admin");
+  // Giriş kimliği: e-posta (+ girildiyse kullanıcı adı) + belirlenen şifre.
+  const girisKimlik = username ? `${email} veya kullanıcı adı "${username}"` : email;
   const mesaj = encodeURIComponent(
-    `İşletme oluşturuldu. Giriş: telefon ${phone} · geçici şifre ${tempPassword} (sahibine ilet). Yayın için fotoğraf ve en az bir şoför eklenmeli.`,
+    `İşletme oluşturuldu. Giriş: ${girisKimlik} · belirlediğin şifre (sahibine ilet).` +
+      (username ? "" : " İlk girişte kullanıcı adı belirleyecek.") +
+      (wantsDriver
+        ? ` Şoför girişi: kullanıcı adı "${dUsername}" · belirlediğin şoför şifresi.`
+        : " Yayın için en az bir şoför eklenmeli.") +
+      (photos.length === 0 ? " Yayın için fotoğraf da gerekli." : ""),
   );
   // SUPPORT admin detay sayfasını göremez — kendi sayfasına döner (şifre mesajda).
   redirect(

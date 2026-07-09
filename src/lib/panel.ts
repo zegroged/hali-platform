@@ -18,7 +18,12 @@ export async function getCurrentBusiness() {
       },
       subscription: true,
       badges: true,
-      drivers: { include: { user: { select: { name: true, phone: true } } } },
+      drivers: {
+        include: {
+          // username: şoförün giriş kimliği — halıcı panelde görüp iletir.
+          user: { select: { name: true, phone: true, username: true } },
+        },
+      },
       pricing: { orderBy: { createdAt: "asc" } },
       serviceAreas: true,
       photos: true,

@@ -14,7 +14,7 @@ import { startTracking, stopTracking, isTracking } from "./src/tracking";
 function Driver() {
   const [authed, setAuthed] = useState(false);
   const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [onShift, setOnShift] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -29,7 +29,7 @@ function Driver() {
   async function doLogin() {
     setBusy(true);
     try {
-      const d = await login(phone.trim(), password);
+      const d = await login(identifier.trim(), password);
       setName(d.name);
       setAuthed(true);
     } catch (e) {
@@ -73,11 +73,11 @@ function Driver() {
           <Text style={s.title}>🚚 Halı Şoför</Text>
           <TextInput
             style={s.input}
-            placeholder="Telefon (05xx...)"
-            value={phone}
-            onChangeText={setPhone}
-            keyboardType="phone-pad"
+            placeholder="Kullanıcı adı"
+            value={identifier}
+            onChangeText={setIdentifier}
             autoCapitalize="none"
+            autoCorrect={false}
           />
           <TextInput
             style={s.input}

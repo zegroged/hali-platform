@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+import { getSessionUser } from "@/lib/auth";
 import { getCurrentBusiness } from "@/lib/panel";
 import { LogoutButton } from "@/components/LogoutButton";
 import PanelNav from "@/components/PanelNav";
@@ -12,6 +13,11 @@ export default async function PanelLayout({
 }: {
   children: React.ReactNode;
 }) {
+  // Telefonla giriş kaldırıldı: kullanıcı adı olmayan eski hesap önce onu belirler.
+  const u = await getSessionUser();
+  if (!u) redirect("/giris");
+  if (!u.username) redirect("/kullanici-adi");
+
   const business = await getCurrentBusiness();
   if (!business) redirect("/giris");
 

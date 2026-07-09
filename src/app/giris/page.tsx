@@ -14,11 +14,11 @@ const ROLE_HOME: Record<string, string> = {
 };
 
 /** Alan bazlı doğrulama hataları (alan adı → mesaj). */
-type FieldErrors = Partial<Record<"phone" | "password", string>>;
+type FieldErrors = Partial<Record<"identifier" | "password", string>>;
 
 export default function GirisPage() {
   const router = useRouter();
-  const [phone, setPhone] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
@@ -28,18 +28,21 @@ export default function GirisPage() {
     e.preventDefault();
     setError(null);
 
-    // Alan bazlı doğrulama — hatalı alan işaretlenir, mesajı altında gösterilir.
-    // Ayraçları (boşluk/tire/parantez/nokta) söküp salt rakam kalıyorsa telefon,
-    // kalmıyorsa kullanıcı adı kabul edilir ("0532 111 22 01" telefon sayılır).
-    const digits = phone.replace(/[\s().-]/g, "");
-    const isPhone = /^\d+$/.test(digits) && digits.length > 0;
-    const id = isPhone ? digits : phone.trim();
+    // Giriş kimliği: DOĞRULANMIŞ e-posta veya kullanıcı adı. Telefon kabul
+    // edilmez (SMS doğrulaması olmadığından sahiplik kanıtlanamıyor).
+    const id = identifier.trim();
     const errs: FieldErrors = {};
-    if (isPhone) {
-      if (id.length < 10)
-        errs.phone = "Telefon 05xx ile başlamalı ve 11 hane olmalı.";
-    } else if (id.length < 3) {
-      errs.phone = "Telefon veya kullanıcı adı gir.";
+    if (id.length < 3) {
+      errs.identifier = "E-posta veya kullanıcı adı gir.";
+    } else if (
+      // Eski alışkanlıkla telefon yazanı boş bir "hatalı" mesajıyla bırakma.
+      // Yalnız GERÇEKTEN telefona benzeyeni reddet: harf yok + en az 10 rakam.
+      // ("3.14" gibi geçerli kullanıcı adları yanlışlıkla engellenmesin.)
+      !/[a-zçğıöşü_]/i.test(id) &&
+      id.replace(/\D/g, "").length >= 10
+    ) {
+      errs.identifier =
+        "Telefonla giriş kaldırıldı. E-postanı veya kullanıcı adını gir.";
     }
     if (!password) errs.password = "Şifre gerekli.";
     setFieldErrors(errs);
@@ -50,14 +53,23 @@ export default function GirisPage() {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: id, password }),
+        body: JSON.stringify({ identifier: id, password }),
       });
       if (!res.ok) {
-        setError("Telefon veya şifre hatalı.");
+        const data = await res.json().catch(() => null);
+        // 403 (engelli hesap / doğrulanmamış e-posta) kendi mesajını taşır.
+        setError(
+          res.status === 403 && data?.error
+            ? data.error
+            : "E-posta/kullanıcı adı veya şifre hatalı.",
+        );
         return;
       }
       const data = await res.json();
-      router.push(ROLE_HOME[data.role] ?? "/");
+      // Eski hesap: henüz kullanıcı adı yok → önce onu belirlesin.
+      router.push(
+        data.needsUsername ? "/kullanici-adi" : (ROLE_HOME[data.role] ?? "/"),
+      );
       router.refresh();
     } catch {
       setError("Bağlantı hatası, lütfen tekrar deneyin.");
@@ -87,24 +99,23 @@ export default function GirisPage() {
 
         <form onSubmit={submit} noValidate className="mt-6 space-y-3">
           <div>
-            <label htmlFor="giris-telefon" className={labelCls}>
-              Telefon veya kullanıcı adı
+            <label htmlFor="giris-kimlik" className={labelCls}>
+              E-posta veya kullanıcı adı
             </label>
             <input
-              id="giris-telefon"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
+              id="giris-kimlik"
+              value={identifier}
+              onChange={(e) => setIdentifier(e.target.value)}
               type="text"
-              // Rakam/ayraç yazıldıkça (ve boşken) mobilde numerik klavye kalsın;
-              // kullanıcı adı (harf) girilirse tam klavyeye geçer.
-              inputMode={/^[\d\s().-]*$/.test(phone) ? "tel" : "text"}
-              maxLength={50}
-              placeholder="05xxxxxxxxx"
-              className={inputCls(fieldErrors.phone)}
+              maxLength={120}
+              placeholder="ornek@eposta.com"
+              className={inputCls(fieldErrors.identifier)}
               autoComplete="username"
             />
-            {fieldErrors.phone && (
-              <p className="mt-1 text-xs text-red-600">{fieldErrors.phone}</p>
+            {fieldErrors.identifier && (
+              <p className="mt-1 text-xs text-red-600">
+                {fieldErrors.identifier}
+              </p>
             )}
           </div>
           <div>
@@ -137,6 +148,11 @@ export default function GirisPage() {
             {loading ? "Giriş yapılıyor…" : "Giriş Yap"}
           </button>
         </form>
+
+        <p className="mt-3 text-xs text-slate-500">
+          Şoförsün ve giriş bilgini bilmiyor musun? Kullanıcı adını çalıştığın
+          işletmeden öğrenebilirsin.
+        </p>
 
         <p className="mt-4 text-sm text-slate-500">
           Siparişini mi arıyorsun? Takip koduyla{" "}
@@ -173,7 +189,7 @@ export default function GirisPage() {
             <p className="font-semibold">
               Demo hesaplar (şifre: 1234) — yalnız geliştirme
             </p>
-            <p>Halıcı: 05321112201 · Şoför: 05331112202 · Admin: 05320000000</p>
+            <p>Halıcı: halici1 · Şoför: sofor1 · Admin: mert123</p>
           </div>
         )}
       </main>

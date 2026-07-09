@@ -74,7 +74,14 @@ export async function destroySession(): Promise<void> {
   c.delete(COOKIE);
 }
 
-export type SessionUser = { id: string; role: UserRole; name: string };
+// username: giriş kimliği (telefon yerine). Eski hesaplarda null olabilir —
+// panel/şoför layout'ları bu durumda "kullanıcı adı belirle" adımına yönlendirir.
+export type SessionUser = {
+  id: string;
+  role: UserRole;
+  name: string;
+  username: string | null;
+};
 
 export async function getSessionUser(): Promise<SessionUser | null> {
   const c = await cookies();
@@ -84,11 +91,17 @@ export async function getSessionUser(): Promise<SessionUser | null> {
   if (!userId) return null;
   const u = await prisma.user.findUnique({
     where: { id: userId },
-    select: { id: true, role: true, name: true, bannedAt: true },
+    select: {
+      id: true,
+      role: true,
+      name: true,
+      username: true,
+      bannedAt: true,
+    },
   });
   // Engellenen kullanıcının MEVCUT oturumu da geçersizdir (yalnız yeni giriş değil).
   if (!u || u.bannedAt) return null;
-  return { id: u.id, role: u.role, name: u.name };
+  return { id: u.id, role: u.role, name: u.name, username: u.username };
 }
 
 /** Belirli bir rol gerektirir; yoksa null döner (çağıran yönlendirir). */
@@ -114,10 +127,16 @@ async function getBearerUser(): Promise<SessionUser | null> {
   if (!userId) return null;
   const u = await prisma.user.findUnique({
     where: { id: userId },
-    select: { id: true, role: true, name: true, bannedAt: true },
+    select: {
+      id: true,
+      role: true,
+      name: true,
+      username: true,
+      bannedAt: true,
+    },
   });
   if (!u || u.bannedAt) return null; // engelli: native token da geçersiz
-  return { id: u.id, role: u.role, name: u.name };
+  return { id: u.id, role: u.role, name: u.name, username: u.username };
 }
 
 // Çerez (web) VEYA Bearer token (native) — ikisini de kabul eder.

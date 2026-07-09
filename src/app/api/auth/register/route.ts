@@ -4,13 +4,17 @@ import { prisma } from "@/lib/prisma";
 import { hashPassword, createSession } from "@/lib/auth";
 import { rateLimit, clientIp, tooMany } from "@/lib/ratelimit";
 import { CONTRACT_VERSION } from "@/lib/legal";
+import { normalizeUsername, validateUsername } from "@/lib/username";
 
 // İşletme self-servis kaydı. Hesap PENDING açılır ve görünmez;
 // panel akışı (e-posta doğrulama → profil → admin onayı) tamamlar.
 const Body = z.object({
   businessName: z.string().trim().min(2).max(80),
   name: z.string().trim().min(2).max(60),
+  // Telefon giriş kimliği DEĞİL — işletmenin iletişim numarası (müşteriye gösterilir).
   phone: z.string().regex(/^05\d{9}$/, "Telefon 05xx ile 11 hane olmalı"),
+  // Giriş kimliği: kullanıcı adı (e-posta da giriş için kullanılabilir).
+  username: z.string().trim().min(3).max(30),
   email: z.string().trim().email().max(120),
   password: z.string().min(8).max(72), // bcrypt 72 bayt sınırı
   city: z.string().trim().min(2).max(40),
@@ -88,6 +92,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Geçersiz istek." }, { status: 400 });
   }
 
+  // Kullanıcı adı: tek biçime indir (küçük harf) + kural kontrolü.
+  const username = normalizeUsername(parsed.data.username);
+  const usernameError = validateUsername(username);
+  if (usernameError) {
+    return NextResponse.json({ error: usernameError }, { status: 400 });
+  }
+
   // E-posta doğrulama kodu (kayıt ancak posta kutusuna erişenle kurulur).
   const otp = await prisma.signupOtp.findUnique({ where: { email } });
   if (!otp || otp.expiresAt < new Date()) {
@@ -112,23 +123,29 @@ export async function POST(req: NextRequest) {
       { status: 400 },
     );
   }
-  await prisma.signupOtp.delete({ where: { email } });
 
+  // Çakışma kontrolü OTP SİLİNMEDEN ÖNCE: kullanıcı adı doluysa kod boşa
+  // yanmasın (kullanıcı adını düzeltip aynı kodla tekrar denesin).
   const existing = await prisma.user.findFirst({
-    where: { OR: [{ phone }, { email }] },
-    select: { phone: true },
+    where: { OR: [{ phone }, { email }, { username }] },
+    select: { phone: true, username: true },
   });
   if (existing) {
     return NextResponse.json(
       {
         error:
-          existing.phone === phone
-            ? "Bu telefon numarasıyla zaten bir hesap var. Giriş yapmayı deneyin."
-            : "Bu e-posta adresiyle zaten bir hesap var. Giriş yapmayı deneyin.",
+          existing.username === username
+            ? "Bu kullanıcı adı alınmış. Başka bir tane seçin."
+            : existing.phone === phone
+              ? "Bu telefon numarasıyla zaten bir hesap var. Giriş yapmayı deneyin."
+              : "Bu e-posta adresiyle zaten bir hesap var. Giriş yapmayı deneyin.",
       },
       { status: 409 },
     );
   }
+
+  // Kod doğru + çakışma yok → kodu tüket (tekrar kullanılamaz).
+  await prisma.signupOtp.delete({ where: { email } });
 
   const [{ lat, lng }, hashed] = await Promise.all([
     geocodeDistrict(district, city),
@@ -140,10 +157,10 @@ export async function POST(req: NextRequest) {
       role: "CLEANER",
       name,
       phone,
+      username, // giriş kimliği (küçük harfe indirgenmiş)
       email,
       emailVerified: true, // kayıt öncesi kodla doğrulandı
       password: hashed,
-      // e-posta panel akışında doğrulanır (emailVerified=false başlar)
       ownedBusiness: {
         create: {
           name: businessName,

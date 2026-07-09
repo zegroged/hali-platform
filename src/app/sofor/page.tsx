@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { PendingButton } from "@/components/PendingButton";
 import { prisma } from "@/lib/prisma";
 import { getSessionUser } from "@/lib/auth";
@@ -28,6 +29,8 @@ const inp =
 export default async function SoforPage() {
   const u = await getSessionUser();
   if (!u) return null;
+  // Telefonla giriş kaldırıldı: kimliği eksik şoför önce kullanıcı adı belirler.
+  if (!u.username) redirect("/kullanici-adi");
   const driver = await prisma.driver.findUnique({ where: { userId: u.id } });
   if (!driver) return null;
 

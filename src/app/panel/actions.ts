@@ -10,6 +10,7 @@ import { sendSms, trackingLink } from "@/lib/sms";
 import { getAppBaseUrl } from "@/lib/config";
 import { ORDER_STATUS_META, PANEL_NEXT } from "@/lib/orderStatus";
 import { isValidTaxOrTckn } from "@/lib/taxId";
+import { normalizeUsername, validateUsername } from "@/lib/username";
 import type { PricingUnit } from "@prisma/client";
 
 async function biz() {
@@ -160,23 +161,35 @@ export async function addDriver(formData: FormData) {
   const name = String(formData.get("name") || "").trim();
   const phone = String(formData.get("phone") || "").trim();
   const chosen = String(formData.get("password") || "");
+  // Şoförün GİRİŞ KİMLİĞİ: kullanıcı adı (telefonla giriş kaldırıldı, şoförün
+  // e-postası yok). Halıcı belirler ve şoförüne iletir — şifrede olduğu gibi.
+  const username = normalizeUsername(String(formData.get("username") || ""));
   if (!name || phone.length < 10) {
     throw new Error("Geçerli ad ve telefon (05xx...) girin.");
   }
+  const usernameError = validateUsername(username);
+  if (usernameError) throw new Error(usernameError);
   if (chosen && chosen.length < 8) {
     throw new Error("Şifre en az 8 karakter olmalı.");
   }
-  const exists = await prisma.user.findUnique({ where: { phone } });
+  const exists = await prisma.user.findFirst({
+    where: { OR: [{ phone }, { username }] },
+    select: { username: true },
+  });
   if (exists) {
     // Sessiz başarısızlık yerine halıcıya neden eklenemediğini söyle.
-    throw new Error("Bu telefon numarası başka bir hesapta zaten kayıtlı.");
+    throw new Error(
+      exists.username === username
+        ? "Bu kullanıcı adı alınmış. Başka bir tane seçin."
+        : "Bu telefon numarası başka bir hesapta zaten kayıtlı.",
+    );
   }
   // Şifreyi halıcı belirleyebilir (SMS canlı olana kadar tek pratik yol).
   // Boş bırakılırsa eski davranış: rastgele geçici şifre + SMS. Sabit "1234" YOK.
   const tempPassword = chosen || crypto.randomBytes(6).toString("base64url");
   const password = await hashPassword(tempPassword);
   const user = await prisma.user.create({
-    data: { role: "DRIVER", name, phone, password },
+    data: { role: "DRIVER", name, phone, username, password },
   });
   await prisma.driver.create({
     data: { userId: user.id, businessId: b.id },
@@ -186,8 +199,8 @@ export async function addDriver(formData: FormData) {
     await sendSms(
       phone,
       chosen
-        ? `${b.name} sizi şoför olarak ekledi. Giriş: ${getAppBaseUrl()}/giris · Telefon: ${phone} · Şifrenizi işletmenizden alabilirsiniz.`
-        : `${b.name} sizi şoför olarak ekledi. Giriş: ${getAppBaseUrl()}/giris · Telefon: ${phone} · Geçici şifre: ${tempPassword}`,
+        ? `${b.name} sizi şoför olarak ekledi. Giriş: ${getAppBaseUrl()}/giris · Kullanıcı adı: ${username} · Şifrenizi işletmenizden alabilirsiniz.`
+        : `${b.name} sizi şoför olarak ekledi. Giriş: ${getAppBaseUrl()}/giris · Kullanıcı adı: ${username} · Geçici şifre: ${tempPassword}`,
     );
   } catch (e) {
     console.error("addDriver SMS hatası:", e);
@@ -219,6 +232,31 @@ export async function removeDriver(formData: FormData) {
   await syncVisibility(b.id); // son şoför silindiyse listeden düş
   revalidatePath("/panel/soforler");
   revalidatePath("/panel");
+}
+
+/**
+ * Şoförün GİRİŞ KİMLİĞİNİ (kullanıcı adı) halıcı değiştirir. Şoförün e-postası
+ * olmadığından kullanıcı adı tek kimliğidir — yanlış/çakışan bir ad girildiğinde
+ * elle SQL gerekmemesi için bu aksiyon şart.
+ */
+export async function setDriverUsername(formData: FormData) {
+  const b = await biz();
+  const id = String(formData.get("id"));
+  const username = normalizeUsername(String(formData.get("username") || ""));
+  const err = validateUsername(username);
+  if (err) throw new Error(err);
+  // sadece bu işletmenin şoförü güncellenebilir
+  const d = await prisma.driver.findFirst({ where: { id, businessId: b.id } });
+  if (!d) return;
+  const taken = await prisma.user.findUnique({
+    where: { username },
+    select: { id: true },
+  });
+  if (taken && taken.id !== d.userId) {
+    throw new Error("Bu kullanıcı adı alınmış. Başka bir tane seçin.");
+  }
+  await prisma.user.update({ where: { id: d.userId }, data: { username } });
+  revalidatePath("/panel/soforler");
 }
 
 /** Şoför şifresini halıcı belirler/sıfırlar (unutulan şifre + SMS-öncesi dönem). */

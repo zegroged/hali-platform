@@ -9,13 +9,14 @@ export const API_BASE =
 const TOKEN_KEY = "hali_driver_token";
 
 // Token şifreli saklama (Android Keystore / iOS Keychain) — düz AsyncStorage DEĞİL.
-export async function login(phone: string, password: string) {
+// Giriş kimliği: kullanıcı adı (telefonla giriş kaldırıldı — SMS doğrulaması yok).
+export async function login(identifier: string, password: string) {
   const res = await fetch(`${API_BASE}/api/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ phone, password }),
+    body: JSON.stringify({ identifier, password }),
   });
-  if (!res.ok) throw new Error("Telefon veya şifre hatalı.");
+  if (!res.ok) throw new Error("Kullanıcı adı veya şifre hatalı.");
   const data = await res.json();
   if (data.role !== "DRIVER") throw new Error("Bu hesap şoför değil.");
   await SecureStore.setItemAsync(TOKEN_KEY, data.token);

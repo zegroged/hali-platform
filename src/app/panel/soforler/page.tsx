@@ -1,5 +1,10 @@
 import { getCurrentBusiness } from "@/lib/panel";
-import { addDriver, removeDriver, setDriverPassword } from "../actions";
+import {
+  addDriver,
+  removeDriver,
+  setDriverPassword,
+  setDriverUsername,
+} from "../actions";
 import { ConfirmButton } from "../ConfirmButton";
 import { PendingButton } from "@/components/PendingButton";
 import EmptyState from "@/components/EmptyState";
@@ -26,7 +31,14 @@ export default async function PanelDrivers() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="font-medium text-slate-900">{d.user.name}</p>
-                <p className="text-sm text-slate-500">{d.user.phone}</p>
+                {/* Şoförün giriş kimliği — halıcı buradan okuyup şoförüne iletir. */}
+                <p className="text-sm text-slate-500">
+                  Kullanıcı adı:{" "}
+                  <span className="font-mono text-slate-700">
+                    {d.user.username ?? "—"}
+                  </span>
+                </p>
+                <p className="text-xs text-slate-400">{d.user.phone}</p>
               </div>
               <div className="flex items-center gap-2">
                 <span
@@ -82,8 +94,35 @@ export default async function PanelDrivers() {
               </form>
               <p className="mt-1.5 text-xs text-slate-500">
                 En az 8 karakter. Şifreyi şoförüne sen ilet; giriş adresi:
-                /giris (kendi telefon numarasıyla girer).
+                /giris (yukarıdaki kullanıcı adıyla girer).
               </p>
+
+              {/* Kullanıcı adı şoförün TEK giriş kimliği (e-postası yok) —
+                  yanlış girildiyse halıcı buradan düzeltebilmeli. */}
+              <form
+                action={setDriverUsername}
+                className="mt-3 flex items-end gap-2 border-t border-slate-100 pt-3"
+              >
+                <input type="hidden" name="id" value={d.id} />
+                <div className="min-w-0 flex-1 sm:max-w-xs">
+                  <label htmlFor={`kadi-${d.id}`} className={lbl}>
+                    Kullanıcı adını değiştir
+                  </label>
+                  <input
+                    id={`kadi-${d.id}`}
+                    name="username"
+                    type="text"
+                    maxLength={30}
+                    defaultValue={d.user.username ?? ""}
+                    required
+                    autoComplete="off"
+                    className={inp}
+                  />
+                </div>
+                <PendingButton className="whitespace-nowrap rounded-lg border border-brand px-4 py-2 text-sm font-semibold text-brand-dark transition hover:bg-brand-light/50 disabled:opacity-60">
+                  Kaydet
+                </PendingButton>
+              </form>
             </details>
           </div>
         ))}
@@ -119,6 +158,27 @@ export default async function PanelDrivers() {
               required
               className={inp}
             />
+            <p className="mt-1 text-xs text-slate-500">
+              İletişim için — şoför bununla giriş yapmaz.
+            </p>
+          </div>
+          <div>
+            <label htmlFor="sofor-kullanici-adi" className={lbl}>
+              Kullanıcı adı (giriş için)
+            </label>
+            <input
+              id="sofor-kullanici-adi"
+              name="username"
+              type="text"
+              maxLength={30}
+              placeholder="orn: ahmet.sofor"
+              required
+              autoComplete="off"
+              className={inp}
+            />
+            <p className="mt-1 text-xs text-slate-500">
+              Şoförün girişte kullanacağı ad. Harf, rakam ve . _ - kullanılabilir.
+            </p>
           </div>
           <div>
             <label htmlFor="sofor-sifre" className={lbl}>
@@ -134,8 +194,8 @@ export default async function PanelDrivers() {
               className={inp}
             />
             <p className="mt-1 text-xs text-slate-500">
-              En az 8 karakter. Şoförün /giris adresinden kendi telefonu ve bu
-              şifreyle girer — şifreyi ona sen ilet.
+              En az 8 karakter. Şoför /giris adresinden yukarıdaki kullanıcı adı
+              ve bu şifreyle girer — ikisini de ona sen ilet.
             </p>
           </div>
           <PendingButton className="rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark active:scale-[0.99] disabled:opacity-60">
