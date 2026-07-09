@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+import { getSessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { verifMeta } from "@/lib/verifMeta";
 import { subscriptionActive } from "@/lib/subscription";
@@ -66,6 +67,12 @@ export default async function AdminBusinessDetail({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ mesaj?: string; hata?: string }>;
 }) {
+  // YETKİ KAPISI — prisma sorgusundan ÖNCE. Layout redirect'i tek başına yeterli
+  // DEĞİL: sayfa Server Component'i layout'la paralel render olduğundan, sorgu
+  // sonucu (vergi no, TC, e-posta, telefon) yetkisiz isteğin RSC akışına sızardı.
+  const admin = await getSessionUser();
+  if (!admin || admin.role !== "ADMIN") redirect("/giris");
+
   const { id } = await params;
   const { mesaj, hata } = await searchParams;
   const b = await prisma.cleanerBusiness.findUnique({

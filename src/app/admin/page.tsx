@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { getSessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { verifMeta, subscriptionLabel } from "@/lib/verifMeta";
 import { subscriptionActive } from "@/lib/subscription";
@@ -11,6 +13,11 @@ export default async function AdminHome({
 }: {
   searchParams: Promise<{ hata?: string }>;
 }) {
+  // YETKİ KAPISI — prisma sorgularından ÖNCE (layout redirect'i RSC sızıntısını
+  // tek başına engellemez; işletme listesi yetkisiz akışa girerdi).
+  const admin = await getSessionUser();
+  if (!admin || admin.role !== "ADMIN") redirect("/giris");
+
   const { hata } = await searchParams;
 
   const [businesses, driverCount, orderCount] = await Promise.all([

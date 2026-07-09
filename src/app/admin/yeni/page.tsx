@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { getSessionUser } from "@/lib/auth";
 import NewBusinessForm from "@/components/NewBusinessForm";
 
 export const dynamic = "force-dynamic";
@@ -10,6 +12,8 @@ export default async function AdminNewBusiness({
 }: {
   searchParams: Promise<{ hata?: string }>;
 }) {
+  const admin = await getSessionUser();
+  if (!admin || admin.role !== "ADMIN") redirect("/giris");
   const { hata } = await searchParams;
   return (
     <div className="mx-auto max-w-lg space-y-5">

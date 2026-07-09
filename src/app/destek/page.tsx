@@ -1,3 +1,5 @@
+import { redirect } from "next/navigation";
+import { getSessionUser } from "@/lib/auth";
 import NewBusinessForm from "@/components/NewBusinessForm";
 
 export const dynamic = "force-dynamic";
@@ -9,6 +11,8 @@ export default async function DestekPage({
 }: {
   searchParams: Promise<{ hata?: string; mesaj?: string }>;
 }) {
+  const u = await getSessionUser();
+  if (!u || (u.role !== "SUPPORT" && u.role !== "ADMIN")) redirect("/giris");
   const { hata, mesaj } = await searchParams;
   return (
     <div className="mx-auto max-w-lg space-y-5">
