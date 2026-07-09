@@ -6,6 +6,7 @@ import {
   verificationReady,
 } from "@/lib/panel";
 import { subscriptionActive } from "@/lib/subscription";
+import { paymentsLive } from "@/lib/config";
 import { submitForVerification } from "./actions";
 import { startSubscriptionPayment } from "./subscription-actions";
 import { acceptContractVersioned } from "./contract-actions";
@@ -294,19 +295,31 @@ export default async function PanelHome({
           </div>
           <IconWallet size={26} className="text-brand-dark" />
         </div>
-        {/* iyzico ile abonelik ödemesi — ödeme başarılı olunca hesap OTOMATİK
-            yayına girer (callback). Kart bilgisi iyzico'nun güvenli sayfasında. */}
-        <form action={startSubscriptionPayment} className="mt-3">
-          <PendingButton className="w-full rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark active:scale-[0.99]">
-            {subOk
-              ? "Aboneliği yenile — 2.400 TL (iyzico ile güvenli ödeme)"
-              : "Aboneliğini öde — 2.400 TL (iyzico ile güvenli ödeme)"}
-          </PendingButton>
-        </form>
-        <p className="mt-1.5 text-xs text-slate-400">
-          Ödeme, iyzico&apos;nun güvenli sayfasında yapılır; kart bilgilerin
-          bize hiç ulaşmaz. 2.000 TL + %20 KDV = 2.400 TL.
-        </p>
+        {/* iyzico kartlı ödeme yalnız PAYMENTS_MODE=live iken; ödeme başarılı
+            olunca hesap OTOMATİK yayına girer (callback). Kart bilgisi iyzico'nun
+            güvenli sayfasında. Canlı değilken havale/EFT + admin aktivasyonu. */}
+        {paymentsLive ? (
+          <>
+            <form action={startSubscriptionPayment} className="mt-3">
+              <PendingButton className="w-full rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark active:scale-[0.99]">
+                {subOk
+                  ? "Aboneliği yenile — 2.400 TL (iyzico ile güvenli ödeme)"
+                  : "Aboneliğini öde — 2.400 TL (iyzico ile güvenli ödeme)"}
+              </PendingButton>
+            </form>
+            <p className="mt-1.5 text-xs text-slate-400">
+              Ödeme, iyzico&apos;nun güvenli sayfasında yapılır; kart bilgilerin
+              bize hiç ulaşmaz. 2.000 TL + %20 KDV = 2.400 TL.
+            </p>
+          </>
+        ) : (
+          !subOk && (
+            <p className="mt-2 text-xs text-amber-700">
+              Ödemen alındığında hesabın yayına girer — ödeme bilgileri e-posta
+              adresine gönderilir.
+            </p>
+          )
+        )}
       </div>
 
       {/* Yayın koşulları — eksik varsa "burayı doldur" listesi. Tümü dolunca
