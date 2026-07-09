@@ -54,6 +54,16 @@ export default async function AdminHome({
         </p>
       )}
 
+      {/* Admin işlemleri */}
+      <div className="flex justify-end">
+        <Link
+          href="/admin/yeni"
+          className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-dark"
+        >
+          + Yeni İşletme
+        </Link>
+      </div>
+
       {/* Sayaçlar */}
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-5">
         {stats.map((s) => (

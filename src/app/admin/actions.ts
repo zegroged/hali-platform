@@ -7,10 +7,139 @@ import crypto from "node:crypto";
 import { getSessionUser, hashPassword } from "@/lib/auth";
 import { profileComplete, syncVisibility } from "@/lib/panel";
 import { extendSubscription } from "@/lib/subscription";
+import { isValidTaxOrTckn } from "@/lib/taxId";
+import { CONTRACT_VERSION } from "@/lib/legal";
 
 async function requireAdmin() {
   const u = await getSessionUser();
   if (!u || u.role !== "ADMIN") redirect("/giris");
+}
+
+// Admin'in ilçe koordinatı çözmesi (kayıt route'uyla aynı; erişilemezse İstanbul).
+async function geocodeDistrict(district: string, city: string) {
+  try {
+    const res = await fetch(
+      "https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=tr&q=" +
+        encodeURIComponent(`${district}, ${city}`),
+      {
+        headers: { "User-Agent": "HaliYikamaPlatformu/1.0", "Accept-Language": "tr" },
+        cache: "no-store",
+        signal: AbortSignal.timeout(5000),
+      },
+    );
+    if (res.ok) {
+      const d = (await res.json()) as Array<{ lat: string; lon: string }>;
+      if (d.length) return { lat: Number(d[0].lat), lng: Number(d[0].lon) };
+    }
+  } catch {
+    /* varsayılan */
+  }
+  return { lat: 41.0082, lng: 28.9784 };
+}
+
+/**
+ * Admin tarafından işletme oluştur: doğrulama/ödeme kapıları YOK. Hesap
+ * VERIFIED + sözleşme onaylı + e-posta doğrulanmış + SÜRESİZ ÜCRETSİZ abonelik
+ * (dönem 2099) ile açılır. Fotoğraf ve şoför fiziki gerçeklik olduğundan
+ * eklenince otomatik yayına girer (syncVisibility). Geçici şifre admin'e gösterilir.
+ */
+export async function createBusinessByAdmin(formData: FormData) {
+  const admin = await getSessionUser();
+  if (!admin || admin.role !== "ADMIN") redirect("/giris");
+
+  const businessName = String(formData.get("businessName") || "").trim();
+  const ownerName = String(formData.get("ownerName") || "").trim();
+  const phone = String(formData.get("phone") || "").replace(/\D/g, "");
+  const email = String(formData.get("email") || "").trim().toLowerCase();
+  const city = String(formData.get("city") || "").trim();
+  const district = String(formData.get("district") || "").trim();
+  const taxNumber = String(formData.get("taxNumber") || "").replace(/\D/g, "");
+  const pricePerM2 = Number(formData.get("pricePerM2")) || null;
+  const minDays = Number(formData.get("minDays")) || null;
+  const maxDays = Number(formData.get("maxDays")) || null;
+
+  const err = (msg: string) =>
+    redirect("/admin/yeni?hata=" + encodeURIComponent(msg));
+
+  if (businessName.length < 2 || ownerName.length < 2)
+    err("İşletme adı ve yetkili adı gerekli.");
+  if (!/^05\d{9}$/.test(phone)) err("Telefon 05xx ile 11 hane olmalı.");
+  if (!/^\S+@\S+\.\S+$/.test(email)) err("Geçerli bir e-posta gerekli.");
+  if (city.length < 2 || district.length < 2) err("İl ve ilçe gerekli.");
+  if (taxNumber && !isValidTaxOrTckn(taxNumber))
+    err("Vergi/kimlik no geçersiz (11 hane TC veya 10 hane VKN).");
+
+  const exists = await prisma.user.findFirst({
+    where: { OR: [{ phone }, { email }] },
+    select: { id: true },
+  });
+  if (exists) err("Bu telefon veya e-posta ile zaten bir hesap var.");
+
+  const { lat, lng } = await geocodeDistrict(district, city);
+  const tempPassword = "Gecici-" + crypto.randomBytes(4).toString("hex");
+  const farFuture = new Date("2099-12-31T00:00:00.000Z"); // süresiz ücretsiz
+
+  const owner = await prisma.user.create({
+    data: {
+      role: "CLEANER",
+      name: ownerName,
+      phone,
+      email,
+      emailVerified: true, // admin açtı — e-posta doğrulaması atlanır
+      password: await hashPassword(tempPassword),
+      ownedBusiness: {
+        create: {
+          name: businessName,
+          address: `${district}, ${city}`,
+          city,
+          district,
+          lat,
+          lng,
+          phone,
+          taxNumber: taxNumber || null,
+          deliveryEstimateMinDays: minDays,
+          deliveryEstimateMaxDays: maxDays,
+          workingHours: {
+            mon: { open: "09:00", close: "19:00" },
+            tue: { open: "09:00", close: "19:00" },
+            wed: { open: "09:00", close: "19:00" },
+            thu: { open: "09:00", close: "19:00" },
+            fri: { open: "09:00", close: "19:00" },
+            sat: { open: "10:00", close: "17:00" },
+            sun: null,
+          },
+          verification: "VERIFIED", // doğrulama kapısı yok
+          isVisible: false, // syncVisibility hesaplar (foto+şoför gelince açılır)
+          contractAcceptedAt: new Date(),
+          contractVersion: CONTRACT_VERSION,
+          adminNote: `Admin (${admin.name}) tarafından açıldı — süresiz ücretsiz abonelik.`,
+          serviceAreas: { create: [{ city, district }] },
+          ...(pricePerM2
+            ? { pricing: { create: [{ label: "Makine Halısı", unit: "PER_M2", price: pricePerM2 }] } }
+            : {}),
+          badges: { create: [{ type: "VERIFIED" }] },
+          subscription: {
+            create: {
+              status: "ACTIVE",
+              currentPeriodStart: new Date(),
+              currentPeriodEnd: farFuture,
+            },
+          },
+        },
+      },
+    },
+    include: { ownedBusiness: { select: { id: true } } },
+  });
+
+  const businessId = owner.ownedBusiness!.id;
+  await syncVisibility(businessId); // foto+şoför varsa hemen yayına al
+  revalidatePath("/admin");
+  redirect(
+    `/admin/isletme/${businessId}?mesaj=` +
+      encodeURIComponent(
+        `İşletme oluşturuldu. Giriş: telefon ${phone} · geçici şifre ${tempPassword} (sahibine ilet). Yayın için fotoğraf ve en az bir şoför eklenmeli.`,
+      ),
+  );
 }
 
 export async function approveBusiness(formData: FormData) {

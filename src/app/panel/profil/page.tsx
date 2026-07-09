@@ -22,9 +22,14 @@ const UNIT_LABEL: Record<string, string> = {
   FLAT: "sabit",
 };
 
-export default async function PanelProfile() {
+export default async function PanelProfile({
+  searchParams,
+}: {
+  searchParams: Promise<{ hata?: string }>;
+}) {
   const b = await getCurrentBusiness();
   if (!b) return null;
+  const { hata } = await searchParams;
 
   const hours = (b.workingHours ?? {}) as Record<
     string,
@@ -35,6 +40,14 @@ export default async function PanelProfile() {
 
   return (
     <div className="space-y-8">
+      {hata && (
+        <p
+          role="alert"
+          className="rounded-xl border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700"
+        >
+          {hata}
+        </p>
+      )}
       <div>
         <h1 className="text-lg font-semibold text-slate-900">
           Profil &amp; Fiyat
