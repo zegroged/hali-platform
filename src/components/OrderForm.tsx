@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { IconMapPin, IconWallet, IconCheck } from "@/components/icons";
+import { LocationPicker } from "@/components/LocationPicker";
 
 /** Alan bazlı doğrulama hataları (alan adı → mesaj). */
 type FieldErrors = Partial<
@@ -41,6 +42,8 @@ export function OrderForm({
   const [geoState, setGeoState] = useState<"idle" | "loading" | "error">(
     "idle",
   );
+  // Tarayıcının bildirdiği konum hatası (metre) — kaba konumu kullanıcıya söyle.
+  const [accuracy, setAccuracy] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [loading, setLoading] = useState(false);
@@ -58,13 +61,18 @@ export function OrderForm({
       return;
     }
     setGeoState("loading");
+    setAccuracy(null);
+    // enableHighAccuracy: GPS/Wi-Fi kullanır. Kapalıyken tarayıcı IP/baz-istasyonu
+    // konumuna düşüyor ve kilometrelerce sapıyordu. maximumAge:0 → önbellekteki
+    // eski (kaba) konumu kullanma; timeout uzun çünkü GPS kilidi zaman alır.
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        setAccuracy(pos.coords.accuracy ?? null);
         setGeoState("idle");
       },
       () => setGeoState("error"),
-      { timeout: 10000 },
+      { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 },
     );
   }
 
@@ -221,15 +229,41 @@ export function OrderForm({
             </button>
             {geoState === "error" ? (
               <p className="mt-1 text-xs text-slate-500">
-                Konum alınamadı — adresi eksiksiz yazman yeterli.
+                Konum alınamadı — adresi eksiksiz yaz veya haritadan işaretle.
               </p>
-            ) : (
-              !coords && (
-                <p className="mt-1 text-xs text-slate-500">
-                  Opsiyonel — şoförün adresi bulmasını kolaylaştırır.
+            ) : coords ? (
+              // Tarayıcı konumu bazen kilometrelerce sapar (masaüstünde Wi-Fi/IP
+              // tabanlı). Sapmayı açıkça söyle ve haritadan düzeltmeyi öner.
+              accuracy != null && accuracy > 200 ? (
+                <p className="mt-1 text-xs text-amber-700">
+                  Konum yaklaşık ±{Math.round(accuracy)} m hassasiyetle alındı —
+                  sapmış olabilir. Aşağıdaki haritadan kapını işaretleyip
+                  düzeltebilirsin.
+                </p>
+              ) : (
+                <p className="mt-1 text-xs text-emerald-700">
+                  Konum alındı
+                  {accuracy != null ? ` (±${Math.round(accuracy)} m)` : ""} —
+                  haritadan düzeltebilirsin.
                 </p>
               )
+            ) : (
+              <p className="mt-1 text-xs text-slate-500">
+                Opsiyonel — şoförün adresi bulmasını kolaylaştırır.
+              </p>
             )}
+            <div className="mt-2">
+              <LocationPicker
+                value={coords}
+                onChange={(c) => {
+                  setCoords(c);
+                  // Haritadan elle seçildi → tarayıcı hassasiyet uyarısı geçersiz.
+                  setAccuracy(null);
+                  if (!c) setGeoState("idle");
+                }}
+                addressHint={form.pickupAddress}
+              />
+            </div>
           </div>
           <div>
             <label htmlFor="siparis-m2" className={labelCls}>

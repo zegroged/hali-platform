@@ -47,6 +47,8 @@ export async function updateProfileBasics(formData: FormData) {
   await syncVisibility(b.id); // vergi no / teslim süresi boşaltılırsa görünürlüğü güncelle
   revalidatePath("/panel/profil");
   revalidatePath("/panel");
+  // Kaydet'e basınca hiçbir şey olmuyor gibi görünüyordu — görünür geri bildirim.
+  redirect("/panel/profil?kaydedildi=Temel+bilgiler");
 }
 
 export async function setWorkingHours(formData: FormData) {
@@ -74,6 +76,7 @@ export async function setWorkingHours(formData: FormData) {
   await syncVisibility(b.id);
   revalidatePath("/panel/profil");
   revalidatePath("/panel");
+  redirect("/panel/profil?kaydedildi=Çalışma+saatleri");
 }
 
 export async function addPricingItem(formData: FormData) {

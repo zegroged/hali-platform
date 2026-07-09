@@ -7,11 +7,18 @@ import { sendTrackingSms, trackingLink } from "@/lib/sms";
 import { subscriptionActive } from "@/lib/subscription";
 
 const Body = z.object({
-  customerName: z.string().min(2).max(100),
-  customerPhone: z.string().min(10).max(20),
-  pickupAddress: z.string().min(3).max(300),
-  approxM2: z.number().positive().max(100000).optional(),
-  note: z.string().max(500).optional(),
+  customerName: z.string().min(2, "Müşteri adı en az 2 karakter olmalı.").max(100),
+  customerPhone: z.string().min(10, "Telefon 11 hane olmalı.").max(20),
+  pickupAddress: z.string().min(3, "Adres en az 3 karakter olmalı.").max(300),
+  // Müşteri konumu — opsiyonel (halıcı adresten bulur / haritadan işaretler).
+  pickupLat: z.number().min(-90).max(90).optional(),
+  pickupLng: z.number().min(-180).max(180).optional(),
+  approxM2: z
+    .number()
+    .positive("m² sıfırdan büyük olmalı.")
+    .max(100000, "m² en fazla 100.000 olabilir.")
+    .optional(),
+  note: z.string().max(500, "Not en fazla 500 karakter olabilir.").optional(),
   paymentMethod: z.enum(["CASH", "CARD"]),
   driverId: z.string().max(40).optional(),
 });
@@ -24,7 +31,13 @@ export async function POST(req: NextRequest) {
   }
   const parsed = Body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) {
-    return NextResponse.json({ error: "Geçersiz veri" }, { status: 400 });
+    // "Geçersiz veri" hiçbir şey anlatmıyordu (ör. 123123 m² sessizce reddediliyordu).
+    // İlk kuralın kendi mesajını dön ki halıcı NEYİ düzelteceğini görsün.
+    const first = parsed.error.issues[0];
+    return NextResponse.json(
+      { error: first?.message ?? "Geçersiz veri" },
+      { status: 400 },
+    );
   }
   const d = parsed.data;
 
@@ -64,6 +77,8 @@ export async function POST(req: NextRequest) {
         customerName: d.customerName,
         customerPhone: d.customerPhone,
         pickupAddress: d.pickupAddress,
+        pickupLat: d.pickupLat,
+        pickupLng: d.pickupLng,
         approxM2: d.approxM2,
         note: d.note,
         // Web'de şimdilik YALNIZ nakit (komisyon/kart ertelendi; app'te geri açılacak).

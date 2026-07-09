@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { IconWallet } from "@/components/icons";
+import { LocationPicker, type Coords } from "@/components/LocationPicker";
 
 type Driver = { id: string; name: string };
 
@@ -9,6 +10,9 @@ type Driver = { id: string; name: string };
 type FieldErrors = Partial<
   Record<"customerName" | "customerPhone" | "pickupAddress" | "approxM2", string>
 >;
+
+/** Sunucudaki zod sınırıyla AYNI (api/panel/orders): üstünü client'ta yakala. */
+const MAX_M2 = 100000;
 
 /** m² metnini sayıya çevirir; Türkçe virgüllü ondalık da kabul eder. */
 function parseM2(v: string): number | null {
@@ -26,6 +30,8 @@ export function ManualOrderForm({ drivers }: { drivers: Driver[] }) {
     paymentMethod: "CASH" as "CASH" | "CARD",
     driverId: "",
   });
+  // Müşteri konumu — opsiyonel; adresten bulunur, haritadan seçilir/taşınır.
+  const [coords, setCoords] = useState<Coords | null>(null);
   const [result, setResult] = useState<{ code: string; trackingUrl: string } | null>(
     null,
   );
@@ -49,8 +55,12 @@ export function ManualOrderForm({ drivers }: { drivers: Driver[] }) {
       errs.customerPhone = "Telefon 05xx ile başlamalı ve 11 hane olmalı.";
     if (form.pickupAddress.trim().length < 3)
       errs.pickupAddress = "Adres gerekli.";
-    if (form.approxM2 && parseM2(form.approxM2) === null)
-      errs.approxM2 = "Geçerli bir m² değeri gir (ör. 12,5).";
+    if (form.approxM2) {
+      const m2 = parseM2(form.approxM2);
+      if (m2 === null) errs.approxM2 = "Geçerli bir m² değeri gir (ör. 12,5).";
+      else if (m2 > MAX_M2)
+        errs.approxM2 = `m² en fazla ${MAX_M2.toLocaleString("tr-TR")} olabilir.`;
+    }
     setFieldErrors(errs);
     if (Object.keys(errs).length > 0) {
       setErr("Lütfen işaretli alanları düzelt.");
@@ -66,6 +76,8 @@ export function ManualOrderForm({ drivers }: { drivers: Driver[] }) {
           customerName: form.customerName,
           customerPhone: form.customerPhone,
           pickupAddress: form.pickupAddress,
+          pickupLat: coords?.lat,
+          pickupLng: coords?.lng,
           approxM2: form.approxM2
             ? (parseM2(form.approxM2) ?? undefined)
             : undefined,
@@ -74,8 +86,15 @@ export function ManualOrderForm({ drivers }: { drivers: Driver[] }) {
           driverId: form.driverId || undefined,
         }),
       });
-      if (res.ok) setResult(await res.json());
-      else setErr("Kayıt oluşturulamadı.");
+      if (res.ok) {
+        setResult(await res.json());
+        return;
+      }
+      // Sunucunun ASIL nedenini göster ("Kayıt oluşturulamadı" hiçbir şey anlatmıyordu).
+      const data = (await res.json().catch(() => null)) as {
+        error?: string;
+      } | null;
+      setErr(data?.error ?? "Kayıt oluşturulamadı.");
     } catch {
       setErr("Bağlantı hatası, lütfen tekrar deneyin.");
     } finally {
@@ -130,6 +149,7 @@ export function ManualOrderForm({ drivers }: { drivers: Driver[] }) {
               setResult(null);
               setCopied(false);
               setFieldErrors({});
+              setCoords(null);
               setForm({
                 customerName: "",
                 customerPhone: "",
@@ -202,6 +222,17 @@ export function ManualOrderForm({ drivers }: { drivers: Driver[] }) {
         {fieldErrors.pickupAddress && (
           <p className={fieldErrCls}>{fieldErrors.pickupAddress}</p>
         )}
+      </div>
+      <div>
+        <label className={labelCls}>
+          Müşteri konumu
+          {optionalBadge}
+        </label>
+        <LocationPicker
+          value={coords}
+          onChange={setCoords}
+          addressHint={form.pickupAddress}
+        />
       </div>
       <div className="grid grid-cols-2 gap-2">
         <div>

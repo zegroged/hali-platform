@@ -1,4 +1,4 @@
-import { getCurrentBusiness } from "@/lib/panel";
+import { getCurrentBusiness, completenessChecklist } from "@/lib/panel";
 import {
   updateProfileBasics,
   setWorkingHours,
@@ -9,12 +9,21 @@ import {
   removePhoto,
 } from "../actions";
 import { ConfirmButton } from "../ConfirmButton";
+import { PendingButton } from "@/components/PendingButton";
 import { PhotoUpload } from "@/components/PhotoUpload";
-import { IconX } from "@/components/icons";
+import { IconX, IconCheck } from "@/components/icons";
 
 const inp =
   "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand";
+// Eksik zorunlu alan: kırmızı çerçeve + kırmızımsı zemin (nereyi dolduracağı belli olsun)
+const inpMissing =
+  "w-full rounded-lg border-2 border-red-400 bg-red-50/40 px-3 py-2 text-sm focus:border-brand";
 const lbl = "text-xs font-medium text-slate-500";
+const reqBadge = (
+  <span className="ml-1.5 rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold text-red-700">
+    YAYIN İÇİN GEREKLİ
+  </span>
+);
 
 const UNIT_LABEL: Record<string, string> = {
   PER_M2: "/m²",
@@ -25,11 +34,11 @@ const UNIT_LABEL: Record<string, string> = {
 export default async function PanelProfile({
   searchParams,
 }: {
-  searchParams: Promise<{ hata?: string }>;
+  searchParams: Promise<{ hata?: string; kaydedildi?: string }>;
 }) {
   const b = await getCurrentBusiness();
   if (!b) return null;
-  const { hata } = await searchParams;
+  const { hata, kaydedildi } = await searchParams;
 
   const hours = (b.workingHours ?? {}) as Record<
     string,
@@ -38,8 +47,22 @@ export default async function PanelProfile({
   const main = b.pricing.filter((p) => !p.isAddon);
   const addons = b.pricing.filter((p) => p.isAddon);
 
+  // Yayına çıkmak için eksik kalan alanlar — kullanıcı NEYİ dolduracağını görsün.
+  const checklist = completenessChecklist(b);
+  const missing = checklist.filter((c) => !c.done);
+  const taxMissing = !b.taxNumber;
+  const daysMissing = !(b.deliveryEstimateMinDays && b.deliveryEstimateMaxDays);
+
   return (
     <div className="space-y-8">
+      {kaydedildi && (
+        <p
+          role="status"
+          className="flex items-center gap-2 rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800"
+        >
+          <IconCheck size={16} /> {kaydedildi} kaydedildi.
+        </p>
+      )}
       {hata && (
         <p
           role="alert"
@@ -57,6 +80,31 @@ export default async function PanelProfile({
           bölgelerin.
         </p>
       </div>
+
+      {/* Eksik alanlar özeti — yayına çıkma şartları tek bakışta. */}
+      {missing.length > 0 ? (
+        <section className="rounded-xl border-2 border-red-300 bg-red-50 p-4">
+          <h2 className="font-semibold text-red-800">
+            Yayına çıkmak için {missing.length} eksik var
+          </h2>
+          <p className="mt-1 text-sm text-red-700">
+            Aşağıdakiler tamamlanmadan işletmen müşterilere görünmez.
+          </p>
+          <ul className="mt-2 space-y-1">
+            {missing.map((m) => (
+              <li key={m.label} className="text-sm font-medium text-red-800">
+                ✗ {m.label}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : (
+        <section className="rounded-xl border border-emerald-300 bg-emerald-50 p-4">
+          <h2 className="flex items-center gap-2 font-semibold text-emerald-800">
+            <IconCheck size={16} /> Profil eksiksiz — yayın şartları tamam.
+          </h2>
+        </section>
+      )}
 
       {/* Temel bilgiler */}
       <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -95,37 +143,48 @@ export default async function PanelProfile({
               <input name="phone" defaultValue={b.phone} className={inp} />
             </div>
             <div>
-              <label className={lbl}>Vergi No</label>
+              <label className={lbl}>
+                Vergi / T.C. kimlik no{taxMissing && reqBadge}
+              </label>
               <input
                 name="taxNumber"
                 defaultValue={b.taxNumber ?? ""}
-                className={inp}
+                placeholder="11 hane T.C. veya 10 hane vergi no"
+                className={taxMissing ? inpMissing : inp}
               />
+              <p className="mt-1 text-xs text-slate-500">
+                Şahıs işletmesi 11 haneli T.C. kimlik, şirket 10 haneli vergi
+                numarası girer. Müşteriye yalnız şirket vergi numarası gösterilir.
+              </p>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className={lbl}>Teslim (min gün)</label>
+              <label className={lbl}>
+                Teslim (min gün){daysMissing && reqBadge}
+              </label>
               <input
                 name="minDays"
                 type="number"
                 defaultValue={b.deliveryEstimateMinDays ?? ""}
-                className={inp}
+                className={daysMissing ? inpMissing : inp}
               />
             </div>
             <div>
-              <label className={lbl}>Teslim (max gün)</label>
+              <label className={lbl}>
+                Teslim (max gün){daysMissing && reqBadge}
+              </label>
               <input
                 name="maxDays"
                 type="number"
                 defaultValue={b.deliveryEstimateMaxDays ?? ""}
-                className={inp}
+                className={daysMissing ? inpMissing : inp}
               />
             </div>
           </div>
-          <button className="rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark active:scale-[0.99]">
+          <PendingButton className="rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark active:scale-[0.99] disabled:opacity-60">
             Kaydet
-          </button>
+          </PendingButton>
         </form>
       </section>
 
@@ -180,9 +239,9 @@ export default async function PanelProfile({
             />{" "}
             Pazar kapalı
           </label>
-          <button className="rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark active:scale-[0.99]">
+          <PendingButton className="rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark active:scale-[0.99] disabled:opacity-60">
             Kaydet
-          </button>
+          </PendingButton>
         </form>
       </section>
 
