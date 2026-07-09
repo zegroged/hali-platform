@@ -18,6 +18,7 @@ enum UserRole {
   CLEANER // halıcı / dükkan sahibi
   DRIVER // şoför
   ADMIN
+  SUPPORT // müşteri hizmetleri — TEK yetkisi: doğrulamasız işletme açmak (/destek)
 }
 
 enum VerificationStatus {
@@ -77,6 +78,7 @@ model User {
   role              UserRole
   name              String
   phone             String    @unique
+  username          String?   @unique // girişte telefon YERİNE kullanılabilen ad (admin/destek hesapları)
   email             String?   @unique
   password          String? // hash; müşteri için opsiyonel
   phoneVerified     Boolean   @default(false)

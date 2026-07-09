@@ -44,8 +44,12 @@ async function geocodeDistrict(district: string, city: string) {
  * eklenince otomatik yayına girer (syncVisibility). Geçici şifre admin'e gösterilir.
  */
 export async function createBusinessByAdmin(formData: FormData) {
+  // ADMIN veya SUPPORT (müşteri hizmetleri — tek yetkisi bu aksiyon).
   const admin = await getSessionUser();
-  if (!admin || admin.role !== "ADMIN") redirect("/giris");
+  if (!admin || (admin.role !== "ADMIN" && admin.role !== "SUPPORT"))
+    redirect("/giris");
+  const isSupport = admin.role === "SUPPORT";
+  const formPath = isSupport ? "/destek" : "/admin/yeni";
 
   const businessName = String(formData.get("businessName") || "").trim();
   const ownerName = String(formData.get("ownerName") || "").trim();
@@ -59,7 +63,7 @@ export async function createBusinessByAdmin(formData: FormData) {
   const maxDays = Number(formData.get("maxDays")) || null;
 
   const err = (msg: string) =>
-    redirect("/admin/yeni?hata=" + encodeURIComponent(msg));
+    redirect(formPath + "?hata=" + encodeURIComponent(msg));
 
   if (businessName.length < 2 || ownerName.length < 2)
     err("İşletme adı ve yetkili adı gerekli.");
@@ -112,7 +116,7 @@ export async function createBusinessByAdmin(formData: FormData) {
           isVisible: false, // syncVisibility hesaplar (foto+şoför gelince açılır)
           contractAcceptedAt: new Date(),
           contractVersion: CONTRACT_VERSION,
-          adminNote: `Admin (${admin.name}) tarafından açıldı — süresiz ücretsiz abonelik.`,
+          adminNote: `${isSupport ? "Müşteri Hizmetleri" : "Admin"} (${admin.name}) tarafından açıldı — süresiz ücretsiz abonelik.`,
           serviceAreas: { create: [{ city, district }] },
           ...(pricePerM2
             ? { pricing: { create: [{ label: "Makine Halısı", unit: "PER_M2", price: pricePerM2 }] } }
@@ -134,11 +138,14 @@ export async function createBusinessByAdmin(formData: FormData) {
   const businessId = owner.ownedBusiness!.id;
   await syncVisibility(businessId); // foto+şoför varsa hemen yayına al
   revalidatePath("/admin");
+  const mesaj = encodeURIComponent(
+    `İşletme oluşturuldu. Giriş: telefon ${phone} · geçici şifre ${tempPassword} (sahibine ilet). Yayın için fotoğraf ve en az bir şoför eklenmeli.`,
+  );
+  // SUPPORT admin detay sayfasını göremez — kendi sayfasına döner (şifre mesajda).
   redirect(
-    `/admin/isletme/${businessId}?mesaj=` +
-      encodeURIComponent(
-        `İşletme oluşturuldu. Giriş: telefon ${phone} · geçici şifre ${tempPassword} (sahibine ilet). Yayın için fotoğraf ve en az bir şoför eklenmeli.`,
-      ),
+    isSupport
+      ? `/destek?mesaj=${mesaj}`
+      : `/admin/isletme/${businessId}?mesaj=${mesaj}`,
   );
 }
 

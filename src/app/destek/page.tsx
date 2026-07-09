@@ -1,24 +1,17 @@
-import Link from "next/link";
 import NewBusinessForm from "@/components/NewBusinessForm";
 
 export const dynamic = "force-dynamic";
 
-// Admin'in doğrulama/ödeme olmadan işletme açtığı form. Oluşturulan hesap
-// VERIFIED + süresiz ücretsiz abonelikle gelir; foto+şoför eklenince yayınlanır.
-export default async function AdminNewBusiness({
+// Müşteri hizmetlerinin tek işlevi: doğrulama/ödeme olmadan işletme açmak
+// (adminin /admin/yeni yetkisinin aynısı). Başarı mesajı geçici şifreyi içerir.
+export default async function DestekPage({
   searchParams,
 }: {
-  searchParams: Promise<{ hata?: string }>;
+  searchParams: Promise<{ hata?: string; mesaj?: string }>;
 }) {
-  const { hata } = await searchParams;
+  const { hata, mesaj } = await searchParams;
   return (
     <div className="mx-auto max-w-lg space-y-5">
-      <Link
-        href="/admin"
-        className="text-sm font-medium text-brand-dark hover:underline"
-      >
-        ← Panele dön
-      </Link>
       <div>
         <h1 className="text-lg font-semibold text-slate-900">
           Yeni İşletme Oluştur
@@ -30,6 +23,11 @@ export default async function AdminNewBusiness({
         </p>
       </div>
 
+      {mesaj && (
+        <p className="rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+          {mesaj}
+        </p>
+      )}
       {hata && (
         <p
           role="alert"

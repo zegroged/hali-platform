@@ -5,7 +5,9 @@ import { verifyPassword, createSession, signSession } from "@/lib/auth";
 import { rateLimit, clientIp, tooMany } from "@/lib/ratelimit";
 
 const Body = z.object({
-  phone: z.string().min(10).max(20),
+  // Telefon (05xxxxxxxxx) VEYA kullanıcı adı (admin/destek hesapları) — native
+  // uygulamalar da aynı "phone" alanını gönderdiğinden alan adı korunuyor.
+  phone: z.string().min(3).max(50),
   password: z.string().min(1).max(72), // bcrypt 72 bayt sınırı
 });
 
@@ -21,7 +23,14 @@ export async function POST(req: NextRequest) {
   const rl = rateLimit(`login:${ip}:${phone}`, 5, 15 * 60 * 1000);
   if (!rl.ok) return tooMany(rl.retryAfterSec);
 
-  const user = await prisma.user.findUnique({ where: { phone } });
+  // Ayraçlar (boşluk/tire/parantez/nokta) söküldüğünde salt rakam kalıyorsa
+  // telefon, kalmıyorsa kullanıcı adı olarak ara (ikisi de @unique).
+  const digits = phone.replace(/[\s().-]/g, "");
+  const user = await prisma.user.findUnique({
+    where: /^\d+$/.test(digits) && digits.length > 0
+      ? { phone: digits }
+      : { username: phone.trim() },
+  });
   if (!user || !user.password) {
     return NextResponse.json({ error: "Geçersiz" }, { status: 401 });
   }

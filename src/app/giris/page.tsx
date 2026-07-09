@@ -9,6 +9,7 @@ const ROLE_HOME: Record<string, string> = {
   CLEANER: "/panel",
   DRIVER: "/sofor",
   ADMIN: "/admin",
+  SUPPORT: "/destek",
   CUSTOMER: "/",
 };
 
@@ -28,9 +29,18 @@ export default function GirisPage() {
     setError(null);
 
     // Alan bazlı doğrulama — hatalı alan işaretlenir, mesajı altında gösterilir.
+    // Ayraçları (boşluk/tire/parantez/nokta) söküp salt rakam kalıyorsa telefon,
+    // kalmıyorsa kullanıcı adı kabul edilir ("0532 111 22 01" telefon sayılır).
+    const digits = phone.replace(/[\s().-]/g, "");
+    const isPhone = /^\d+$/.test(digits) && digits.length > 0;
+    const id = isPhone ? digits : phone.trim();
     const errs: FieldErrors = {};
-    if (phone.length < 10)
-      errs.phone = "Telefon 05xx ile başlamalı ve 11 hane olmalı.";
+    if (isPhone) {
+      if (id.length < 10)
+        errs.phone = "Telefon 05xx ile başlamalı ve 11 hane olmalı.";
+    } else if (id.length < 3) {
+      errs.phone = "Telefon veya kullanıcı adı gir.";
+    }
     if (!password) errs.password = "Şifre gerekli.";
     setFieldErrors(errs);
     if (Object.keys(errs).length > 0) return;
@@ -40,7 +50,7 @@ export default function GirisPage() {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone, password }),
+        body: JSON.stringify({ phone: id, password }),
       });
       if (!res.ok) {
         setError("Telefon veya şifre hatalı.");
@@ -78,15 +88,17 @@ export default function GirisPage() {
         <form onSubmit={submit} noValidate className="mt-6 space-y-3">
           <div>
             <label htmlFor="giris-telefon" className={labelCls}>
-              Telefon
+              Telefon veya kullanıcı adı
             </label>
             <input
               id="giris-telefon"
               value={phone}
-              onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))}
-              type="tel"
-              inputMode="tel"
-              maxLength={11}
+              onChange={(e) => setPhone(e.target.value)}
+              type="text"
+              // Rakam/ayraç yazıldıkça (ve boşken) mobilde numerik klavye kalsın;
+              // kullanıcı adı (harf) girilirse tam klavyeye geçer.
+              inputMode={/^[\d\s().-]*$/.test(phone) ? "tel" : "text"}
+              maxLength={50}
               placeholder="05xxxxxxxxx"
               className={inputCls(fieldErrors.phone)}
               autoComplete="username"
