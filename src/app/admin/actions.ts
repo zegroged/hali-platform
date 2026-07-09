@@ -8,7 +8,7 @@ import crypto from "node:crypto";
 import { getSessionUser, hashPassword } from "@/lib/auth";
 import { profileComplete, syncVisibility } from "@/lib/panel";
 import { extendSubscription } from "@/lib/subscription";
-import { isValidTaxOrTckn } from "@/lib/taxId";
+import { taxIdError } from "@/lib/taxId";
 import { normalizeUsername, validateUsername } from "@/lib/username";
 import { saveObject } from "@/lib/storage";
 import { CONTRACT_VERSION } from "@/lib/legal";
@@ -93,8 +93,8 @@ export async function createBusinessByAdmin(formData: FormData) {
     if (uErr) err(uErr);
   }
   if (city.length < 2 || district.length < 2) err("İl ve ilçe gerekli.");
-  if (taxNumber && !isValidTaxOrTckn(taxNumber))
-    err("Vergi/kimlik no geçersiz (11 hane TC veya 10 hane VKN).");
+  const taxErr = taxIdError(taxNumber);
+  if (taxErr) err("Vergi/kimlik no: " + taxErr);
   if (wantsDriver) {
     // Şoför alanlarından biri doldurulduysa hepsi gerekli (yarım hesap olmasın).
     if (dName.length < 2) err("Şoför adı gerekli.");

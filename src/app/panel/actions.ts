@@ -9,7 +9,7 @@ import { hashPassword } from "@/lib/auth";
 import { sendSms, trackingLink } from "@/lib/sms";
 import { getAppBaseUrl } from "@/lib/config";
 import { ORDER_STATUS_META, PANEL_NEXT } from "@/lib/orderStatus";
-import { isValidTaxOrTckn } from "@/lib/taxId";
+import { taxIdError } from "@/lib/taxId";
 import { normalizeUsername, validateUsername } from "@/lib/username";
 import type { PricingUnit } from "@prisma/client";
 
@@ -26,13 +26,9 @@ export async function updateProfileBasics(formData: FormData) {
   const taxRaw = String(formData.get("taxNumber") || "").replace(/\D/g, "");
   // Vergi/kimlik no checksum doğrulaması — rastgele/uydurma sayı girilemez
   // (11 hane TC, 10 hane VKN). Boş bırakılabilir ama girildiyse geçerli olmalı.
-  if (taxRaw && !isValidTaxOrTckn(taxRaw)) {
-    redirect(
-      "/panel/profil?hata=" +
-        encodeURIComponent(
-          "Vergi/kimlik numarası geçersiz. Şahıs işletmesi 11 haneli T.C. kimlik, tüzel kişi 10 haneli vergi numarası girer.",
-        ),
-    );
+  const taxErr = taxIdError(taxRaw);
+  if (taxErr) {
+    redirect("/panel/profil?hata=" + encodeURIComponent(taxErr));
   }
   await prisma.cleanerBusiness.update({
     where: { id: b.id },

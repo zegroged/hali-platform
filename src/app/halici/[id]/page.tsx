@@ -3,6 +3,7 @@ import { cache } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getBusinessById } from "@/lib/businesses";
+import { publicTaxNumber } from "@/lib/taxId";
 import { prisma } from "@/lib/prisma";
 import { Badges } from "@/components/Badges";
 import { IconStar, IconTruck } from "@/components/icons";
@@ -60,16 +61,18 @@ export default async function HaliciProfile({
   const b = await getBusiness(id);
   if (!b) notFound();
 
-  // ETAHS Yön. md.5/2-b: esnaf/tacirin vergi kimlik numarasının kendisine
-  // tahsis edilen alanda gösterimi — getBusinessById bu alanı döndürmediği
-  // için yalnız taxNumber ayrıca okunur.
-  const taxNumber =
+  // ETAHS Yön. md.5/2-b: vergi kimlik numarası gösterimi — ANCAK yalnız
+  // 10 haneli VKN (tüzel kişi). Şahıs işletmesinde bu alan T.C. kimlik no'dur;
+  // TCKN kişisel veridir (KVKK) ve müşteriye ASLA gösterilmez (publicTaxNumber
+  // 11 haneli değeri null yapar).
+  const taxNumber = publicTaxNumber(
     (
       await prisma.cleanerBusiness.findUnique({
         where: { id: b.id },
         select: { taxNumber: true },
       })
-    )?.taxNumber ?? null;
+    )?.taxNumber ?? null,
+  );
 
   const main = b.pricing.filter((p) => !p.isAddon);
   const addons = b.pricing.filter((p) => p.isAddon);
