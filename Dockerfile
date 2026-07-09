@@ -41,4 +41,8 @@ EXPOSE 3000
 # Boş/şemasız DB → kesinti olmasın: önce şemayı uygula, sonra sunucuyu başlat.
 # NOT: db push hızlı başlangıç içindir; sürüm geçmişi gereken üretimde
 # `prisma migrate deploy` ile versiyonlanmış migration tercih edilmeli.
-CMD ["sh", "-c", "node node_modules/prisma/build/index.js db push --skip-generate && node server.js"]
+# --accept-data-loss ŞART: unique-kısıt/kolon-tipi değişikliklerinde db push
+# aksi halde onay bekleyip başarısız olur ve app AÇILMAZ (crash-loop). Yaşandı:
+# 2026-07-09 iyzicoSubRef @unique eklenince prod down oldu. (Geri dönüşü olmayan
+# şema değişikliklerinde önce elle/migration ile uygula, sonra deploy et.)
+CMD ["sh", "-c", "node node_modules/prisma/build/index.js db push --skip-generate --accept-data-loss && node server.js"]
