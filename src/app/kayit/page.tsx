@@ -378,82 +378,27 @@ export default function KayitPage() {
             aria-hidden="true"
           />
 
-          {/* Ödeme bilgileri — Kayıt Ol butonu bunun ALTINDA: ödeme adımı
-              tamamlanmadan hesap yayına açılmaz. TODO(iyzico): anahtarlar
-              gelince bu alan gerçek tahsilata bağlanacak (iyzico Checkout/
-              abonelik) ve kayıt, ödemenin tamamlanmasıyla sonuçlanıp hesabı
-              OTOMATİK aktifleştirecek. O güne kadar alanlar disabled — veri
-              girilemez/toplanmaz (PCI). */}
+          {/* Ödeme adımı — kart bilgisi iyzico'nun GÜVENLİ sayfasında toplanır
+              (PCI: kart numarası bizim sunucumuza hiç girmez). Kayıttan hemen
+              sonra panelde "Aboneliğini öde" ile iyzico'ya geçilir; ödeme
+              tamamlanınca hesap OTOMATİK yayına alınır. */}
           <section className="!mt-6 rounded-2xl border border-slate-200 bg-white p-5">
-          <h2 className="font-semibold text-slate-900">Ödeme bilgileri</h2>
-          <p className="mt-1 text-sm text-slate-600">
-            Abonelik bedeli kayıt sırasında tahsil edilir; ödemesi alınmayan
-            hesap yayına açılmaz.
-          </p>
-          <div className="mt-4 space-y-3" aria-disabled="true">
-            <div>
-              <label htmlFor="odeme-isim" className={labelCls}>
-                Kart üzerindeki isim
-              </label>
-              <input
-                id="odeme-isim"
-                disabled
-                placeholder="Ad Soyad"
-                className={`${inputCls()} bg-slate-50 text-slate-400`}
-                autoComplete="off"
-              />
-            </div>
-            <div>
-              <label htmlFor="odeme-kart" className={labelCls}>
-                Kart numarası
-              </label>
-              <input
-                id="odeme-kart"
-                disabled
-                placeholder="•••• •••• •••• ••••"
-                className={`${inputCls()} bg-slate-50 text-slate-400`}
-                autoComplete="off"
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label htmlFor="odeme-skt" className={labelCls}>
-                  Son kullanma
-                </label>
-                <input
-                  id="odeme-skt"
-                  disabled
-                  placeholder="AA/YY"
-                  className={`${inputCls()} bg-slate-50 text-slate-400`}
-                  autoComplete="off"
-                />
-              </div>
-              <div>
-                <label htmlFor="odeme-cvv" className={labelCls}>
-                  CVV
-                </label>
-                <input
-                  id="odeme-cvv"
-                  disabled
-                  placeholder="•••"
-                  className={`${inputCls()} bg-slate-50 text-slate-400`}
-                  autoComplete="off"
-                />
-              </div>
-            </div>
+          <h2 className="font-semibold text-slate-900">Ödeme</h2>
+          <div className="mt-3 flex items-center gap-3">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/iyzico-band-colored.svg"
               alt="iyzico ile güvenli ödeme — Visa, Mastercard, Troy"
               className="h-6 w-auto max-w-full"
             />
-            <p className="text-sm text-slate-500">
-              Kartla online ödeme, anlaşmalı ödeme kuruluşumuzun onay süreci
-              tamamlandığında burada aktifleşecek. Şimdilik ödeme havale/EFT
-              ile alınır: kayıttan sonra ödeme bilgileri e-posta adresine
-              gönderilir, ödemen doğrulanır doğrulanmaz hesabın yayına açılır.
-            </p>
           </div>
+          <p className="mt-3 text-sm text-slate-600">
+            Kayıt olduktan sonra panelinden <strong>iyzico&apos;nun güvenli
+            sayfasında</strong> kartınla ödemeni yaparsın; kart bilgilerin bize
+            hiç ulaşmaz. Ödemen tamamlanır tamamlanmaz hesabın{" "}
+            <strong>otomatik yayına</strong> girer. Ödeme yapılmadan işletmen
+            müşterilere görünmez.
+          </p>
         </section>
         </div>
 
@@ -480,7 +425,9 @@ export default function KayitPage() {
                 </dd>
               </div>
               <div className="flex justify-between gap-2 rounded-lg bg-brand-light px-3 py-2">
-                <dt className="font-medium text-brand-dark">Bugün ödenecek</dt>
+                <dt className="font-medium text-brand-dark">
+                  Ödenecek (kayıt sonrası)
+                </dt>
                 <dd className="whitespace-nowrap font-semibold text-brand-dark">
                   {PLAN.priceGrossMonthly} TL
                 </dd>
@@ -540,7 +487,7 @@ export default function KayitPage() {
               disabled={loading}
               className="mt-4 w-full rounded-lg bg-brand px-4 py-2.5 font-semibold text-white transition hover:bg-brand-dark active:scale-[0.99] disabled:opacity-60"
             >
-              {loading ? "Hesap açılıyor…" : "Ödemeyi Tamamla ve Kayıt Ol"}
+              {loading ? "Hesap açılıyor…" : "Kayıt Ol ve Ödemeye Geç"}
             </button>
           </aside>
         </form>

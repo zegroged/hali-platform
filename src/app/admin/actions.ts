@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
 import crypto from "node:crypto";
 import { getSessionUser, hashPassword } from "@/lib/auth";
 import { profileComplete, syncVisibility } from "@/lib/panel";
-import { PERIOD_DAYS } from "@/lib/subscription";
+import { extendSubscription } from "@/lib/subscription";
 
 async function requireAdmin() {
   const u = await getSessionUser();
@@ -60,25 +60,8 @@ export async function approveBusiness(formData: FormData) {
 export async function activateSubscription(formData: FormData) {
   await requireAdmin();
   const id = String(formData.get("id"));
-  const existing = await prisma.subscription.findUnique({
-    where: { businessId: id },
-  });
-  const base =
-    existing?.currentPeriodEnd &&
-    existing.currentPeriodEnd.getTime() > Date.now()
-      ? existing.currentPeriodEnd
-      : new Date();
-  const end = new Date(base.getTime() + PERIOD_DAYS * 24 * 60 * 60 * 1000);
-  await prisma.subscription.upsert({
-    where: { businessId: id },
-    create: {
-      businessId: id,
-      status: "ACTIVE",
-      currentPeriodStart: new Date(),
-      currentPeriodEnd: end,
-    },
-    update: { status: "ACTIVE", currentPeriodEnd: end },
-  });
+  await extendSubscription(prisma, id); // havale/EFT — kartlı ödeme callback'iyle aynı mantık
+  await syncVisibility(id); // ödeme sonrası profil tamsa yayına al
   revalidatePath("/admin");
   revalidatePath(`/admin/isletme/${id}`);
 }

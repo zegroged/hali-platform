@@ -9,6 +9,7 @@ export async function getCurrentBusiness() {
     include: {
       owner: {
         select: {
+          name: true,
           phoneVerified: true,
           emailVerified: true,
           phone: true,

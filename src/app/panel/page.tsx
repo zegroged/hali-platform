@@ -7,6 +7,7 @@ import {
 } from "@/lib/panel";
 import { subscriptionActive } from "@/lib/subscription";
 import { submitForVerification } from "./actions";
+import { startSubscriptionPayment } from "./subscription-actions";
 import { acceptContractVersioned } from "./contract-actions";
 import { CONTRACT_VERSION } from "@/lib/legal";
 import { PendingButton } from "@/components/PendingButton";
@@ -38,9 +39,14 @@ function fmtGun(dt: Date) {
   });
 }
 
-export default async function PanelHome() {
+export default async function PanelHome({
+  searchParams,
+}: {
+  searchParams: Promise<{ odeme?: string }>;
+}) {
   const b = await getCurrentBusiness();
   if (!b) return null;
+  const { odeme } = await searchParams;
 
   const [pendingOrders, activeOrders, delivered] = await Promise.all([
     prisma.order.count({ where: { businessId: b.id, status: "CREATED" } }),
@@ -94,8 +100,33 @@ export default async function PanelHome() {
   const statCard =
     "relative block rounded-xl border border-slate-200 bg-white p-4 transition hover:border-brand hover:shadow-sm";
 
+  const odemeBanner: Record<string, { cls: string; text: string }> = {
+    basarili: {
+      cls: "border-green-300 bg-green-50 text-green-800",
+      text: "Ödemen alındı — aboneliğin aktif. Profilin tamsa hesabın yayında!",
+    },
+    hata: {
+      cls: "border-red-300 bg-red-50 text-red-700",
+      text: "Ödeme tamamlanamadı. Tekrar deneyebilir veya bize ulaşabilirsin.",
+    },
+    eposta: {
+      cls: "border-amber-300 bg-amber-50 text-amber-800",
+      text: "Ödemeden önce e-posta adresini doğrulaman gerekiyor (aşağıdan).",
+    },
+    vergino: {
+      cls: "border-amber-300 bg-amber-50 text-amber-800",
+      text: "Ödemeden önce profilinde vergi/kimlik numaranı girmen gerekiyor.",
+    },
+  };
+  const banner = odeme ? odemeBanner[odeme] : undefined;
+
   return (
     <div className="space-y-6">
+      {banner && (
+        <p className={`rounded-xl border px-4 py-3 text-sm ${banner.cls}`}>
+          {banner.text}
+        </p>
+      )}
       <div>
         <h1 className="text-lg font-semibold text-slate-900">
           Hoş geldin, {b.name}
@@ -255,15 +286,27 @@ export default async function PanelHome() {
             <p className="text-sm text-slate-500">
               {subOk ? "Aktif" : "Yok"} · 2.000 TL + KDV/ay
             </p>
-            {!subOk && (
-              <p className="mt-1 text-xs text-amber-700">
-                Ödemen alındığında hesabın yayına girer — ödeme bilgileri
-                e-posta adresine gönderilir.
+            {subOk && b.subscription?.currentPeriodEnd && (
+              <p className="mt-1 text-xs text-slate-500">
+                Dönem sonu: {fmtGun(b.subscription.currentPeriodEnd)}
               </p>
             )}
           </div>
           <IconWallet size={26} className="text-brand-dark" />
         </div>
+        {/* iyzico ile abonelik ödemesi — ödeme başarılı olunca hesap OTOMATİK
+            yayına girer (callback). Kart bilgisi iyzico'nun güvenli sayfasında. */}
+        <form action={startSubscriptionPayment} className="mt-3">
+          <PendingButton className="w-full rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark active:scale-[0.99]">
+            {subOk
+              ? "Aboneliği yenile — 2.400 TL (iyzico ile güvenli ödeme)"
+              : "Aboneliğini öde — 2.400 TL (iyzico ile güvenli ödeme)"}
+          </PendingButton>
+        </form>
+        <p className="mt-1.5 text-xs text-slate-400">
+          Ödeme, iyzico&apos;nun güvenli sayfasında yapılır; kart bilgilerin
+          bize hiç ulaşmaz. 2.000 TL + %20 KDV = 2.400 TL.
+        </p>
       </div>
 
       {/* Yayın koşulları — eksik varsa "burayı doldur" listesi. Tümü dolunca

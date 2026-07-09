@@ -112,11 +112,95 @@ export async function initCheckout(p: InitParams): Promise<InitResult> {
   });
 }
 
+export type SubInitParams = {
+  paymentId: string; // SubscriptionPayment.id — conversationId/basketId olur
+  price: number; // KDV dahil TL (2400)
+  businessName: string;
+  ownerName: string;
+  ownerEmail: string;
+  ownerPhone: string;
+  identityNumber: string; // halıcının TC/vergi no — canlıda geçerli olmalı
+  address: string;
+  city: string;
+  callbackUrl: string;
+};
+
+// Abonelik ödemesi için iyzico Checkout Form başlat. Alıcı = halıcının kendisi
+// (GERÇEK e-posta + kimlik no — canlıda iyzico geçerli veri ister).
+export async function initSubscriptionCheckout(
+  p: SubInitParams,
+): Promise<InitResult> {
+  if (!client) {
+    return {
+      ok: true,
+      mock: true,
+      token: "MOCK-" + p.paymentId,
+      paymentPageUrl: `${p.callbackUrl}?mock=1&token=MOCK-${p.paymentId}`,
+    };
+  }
+  const [first, ...rest] = p.ownerName.trim().split(" ");
+  const surname = rest.join(" ") || first;
+  const price = p.price.toFixed(2);
+  const gsm =
+    "+90" + p.ownerPhone.replace(/\D/g, "").replace(/^90/, "").replace(/^0/, "");
+  const request = {
+    locale: "tr",
+    conversationId: p.paymentId,
+    price,
+    paidPrice: price,
+    currency: "TRY",
+    basketId: p.paymentId,
+    paymentGroup: "SUBSCRIPTION",
+    callbackUrl: p.callbackUrl,
+    enabledInstallments: [1], // abonelikte taksit yok
+    buyer: {
+      id: p.paymentId,
+      name: first,
+      surname,
+      gsmNumber: gsm,
+      email: p.ownerEmail,
+      identityNumber: p.identityNumber,
+      registrationAddress: p.address,
+      city: p.city || "Istanbul",
+      country: "Turkey",
+    },
+    billingAddress: {
+      contactName: p.ownerName,
+      city: p.city || "Istanbul",
+      country: "Turkey",
+      address: p.address,
+    },
+    basketItems: [
+      {
+        id: p.paymentId,
+        name: "İşletme Aboneliği (1 ay)",
+        category1: "Abonelik",
+        itemType: "VIRTUAL",
+        price,
+      },
+    ],
+  };
+  return new Promise((resolve) => {
+    client.checkoutFormInitialize.create(request, (err: any, result: any) => {
+      if (err || result?.status !== "success") {
+        resolve({ ok: false, error: result?.errorMessage ?? String(err) });
+      } else {
+        resolve({
+          ok: true,
+          token: result.token,
+          paymentPageUrl: result.paymentPageUrl,
+        });
+      }
+    });
+  });
+}
+
 export type RetrieveResult = {
   ok: boolean;
   paid: boolean;
   orderId?: string; // basketId — iyzico'nun döndürdüğü değer (client'a güvenilmez)
   paidPrice?: number; // gerçekten tahsil edilen tutar (tutar doğrulaması için)
+  paymentId?: string; // iyzico ödeme kimliği — idempotency
 };
 
 // iyzico retrieve yanıtının imzasını doğrula (defense-in-depth). retrieve zaten
@@ -156,6 +240,7 @@ export async function retrieveCheckout(token: string): Promise<RetrieveResult> {
           paid: result.paymentStatus === "SUCCESS",
           orderId: result.basketId,
           paidPrice: result.paidPrice != null ? Number(result.paidPrice) : undefined,
+          paymentId: result.paymentId != null ? String(result.paymentId) : undefined,
         });
       }
     });

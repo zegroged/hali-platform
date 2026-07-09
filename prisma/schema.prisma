@@ -134,6 +134,7 @@ model CleanerBusiness {
   reviews      Review[]
   badges       Badge[]
   subscription Subscription?
+  payments     SubscriptionPayment[]
 
   @@index([city, district])
 }
@@ -340,6 +341,25 @@ model Subscription {
   currentPeriodEnd   DateTime?
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
+}
+
+// Abonelik ödemesi kaydı — iyzico Checkout. Idempotency (çift callback/replay)
+// ve yasal saklama (6563 md.11/3 on yıl) için her ödeme burada tutulur.
+model SubscriptionPayment {
+  id             String          @id @default(cuid())
+  business       CleanerBusiness @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  businessId     String
+  // iyzico'ya conversationId olarak bu kaydın id'si gider; callback bununla bulur.
+  status         String          @default("PENDING") // PENDING | PAID | FAILED
+  amount         Decimal         @db.Decimal(10, 2) // KDV dahil tahsil edilen (2400)
+  iyzicoToken    String? // checkout token
+  iyzicoPaymentId String?        @unique // iyzico ödeme kimliği — idempotency anahtarı
+  periodStart    DateTime?
+  periodEnd      DateTime?
+  createdAt      DateTime        @default(now())
+  paidAt         DateTime?
+
+  @@index([businessId])
 }
 
 model Badge {

@@ -12,6 +12,9 @@ export const PLAN = {
   priceNetMonthly: "2.000,00",
   kdvMonthly: "400,00",
   priceGrossMonthly: "2.400,00",
+  // iyzico'ya gönderilen KDV DAHİL sayısal tutar (tahsil edilen). Görünen
+  // metinlerle (yukarısı) tutarlı olmalı.
+  priceGrossNumber: 2400,
   features: [
     "Keşif sayfalarında bölgendeki müşterilere görünürlük",
     "Sınırsız sipariş talebi — sipariş başına komisyon yok",
