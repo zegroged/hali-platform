@@ -321,11 +321,13 @@ model OrderPhoto {
 model Review {
   id         String          @id @default(cuid())
   order      Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  orderId    String          @unique // yorum sadece tamamlanmış siparişten
+  orderId    String          @unique // yorum sadece tamamlanmış siparişten (sipariş başına 1)
   business   CleanerBusiness @relation(fields: [businessId], references: [id], onDelete: Cascade)
   businessId String
-  customer   User            @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  customerId String
+  // Misafir müşteri (hesapsız, takip koduyla) yorum bırakabilir → opsiyonel.
+  // Görünen ad siparişteki customerName'den gelir (maskelenerek).
+  customer   User?           @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customerId String?
   rating     Int // 1-5
   comment    String?
   createdAt  DateTime        @default(now())

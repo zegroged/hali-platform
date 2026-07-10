@@ -22,6 +22,7 @@ export async function GET(
       driver: { select: { lastLat: true, lastLng: true, user: { select: { name: true } } } },
       events: { orderBy: { createdAt: "asc" } },
       photos: { orderBy: { createdAt: "asc" }, select: { id: true, url: true } },
+      review: { select: { rating: true } },
     },
   });
   if (!order) {
@@ -50,6 +51,8 @@ export async function GET(
     estimatedDays: order.estimatedDays,
     photos: order.photos,
     business: order.business,
+    // Teslim sonrası değerlendirme: varsa yıldızı göster, yoksa form çıkar.
+    review: order.review,
     events: order.events.map((e) => ({
       status: e.status,
       note: e.note,

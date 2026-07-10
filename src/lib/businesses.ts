@@ -44,6 +44,15 @@ function rejectConfidence(totalOrders: number): number {
   return Math.min(1, Math.sqrt(totalOrders / 5));
 }
 
+// Yorumcu adını herkese açık sayfada maskele (KVKK): "Ayşe Kaya" → "Ayşe K."
+function maskName(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "Müşteri";
+  const first = parts[0];
+  const initial = parts.length > 1 ? ` ${parts[parts.length - 1][0].toUpperCase()}.` : "";
+  return first + initial;
+}
+
 // Sıralama puanı: yeni halıcıya küçük destek, red oranına güvenle-ölçekli ceza
 function sortRating(b: BusinessSummary): number {
   const base =
@@ -236,7 +245,11 @@ export async function getBusinessById(id: string) {
       reviews: {
         orderBy: { createdAt: "desc" },
         take: 10,
-        include: { customer: { select: { name: true } } },
+        include: {
+          customer: { select: { name: true } },
+          // Misafir yorumcu: ad siparişten gelir (maskelenerek gösterilir).
+          order: { select: { customerName: true } },
+        },
       },
     },
   });
@@ -286,7 +299,7 @@ export async function getBusinessById(id: string) {
     reviews: b.reviews.map((r) => ({
       rating: r.rating,
       comment: r.comment,
-      customerName: r.customer?.name ?? "Müşteri",
+      customerName: maskName(r.customer?.name ?? r.order.customerName),
       createdAt: r.createdAt.toISOString(),
     })),
   };

@@ -42,6 +42,8 @@ type Track = {
   business: { name: string; phone: string };
   events: { status: OrderStatus; note: string | null; at: string }[];
   driver: { name: string; lat: number; lng: number } | null;
+  // Teslim sonrası müşteri değerlendirmesi (sipariş başına 1)
+  review: { rating: number } | null;
 };
 
 // Poll'un durdurulacağı nihai durumlar — teslim edilmiş sipariş sonsuza dek sorgulanmasın.
@@ -110,6 +112,12 @@ export function TrackingClient({ token }: { token: string }) {
   const [cancelFormOpen, setCancelFormOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
   const [cancelNote, setCancelNote] = useState("");
+  // Teslim sonrası değerlendirme (yıldız + yorum)
+  const [reviewRating, setReviewRating] = useState(0);
+  const [reviewComment, setReviewComment] = useState("");
+  const [reviewPending, setReviewPending] = useState(false);
+  const [reviewError, setReviewError] = useState<string | null>(null);
+  const [reviewDone, setReviewDone] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -224,6 +232,26 @@ export function TrackingClient({ token }: { token: string }) {
       setRetryKey((k) => k + 1); // veriyi hemen tazele → iptal ekranı
     }
     setCancelPending(false);
+  }
+
+  // Teslim sonrası değerlendirme gönder (yıldız zorunlu, yorum opsiyonel).
+  async function submitReview() {
+    if (reviewRating < 1) {
+      setReviewError("Lütfen yıldız vererek puanla.");
+      return;
+    }
+    setReviewPending(true);
+    setReviewError(null);
+    const err = await postAction("review", {
+      rating: reviewRating,
+      comment: reviewComment.trim() || undefined,
+    });
+    if (err) setReviewError(err);
+    else {
+      setReviewDone(true);
+      setRetryKey((k) => k + 1);
+    }
+    setReviewPending(false);
   }
 
   if (notFound) {
@@ -403,6 +431,85 @@ export function TrackingClient({ token }: { token: string }) {
               Tahmini teslim: ~{data.estimatedDays} gün
             </div>
           )}
+
+          {/* Teslim sonrası değerlendirme: yıldız (zorunlu) + yorum (opsiyonel).
+              Sipariş başına bir kez; işletme sayfasında yayınlanır. */}
+          {data.status === "DELIVERED" &&
+            (data.review || reviewDone ? (
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+                <p className="font-medium text-emerald-800">
+                  Değerlendirmen için teşekkürler!
+                  {data.review && (
+                    <span className="ml-2 text-amber-500" aria-label={`${data.review.rating} yıldız`}>
+                      {"★".repeat(data.review.rating)}
+                      <span className="text-slate-300">
+                        {"★".repeat(5 - data.review.rating)}
+                      </span>
+                    </span>
+                  )}
+                </p>
+                <p className="mt-1 text-sm text-emerald-700">
+                  Yorumun işletmenin sayfasında yayınlanacak.
+                </p>
+              </div>
+            ) : (
+              <div className="rounded-xl border-2 border-brand bg-brand-light/40 p-4">
+                <p className="font-semibold text-slate-900">
+                  Hizmetten memnun kaldın mı?
+                </p>
+                <p className="mt-1 text-sm text-slate-600">
+                  {data.business.name} işletmesini değerlendir — yorumun diğer
+                  müşterilere yol gösterir.
+                </p>
+                <div
+                  className="mt-3 flex items-center gap-1"
+                  role="radiogroup"
+                  aria-label="Yıldız puanı"
+                >
+                  {[1, 2, 3, 4, 5].map((n) => (
+                    <button
+                      key={n}
+                      type="button"
+                      role="radio"
+                      aria-checked={reviewRating === n}
+                      aria-label={`${n} yıldız`}
+                      onClick={() => setReviewRating(n)}
+                      className={`text-3xl leading-none transition ${
+                        n <= reviewRating ? "text-amber-400" : "text-slate-300"
+                      } hover:scale-110`}
+                    >
+                      ★
+                    </button>
+                  ))}
+                  {reviewRating > 0 && (
+                    <span className="ml-2 text-sm text-slate-600">
+                      {["", "Çok kötü", "Kötü", "İdare eder", "İyi", "Harika"][reviewRating]}
+                    </span>
+                  )}
+                </div>
+                <textarea
+                  rows={2}
+                  maxLength={500}
+                  value={reviewComment}
+                  onChange={(e) => setReviewComment(e.target.value)}
+                  placeholder="Yorumun (opsiyonel) — ör. halılar tertemiz geldi, şoför çok ilgiliydi"
+                  className="mt-3 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-brand"
+                />
+                {reviewError && (
+                  <p className="mt-2 text-sm text-red-600" role="alert">
+                    {reviewError}
+                  </p>
+                )}
+                <button
+                  type="button"
+                  onClick={submitReview}
+                  disabled={reviewPending}
+                  className="mt-3 w-full rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark active:scale-[0.99] disabled:opacity-60 sm:w-auto"
+                >
+                  {reviewPending ? "Gönderiliyor…" : "Değerlendirmeyi Gönder"}
+                </button>
+              </div>
+            ))}
 
           {/* Kesin fiyat onayı (Mesafeli Söz. Yön. md.15/1-h): onayla birlikte
               yıkamaya başlanır; onay anı sipariş kaydına işlenir. */}
