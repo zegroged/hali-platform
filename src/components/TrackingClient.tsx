@@ -48,8 +48,18 @@ type Track = {
 const FINAL_STATUSES: OrderStatus[] = ["DELIVERED", "REJECTED", "CANCELED"];
 
 // Platform üzerinden cayma/iptalin mümkün olduğu durumlar (md.11/5) —
-// yıkama başladıktan (WASHING) sonra buton görünmez.
-const CUSTOMER_CANCELABLE: OrderStatus[] = ["CREATED", "ACCEPTED", "PICKED_UP"];
+// halı TESLİM ALINDIĞI an hizmet ifası başlar (md.15/1-h istisnası): PICKED_UP
+// ve sonrasında cayma yok; müşterinin çıkışı kesin fiyatı reddetmektir.
+const CUSTOMER_CANCELABLE: OrderStatus[] = ["CREATED", "ACCEPTED"];
+
+// İptal öncesi sorulan neden seçenekleri — sunucudaki CANCEL_REASONS ile aynı.
+const CANCEL_REASONS = [
+  "Vazgeçtim",
+  "Fiyat beklentimi aştı",
+  "Başka işletmeyle anlaştım",
+  "Zamanlama uygun değil",
+  "Diğer",
+] as const;
 
 /** Zaman çizelgesiyle aynı iskelette skeleton — içerik gelince zıplama olmaz. */
 function TrackingSkeleton() {
@@ -96,6 +106,10 @@ export function TrackingClient({ token }: { token: string }) {
   const [cancelPending, setCancelPending] = useState(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
   const [cancelDone, setCancelDone] = useState(false);
+  // İptal anketi: buton önce formu açar; neden seçilmeden iptal gönderilmez.
+  const [cancelFormOpen, setCancelFormOpen] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
+  const [cancelNote, setCancelNote] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -154,10 +168,19 @@ export function TrackingClient({ token }: { token: string }) {
   }
 
   /** Tek seferlik POST aksiyonu; başarıda null, hatada Türkçe mesaj döner. */
-  async function postAction(path: string): Promise<string | null> {
+  async function postAction(
+    path: string,
+    body?: Record<string, unknown>,
+  ): Promise<string | null> {
     try {
       const res = await fetch(`/api/orders/${token}/${path}`, {
         method: "POST",
+        ...(body
+          ? {
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(body),
+            }
+          : {}),
       });
       const json = await res.json().catch(() => null);
       if (!res.ok) {
@@ -182,18 +205,19 @@ export function TrackingClient({ token }: { token: string }) {
     setApprovePending(false);
   }
 
-  // Platform üzerinden cayma/iptal (md.11/5): bildirim kayda geçer,
-  // işletmeye SMS ile iletilir, müşteriye ekranda + SMS ile teyit verilir.
+  // Platform üzerinden cayma/iptal (md.11/5): önce kısa anket (neden + not),
+  // sonra bildirim kayda geçer, işletmeye SMS ile iletilir, teyit verilir.
   async function cancelOrder() {
-    if (
-      !window.confirm(
-        "Siparişi iptal etmek / cayma hakkını kullanmak istediğine emin misin?",
-      )
-    )
+    if (!cancelReason) {
+      setCancelError("Lütfen iptal nedenini seç.");
       return;
+    }
     setCancelPending(true);
     setCancelError(null);
-    const err = await postAction("cancel");
+    const err = await postAction("cancel", {
+      reason: cancelReason,
+      note: cancelNote.trim() || undefined,
+    });
     if (err) setCancelError(err);
     else {
       setCancelDone(true);
@@ -593,26 +617,116 @@ export function TrackingClient({ token }: { token: string }) {
         </div>
       )}
 
-      {/* Platform üzerinden cayma/iptal (md.11/5) — yıkama başlamadan ve kesin
-          fiyat onaylanmadan her an; sonrasında buton görünmez. */}
+      {/* Platform üzerinden cayma/iptal (md.11/5) — YALNIZ halı teslim
+          alınmadan önce (md.15/1-h: alımla hizmet ifası başlar). Buton önce
+          kısa bir anket açar; neden seçilmeden iptal gönderilmez. */}
       {CUSTOMER_CANCELABLE.includes(data.status) && !data.priceApprovedAt && (
         <div className="border-t border-slate-100 pt-3">
-          {cancelError && (
-            <p className="mb-2 text-sm text-red-600" role="alert">
-              {cancelError}
-            </p>
+          {!cancelFormOpen ? (
+            <>
+              <button
+                type="button"
+                onClick={() => {
+                  setCancelFormOpen(true);
+                  setCancelError(null);
+                }}
+                className="text-sm text-slate-500 underline transition hover:text-slate-700"
+              >
+                Siparişi iptal et / cayma bildir
+              </button>
+              <p className="mt-1 text-xs text-slate-400">
+                Halınız teslim alınana kadar iptal/cayma ücretsizdir;
+                bildiriminiz işletmeye anında iletilir ve kayda geçer.
+              </p>
+            </>
+          ) : (
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <p className="font-medium text-slate-800">
+                Siparişini iptal etmeden önce iki kısa soru:
+              </p>
+              <div className="mt-3">
+                <label
+                  htmlFor="iptal-neden"
+                  className="mb-1 block text-sm text-slate-600"
+                >
+                  1. Neden iptal ediyorsun?
+                </label>
+                <select
+                  id="iptal-neden"
+                  value={cancelReason}
+                  onChange={(e) => setCancelReason(e.target.value)}
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-brand"
+                >
+                  <option value="">Seç…</option>
+                  {CANCEL_REASONS.map((r) => (
+                    <option key={r} value={r}>
+                      {r}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="mt-3">
+                <label
+                  htmlFor="iptal-not"
+                  className="mb-1 block text-sm text-slate-600"
+                >
+                  2. Eklemek istediğin bir şey var mı?{" "}
+                  <span className="text-slate-400">(opsiyonel)</span>
+                </label>
+                <textarea
+                  id="iptal-not"
+                  rows={2}
+                  maxLength={300}
+                  value={cancelNote}
+                  onChange={(e) => setCancelNote(e.target.value)}
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-brand"
+                />
+              </div>
+              <p className="mt-2 text-xs text-slate-500">
+                Halın teslim alınmadığı için iptal ücretsizdir. Onayladığında
+                bildirim işletmeye anında iletilir ve kayda geçer.
+              </p>
+              {cancelError && (
+                <p className="mt-2 text-sm text-red-600" role="alert">
+                  {cancelError}
+                </p>
+              )}
+              <div className="mt-3 flex gap-2">
+                <button
+                  type="button"
+                  onClick={cancelOrder}
+                  disabled={cancelPending}
+                  className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700 disabled:opacity-60"
+                >
+                  {cancelPending ? "İşleniyor…" : "Evet, siparişi iptal et"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCancelFormOpen(false);
+                    setCancelError(null);
+                  }}
+                  className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
+                >
+                  Vazgeç
+                </button>
+              </div>
+            </div>
           )}
-          <button
-            type="button"
-            onClick={cancelOrder}
-            disabled={cancelPending}
-            className="text-sm text-slate-500 underline transition hover:text-slate-700 disabled:opacity-60"
-          >
-            {cancelPending ? "İşleniyor…" : "Siparişi iptal et / cayma bildir"}
-          </button>
-          <p className="mt-1 text-xs text-slate-400">
-            Yıkamaya başlanmadan iptal/cayma ücretsizdir; bildiriminiz
-            işletmeye anında iletilir ve kayda geçer.
+        </div>
+      )}
+
+      {/* Halı alındıktan sonra cayma yok (md.15/1-h) — durumu açıkça söyle ki
+          müşteri "buton nereye gitti" diye aramasın. */}
+      {["PICKED_UP", "WASHING", "OUT_FOR_DELIVERY"].includes(data.status) && (
+        <div className="border-t border-slate-100 pt-3">
+          <p className="text-xs text-slate-400">
+            Halınız teslim alındığı için cayma hakkı sona ermiştir (hizmet
+            ifası başladı — Yönetmelik md.15/1-h).
+            {data.status === "PICKED_UP" && !data.priceApprovedAt
+              ? " Kesin fiyat bildirildiğinde onaylamazsanız halınız yıkanmadan ücretsiz iade edilir."
+              : ""}{" "}
+            Sorularınız için yukarıdaki telefondan işletmeye ulaşabilirsiniz.
           </p>
         </div>
       )}

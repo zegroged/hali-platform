@@ -7,6 +7,16 @@ import { prisma } from "@/lib/prisma";
 import { rateLimit, clientIp, tooMany } from "@/lib/ratelimit";
 import { sendSms } from "@/lib/sms";
 
+// İptal öncesi sorulan "neden" seçenekleri — istatistik + işletmeye bildirim.
+// İstemcideki listeyle aynı tutulmalı (TrackingClient CANCEL_REASONS).
+const CANCEL_REASONS = new Set([
+  "Vazgeçtim",
+  "Fiyat beklentimi aştı",
+  "Başka işletmeyle anlaştım",
+  "Zamanlama uygun değil",
+  "Diğer",
+]);
+
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ token: string }> },
@@ -15,6 +25,18 @@ export async function POST(
   const ip = clientIp(req);
   const rl = rateLimit(`order-cancel:${ip}`, 10, 60 * 1000);
   if (!rl.ok) return tooMany(rl.retryAfterSec);
+
+  // İptal anketi (opsiyonel gövde): neden listeden, not serbest metin.
+  const body = (await req.json().catch(() => null)) as {
+    reason?: unknown;
+    note?: unknown;
+  } | null;
+  const reason =
+    typeof body?.reason === "string" && CANCEL_REASONS.has(body.reason)
+      ? body.reason
+      : null;
+  const note =
+    typeof body?.note === "string" ? body.note.trim().slice(0, 300) : "";
 
   const { token } = await params;
   // Link (trackingToken) ya da kısa kod ile bulunabilir
@@ -34,12 +56,14 @@ export async function POST(
     return NextResponse.json({ error: "Bulunamadı" }, { status: 404 });
   }
 
-  // CAS: yalnız yıkama başlamamış (CREATED/ACCEPTED/PICKED_UP) ve kesin fiyat
-  // onaylanmamışken iptal edilebilir; onay sonrası md.15/1-h istisnası uygulanır.
+  // CAS: cayma/iptal YALNIZ halı teslim alınmadan (CREATED/ACCEPTED) kullanılabilir.
+  // Halı alındığı an hizmet ifası başlar (taşıma dahil) → md.15/1-h istisnası;
+  // bu aşamadan sonra müşterinin çıkışı kesin fiyat onayını REDDETMEKTİR
+  // (halı yıkanmadan ücretsiz iade edilir — /iade §2).
   const canceled = await prisma.order.updateMany({
     where: {
       id: order.id,
-      status: { in: ["CREATED", "ACCEPTED", "PICKED_UP"] },
+      status: { in: ["CREATED", "ACCEPTED"] },
       priceApprovedAt: null,
     },
     data: { status: "CANCELED" },
@@ -47,10 +71,14 @@ export async function POST(
   if (canceled.count === 0) {
     // Çift tık: zaten iptal edilmişse idempotent başarı döndür.
     if (order.status === "CANCELED") return NextResponse.json({ ok: true });
+    const afterPickup = ["PICKED_UP", "WASHING", "OUT_FOR_DELIVERY"].includes(
+      order.status,
+    );
     return NextResponse.json(
       {
-        error:
-          "Bu aşamada platform üzerinden iptal edilemiyor. Lütfen işletmeyi arayın.",
+        error: afterPickup
+          ? "Halınız teslim alındığı için cayma hakkı kullanılamaz (hizmet ifası başladı — Yönetmelik md.15/1-h). Kesin fiyat bildirildiğinde onaylamazsanız halınız yıkanmadan ücretsiz iade edilir; ayrıca işletmeyi arayabilirsiniz."
+          : "Bu aşamada platform üzerinden iptal edilemiyor. Lütfen işletmeyi arayın.",
       },
       { status: 409 },
     );
@@ -60,7 +88,10 @@ export async function POST(
     data: {
       orderId: order.id,
       status: "CANCELED",
-      note: "Müşteri platform üzerinden cayma/iptal bildirdi",
+      note:
+        "Müşteri platform üzerinden cayma/iptal bildirdi" +
+        (reason ? ` — Neden: ${reason}` : "") +
+        (note ? ` — Not: ${note}` : ""),
     },
   });
 
@@ -70,7 +101,8 @@ export async function POST(
   try {
     await sendSms(
       order.business.phone,
-      `${ref} kodlu siparis musteri tarafindan iptal edildi.`,
+      `${ref} kodlu siparis musteri tarafindan iptal edildi.` +
+        (reason ? ` Neden: ${reason}` : ""),
     );
   } catch (e) {
     console.error("cancel işletme SMS hatası:", e);

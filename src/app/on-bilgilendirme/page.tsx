@@ -93,7 +93,9 @@ export default function OnBilgilendirmePage() {
       <Section title="6. Cayma/İptal Bildirim Kanalları">
         <p>
           Cayma veya iptal bildiriminizi (Yönetmelik md. 5/1-g uyarınca)
-          şu kanallardan yapabilirsiniz: sipariş takip sayfanızda görünen{" "}
+          şu kanallardan yapabilirsiniz: sipariş takip sayfanızdaki{" "}
+          <strong>&quot;Siparişi iptal et&quot; butonu</strong> (halınız teslim
+          alınana kadar), takip sayfanızda görünen{" "}
           <strong>işletme telefonu</strong>,{" "}
           <strong>info@enyakinhaliyikamaservisi.com</strong> e-posta adresi
           veya{" "}

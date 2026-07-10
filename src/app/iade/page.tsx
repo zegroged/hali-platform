@@ -21,11 +21,14 @@ export default function IadePage() {
         <p>
           Halınız adresinizden alınmadan önce siparişinizi hiçbir gerekçe
           göstermeden, ücretsiz iptal edebilirsiniz. İptal için takip
-          sayfanızdaki telefon üzerinden işletmeyi arayabilir veya{" "}
+          sayfanızdaki <strong>&quot;Siparişi iptal et&quot;</strong> butonunu
+          kullanabilir, işletmeyi telefonla arayabilir veya{" "}
           <Link href="/iletisim" className="text-brand-dark underline">
             bize ulaşabilirsiniz
           </Link>
-          .
+          . Halınız teslim alındıktan sonra hizmet ifası başladığından bu buton
+          kapanır; kesin fiyatı onaylamazsanız halınız yıkanmadan ücretsiz iade
+          edilir (bkz. madde 2).
         </p>
       </Section>
 
