@@ -67,6 +67,32 @@ export default function GizlilikPage() {
         </p>
       </Section>
 
+      <Section title="Mobil Uygulamalar — Şoför Uygulaması">
+        <p>
+          <strong>Halı Şoför</strong> uygulaması, şoförün açıkça başlattığı{" "}
+          <strong>mesai süresince</strong> cihazın <strong>hassas konum</strong>{" "}
+          verisini toplar — uygulama arka plandayken veya ekran kapalıyken de.
+          Mesai kapatıldığında konum toplama tamamen durur.
+        </p>
+        <p>
+          <strong>Amaç:</strong> siparişlerin canlı takibi (müşterinin
+          &quot;halım nerede&quot; ekranı), rota/durak kaydı ve teslimat
+          operasyonunun yürütülmesi. Konum verisi{" "}
+          <strong>yalnızca şoförün bağlı olduğu halı yıkama işletmesiyle</strong>{" "}
+          paylaşılır; üçüncü taraflara satılmaz, reklam/pazarlama amacıyla
+          kullanılmaz.
+        </p>
+        <p>
+          Uygulama ayrıca giriş için ad ve kullanıcı adı bilgisini işler.
+          Reklam kimliği, analitik veya çerez kullanmaz. Veriler HTTPS ile
+          şifrelenerek iletilir; oturum anahtarı cihazın güvenli deposunda
+          (Android Keystore / iOS Keychain) saklanır. Rota/durak kayıtları
+          operasyonel amaçla saklanır ve 12 ayı aşan kayıtlar silinir. Konum
+          verilerinizin silinmesini istemek için aşağıdaki iletişim adresine
+          yazabilirsiniz; hesabınız işletmeniz aracılığıyla da kapatılabilir.
+        </p>
+      </Section>
+
       <Section title="İletişim">
         <p>
           Gizlilikle ilgili sorularınız için{" "}

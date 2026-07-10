@@ -2,10 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getSessionUser } from "@/lib/auth";
-import { sendTrackingSms } from "@/lib/sms";
+import { sendSms, sendTrackingSms } from "@/lib/sms";
 import { createOrderWithCode } from "@/lib/ordercode";
 import { rateLimit, clientIp, tooMany } from "@/lib/ratelimit";
 import { subscriptionActive } from "@/lib/subscription";
+import { getAppBaseUrl } from "@/lib/config";
 import { CONTRACT_VERSION } from "@/lib/legal";
 
 const Body = z.object({
@@ -47,6 +48,7 @@ export async function POST(req: NextRequest) {
     },
     select: {
       id: true,
+      phone: true,
       subscription: { select: { status: true, currentPeriodEnd: true } },
     },
   });
@@ -67,7 +69,7 @@ export async function POST(req: NextRequest) {
   const driver = await prisma.driver.findFirst({
     where: { businessId: d.businessId },
     orderBy: [{ isOnShift: "desc" }, { createdAt: "asc" }],
-    select: { id: true },
+    select: { id: true, user: { select: { phone: true } } },
   });
   // Şoförü olmayan işletme sipariş alamaz → sipariş "CREATED"da asılı kalmasın (A5).
   if (!driver) {
@@ -100,6 +102,29 @@ export async function POST(req: NextRequest) {
       },
     }),
   );
+
+  // YENİ SİPARİŞ BİLDİRİMİ (kritik): işletme ve atanan şoför haberdar edilmezse
+  // sipariş CREATED'da sessizce bekler, müşteri evde boşuna alım bekler.
+  // Best-effort — bildirim hatası sipariş oluşturmayı bozmaz.
+  const ref = order.code ?? order.trackingToken;
+  try {
+    await sendSms(
+      business.phone,
+      `Yeni siparis! Kod: ${ref} · ${d.customerName} · ${d.pickupAddress.slice(0, 60)}. Panel: ${getAppBaseUrl()}/panel/siparisler`,
+    );
+  } catch (e) {
+    console.error("yeni sipariş işletme SMS hatası:", e);
+  }
+  if (driver.user.phone !== business.phone) {
+    try {
+      await sendSms(
+        driver.user.phone,
+        `Yeni is atandi! Kod: ${ref}. Detay ve kabul: ${getAppBaseUrl()}/sofor`,
+      );
+    } catch (e) {
+      console.error("yeni sipariş şoför SMS hatası:", e);
+    }
+  }
 
   // SMS hatası sipariş oluşturmayı bozmasın (sipariş zaten kaydedildi).
   try {

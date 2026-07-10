@@ -6,10 +6,37 @@ import {
   TouchableOpacity,
   StyleSheet,
   Alert,
+  Linking,
 } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { login, getToken, logout, setShift } from "./src/api";
 import { startTracking, stopTracking, isTracking } from "./src/tracking";
+
+const NAME_KEY = "hali_driver_name";
+const PRIVACY_URL = "https://enyakinhaliyikamaservisi.com/gizlilik";
+
+/**
+ * Google Play "prominent disclosure": arka plan konum İZNİ İSTENMEDEN ÖNCE
+ * ne toplandığı, ne zaman ve kiminle paylaşıldığı açıkça söylenip onay alınır.
+ * Kullanıcı vazgeçerse izin isteği HİÇ tetiklenmez (politika gereği).
+ */
+function askLocationDisclosure(): Promise<boolean> {
+  return new Promise((resolve) => {
+    Alert.alert(
+      "Konum paylaşımı",
+      "Mesaiye başladığında bu uygulama, uygulama kapalı veya arka plandayken " +
+        "bile konumunu toplar ve bağlı olduğun halı yıkama işletmesiyle paylaşır. " +
+        "Konum yalnız sipariş takibi ve rota kaydı için kullanılır; mesaiyi " +
+        "bitirdiğinde paylaşım tamamen durur.",
+      [
+        { text: "Vazgeç", style: "cancel", onPress: () => resolve(false) },
+        { text: "Kabul et ve başla", onPress: () => resolve(true) },
+      ],
+      { cancelable: true, onDismiss: () => resolve(false) },
+    );
+  });
+}
 
 function Driver() {
   const [authed, setAuthed] = useState(false);
@@ -23,6 +50,9 @@ function Driver() {
     (async () => {
       setAuthed(!!(await getToken()));
       setOnShift(await isTracking());
+      // Ad kalıcı: uygulama yeniden açılınca başlık "Şoför"e düşmesin.
+      const savedName = await AsyncStorage.getItem(NAME_KEY);
+      if (savedName) setName(savedName);
     })();
   }, []);
 
@@ -31,6 +61,7 @@ function Driver() {
     try {
       const d = await login(identifier.trim(), password);
       setName(d.name);
+      await AsyncStorage.setItem(NAME_KEY, d.name);
       setAuthed(true);
     } catch (e) {
       Alert.alert("Hata", e instanceof Error ? e.message : "Giriş başarısız");
@@ -44,6 +75,9 @@ function Driver() {
     try {
       const next = !onShift;
       if (next) {
+        // Play politikası: izin isteğinden ÖNCE belirgin açıklama + onay.
+        const accepted = await askLocationDisclosure();
+        if (!accepted) return;
         const err = await startTracking();
         if (err) {
           Alert.alert("İzin gerekli", err);
@@ -52,7 +86,18 @@ function Driver() {
       } else {
         await stopTracking();
       }
-      await setShift(next);
+      try {
+        await setShift(next);
+      } catch (e) {
+        // Sunucuya yazamadıysak cihazdaki izlemeyi geri al — "cihazda açık,
+        // sunucuda kapalı" tutarsızlığı olmasın.
+        if (next) await stopTracking();
+        Alert.alert(
+          "Bağlantı hatası",
+          "Sunucuya ulaşılamadı, mesai durumu değişmedi. Tekrar dene.",
+        );
+        return;
+      }
       setOnShift(next);
     } finally {
       setBusy(false);
@@ -62,9 +107,16 @@ function Driver() {
   async function doLogout() {
     await stopTracking();
     await logout();
+    await AsyncStorage.removeItem(NAME_KEY);
     setAuthed(false);
     setOnShift(false);
   }
+
+  const privacyLink = (
+    <TouchableOpacity onPress={() => Linking.openURL(PRIVACY_URL)}>
+      <Text style={s.privacy}>Gizlilik Politikası</Text>
+    </TouchableOpacity>
+  );
 
   if (!authed) {
     return (
@@ -86,13 +138,13 @@ function Driver() {
             onChangeText={setPassword}
             secureTextEntry
           />
-          <TouchableOpacity
-            style={s.btn}
-            onPress={doLogin}
-            disabled={busy}
-          >
+          <TouchableOpacity style={s.btn} onPress={doLogin} disabled={busy}>
             <Text style={s.btnText}>{busy ? "..." : "Giriş Yap"}</Text>
           </TouchableOpacity>
+          <Text style={s.hint}>
+            Kullanıcı adını ve şifreni çalıştığın işletmeden alabilirsin.
+          </Text>
+          {privacyLink}
         </View>
       </SafeAreaView>
     );
@@ -124,6 +176,7 @@ function Driver() {
         <TouchableOpacity onPress={doLogout}>
           <Text style={s.link}>Çıkış</Text>
         </TouchableOpacity>
+        {privacyLink}
       </View>
     </SafeAreaView>
   );
@@ -164,4 +217,11 @@ const s = StyleSheet.create({
   btnStop: { backgroundColor: "#ef4444" },
   btnText: { color: "#fff", fontSize: 16, fontWeight: "700" },
   link: { color: "#94a3b8", textAlign: "center", marginTop: 8 },
+  privacy: {
+    color: "#0d9488",
+    textAlign: "center",
+    marginTop: 4,
+    fontSize: 13,
+    textDecorationLine: "underline",
+  },
 });

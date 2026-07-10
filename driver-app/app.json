@@ -6,6 +6,12 @@
     "orientation": "portrait",
     "scheme": "halidriver",
     "userInterfaceStyle": "light",
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0d9488"
+    },
     "plugins": [
       [
         "expo-location",
@@ -19,7 +25,7 @@
       ]
     ],
     "ios": {
-      "bundleIdentifier": "com.hali.driver",
+      "bundleIdentifier": "com.enyakinhaliyikamaservisi.driver",
       "supportsTablet": false,
       "infoPlist": {
         "UIBackgroundModes": ["location"],
@@ -28,13 +34,19 @@
       }
     },
     "android": {
-      "package": "com.hali.driver",
+      "package": "com.enyakinhaliyikamaservisi.driver",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0d9488"
+      },
       "permissions": [
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
         "ACCESS_BACKGROUND_LOCATION",
         "FOREGROUND_SERVICE",
-        "FOREGROUND_SERVICE_LOCATION"
+        "FOREGROUND_SERVICE_LOCATION",
+        "POST_NOTIFICATIONS"
       ]
     }
   }

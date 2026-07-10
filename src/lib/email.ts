@@ -70,6 +70,21 @@ export async function sendEmail(
   await transport().sendMail({ from, to, subject, text, html });
 }
 
+/**
+ * Platform yöneticisine operasyonel bildirim (destek kutusuna düşer).
+ * Best-effort kullan: çağıran try/catch ile akışı korumalı.
+ */
+export async function sendAdminEmail(
+  subject: string,
+  html: string,
+): Promise<void> {
+  const to =
+    process.env.ADMIN_NOTIFY_EMAIL ??
+    process.env.SMTP_USER ??
+    "destek@enyakinhaliyikamaservisim.com";
+  await sendEmail(to, subject, subject, wrapEmail(html));
+}
+
 export async function sendVerificationEmail(
   to: string,
   code: string,

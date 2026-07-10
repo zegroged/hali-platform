@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentBusiness, profileComplete, syncVisibility } from "@/lib/panel";
 import { hashPassword } from "@/lib/auth";
 import { sendSms, trackingLink } from "@/lib/sms";
+import { sendAdminEmail } from "@/lib/email";
 import { getAppBaseUrl } from "@/lib/config";
 import { ORDER_STATUS_META, PANEL_NEXT } from "@/lib/orderStatus";
 import { taxIdError } from "@/lib/taxId";
@@ -297,6 +298,16 @@ export async function submitForVerification() {
     where: { id: b.id },
     data: { verification: "PENDING" },
   });
+  // Admin haberdar olmazsa talep panel elle açılana dek bekliyordu — bildir.
+  try {
+    await sendAdminEmail(
+      `Doğrulama talebi: ${b.name}`,
+      `<p style="margin:0 0 12px;"><strong>${b.name}</strong> (${b.district}/${b.city}) doğrulanmış rozeti için başvurdu.</p>
+       <p style="margin:0;"><a href="${getAppBaseUrl()}/admin/isletme/${b.id}" style="color:#0f766e;">Admin panelinde incele →</a></p>`,
+    );
+  } catch (e) {
+    console.error("doğrulama talebi admin e-postası hatası:", e);
+  }
   revalidatePath("/panel");
   revalidatePath("/panel/profil");
 }
@@ -309,16 +320,31 @@ export async function reassignOrder(formData: FormData) {
     where: { id: orderId, businessId: b.id },
   });
   if (!order) return;
+  let newDriverPhone: string | null = null;
   if (driverId) {
     const d = await prisma.driver.findFirst({
       where: { id: driverId, businessId: b.id },
+      include: { user: { select: { phone: true } } },
     });
     if (!d) return;
+    newDriverPhone = d.user.phone;
   }
   await prisma.order.update({
     where: { id: orderId },
     data: { driverId },
   });
+  // Yeni atanan şoför işi bilsin (yalnız GERÇEKTEN değiştiyse — aynı şoföre
+  // tekrar "Ata" basılınca SMS gitmesin; gereksiz bildirim yok ilkesi).
+  if (newDriverPhone && driverId !== order.driverId) {
+    try {
+      await sendSms(
+        newDriverPhone,
+        `Size yeni is atandi! Kod: ${order.code ?? ""}. Detay: ${getAppBaseUrl()}/sofor`,
+      );
+    } catch (e) {
+      console.error("reassignOrder şoför SMS hatası:", e);
+    }
+  }
   revalidatePath("/panel/siparisler");
 }
 
@@ -343,6 +369,21 @@ export async function cancelOrder(formData: FormData) {
   await prisma.orderEvent.create({
     data: { orderId, status: "CANCELED", note: "Halıcı iptal etti" },
   });
+  // Müşteri evde alım/teslim bekliyor olabilir — iptali MUTLAKA bilsin
+  // (rejectOrder SMS'li, iptal SMS'siz kalmıştı; tutarsızlık giderildi).
+  const wasPickedUp = ["PICKED_UP", "WASHING"].includes(order.status);
+  try {
+    await sendSms(
+      order.customerPhone,
+      `Siparisiniz (${order.code ?? ""}) isletme tarafindan iptal edildi.` +
+        (wasPickedUp
+          ? " Haliniz yikanmadan adresinize iade edilecek, ucret talep edilmez."
+          : "") +
+        ` Sorulariniz icin: ${b.phone}`,
+    );
+  } catch (e) {
+    console.error("cancelOrder müşteri SMS hatası:", e);
+  }
   revalidatePath("/panel/siparisler");
 }
 

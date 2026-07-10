@@ -11,13 +11,19 @@ TaskManager.defineTask(LOCATION_TASK, async ({ data, error }) => {
   const loc = locs?.[locs.length - 1];
   if (!loc) return;
   try {
-    await postLocation(loc.coords.latitude, loc.coords.longitude);
+    const result = await postLocation(loc.coords.latitude, loc.coords.longitude);
+    // Oturum düştüyse izlemeyi durdur — "Mesaidesin" bildirimi asılı kalmasın,
+    // boşuna GPS/pil yakmasın (şoför açınca tekrar giriş yapar).
+    if (result === "unauthorized") await stopTracking();
   } catch {
     // ağ hatasında sessizce geç; sonraki konumda tekrar denenir
   }
 });
 
 export async function startTracking(): Promise<string | null> {
+  // ÖNEMLİ (Google Play politikası): bu fonksiyon çağrılmadan ÖNCE kullanıcıya
+  // "belirgin açıklama" (prominent disclosure) gösterilip onay alınmış olmalı —
+  // App.tsx toggleShift bunu yapar. İzin isteği onaydan önce ASLA tetiklenmemeli.
   const fg = await Location.requestForegroundPermissionsAsync();
   if (fg.status !== "granted") return "Konum izni gerekli.";
   const bg = await Location.requestBackgroundPermissionsAsync();

@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { rateLimit, clientIp, tooMany } from "@/lib/ratelimit";
+import { sendSms } from "@/lib/sms";
 
 export async function POST(
   req: NextRequest,
@@ -18,7 +19,13 @@ export async function POST(
   // Link (trackingToken) ya da kısa kod ile bulunabilir
   const order = await prisma.order.findFirst({
     where: { OR: [{ trackingToken: token }, { code: token.toUpperCase() }] },
-    select: { id: true, quotedPrice: true, priceApprovedAt: true },
+    select: {
+      id: true,
+      code: true,
+      quotedPrice: true,
+      priceApprovedAt: true,
+      business: { select: { phone: true } },
+    },
   });
   if (!order) {
     return NextResponse.json({ error: "Bulunamadı" }, { status: 404 });
@@ -63,6 +70,17 @@ export async function POST(
       note: `Müşteri kesin fiyatı onayladı: ${Number(locked?.quotedPrice ?? order.quotedPrice)} TL — yıkamaya başlama izni verildi`,
     },
   });
+
+  // İşletme onayı beklemeden yıkamaya başlayamıyor — panel yenilemesine
+  // muhtaç bırakma, haber ver (best-effort).
+  try {
+    await sendSms(
+      order.business.phone,
+      `Musteri kesin fiyati ONAYLADI (${order.code ?? ""}, ${Number(locked?.quotedPrice ?? order.quotedPrice)} TL). Yikamaya baslayabilirsiniz.`,
+    );
+  } catch (e) {
+    console.error("approve-price işletme SMS hatası:", e);
+  }
 
   return NextResponse.json({ ok: true });
 }
