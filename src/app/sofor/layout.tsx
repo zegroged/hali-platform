@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { LogoutButton } from "@/components/LogoutButton";
+import { NotificationBell } from "@/components/NotificationBell";
 
 // Şoför sayfaları arama motorlarına kapalı.
 export const metadata: Metadata = { robots: { index: false, follow: false } };
@@ -22,7 +23,10 @@ export default async function SoforLayout({
             <p className="text-xs text-slate-500">Şoför</p>
             <p className="font-semibold text-slate-900">{u.name}</p>
           </div>
-          <LogoutButton />
+          <div className="flex items-center gap-1">
+            <NotificationBell />
+            <LogoutButton />
+          </div>
         </div>
       </header>
       <main className="mx-auto max-w-lg px-4 py-6">{children}</main>

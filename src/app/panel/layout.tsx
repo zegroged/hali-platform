@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { getCurrentBusiness } from "@/lib/panel";
 import { LogoutButton } from "@/components/LogoutButton";
+import { NotificationBell } from "@/components/NotificationBell";
 import PanelNav from "@/components/PanelNav";
 
 // Panel sayfaları arama motorlarına kapalı (robots.txt'e ek ikinci savunma hattı).
@@ -29,7 +30,10 @@ export default async function PanelLayout({
             <p className="text-xs text-slate-500">Halıcı Paneli</p>
             <p className="font-semibold text-slate-900">{business.name}</p>
           </div>
-          <LogoutButton />
+          <div className="flex items-center gap-1">
+            <NotificationBell />
+            <LogoutButton />
+          </div>
         </div>
         <PanelNav />
       </header>

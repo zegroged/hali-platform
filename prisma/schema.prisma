@@ -95,6 +95,25 @@ model User {
   driverProfile Driver?
   orders        Order[]          @relation("CustomerOrders")
   reviews       Review[]
+  notifications Notification[]
+}
+
+// Uygulama-içi bildirim (halıcı paneli + şoför + admin). SMS mock olduğundan
+// içerideki kullanıcılara ulaşmanın asıl yolu budur: panel/şoför başlığındaki
+// zil sayaç gösterir, açılınca liste + okundu işaretlenir.
+model Notification {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  type      String // yeni-siparis | fiyat-onay | is-atandi | iptal | dogrulama | genel
+  title     String
+  body      String?
+  href      String? // tıklanınca gidilecek panel içi yol
+  readAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([userId, readAt])
+  @@index([userId, createdAt])
 }
 
 model CleanerBusiness {

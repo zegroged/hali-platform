@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { rateLimit, clientIp, tooMany } from "@/lib/ratelimit";
 import { sendSms } from "@/lib/sms";
+import { notify } from "@/lib/notify";
 
 export async function POST(
   req: NextRequest,
@@ -24,7 +25,7 @@ export async function POST(
       code: true,
       quotedPrice: true,
       priceApprovedAt: true,
-      business: { select: { phone: true } },
+      business: { select: { phone: true, ownerId: true } },
     },
   });
   if (!order) {
@@ -72,7 +73,14 @@ export async function POST(
   });
 
   // İşletme onayı beklemeden yıkamaya başlayamıyor — panel yenilemesine
-  // muhtaç bırakma, haber ver (best-effort).
+  // muhtaç bırakma, haber ver. Uygulama-içi asıl kanal (SMS mock).
+  await notify({
+    userId: order.business.ownerId,
+    type: "fiyat-onay",
+    title: "Müşteri kesin fiyatı onayladı",
+    body: `${order.code ?? ""} · ${Number(locked?.quotedPrice ?? order.quotedPrice)} TL — yıkamaya başlayabilirsiniz`,
+    href: "/panel/siparisler",
+  });
   try {
     await sendSms(
       order.business.phone,

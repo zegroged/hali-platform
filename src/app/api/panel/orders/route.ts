@@ -5,6 +5,7 @@ import { getCurrentBusiness } from "@/lib/panel";
 import { createOrderWithCode } from "@/lib/ordercode";
 import { sendTrackingSms, trackingLink } from "@/lib/sms";
 import { subscriptionActive } from "@/lib/subscription";
+import { notify } from "@/lib/notify";
 
 const Body = z.object({
   customerName: z.string().min(2, "Müşteri adı en az 2 karakter olmalı.").max(100),
@@ -87,6 +88,18 @@ export async function POST(req: NextRequest) {
       },
     }),
   );
+
+  // Atanan şoföre uygulama-içi bildirim (halıcı zaten kendisi oluşturdu).
+  const assigned = b.drivers.find((x) => x.id === driverId);
+  if (assigned) {
+    await notify({
+      userId: assigned.userId,
+      type: "is-atandi",
+      title: "Sana yeni iş atandı",
+      body: `Kod: ${order.code ?? ""} · ${d.customerName}`,
+      href: "/sofor",
+    });
+  }
 
   try {
     await sendTrackingSms(

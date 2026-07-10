@@ -7,6 +7,7 @@ import { createOrderWithCode } from "@/lib/ordercode";
 import { rateLimit, clientIp, tooMany } from "@/lib/ratelimit";
 import { subscriptionActive } from "@/lib/subscription";
 import { getAppBaseUrl } from "@/lib/config";
+import { notify } from "@/lib/notify";
 import { CONTRACT_VERSION } from "@/lib/legal";
 
 const Body = z.object({
@@ -49,6 +50,7 @@ export async function POST(req: NextRequest) {
     select: {
       id: true,
       phone: true,
+      ownerId: true,
       subscription: { select: { status: true, currentPeriodEnd: true } },
     },
   });
@@ -69,7 +71,7 @@ export async function POST(req: NextRequest) {
   const driver = await prisma.driver.findFirst({
     where: { businessId: d.businessId },
     orderBy: [{ isOnShift: "desc" }, { createdAt: "asc" }],
-    select: { id: true, user: { select: { phone: true } } },
+    select: { id: true, userId: true, user: { select: { phone: true } } },
   });
   // Şoförü olmayan işletme sipariş alamaz → sipariş "CREATED"da asılı kalmasın (A5).
   if (!driver) {
@@ -104,9 +106,25 @@ export async function POST(req: NextRequest) {
   );
 
   // YENİ SİPARİŞ BİLDİRİMİ (kritik): işletme ve atanan şoför haberdar edilmezse
-  // sipariş CREATED'da sessizce bekler, müşteri evde boşuna alım bekler.
-  // Best-effort — bildirim hatası sipariş oluşturmayı bozmaz.
+  // sipariş CREATED'da sessizce bekler. UYGULAMA-İÇİ bildirim asıl kanaldır
+  // (SMS mock); SMS canlı olunca ikisi birden gider.
   const ref = order.code ?? order.trackingToken;
+  await notify({
+    userId: business.ownerId,
+    type: "yeni-siparis",
+    title: "Yeni sipariş geldi",
+    body: `${d.customerName} · ${d.pickupAddress.slice(0, 50)}`,
+    href: "/panel/siparisler",
+  });
+  if (driver.userId !== business.ownerId) {
+    await notify({
+      userId: driver.userId,
+      type: "is-atandi",
+      title: "Sana yeni iş atandı",
+      body: `Kod: ${ref}`,
+      href: "/sofor",
+    });
+  }
   try {
     await sendSms(
       business.phone,

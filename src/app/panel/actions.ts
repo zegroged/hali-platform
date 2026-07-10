@@ -8,6 +8,7 @@ import { getCurrentBusiness, profileComplete, syncVisibility } from "@/lib/panel
 import { hashPassword } from "@/lib/auth";
 import { sendSms, trackingLink } from "@/lib/sms";
 import { sendAdminEmail } from "@/lib/email";
+import { notify, notifyAdmins } from "@/lib/notify";
 import { getAppBaseUrl } from "@/lib/config";
 import { ORDER_STATUS_META, PANEL_NEXT } from "@/lib/orderStatus";
 import { taxIdError } from "@/lib/taxId";
@@ -298,7 +299,14 @@ export async function submitForVerification() {
     where: { id: b.id },
     data: { verification: "PENDING" },
   });
-  // Admin haberdar olmazsa talep panel elle açılana dek bekliyordu — bildir.
+  // Admin haberdar olmazsa talep panel elle açılana dek bekliyordu — hem
+  // uygulama-içi (admin paneli zili) hem e-posta (canlı) ile bildir.
+  await notifyAdmins({
+    type: "dogrulama",
+    title: "Yeni doğrulama talebi",
+    body: `${b.name} (${b.district}/${b.city})`,
+    href: `/admin/isletme/${b.id}`,
+  });
   try {
     await sendAdminEmail(
       `Doğrulama talebi: ${b.name}`,
@@ -321,6 +329,7 @@ export async function reassignOrder(formData: FormData) {
   });
   if (!order) return;
   let newDriverPhone: string | null = null;
+  let newDriverUserId: string | null = null;
   if (driverId) {
     const d = await prisma.driver.findFirst({
       where: { id: driverId, businessId: b.id },
@@ -328,17 +337,25 @@ export async function reassignOrder(formData: FormData) {
     });
     if (!d) return;
     newDriverPhone = d.user.phone;
+    newDriverUserId = d.userId;
   }
   await prisma.order.update({
     where: { id: orderId },
     data: { driverId },
   });
   // Yeni atanan şoför işi bilsin (yalnız GERÇEKTEN değiştiyse — aynı şoföre
-  // tekrar "Ata" basılınca SMS gitmesin; gereksiz bildirim yok ilkesi).
-  if (newDriverPhone && driverId !== order.driverId) {
+  // tekrar "Ata" basılınca bildirim gitmesin; gereksiz bildirim yok ilkesi).
+  if (newDriverUserId && driverId !== order.driverId) {
+    await notify({
+      userId: newDriverUserId,
+      type: "is-atandi",
+      title: "Sana bir iş atandı",
+      body: `Kod: ${order.code ?? ""}`,
+      href: "/sofor",
+    });
     try {
       await sendSms(
-        newDriverPhone,
+        newDriverPhone!,
         `Size yeni is atandi! Kod: ${order.code ?? ""}. Detay: ${getAppBaseUrl()}/sofor`,
       );
     } catch (e) {
