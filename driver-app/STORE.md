@@ -6,11 +6,23 @@
 > hata geri-alma. Kalan adımlar Expo/Play hesaplarıyla yapılır.
 
 ## 0. Ön koşullar
-- Google Play Developer hesabı (25 $ tek sefer). Kurumsal hesap için D-U-N-S
-  (başvuru: dnb.com/en-us/smb/duns/google-developers.html) → 12 kişilik test
-  şartından muaf olur. Şahıs hesapta: 12 testçi × 14 gün kapalı test zorunlu.
+- **KARAR (2026-07-10): ŞAHIS hesap** (D-U-N-S beklenmeyecek — o 3-6 hafta
+  sürüyor). Google Play Developer hesabı 25 $ tek sefer. Şahıs hesapta kural:
+  **en az 12 testçi × 14 gün kesintisiz kapalı test** → sonra herkese açık
+  yayına başvurulabilir. (Kurumsal + D-U-N-S bu şarttan muaftı ama beklemeye
+  değmez; istersen paralel başvurup sonra geçersin.)
 - Ücretsiz Expo hesabı (expo.dev) — build bulutunda alınır, yerel Android
   Studio GEREKMEZ.
+
+### Şahıs hesap + kapalı test — özet sıra
+1. Play Console hesabı aç (25 $, kimlik doğrulaması birkaç gün sürebilir).
+2. `eas build` ile .aab üret (Bölüm 1).
+3. Uygulama oluştur + tüm formları doldur (Bölüm 2-8).
+4. **Closed testing** track'i aç, .aab'ı yükle, 12+ testçi Gmail'ini ekle.
+5. Testçiler linke tıklayıp uygulamayı kurar, **14 gün boyunca** ara sıra
+   açar (Google katılımı izler; herkesin her gün açması şart değil ama aktif
+   kullanım beklenir).
+6. 14 gün + en az 12 aktif testçi dolunca "Production'a başvur" açılır.
 
 ## 1. Build (bu klasörde)
 ```bash
@@ -94,11 +106,20 @@ taraflarla paylaşılmaz. Ayrıntı: enyakinhaliyikamaservisi.com/gizlilik
 - 18+ seç ("çocuklara yönelik değil") — arka plan konumlu uygulama çocuk
   hedefleyemez. İçerik derecelendirme anketi: Utility/araç, şiddet yok.
 
-## 9. Yayın
-- Production > Create release > .aab'ı yükle → incele → Rollout.
-- Şahıs hesapsa: önce Closed testing'de 12 testçiyle 14 gün (halıcı adayları
-  + tanıdıklar; testçi Gmail listesini Console'a ekle).
-- İnceleme süresi: genelde 1-7 gün (arka plan konumu nedeniyle uzayabilir).
+## 9. Yayın (şahıs hesap yolu)
+1. **Testing > Closed testing > Create track.** .aab'ı buraya yükle.
+2. **Testers** sekmesi: bir e-posta listesi oluştur, **12+ testçi Gmail'i**
+   ekle (halıcı adayları + tanıdıklar; test sırasında düşme olmasın diye 14-15
+   kişi ekle — tampon). "Copy link" ile davet linkini testçilere gönder.
+3. Testçiler linke girip "Become a tester" → Play'den kurar. Herkesin GERÇEK
+   cihazda kurup birkaç kez açması gerekir (Google aktif katılımı ölçer).
+4. **14 gün kesintisiz** + ≥12 aktif testçi sağlanınca Console "Apply for
+   production" seçeneğini açar → başvur.
+5. **Production > Create release** → aynı .aab → incele → Rollout.
+- İnceleme süresi: genelde 1-7 gün (arka plan konumu + demo video nedeniyle
+  uzayabilir; disclosure akışı ve demo hesap hazır olduğundan takılmamalı).
+- Sonraki güncellemeler: `android.versionCode`'u +1 yap, `eas build`, yeni
+  .aab'ı Production'a yükle (kapalı test tekrar gerekmez).
 
 ## iOS notu
 App Store ayrı iş: Apple Developer 99 $/yıl + `eas build -p ios` +
