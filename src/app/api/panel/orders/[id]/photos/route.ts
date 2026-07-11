@@ -61,7 +61,9 @@ export async function POST(
     );
   }
 
-  let count = 0;
+  // Oluşturulan fotoğrafları geri döndür ki istemci sayfayı KOMPLE yenilemeden
+  // (router.refresh — ağır yeniden-render) galeriye anında ekleyebilsin.
+  const created: { id: string; url: string }[] = [];
   for (const file of files) {
     const rawExt = ALLOWED[file.type];
     if (!rawExt || file.size > MAX) continue;
@@ -73,11 +75,14 @@ export async function POST(
       img.buf,
       img.contentType,
     );
-    await prisma.orderPhoto.create({ data: { orderId: order.id, url } });
-    count++;
+    const row = await prisma.orderPhoto.create({
+      data: { orderId: order.id, url },
+      select: { id: true, url: true },
+    });
+    created.push(row);
   }
 
-  return NextResponse.json({ ok: true, count });
+  return NextResponse.json({ ok: true, count: created.length, photos: created });
 }
 
 // Fotoğraf silme (yanlış yükleme düzeltilebilsin).

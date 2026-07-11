@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { getCurrentBusiness } from "@/lib/panel";
+import { getSessionUser } from "@/lib/auth";
 import { getAppBaseUrl } from "@/lib/config";
 import {
   ORDER_STATUS_META,
@@ -57,7 +57,21 @@ export default async function OrderManagePage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const b = await getCurrentBusiness();
+  // HAFİF sorgu: bu sayfa yalnız işletme id'si + şoför listesi kullanıyor.
+  // getCurrentBusiness tüm işletme grafiğini (fiyat/bölge/foto...) çekiyordu ve
+  // her form işleminden sonraki yeniden-render'ı yavaşlatıyordu (B: hız).
+  const u = await getSessionUser();
+  if (!u || u.role !== "CLEANER") redirect("/giris");
+  const b = await prisma.cleanerBusiness.findUnique({
+    where: { ownerId: u.id },
+    select: {
+      id: true,
+      drivers: {
+        select: { id: true, user: { select: { name: true } } },
+        orderBy: { createdAt: "asc" },
+      },
+    },
+  });
   if (!b) return null;
 
   const { id } = await params;
@@ -436,12 +450,9 @@ export default async function OrderManagePage({
 
       {/* Fotoğraflar */}
       <div className={card}>
-        <h2 className="font-semibold text-slate-900">
-          Fotoğraflar{" "}
-          <span className="text-sm font-normal text-slate-500">
-            ({o.photos.length})
-          </span>
-        </h2>
+        {/* Sayaç yok: galeri yerel state ile anında güncelleniyor; sunucudan
+            gelen sabit sayı yükleme sonrası yanıltıcı kalırdı. */}
+        <h2 className="font-semibold text-slate-900">Fotoğraflar</h2>
         <div className="mt-3">
           <OrderPhotoManager
             orderId={o.id}

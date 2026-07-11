@@ -1,20 +1,21 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import { IconX } from "@/components/icons";
 
 type Photo = { id: string; url: string };
 
-/** Sipariş yönetim sayfası: fotoğraf yükleme + galeri + silme. */
+/** Sipariş yönetim sayfası: fotoğraf yükleme + galeri + silme.
+ *  Galeri yerel state'te tutulur → yükleme/silme ANINDA görünür; sayfanın
+ *  ağır yeniden-render'ını (router.refresh) beklemez. */
 export function OrderPhotoManager({
   orderId,
-  photos,
+  photos: initialPhotos,
 }: {
   orderId: string;
   photos: Photo[];
 }) {
-  const router = useRouter();
+  const [photos, setPhotos] = useState<Photo[]>(initialPhotos);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -34,13 +35,17 @@ export function OrderPhotoManager({
         method: "POST",
         body: fd,
       });
+      const data = (await res.json().catch(() => null)) as {
+        photos?: Photo[];
+        error?: string;
+      } | null;
       if (!res.ok) {
-        const data = await res.json().catch(() => null);
         setErr(data?.error ?? "Yükleme başarısız (jpg/png/webp, ≤5MB).");
         return;
       }
+      // Dönen fotoğrafları galeriye anında ekle — sayfa yenilemeye gerek yok.
+      if (data?.photos?.length) setPhotos((prev) => [...prev, ...data.photos!]);
       if (fileRef.current) fileRef.current.value = "";
-      router.refresh();
     } catch {
       setErr("Bağlantı hatası, lütfen tekrar deneyin.");
     } finally {
@@ -50,15 +55,18 @@ export function OrderPhotoManager({
 
   async function remove(photoId: string) {
     if (!confirm("Fotoğraf silinsin mi?")) return;
+    // İyimser: önce ekrandan kaldır, sunucu reddederse geri koy.
+    const snapshot = photos;
+    setPhotos((prev) => prev.filter((p) => p.id !== photoId));
     try {
       const res = await fetch(`/api/panel/orders/${orderId}/photos`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ photoId }),
       });
-      if (res.ok) router.refresh();
+      if (!res.ok) setPhotos(snapshot); // geri al
     } catch {
-      // sessiz — sayfa durumu değişmez
+      setPhotos(snapshot); // bağlantı hatası → geri al
     }
   }
 

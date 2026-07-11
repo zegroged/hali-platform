@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
-import { getCurrentBusiness } from "@/lib/panel";
+import { prisma } from "@/lib/prisma";
 import { LogoutButton } from "@/components/LogoutButton";
 import { NotificationBell } from "@/components/NotificationBell";
 import PanelNav from "@/components/PanelNav";
@@ -19,7 +19,13 @@ export default async function PanelLayout({
   if (!u) redirect("/giris");
   if (!u.username) redirect("/kullanici-adi");
 
-  const business = await getCurrentBusiness();
+  // HAFİF: layout yalnız işletme adına ihtiyaç duyar; getCurrentBusiness'in tüm
+  // grafiğini (şoför/fiyat/bölge/foto) çekmesi her panel işleminde yeniden-render'ı
+  // yavaşlatıyordu. Yalnız ad + varlık kontrolü çek.
+  const business = await prisma.cleanerBusiness.findUnique({
+    where: { ownerId: u.id },
+    select: { name: true },
+  });
   if (!business) redirect("/giris");
 
   return (
