@@ -45,7 +45,7 @@ function rejectConfidence(totalOrders: number): number {
 }
 
 // Yorumcu adını herkese açık sayfada maskele (KVKK): "Ayşe Kaya" → "Ayşe K."
-function maskName(name: string): string {
+export function maskName(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
   if (parts.length === 0) return "Müşteri";
   const first = parts[0];
@@ -248,6 +248,55 @@ export async function getBusinesses(
   }
 
   return list;
+}
+
+export type RecentReview = {
+  rating: number;
+  comment: string;
+  customerName: string; // maskelenmiş
+  businessId: string;
+  businessName: string;
+  district: string;
+  createdAt: string;
+};
+
+/**
+ * Son yorumlar vitrini (ana sayfa + şehir sayfaları): yalnız yayındaki
+ * işletmelerin YORUMLU değerlendirmeleri, adlar maskeli (KVKK).
+ */
+export async function getRecentReviews(
+  city?: string,
+  take = 6,
+): Promise<RecentReview[]> {
+  const rows = await prisma.review.findMany({
+    where: {
+      comment: { not: null },
+      business: {
+        isVisible: true,
+        verification: { not: "REJECTED" },
+        subscription: activeSubscriptionWhere(),
+        ...(city ? { city: { equals: city, mode: "insensitive" } } : {}),
+      },
+    },
+    orderBy: { createdAt: "desc" },
+    take,
+    include: {
+      business: { select: { id: true, name: true, district: true } },
+      customer: { select: { name: true } },
+      order: { select: { customerName: true } },
+    },
+  });
+  return rows
+    .filter((r) => r.comment && r.comment.trim().length > 0)
+    .map((r) => ({
+      rating: r.rating,
+      comment: r.comment!,
+      customerName: maskName(r.customer?.name ?? r.order.customerName),
+      businessId: r.business.id,
+      businessName: r.business.name,
+      district: r.business.district,
+      createdAt: r.createdAt.toISOString(),
+    }));
 }
 
 export type PricingRow = {

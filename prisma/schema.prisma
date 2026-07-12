@@ -417,3 +417,11 @@ model CityLead {
   @@unique([city, email]) // aynı il için aynı e-posta bir kez (upsert)
   @@index([city])
 }
+
+// Genel amaçlı anahtar-değer durumu (tekil zamanlayıcı işaretleri vb. —
+// örn. weeklyDigestSentAt: haftalık özet maili en son ne zaman gitti).
+model AppState {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}

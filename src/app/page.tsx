@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { getBusinesses } from "@/lib/businesses";
+import { getBusinesses, getRecentReviews } from "@/lib/businesses";
+import ReviewStrip from "@/components/ReviewStrip";
 import { BusinessCard } from "@/components/BusinessCard";
 import { BusinessRow } from "@/components/BusinessRow";
 import { SearchBar } from "@/components/SearchBar";
@@ -247,7 +248,10 @@ export default async function Home({
   }
 
   // ---- Keşif modu (Çiçek Sepeti tarzı sıralı yatay satırlar) ----
-  const all = await getBusinesses({ lat, lng });
+  const [all, recentReviews] = await Promise.all([
+    getBusinesses({ lat, lng }),
+    getRecentReviews(undefined, 6),
+  ]);
   const nearest =
     lat != null ? all.filter((b) => b.distanceKm != null).slice(0, 10) : [];
   const topRated = [...all]
@@ -362,6 +366,7 @@ export default async function Home({
           </>
         )}
 
+        <ReviewStrip reviews={recentReviews} />
         <CityShortcuts />
         <HomeFaq />
       </main>

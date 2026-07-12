@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getBusinesses } from "@/lib/businesses";
+import { getBusinesses, getRecentReviews } from "@/lib/businesses";
 import { BusinessCard } from "@/components/BusinessCard";
+import ReviewStrip from "@/components/ReviewStrip";
 import SiteHeader from "@/components/SiteHeader";
 import HowItWorks from "@/components/HowItWorks";
 import Footer from "@/components/Footer";
@@ -69,7 +70,10 @@ export default async function CityPage({ params }: { params: Params }) {
   const city = cityBySlug(sehir);
   if (!city) notFound();
 
-  const businesses = await getBusinesses({ city: city.name, sort: "rating" });
+  const [businesses, cityReviews] = await Promise.all([
+    getBusinesses({ city: city.name, sort: "rating" }),
+    getRecentReviews(city.name, 6),
+  ]);
   const faqs = cityFaqs(city.name);
   const loc = locative(city.name);
   const districts = districtsOfCity(city.name);
@@ -165,6 +169,11 @@ export default async function CityPage({ params }: { params: Params }) {
           </section>
         )}
 
+        <ReviewStrip
+          reviews={cityReviews}
+          title={`${loc} müşteriler ne diyor?`}
+        />
+
         <HowItWorks />
 
         {/* Halıcılar için kayıt CTA'sı — şehir sayfaları işletme kazanımının da kanalı */}
@@ -176,12 +185,20 @@ export default async function CityPage({ params }: { params: Params }) {
             İşletmeni platforma ekle; müşteri siparişleri, şoför takibi ve
             değerlendirmelerle {loc} öne çık.
           </p>
-          <Link
-            href="/kayit"
-            className="mt-3 inline-flex items-center justify-center rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark active:scale-[0.99]"
-          >
-            İşletmeni ekle
-          </Link>
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <Link
+              href="/kayit"
+              className="inline-flex items-center justify-center rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark active:scale-[0.99]"
+            >
+              İşletmeni ekle
+            </Link>
+            <Link
+              href="/isletmeler-icin"
+              className="text-sm font-medium text-brand-dark hover:underline"
+            >
+              İşletmeler için detaylar →
+            </Link>
+          </div>
         </section>
 
         <section className="mt-10">

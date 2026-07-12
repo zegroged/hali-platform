@@ -31,6 +31,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${BASE}/iade`, changeFrequency: "yearly", priority: 0.3 },
     { url: `${BASE}/on-bilgilendirme`, changeFrequency: "yearly", priority: 0.2 },
     { url: `${BASE}/sehirler`, changeFrequency: "monthly", priority: 0.7 },
+    { url: `${BASE}/isletmeler-icin`, changeFrequency: "monthly", priority: 0.7 },
     // 81 il — şehir SEO açılış sayfaları (ülke geneli görünürlük kanalı).
     ...CITIES.map((c) => ({
       url: `${BASE}/hali-yikama/${c.slug}`,

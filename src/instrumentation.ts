@@ -26,6 +26,15 @@ async function purgeOldLocationData() {
   }
 }
 
+async function weeklyDigestTick() {
+  try {
+    const { maybeSendWeeklyDigest } = await import("@/lib/weeklyDigest");
+    await maybeSendWeeklyDigest();
+  } catch (e) {
+    console.error("[haftalik-ozet] hata:", e);
+  }
+}
+
 export async function register() {
   // Yalnız Node.js runtime'ında (edge/middleware derlemesinde prisma yok).
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
@@ -33,4 +42,9 @@ export async function register() {
   await purgeOldLocationData();
   const timer = setInterval(purgeOldLocationData, DAY_MS);
   if (typeof timer.unref === "function") timer.unref();
+  // Haftalık özet: saat başı yoklanır, yalnız TR pazartesi + haftada bir gider
+  // (AppState işareti — yeniden başlatmada mükerrer mail yok).
+  await weeklyDigestTick();
+  const digestTimer = setInterval(weeklyDigestTick, 60 * 60 * 1000);
+  if (typeof digestTimer.unref === "function") digestTimer.unref();
 }

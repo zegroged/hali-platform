@@ -6,6 +6,7 @@ import { getBusinessById } from "@/lib/businesses";
 import { publicTaxNumber } from "@/lib/taxId";
 import { prisma } from "@/lib/prisma";
 import { Badges } from "@/components/Badges";
+import PriceEstimator from "@/components/PriceEstimator";
 import { IconStar, IconTruck, IconWhatsApp } from "@/components/icons";
 import EmptyState from "@/components/EmptyState";
 import Footer from "@/components/Footer";
@@ -82,6 +83,8 @@ export default async function HaliciProfile({
 
   const main = b.pricing.filter((p) => !p.isAddon);
   const addons = b.pricing.filter((p) => p.isAddon);
+  // m² hesaplayıcısı yalnız m² bazlı ana fiyatlardan çalışır.
+  const m2Prices = main.filter((p) => p.unit === "PER_M2").map((p) => p.price);
   const hours = (b.workingHours ?? {}) as Record<
     string,
     { open: string; close: string } | null
@@ -258,6 +261,7 @@ export default async function HaliciProfile({
               <p className="mt-2 text-xs text-slate-600">
                 Kesin fiyat, halı alındıktan ve görüldükten sonra netleşir.
               </p>
+              {m2Prices.length > 0 && <PriceEstimator prices={m2Prices} />}
             </section>
 
             {/* İşletme bilgileri — ETAHS Yön. md.5/2 (VKN) + md.6/4 (doğrulama
