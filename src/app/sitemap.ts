@@ -1,5 +1,6 @@
 import type { MetadataRoute } from "next";
 import { prisma } from "@/lib/prisma";
+import { CITIES } from "@/lib/cities";
 
 const BASE =
   process.env.APP_BASE_URL ?? "https://enyakinhaliyikamaservisi.com";
@@ -29,6 +30,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${BASE}/mesafeli-satis`, changeFrequency: "yearly", priority: 0.2 },
     { url: `${BASE}/iade`, changeFrequency: "yearly", priority: 0.3 },
     { url: `${BASE}/on-bilgilendirme`, changeFrequency: "yearly", priority: 0.2 },
+    { url: `${BASE}/sehirler`, changeFrequency: "monthly", priority: 0.7 },
+    // 81 il — şehir SEO açılış sayfaları (ülke geneli görünürlük kanalı).
+    ...CITIES.map((c) => ({
+      url: `${BASE}/hali-yikama/${c.slug}`,
+      changeFrequency: "weekly" as const,
+      priority: 0.7,
+    })),
   ];
 
   // DB'ye ulaşılamazsa sitemap yine de statik sayfalarla dönsün (500 yerine).

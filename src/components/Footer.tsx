@@ -45,6 +45,11 @@ export default function Footer() {
                 </Link>
               </li>
               <li>
+                <Link href="/sehirler" className="hover:text-white">
+                  Şehirlere göre halı yıkama
+                </Link>
+              </li>
+              <li>
                 <Link href="/sss" className="hover:text-white">
                   Sık sorulan sorular
                 </Link>

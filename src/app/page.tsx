@@ -6,10 +6,11 @@ import { SearchBar } from "@/components/SearchBar";
 import { BusinessesMapView } from "@/components/BusinessesMapView";
 import Footer from "@/components/Footer";
 import TrackingBar from "@/components/TrackingBar";
+import SiteHeader from "@/components/SiteHeader";
+import HowItWorks from "@/components/HowItWorks";
 import { DISTRICTS } from "@/components/districts";
+import { featuredCities } from "@/lib/cities";
 import {
-  Logo,
-  IconPackage,
   IconMapPin,
   IconStar,
   IconTruck,
@@ -30,43 +31,6 @@ type SearchParams = Promise<{
   openNow?: string;
   view?: string;
 }>;
-
-function Header() {
-  return (
-    <header className="flex items-center justify-between py-4">
-      <Link href="/" className="flex min-w-0 items-center gap-2">
-        <Logo size={30} />
-        <span className="whitespace-nowrap text-sm font-bold tracking-tight text-slate-900 sm:text-lg">
-          En Yakın Halı Yıkama
-        </span>
-      </Link>
-      <div className="flex shrink-0 items-center gap-3 sm:gap-4">
-        <Link
-          href="/takip"
-          aria-label="Sipariş takibi"
-          className="inline-flex items-center gap-1 py-2 text-sm font-medium text-slate-600 hover:text-brand-dark"
-        >
-          <IconPackage size={17} />
-          <span className="hidden sm:inline">Takip</span>
-        </Link>
-        <Link
-          href="/giris"
-          className="inline-flex items-center whitespace-nowrap py-2 text-sm font-medium text-slate-600 hover:text-brand-dark"
-        >
-          Giriş Yap
-        </Link>
-        <Link
-          href="/kayit"
-          className="inline-flex items-center whitespace-nowrap rounded-lg border border-brand px-3 py-2 text-sm font-medium text-brand-dark transition hover:bg-brand-light"
-        >
-          <span className="sm:hidden">İşletme</span>
-          <span className="hidden sm:inline">İşletmeni ekle</span>
-        </Link>
-      </div>
-    </header>
-  );
-}
-
 
 /** Ana sayfa SSS — müşteri odaklı 6 soru, açılır-kapanır (tümü /sss'te). */
 function HomeFaq() {
@@ -93,7 +57,17 @@ function HomeFaq() {
     },
     {
       q: "Hangi bölgelerde hizmet var?",
-      a: "Platform yeni ve bölge bölge açılıyoruz. Yukarıdan adresini aratarak veya konumunu kullanarak bölgende hizmet veren halıcıları görebilirsin; listede işletme yoksa bölgende henüz açılmamışız demektir.",
+      a: (
+        <>
+          Platform yeni ve bölge bölge açılıyoruz. Yukarıdan adresini aratarak
+          veya konumunu kullanarak bölgende hizmet veren halıcıları
+          görebilirsin;{" "}
+          <Link href="/sehirler" className="font-medium text-brand-dark underline">
+            şehirlere göre halı yıkama
+          </Link>{" "}
+          sayfasından da iline bakabilirsin.
+        </>
+      ),
     },
   ];
   return (
@@ -132,45 +106,30 @@ function HomeFaq() {
   );
 }
 
-/** 3 adımlı "Nasıl çalışır?" şeridi — güven katmanı; footer'dan da linklenir. */
-function HowItWorks() {
-  const steps = [
-    {
-      icon: <IconMapPin size={20} />,
-      title: "Halıcını seç",
-      desc: "Konumunu kullan ya da semtini yaz, yakınındaki halıcıları karşılaştır.",
-    },
-    {
-      icon: <IconTruck size={20} />,
-      title: "Halın kapından alınsın",
-      desc: "Halıcı halını adresinden teslim alır — ön ödeme yok, ödeme teslimde.",
-    },
-    {
-      icon: <IconPackage size={20} />,
-      title: "Adım adım takip et",
-      desc: "Yıkamadan teslimata kadar her adımı takip kodunla canlı izle.",
-    },
-  ];
+/** Şehir kısayolları — şehir SEO sayfalarına iç link (indekslenme için). */
+function CityShortcuts() {
   return (
-    <section id="nasil-calisir" className="mt-8 scroll-mt-4">
-      <h2 className="font-semibold text-slate-900">Nasıl çalışır?</h2>
-      <div className="mt-3 grid gap-3 sm:grid-cols-3">
-        {steps.map((s, i) => (
-          <div
-            key={s.title}
-            className="relative rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
+    <section className="mt-10">
+      <div className="mb-3 flex items-baseline justify-between gap-3">
+        <h2 className="font-semibold text-slate-900">
+          Şehrinde halı yıkama servisi
+        </h2>
+        <Link
+          href="/sehirler"
+          className="shrink-0 text-sm font-medium text-brand-dark hover:underline"
+        >
+          Tüm şehirler
+        </Link>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {featuredCities().map((c) => (
+          <Link
+            key={c.slug}
+            href={`/hali-yikama/${c.slug}`}
+            className="rounded-full border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 shadow-sm hover:border-brand hover:text-brand-dark"
           >
-            <span className="absolute right-3.5 top-3.5 text-xs font-semibold text-slate-500">
-              {i + 1}. adım
-            </span>
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-light text-brand-dark">
-              {s.icon}
-            </div>
-            <h3 className="mt-3 text-sm font-semibold text-slate-900">
-              {s.title}
-            </h3>
-            <p className="mt-1 text-sm text-slate-600">{s.desc}</p>
-          </div>
+            {c.name} halı yıkama
+          </Link>
         ))}
       </div>
     </section>
@@ -233,7 +192,7 @@ export default async function Home({
     return (
       <>
         <main className="mx-auto w-full max-w-lg px-4 pb-12 md:max-w-3xl lg:max-w-5xl">
-          <Header />
+          <SiteHeader />
           <SearchBar {...searchProps} />
           <div className="mb-3 mt-5 flex items-baseline justify-between">
             <h1 className="text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">
@@ -311,7 +270,7 @@ export default async function Home({
   return (
     <>
       <main className="mx-auto w-full max-w-lg px-4 pb-12 md:max-w-3xl lg:max-w-5xl">
-        <Header />
+        <SiteHeader />
 
         {/* Hero: marka bandı — değer önerisi + güven rozetleri + arama kartı */}
         <section className="rounded-2xl bg-gradient-to-br from-brand to-brand-dark p-4 sm:p-6">
@@ -403,6 +362,7 @@ export default async function Home({
           </>
         )}
 
+        <CityShortcuts />
         <HomeFaq />
       </main>
       <Footer />

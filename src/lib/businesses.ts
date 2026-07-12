@@ -129,7 +129,16 @@ export async function getBusinesses(
   if (filter.district) {
     where.serviceAreas = { some: { district: filter.district } };
   } else if (filter.city) {
-    where.serviceAreas = { some: { city: filter.city } };
+    // Şehir sayfaları: işletmenin kendi ili VEYA hizmet bölgesi eşleşsin;
+    // serbest metin girildiği için büyük/küçük harf duyarsız karşılaştır.
+    where.OR = [
+      { city: { equals: filter.city, mode: "insensitive" } },
+      {
+        serviceAreas: {
+          some: { city: { equals: filter.city, mode: "insensitive" } },
+        },
+      },
+    ];
   }
 
   const rows = await prisma.cleanerBusiness.findMany({
