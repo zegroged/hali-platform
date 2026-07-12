@@ -11,6 +11,8 @@ import {
 import { ConfirmButton } from "../ConfirmButton";
 import { PendingButton } from "@/components/PendingButton";
 import { PhotoUpload } from "@/components/PhotoUpload";
+import CityDistrictSelect from "@/components/CityDistrictSelect";
+import { districtsOfCity } from "@/lib/cities";
 import { IconX, IconCheck } from "@/components/icons";
 
 const inp =
@@ -124,14 +126,13 @@ export default async function PanelProfile({
             />
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className={lbl}>İlçe</label>
-              <input name="district" defaultValue={b.district} className={inp} />
-            </div>
-            <div>
-              <label className={lbl}>Şehir</label>
-              <input name="city" defaultValue={b.city} className={inp} />
-            </div>
+            <CityDistrictSelect
+              defaultCity={b.city}
+              defaultDistrict={b.district}
+              selectClass={inp}
+              labelClass={lbl}
+              required
+            />
           </div>
           <div>
             <label className={lbl}>Adres</label>
@@ -347,17 +348,35 @@ export default async function PanelProfile({
             </span>
           ))}
         </div>
-        <form action={addServiceArea} className="mt-3 flex gap-2">
-          <input
-            name="district"
-            placeholder="İlçe ekle"
-            className={`${inp} flex-1`}
-          />
-          <input type="hidden" name="city" value="İstanbul" />
-          <button className="rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark active:scale-[0.99]">
-            Ekle
-          </button>
-        </form>
+        {/* İl işletme profilinden gelir; ilçe resmî listeden seçilir (serbest
+            metin yazım hatası şehir/ilçe eşleşmesini bozuyordu). */}
+        {districtsOfCity(b.city).length > 0 ? (
+          <form action={addServiceArea} className="mt-3 flex gap-2">
+            <select
+              name="district"
+              required
+              defaultValue=""
+              className={`${inp} flex-1`}
+            >
+              <option value="" disabled>
+                İlçe seç ({b.city})
+              </option>
+              {districtsOfCity(b.city).map((d) => (
+                <option key={d} value={d}>
+                  {d}
+                </option>
+              ))}
+            </select>
+            <button className="rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark active:scale-[0.99]">
+              Ekle
+            </button>
+          </form>
+        ) : (
+          <p className="mt-3 text-sm text-slate-500">
+            İlçe ekleyebilmek için önce Temel Bilgiler bölümünden ilini seç ve
+            kaydet.
+          </p>
+        )}
       </section>
 
       {/* Fotoğraflar */}

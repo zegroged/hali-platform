@@ -9,6 +9,7 @@ import { getSessionUser, hashPassword } from "@/lib/auth";
 import { profileComplete, syncVisibility } from "@/lib/panel";
 import { extendSubscription } from "@/lib/subscription";
 import { taxIdError } from "@/lib/taxId";
+import { normalizeCityName, normalizeDistrictName } from "@/lib/cities";
 import { normalizeUsername, validateUsername } from "@/lib/username";
 import { saveObject } from "@/lib/storage";
 import { CONTRACT_VERSION } from "@/lib/legal";
@@ -61,8 +62,13 @@ export async function createBusinessByAdmin(formData: FormData) {
   // Giriş bilgileri oluşturan kişi tarafından belirlenir (sahibine iletir).
   const password = String(formData.get("password") || "");
   const usernameRaw = String(formData.get("username") || "").trim();
-  const city = String(formData.get("city") || "").trim();
-  const district = String(formData.get("district") || "").trim();
+  // İl/ilçe yalnız resmî listeden: kanonik ada normalize edilir (form zaten
+  // seçtiriyor; elle gönderilen listede-olmayan değer aşağıda reddedilir).
+  const city =
+    normalizeCityName(String(formData.get("city") || "")) ?? "";
+  const district = city
+    ? (normalizeDistrictName(city, String(formData.get("district") || "")) ?? "")
+    : "";
   const taxNumber = String(formData.get("taxNumber") || "").replace(/\D/g, "");
   const pricePerM2 = Number(formData.get("pricePerM2")) || null;
   const minDays = Number(formData.get("minDays")) || null;
@@ -92,7 +98,7 @@ export async function createBusinessByAdmin(formData: FormData) {
     const uErr = validateUsername(username);
     if (uErr) err(uErr);
   }
-  if (city.length < 2 || district.length < 2) err("İl ve ilçe gerekli.");
+  if (!city || !district) err("İl ve ilçe listeden seçilmeli.");
   const taxErr = taxIdError(taxNumber);
   if (taxErr) err("Vergi/kimlik no: " + taxErr);
   if (wantsDriver) {

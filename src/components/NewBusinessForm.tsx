@@ -1,4 +1,5 @@
 import { createBusinessByAdmin } from "@/app/admin/actions";
+import CityDistrictSelect from "@/components/CityDistrictSelect";
 
 const inp =
   "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand";
@@ -79,24 +80,7 @@ export default function NewBusinessForm() {
         de ona sen ilet. En az 8 karakter.
       </p>
       <div className="grid gap-4 sm:grid-cols-2">
-        <div>
-          <label htmlFor="city" className={lbl}>
-            İl
-          </label>
-          <input
-            id="city"
-            name="city"
-            defaultValue="İstanbul"
-            required
-            className={inp}
-          />
-        </div>
-        <div>
-          <label htmlFor="district" className={lbl}>
-            İlçe
-          </label>
-          <input id="district" name="district" required className={inp} />
-        </div>
+        <CityDistrictSelect selectClass={inp} labelClass={lbl} required />
       </div>
       <div>
         <label htmlFor="taxNumber" className={lbl}>

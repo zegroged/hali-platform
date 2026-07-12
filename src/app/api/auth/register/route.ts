@@ -5,6 +5,7 @@ import { hashPassword, createSession } from "@/lib/auth";
 import { rateLimit, clientIp, tooMany } from "@/lib/ratelimit";
 import { CONTRACT_VERSION } from "@/lib/legal";
 import { normalizeUsername, validateUsername } from "@/lib/username";
+import { normalizeCityName, normalizeDistrictName } from "@/lib/cities";
 
 // İşletme self-servis kaydı. Hesap PENDING açılır ve görünmez;
 // panel akışı (e-posta doğrulama → profil → admin onayı) tamamlar.
@@ -92,6 +93,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Geçersiz istek." }, { status: 400 });
   }
 
+  // İl/ilçe yalnız resmî listeden (form seçtiriyor; elle istek de reddedilir).
+  // Yazım hatası şehir sayfası (/hali-yikama/..) eşleşmesini bozuyordu.
+  const cityCanon = normalizeCityName(city);
+  const districtCanon = cityCanon
+    ? normalizeDistrictName(cityCanon, district)
+    : null;
+  if (!cityCanon || !districtCanon) {
+    return NextResponse.json(
+      { error: "İl ve ilçe listeden seçilmeli." },
+      { status: 400 },
+    );
+  }
+
   // Kullanıcı adı: tek biçime indir (küçük harf) + kural kontrolü.
   const username = normalizeUsername(parsed.data.username);
   const usernameError = validateUsername(username);
@@ -148,7 +162,7 @@ export async function POST(req: NextRequest) {
   await prisma.signupOtp.delete({ where: { email } });
 
   const [{ lat, lng }, hashed] = await Promise.all([
-    geocodeDistrict(district, city),
+    geocodeDistrict(districtCanon, cityCanon),
     hashPassword(password),
   ]);
 
@@ -164,9 +178,9 @@ export async function POST(req: NextRequest) {
       ownedBusiness: {
         create: {
           name: businessName,
-          address: `${district}, ${city}`,
-          city,
-          district,
+          address: `${districtCanon}, ${cityCanon}`,
+          city: cityCanon,
+          district: districtCanon,
           lat,
           lng,
           phone,
@@ -176,7 +190,9 @@ export async function POST(req: NextRequest) {
           // Sözleşme kayıtta checkbox ile onaylandı — panel adımı otomatik tamam.
           contractAcceptedAt: new Date(),
           contractVersion: CONTRACT_VERSION,
-          serviceAreas: { create: [{ city, district }] },
+          serviceAreas: {
+            create: [{ city: cityCanon, district: districtCanon }],
+          },
         },
       },
     },

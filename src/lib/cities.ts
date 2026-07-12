@@ -1,3 +1,5 @@
+import { DISTRICTS_BY_CITY } from "@/lib/districts";
+
 // 81 il — şehir SEO sayfalarının tek kaynağı (/hali-yikama/[sehir], /sehirler,
 // sitemap ve ana sayfa şehir kısayolları aynı listeyi kullanır).
 export type City = { name: string; slug: string };
@@ -108,6 +110,47 @@ export function cityBySlug(slug: string): City | undefined {
 
 export function featuredCities(): City[] {
   return FEATURED_CITY_SLUGS.map((s) => cityBySlug(s)!).filter(Boolean);
+}
+
+const FOLD_MAP: Record<string, string> = {
+  ç: "c", ğ: "g", ı: "i", ö: "o", ş: "s", ü: "u", â: "a", î: "i", û: "u",
+};
+
+function foldTr(s: string): string {
+  return s
+    .toLocaleLowerCase("tr-TR")
+    .replace(/[çğıöşüâîû]/g, (ch) => FOLD_MAP[ch] ?? ch);
+}
+
+/**
+ * Serbest/şüpheli il girdisini kanonik il adına çevirir ("istanbul",
+ * "ISTANBUL", " İstanbul " → "İstanbul"). Listede yoksa null — il/ilçe
+ * alanları yalnız 81 il listesinden kabul edilir.
+ */
+export function normalizeCityName(input: string): string | null {
+  const folded = foldTr(input.trim());
+  if (!folded) return null;
+  const hit = CITIES.find((c) => c.slug === folded || foldTr(c.name) === folded);
+  return hit ? hit.name : null;
+}
+
+/** İlin resmî ilçe listesi (kanonik il adıyla). Bilinmeyen il → boş liste. */
+export function districtsOfCity(cityName: string): readonly string[] {
+  const canonical = normalizeCityName(cityName);
+  if (!canonical) return [];
+  const slug = CITIES.find((c) => c.name === canonical)!.slug;
+  return DISTRICTS_BY_CITY[slug] ?? [];
+}
+
+/** İlçe, verilen ilin resmî listesinde mi? Kanonik ilçe adını döndürür, yoksa null. */
+export function normalizeDistrictName(
+  cityName: string,
+  district: string,
+): string | null {
+  const folded = foldTr(district.trim());
+  if (!folded) return null;
+  const hit = districtsOfCity(cityName).find((d) => foldTr(d) === folded);
+  return hit ?? null;
 }
 
 const BACK_VOWELS = new Set(["a", "ı", "o", "u", "A", "I", "O", "U"]);

@@ -13,6 +13,7 @@ import { getAppBaseUrl } from "@/lib/config";
 import { ORDER_STATUS_META, PANEL_NEXT } from "@/lib/orderStatus";
 import { taxIdError } from "@/lib/taxId";
 import { normalizeGoogleProfileUrl } from "@/lib/googleUrl";
+import { normalizeCityName, normalizeDistrictName } from "@/lib/cities";
 import { normalizeUsername, validateUsername } from "@/lib/username";
 import type { PricingUnit } from "@prisma/client";
 
@@ -44,14 +45,29 @@ export async function updateProfileBasics(formData: FormData) {
         ),
     );
   }
+  // İl/ilçe yalnız resmî listeden: yazım hatası şehir sayfası (/hali-yikama/..)
+  // ve ilçe eşleşmesini bozuyordu. Kanonik ada normalize edilir, listede yoksa red.
+  const cityCanon = normalizeCityName(String(formData.get("city") || b.city));
+  const districtCanon = cityCanon
+    ? normalizeDistrictName(
+        cityCanon,
+        String(formData.get("district") || b.district),
+      )
+    : null;
+  if (!cityCanon || !districtCanon) {
+    redirect(
+      "/panel/profil?hata=" +
+        encodeURIComponent("İl ve ilçe listeden seçilmeli."),
+    );
+  }
   await prisma.cleanerBusiness.update({
     where: { id: b.id },
     data: {
       name: String(formData.get("name") || b.name),
       description: String(formData.get("description") || ""),
       address: String(formData.get("address") || b.address),
-      district: String(formData.get("district") || b.district),
-      city: String(formData.get("city") || b.city),
+      district: districtCanon,
+      city: cityCanon,
       phone: String(formData.get("phone") || b.phone),
       taxNumber: taxRaw || null,
       googleProfileUrl: googleUrl,
@@ -121,8 +137,15 @@ export async function removePricingItem(formData: FormData) {
 
 export async function addServiceArea(formData: FormData) {
   const b = await biz();
-  const district = String(formData.get("district") || "").trim();
-  const city = String(formData.get("city") || "İstanbul").trim();
+  // İl formdan gelmez, işletmenin kendi ilinden alınır (eski form sabit
+  // "İstanbul" gönderiyordu — başka ildeki işletme yanlış şehre atanıyordu).
+  // İlçe o ilin resmî listesinde olmalı.
+  const city = normalizeCityName(b.city);
+  if (!city) return;
+  const district = normalizeDistrictName(
+    city,
+    String(formData.get("district") || ""),
+  );
   if (!district) return;
   await prisma.serviceArea.create({
     data: { businessId: b.id, city, district },

@@ -6,6 +6,7 @@ import Link from "next/link";
 import Footer from "@/components/Footer";
 import PlanCard from "@/components/PlanCard";
 import { PLAN } from "@/lib/plan";
+import { CITIES, districtsOfCity } from "@/lib/cities";
 
 /** Alan bazlı doğrulama hataları (alan adı → mesaj). */
 type Field =
@@ -34,7 +35,7 @@ export default function KayitPage() {
     username: "",
     email: "",
     password: "",
-    city: "İstanbul",
+    city: "",
     district: "",
   });
   // Aracılık sözleşmesi teyidi — işaretlenmemiş başlar, zorunludur
@@ -375,28 +376,49 @@ export default function KayitPage() {
               <label htmlFor="kayit-il" className={labelCls}>
                 İl
               </label>
-              <input
+              {/* Serbest metin değil: yazım hatası şehir sayfası/ilçe
+                  eşleşmesini bozuyordu — 81 il listesinden seçilir. */}
+              <select
                 id="kayit-il"
                 value={form.city}
-                onChange={(e) => set("city", e.target.value)}
-                maxLength={40}
+                onChange={(e) => {
+                  set("city", e.target.value);
+                  set("district", "");
+                }}
+                required
                 className={inputCls()}
-                autoComplete="address-level1"
-              />
+              >
+                <option value="" disabled>
+                  İl seç
+                </option>
+                {CITIES.map((c) => (
+                  <option key={c.slug} value={c.name}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
             </div>
             <div>
               <label htmlFor="kayit-ilce" className={labelCls}>
                 İlçe
               </label>
-              <input
+              <select
                 id="kayit-ilce"
                 value={form.district}
                 onChange={(e) => set("district", e.target.value)}
-                placeholder="Ör. Kadıköy"
-                maxLength={40}
+                required
+                disabled={!form.city}
                 className={inputCls(fieldErrors.district)}
-                autoComplete="address-level2"
-              />
+              >
+                <option value="" disabled>
+                  {form.city ? "İlçe seç" : "Önce il seç"}
+                </option>
+                {districtsOfCity(form.city).map((d) => (
+                  <option key={d} value={d}>
+                    {d}
+                  </option>
+                ))}
+              </select>
               {err("district")}
             </div>
           </div>
