@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { getAuthedUser } from "@/lib/auth";
 import { rateLimit, clientIp, tooMany } from "@/lib/ratelimit";
 
-// Müşteri yorumu + yıldız (misafir; takip kodu kimlik yerine geçer).
-// Yalnız TESLİM EDİLMİŞ sipariş değerlendirilebilir; sipariş başına 1 yorum
-// (Review.orderId @unique). İşletmenin ratingAvg/ratingCount'u atomik güncellenir.
+// Müşteri yorumu + yıldız. ARTIK ÜYELİK ZORUNLU: yalnız giriş yapmış müşteri
+// (CUSTOMER) yorum yapabilir — takip linki o siparişe erişim kanıtı, üyelik ise
+// kimlik + hesap verilebilirliği sağlar (sahte/anonim yorumu azaltır). Yalnız
+// TESLİM EDİLMİŞ sipariş, sipariş başına 1 yorum. Yoruma ödül puanı verilir.
+const REVIEW_POINTS = 50;
 const Body = z.object({
   rating: z.number().int().min(1, "En az 1 yıldız").max(5, "En fazla 5 yıldız"),
   comment: z.string().trim().max(500, "Yorum en fazla 500 karakter").optional(),
@@ -18,6 +21,15 @@ export async function POST(
   const ip = clientIp(req);
   const rl = rateLimit(`order-review:${ip}`, 10, 60 * 1000);
   if (!rl.ok) return tooMany(rl.retryAfterSec);
+
+  // ÜYELİK ZORUNLU: yalnız giriş yapmış müşteri yorum yapabilir.
+  const viewer = await getAuthedUser();
+  if (!viewer || viewer.role !== "CUSTOMER") {
+    return NextResponse.json(
+      { error: "Değerlendirme yapmak için üye girişi gerekli." },
+      { status: 401 },
+    );
+  }
 
   const parsed = Body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) {
@@ -51,12 +63,14 @@ export async function POST(
     );
   }
 
+  let awarded = 0;
   try {
     await prisma.$transaction(async (tx) => {
       await tx.review.create({
         data: {
           orderId: order.id,
           businessId: order.businessId,
+          customerId: viewer.id, // üye kimliği (kim yazdı)
           rating,
           comment,
         },
@@ -74,6 +88,12 @@ export async function POST(
           ratingCount: agg._count,
         },
       });
+      // Ödül puanı — yorum unique kısıttan geçtiyse (aynı transaction) ver.
+      await tx.user.update({
+        where: { id: viewer.id },
+        data: { points: { increment: REVIEW_POINTS } },
+      });
+      awarded = REVIEW_POINTS;
     });
   } catch (e) {
     // Yarış: aynı anda ikinci istek unique kısıta takıldı → zaten yorumlanmış.
@@ -91,5 +111,5 @@ export async function POST(
     throw e;
   }
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, pointsAwarded: awarded });
 }

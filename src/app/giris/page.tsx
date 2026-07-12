@@ -10,7 +10,7 @@ const ROLE_HOME: Record<string, string> = {
   DRIVER: "/sofor",
   ADMIN: "/admin",
   SUPPORT: "/destek",
-  CUSTOMER: "/",
+  CUSTOMER: "/hesabim",
 };
 
 /** Alan bazlı doğrulama hataları (alan adı → mesaj). */

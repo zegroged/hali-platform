@@ -88,6 +88,7 @@ model User {
   emailOtpCode      String? // e-posta doğrulama kodu (telefondan bağımsız)
   emailOtpExpiresAt DateTime?
   bannedAt          DateTime? // admin engeli: doluysa giriş + mevcut oturum kilitli
+  points            Int       @default(0) // müşteri ödül puanı (yorum/sipariş ile kazanılır)
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 

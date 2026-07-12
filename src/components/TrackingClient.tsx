@@ -44,6 +44,8 @@ type Track = {
   driver: { name: string; lat: number; lng: number } | null;
   // Teslim sonrası müşteri değerlendirmesi (sipariş başına 1)
   review: { rating: number } | null;
+  // Değerlendirme için üyelik zorunlu — görüntüleyen giriş yapmış müşteri mi?
+  viewerIsCustomer: boolean;
 };
 
 // Poll'un durdurulacağı nihai durumlar — teslim edilmiş sipariş sonsuza dek sorgulanmasın.
@@ -433,7 +435,8 @@ export function TrackingClient({ token }: { token: string }) {
           )}
 
           {/* Teslim sonrası değerlendirme: yıldız (zorunlu) + yorum (opsiyonel).
-              Sipariş başına bir kez; işletme sayfasında yayınlanır. */}
+              Sipariş başına bir kez; ÜYELİK ZORUNLU (giriş yapmamış müşteriye
+              "üye ol/giriş yap" bandı gösterilir). İşletme sayfasında yayınlanır. */}
           {data.status === "DELIVERED" &&
             (data.review || reviewDone ? (
               <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
@@ -450,7 +453,34 @@ export function TrackingClient({ token }: { token: string }) {
                 </p>
                 <p className="mt-1 text-sm text-emerald-700">
                   Yorumun işletmenin sayfasında yayınlanacak.
+                  {reviewDone && " Hesabına 50 puan eklendi 🎉"}
                 </p>
+                {reviewDone && (
+                  <a
+                    href="/hesabim"
+                    className="mt-2 inline-block text-sm font-medium text-brand-dark underline"
+                  >
+                    Puanlarımı gör →
+                  </a>
+                )}
+              </div>
+            ) : !data.viewerIsCustomer ? (
+              // Üye değil → değerlendirmeden önce üyelik iste (puan cazibesiyle).
+              <div className="rounded-xl border-2 border-brand bg-brand-light/40 p-4">
+                <p className="font-semibold text-slate-900">
+                  Hizmetini değerlendir, 50 puan kazan
+                </p>
+                <p className="mt-1 text-sm text-slate-600">
+                  Değerlendirme yapmak için ücretsiz üye ol veya giriş yap.
+                  Yorumun {data.business.name} sayfasında yayınlanır, sen de puan
+                  biriktirirsin.
+                </p>
+                <a
+                  href={`/uye-ol?donus=${encodeURIComponent(`/takip/${token}`)}`}
+                  className="mt-3 inline-block rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark"
+                >
+                  Üye ol / Giriş yap
+                </a>
               </div>
             ) : (
               <div className="rounded-xl border-2 border-brand bg-brand-light/40 p-4">

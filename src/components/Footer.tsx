@@ -35,6 +35,11 @@ export default function Footer() {
                 </Link>
               </li>
               <li>
+                <Link href="/hesabim" className="hover:text-white">
+                  Üye girişi / Hesabım
+                </Link>
+              </li>
+              <li>
                 <Link href="/kayit" className="hover:text-white">
                   İşletmeni ekle
                 </Link>

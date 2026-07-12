@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getAuthedUser } from "@/lib/auth";
 import { rateLimit, clientIp, tooMany } from "@/lib/ratelimit";
 
 export async function GET(
@@ -35,6 +36,11 @@ export async function GET(
     order.driver?.lastLat != null &&
     order.driver?.lastLng != null;
 
+  // Değerlendirme için üyelik zorunlu — görüntüleyen giriş yapmış müşteri mi?
+  // (UI: üye ise yorum formu, değilse "üye ol/giriş yap" bandı gösterir.)
+  const viewer = await getAuthedUser();
+  const viewerIsCustomer = viewer?.role === "CUSTOMER";
+
   return NextResponse.json({
     status: order.status,
     rejectReason: order.rejectReason,
@@ -53,6 +59,8 @@ export async function GET(
     business: order.business,
     // Teslim sonrası değerlendirme: varsa yıldızı göster, yoksa form çıkar.
     review: order.review,
+    // Üyelik zorunlu — UI formu mu, "üye ol" bandını mı göstersin?
+    viewerIsCustomer,
     events: order.events.map((e) => ({
       status: e.status,
       note: e.note,
