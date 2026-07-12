@@ -104,6 +104,44 @@ export const FEATURED_CITY_SLUGS = [
   "samsun",
 ];
 
+// 7 coğrafi bölge — şehir sayfalarında şehre özgü içerik + bölge-içi iç link
+// (81 sayfanın hepsine 80'er link koymak yerine ilgili komşular).
+export type Region =
+  | "Marmara"
+  | "Ege"
+  | "Akdeniz"
+  | "İç Anadolu"
+  | "Karadeniz"
+  | "Doğu Anadolu"
+  | "Güneydoğu Anadolu";
+
+const REGION_CITIES: Record<Region, string[]> = {
+  Marmara: ["istanbul", "kocaeli", "yalova", "bursa", "sakarya", "bilecik", "balikesir", "canakkale", "tekirdag", "kirklareli", "edirne"],
+  Ege: ["izmir", "aydin", "mugla", "manisa", "denizli", "usak", "kutahya", "afyonkarahisar"],
+  Akdeniz: ["antalya", "isparta", "burdur", "mersin", "adana", "hatay", "kahramanmaras", "osmaniye"],
+  "İç Anadolu": ["ankara", "konya", "eskisehir", "cankiri", "kirikkale", "kirsehir", "nevsehir", "nigde", "aksaray", "kayseri", "sivas", "yozgat", "karaman"],
+  Karadeniz: ["bolu", "duzce", "zonguldak", "bartin", "karabuk", "kastamonu", "sinop", "samsun", "amasya", "corum", "tokat", "ordu", "giresun", "trabzon", "rize", "artvin", "gumushane", "bayburt"],
+  "Doğu Anadolu": ["erzurum", "erzincan", "kars", "agri", "igdir", "ardahan", "van", "mus", "bitlis", "hakkari", "bingol", "tunceli", "elazig", "malatya"],
+  "Güneydoğu Anadolu": ["gaziantep", "kilis", "sanliurfa", "adiyaman", "diyarbakir", "mardin", "batman", "siirt", "sirnak"],
+};
+
+export function regionOfCity(citySlug: string): Region | null {
+  for (const [region, slugs] of Object.entries(REGION_CITIES)) {
+    if (slugs.includes(citySlug)) return region as Region;
+  }
+  return null;
+}
+
+/** Aynı bölgedeki diğer iller (kendisi hariç) — şehir sayfası iç linkleri. */
+export function regionMates(citySlug: string): City[] {
+  const region = regionOfCity(citySlug);
+  if (!region) return [];
+  return REGION_CITIES[region]
+    .filter((s) => s !== citySlug)
+    .map((s) => cityBySlug(s)!)
+    .filter(Boolean);
+}
+
 export function cityBySlug(slug: string): City | undefined {
   return CITIES.find((c) => c.slug === slug);
 }

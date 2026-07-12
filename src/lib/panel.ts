@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { getSessionUser } from "@/lib/auth";
+import { notifyCityLeadsIfOpen } from "@/lib/cityLeads";
 
 export async function getCurrentBusiness() {
   const u = await getSessionUser();
@@ -75,6 +76,13 @@ export async function syncVisibility(businessId: string): Promise<void> {
       where: { id: businessId },
       data: { isVisible: ok },
     });
+  }
+  // İşletme kamuya açık listeye girdiyse o şehirde bekleyen "haber ver"
+  // kayıtlarına müjde maili (idempotent; hata görünürlük akışını bozmasın).
+  if (ok) {
+    try {
+      await notifyCityLeadsIfOpen(businessId);
+    } catch {}
   }
 }
 

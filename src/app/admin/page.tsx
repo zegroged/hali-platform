@@ -97,11 +97,19 @@ export default async function AdminHome({
           e-postaları. Hangi şehirde halıcı aranacağının verisi. */}
       {cityLeads.length > 0 && (
         <section>
-          <h2 className="mb-2 font-semibold text-slate-900">
-            Şehir talepleri{" "}
-            <span className="text-sm font-normal text-slate-500">
-              (açılınca haber ver kayıtları)
+          <h2 className="mb-2 flex items-baseline justify-between font-semibold text-slate-900">
+            <span>
+              Şehir talepleri{" "}
+              <span className="text-sm font-normal text-slate-500">
+                (açılınca haber ver kayıtları)
+              </span>
             </span>
+            <Link
+              href="/admin/talepler"
+              className="text-sm font-medium text-brand-dark hover:underline"
+            >
+              Tümü / CSV
+            </Link>
           </h2>
           <div className="flex flex-wrap gap-2">
             {cityLeads.map((l) => (

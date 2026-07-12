@@ -9,11 +9,12 @@ import Footer from "@/components/Footer";
 import TrackingBar from "@/components/TrackingBar";
 import CityNotifyForm from "@/components/CityNotifyForm";
 import {
-  CITIES,
   cityBySlug,
   districtSlug,
   districtsOfCity,
   locative,
+  regionMates,
+  regionOfCity,
 } from "@/lib/cities";
 import { IconSparkles, IconTruck, IconWallet } from "@/components/icons";
 
@@ -71,7 +72,14 @@ export default async function CityPage({ params }: { params: Params }) {
   const businesses = await getBusinesses({ city: city.name, sort: "rating" });
   const faqs = cityFaqs(city.name);
   const loc = locative(city.name);
-  const otherCities = CITIES.filter((c) => c.slug !== city.slug);
+  const districts = districtsOfCity(city.name);
+  const region = regionOfCity(city.slug);
+  const mates = regionMates(city.slug);
+  // Şehre özgü metin için örnek ilçeler (ilk 3, "Merkez" öne çıkmasın diye
+  // varsa gerçek adlı ilçeler tercih edilir).
+  const sampleDistricts = [...districts]
+    .sort((a, b) => (a === "Merkez" ? 1 : 0) - (b === "Merkez" ? 1 : 0))
+    .slice(0, 3);
 
   // FAQPage yapılandırılmış verisi — şehir sayfalarının aranma amacı SEO.
   const faqJsonLd = {
@@ -108,6 +116,22 @@ export default async function CityPage({ params }: { params: Params }) {
         </section>
 
         <TrackingBar />
+
+        {/* Şehre özgü tanıtım — şablon-sayfa (ince içerik) algısını kırar */}
+        <section className="mt-6 rounded-xl border border-slate-200 bg-white p-4 text-sm leading-relaxed text-slate-600 shadow-sm">
+          <p>
+            {city.name}
+            {region ? `, ${region} bölgesinde` : ""} {districts.length} ilçesi
+            bulunan bir ilimiz. {sampleDistricts.join(", ")}
+            {districts.length > 3 ? " başta olmak üzere" : ""} {loc} halı
+            yıkama hizmeti kapıdan alma modeliyle çalışır: işletme halını
+            adresinden teslim alır, profesyonel makinelerde yıkar ve kurutup
+            kapına geri getirir. Sipariş verirken ön ödeme yapılmaz; kesin
+            fiyat halın ölçümünden sonra onayına sunulur, ödeme teslimde
+            alınır. Aşağıdan ilçeni seçerek {loc} sana en yakın halı
+            yıkamacıları görebilirsin.
+          </p>
+        </section>
 
         {businesses.length > 0 ? (
           <section className="mt-8">
@@ -192,7 +216,7 @@ export default async function CityPage({ params }: { params: Params }) {
             {locative(city.name)} ilçelere göre halı yıkama
           </h2>
           <div className="mt-3 flex flex-wrap gap-2">
-            {districtsOfCity(city.name).map((d) => (
+            {districts.map((d) => (
               <Link
                 key={d}
                 href={`/hali-yikama/${city.slug}/${districtSlug(d)}`}
@@ -204,10 +228,11 @@ export default async function CityPage({ params }: { params: Params }) {
           </div>
         </section>
 
+        {/* 80 şehirlik link duvarı yerine ilgili komşular (bölge) + dizin linki */}
         <section className="mt-10">
           <div className="mb-3 flex items-baseline justify-between gap-3">
             <h2 className="font-semibold text-slate-900">
-              Diğer şehirlerde halı yıkama
+              {region ? `${region} bölgesinde halı yıkama` : "Diğer şehirlerde halı yıkama"}
             </h2>
             <Link
               href="/sehirler"
@@ -217,13 +242,13 @@ export default async function CityPage({ params }: { params: Params }) {
             </Link>
           </div>
           <div className="flex flex-wrap gap-x-3 gap-y-2">
-            {otherCities.map((c) => (
+            {mates.map((c) => (
               <Link
                 key={c.slug}
                 href={`/hali-yikama/${c.slug}`}
                 className="text-sm text-slate-500 hover:text-brand-dark hover:underline"
               >
-                {c.name}
+                {c.name} halı yıkama
               </Link>
             ))}
           </div>

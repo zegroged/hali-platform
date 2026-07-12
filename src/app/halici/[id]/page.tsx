@@ -6,7 +6,7 @@ import { getBusinessById } from "@/lib/businesses";
 import { publicTaxNumber } from "@/lib/taxId";
 import { prisma } from "@/lib/prisma";
 import { Badges } from "@/components/Badges";
-import { IconStar, IconTruck } from "@/components/icons";
+import { IconStar, IconTruck, IconWhatsApp } from "@/components/icons";
 import EmptyState from "@/components/EmptyState";
 import Footer from "@/components/Footer";
 
@@ -73,6 +73,12 @@ export default async function HaliciProfile({
       })
     )?.taxNumber ?? null,
   );
+
+  // WhatsApp linki — Türkiye'de müşteri aramak yerine yazmayı tercih eder.
+  // 05xx... → 905xx... (wa.me uluslararası biçim ister).
+  const waHref = `https://wa.me/${b.phone.replace(/\D/g, "").replace(/^0/, "90")}?text=${encodeURIComponent(
+    "Merhaba, halı yıkama hizmetiniz için yazıyorum.",
+  )}`;
 
   const main = b.pricing.filter((p) => !p.isAddon);
   const addons = b.pricing.filter((p) => p.isAddon);
@@ -202,6 +208,14 @@ export default async function HaliciProfile({
             >
               Halımı Aldır
             </Link>
+            <a
+              href={waHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-2 hidden items-center justify-center gap-2 rounded-xl border-2 border-[#25D366] py-2.5 text-center font-semibold text-[#1da851] transition hover:bg-[#25D366]/10 active:scale-[0.99] md:flex"
+            >
+              <IconWhatsApp size={18} /> WhatsApp&apos;tan Yaz
+            </a>
 
             {/* Fiyatlandırma */}
             <section className="mt-6">
@@ -375,12 +389,21 @@ export default async function HaliciProfile({
           </section>
         </div>
 
-        {/* Sabit CTA (mobil) — md+ ekranda sağ kolondaki buton kullanılır */}
+        {/* Sabit CTA (mobil) — md+ ekranda sağ kolondaki butonlar kullanılır */}
         <div className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-white p-3 md:hidden">
-          <div className="mx-auto max-w-lg md:max-w-3xl lg:max-w-5xl">
+          <div className="mx-auto flex max-w-lg gap-2 md:max-w-3xl lg:max-w-5xl">
+            <a
+              href={waHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="WhatsApp'tan yaz"
+              className="flex w-14 shrink-0 items-center justify-center rounded-xl border-2 border-[#25D366] text-[#1da851] transition hover:bg-[#25D366]/10 active:scale-[0.99]"
+            >
+              <IconWhatsApp size={22} />
+            </a>
             <Link
               href={`/halici/${b.id}/siparis`}
-              className="block rounded-xl bg-brand py-3 text-center font-semibold text-white transition hover:bg-brand-dark active:scale-[0.99]"
+              className="block flex-1 rounded-xl bg-brand py-3 text-center font-semibold text-white transition hover:bg-brand-dark active:scale-[0.99]"
             >
               Halımı Aldır
             </Link>

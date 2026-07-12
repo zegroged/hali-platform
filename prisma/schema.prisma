@@ -407,11 +407,12 @@ model Badge {
 // (1) şehir açılınca hazır müşteri listesi, (2) hangi şehirde talep biriktiği
 // verisi (işletme kazanım görüşmelerinde kullanılır; /admin'de sayılır).
 model CityLead {
-  id        String   @id @default(cuid())
-  city      String // kanonik il adı (src/lib/cities.ts)
-  district  String? // ilçe sayfasından geldiyse kanonik ilçe adı
-  email     String
-  createdAt DateTime @default(now())
+  id         String    @id @default(cuid())
+  city       String // kanonik il adı (src/lib/cities.ts)
+  district   String? // ilçe sayfasından geldiyse kanonik ilçe adı
+  email      String
+  createdAt  DateTime  @default(now())
+  notifiedAt DateTime? // "bölgende açıldık" maili atıldıysa (kişi başı bir kez)
 
   @@unique([city, email]) // aynı il için aynı e-posta bir kez (upsert)
   @@index([city])
