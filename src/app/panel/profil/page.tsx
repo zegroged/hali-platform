@@ -158,6 +158,21 @@ export default async function PanelProfile({
               </p>
             </div>
           </div>
+          <div>
+            <label className={lbl}>Google işletme profili linki (opsiyonel)</label>
+            <input
+              name="googleProfileUrl"
+              type="url"
+              defaultValue={b.googleProfileUrl ?? ""}
+              placeholder="https://maps.app.goo.gl/... veya g.page/..."
+              className={inp}
+            />
+            <p className="mt-1 text-xs text-slate-500">
+              Google Haritalar&apos;daki işletme sayfanın linkini yapıştır —
+              müşteriler senin gerçek Google puanına/yorumlarına ulaşır, güven
+              artar. (Google Haritalar → işletmen → Paylaş → linki kopyala.)
+            </p>
+          </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className={lbl}>

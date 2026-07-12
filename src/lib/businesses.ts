@@ -283,6 +283,7 @@ export async function getBusinessById(id: string) {
     deliveryMaxDays: b.deliveryEstimateMaxDays,
     ratingAvg: b.ratingAvg,
     ratingCount: b.ratingCount,
+    googleProfileUrl: b.googleProfileUrl,
     badges,
     pricing: b.pricing.map((p) => ({
       label: p.label,

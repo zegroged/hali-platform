@@ -12,6 +12,7 @@ import { notify, notifyAdmins } from "@/lib/notify";
 import { getAppBaseUrl } from "@/lib/config";
 import { ORDER_STATUS_META, PANEL_NEXT } from "@/lib/orderStatus";
 import { taxIdError } from "@/lib/taxId";
+import { normalizeGoogleProfileUrl } from "@/lib/googleUrl";
 import { normalizeUsername, validateUsername } from "@/lib/username";
 import type { PricingUnit } from "@prisma/client";
 
@@ -32,6 +33,17 @@ export async function updateProfileBasics(formData: FormData) {
   if (taxErr) {
     redirect("/panel/profil?hata=" + encodeURIComponent(taxErr));
   }
+  // Google profil linki — girildiyse gerçek bir Google alan adı olmalı.
+  const googleRaw = String(formData.get("googleProfileUrl") || "").trim();
+  const googleUrl = googleRaw ? normalizeGoogleProfileUrl(googleRaw) : null;
+  if (googleRaw && !googleUrl) {
+    redirect(
+      "/panel/profil?hata=" +
+        encodeURIComponent(
+          "Google profil linki geçersiz. Google Haritalar'daki işletme sayfanın linkini yapıştır (google.com/maps... veya g.page/...).",
+        ),
+    );
+  }
   await prisma.cleanerBusiness.update({
     where: { id: b.id },
     data: {
@@ -42,6 +54,7 @@ export async function updateProfileBasics(formData: FormData) {
       city: String(formData.get("city") || b.city),
       phone: String(formData.get("phone") || b.phone),
       taxNumber: taxRaw || null,
+      googleProfileUrl: googleUrl,
       deliveryEstimateMinDays: minDays,
       deliveryEstimateMaxDays: maxDays,
     },

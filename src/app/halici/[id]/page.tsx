@@ -304,7 +304,27 @@ export default async function HaliciProfile({
 
           {/* Sol kolon devamı: yorumlar */}
           <section className="mt-6 md:mt-0">
-            <h2 className="mb-2 font-semibold text-slate-900">Yorumlar</h2>
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <h2 className="font-semibold text-slate-900">Yorumlar</h2>
+              {b.googleProfileUrl && (
+                <a
+                  href={b.googleProfileUrl}
+                  target="_blank"
+                  rel="noopener noreferrer nofollow"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
+                >
+                  <span className="font-bold" aria-hidden>
+                    <span style={{ color: "#4285F4" }}>G</span>
+                    <span style={{ color: "#EA4335" }}>o</span>
+                    <span style={{ color: "#FBBC05" }}>o</span>
+                    <span style={{ color: "#4285F4" }}>g</span>
+                    <span style={{ color: "#34A853" }}>l</span>
+                    <span style={{ color: "#EA4335" }}>e</span>
+                  </span>
+                  Yorumları →
+                </a>
+              )}
+            </div>
             {b.reviews.length > 0 ? (
               <div className="space-y-2">
                 {b.reviews.map((r, i) => (

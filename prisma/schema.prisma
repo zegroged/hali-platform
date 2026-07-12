@@ -134,6 +134,7 @@ model CleanerBusiness {
   deliveryEstimateMaxDays Int? // örn 3
 
   taxNumber          String? // vergi no (doğrulama için)
+  googleProfileUrl   String? // işletmenin Google Haritalar/İşletme profili linki (gerçek Google yorumları)
   contractAcceptedAt DateTime? // platform sözleşmesi onay zamanı
   contractVersion    String? // onaylanan aracılık sözleşmesi sürümü (ETAHS Yön. md.11/2-c)
   verification       VerificationStatus @default(PENDING)
