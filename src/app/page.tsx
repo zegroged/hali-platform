@@ -50,6 +50,12 @@ function Header() {
           <span className="hidden sm:inline">Takip</span>
         </Link>
         <Link
+          href="/giris"
+          className="inline-flex items-center whitespace-nowrap py-2 text-sm font-medium text-slate-600 hover:text-brand-dark"
+        >
+          Giriş Yap
+        </Link>
+        <Link
           href="/kayit"
           className="inline-flex items-center whitespace-nowrap rounded-lg border border-brand px-3 py-2 text-sm font-medium text-brand-dark transition hover:bg-brand-light"
         >

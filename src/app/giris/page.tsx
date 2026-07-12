@@ -66,9 +66,13 @@ export default function GirisPage() {
         return;
       }
       const data = await res.json();
-      // Eski hesap: henüz kullanıcı adı yok → önce onu belirlesin.
+      // Kullanıcı adı yalnız HALICI/ŞOFÖR için gerekli — müşteride (CUSTOMER)
+      // kullanıcı adı yoktur, doğrudan hesabına gider.
+      const needsUsername =
+        data.needsUsername &&
+        (data.role === "CLEANER" || data.role === "DRIVER");
       router.push(
-        data.needsUsername ? "/kullanici-adi" : (ROLE_HOME[data.role] ?? "/"),
+        needsUsername ? "/kullanici-adi" : (ROLE_HOME[data.role] ?? "/"),
       );
       router.refresh();
     } catch {
@@ -91,10 +95,10 @@ export default function GirisPage() {
           ← Ana sayfa
         </Link>
         <h1 className="text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">
-          İşletme Girişi
+          Giriş Yap
         </h1>
         <p className="mt-1 text-sm text-slate-500">
-          Halıcı veya şoför hesabınla giriş yap.
+          Müşteri, halıcı veya şoför hesabınla e-postanla giriş yap.
         </p>
 
         <form onSubmit={submit} noValidate className="mt-6 space-y-3">
@@ -162,9 +166,26 @@ export default function GirisPage() {
           kullan.
         </p>
 
+        {/* Müşteri üyeliği: puan biriktir + yorum yap */}
         <div className="mt-6 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
           <p className="text-sm font-medium text-slate-700">
-            Henüz hesabın yok mu?
+            Müşteri misin?
+          </p>
+          <p className="mt-1 text-sm text-slate-600">
+            Ücretsiz üye ol; siparişlerini takip et, hizmetini değerlendir ve
+            puan biriktir.
+          </p>
+          <Link
+            href="/uye-ol"
+            className="mt-3 inline-flex min-h-[40px] items-center rounded-lg border border-brand px-4 py-2 text-sm font-semibold text-brand-dark transition hover:bg-brand-light"
+          >
+            Üye Ol
+          </Link>
+        </div>
+
+        <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <p className="text-sm font-medium text-slate-700">
+            İşletme misin?
           </p>
           <p className="mt-1 text-sm text-slate-600">
             Halı yıkama işletmeni birkaç dakikada kaydet, bölgendeki
