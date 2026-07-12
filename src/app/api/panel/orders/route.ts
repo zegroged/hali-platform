@@ -84,6 +84,7 @@ export async function POST(req: NextRequest) {
         note: d.note,
         // Web'de şimdilik YALNIZ nakit (komisyon/kart ertelendi; app'te geri açılacak).
         paymentMethod: "CASH",
+        isManual: true, // SLA bekçisi/24s kurtarma bu kaydı atlasın
         events: { create: { status: "CREATED", note: "Halıcı kaydı oluşturdu" } },
       },
     }),

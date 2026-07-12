@@ -8,7 +8,7 @@
 set -u
 
 URL="https://enyakinhaliyikamaservisi.com/"
-MAIL_TO="[EPOSTA]"
+MAIL_TO="destek@enyakinhaliyikamaservisim.com"
 ENVF="/opt/hali/.env"
 FLAG="/run/hali-site-down.flag"      # down maili atıldı işareti
 FAILCNT="/run/hali-site-failcount"   # ardışık başarısız yoklama sayısı

@@ -81,6 +81,15 @@ export default async function HaliciProfile({
     "Merhaba, halı yıkama hizmetiniz için yazıyorum.",
   )}`;
 
+  // Tatil modu: duraklatılmışsa sipariş butonları kapanır (profil yayında kalır).
+  const paused = b.pausedUntil != null;
+  const pausedLabel = paused
+    ? b.pausedUntil!.toLocaleDateString("tr-TR", {
+        day: "numeric",
+        month: "long",
+      })
+    : null;
+
   const main = b.pricing.filter((p) => !p.isAddon);
   const addons = b.pricing.filter((p) => p.isAddon);
   // m² hesaplayıcısı yalnız m² bazlı ana fiyatlardan çalışır.
@@ -205,12 +214,18 @@ export default async function HaliciProfile({
 
           {/* Sağ kolon (md+ sticky): CTA + fiyatlandırma + çalışma saatleri */}
           <aside className="md:sticky md:top-6 md:row-span-2 md:self-start">
-            <Link
-              href={`/halici/${b.id}/siparis`}
-              className="hidden rounded-xl bg-brand py-3 text-center font-semibold text-white transition hover:bg-brand-dark active:scale-[0.99] md:block"
-            >
-              Halımı Aldır
-            </Link>
+            {paused ? (
+              <div className="hidden rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-center text-sm font-medium text-amber-800 md:block">
+                {pausedLabel} tarihine kadar yeni sipariş almıyor
+              </div>
+            ) : (
+              <Link
+                href={`/halici/${b.id}/siparis`}
+                className="hidden rounded-xl bg-brand py-3 text-center font-semibold text-white transition hover:bg-brand-dark active:scale-[0.99] md:block"
+              >
+                Halımı Aldır
+              </Link>
+            )}
             <a
               href={waHref}
               target="_blank"
@@ -405,12 +420,18 @@ export default async function HaliciProfile({
             >
               <IconWhatsApp size={22} />
             </a>
-            <Link
-              href={`/halici/${b.id}/siparis`}
-              className="block flex-1 rounded-xl bg-brand py-3 text-center font-semibold text-white transition hover:bg-brand-dark active:scale-[0.99]"
-            >
-              Halımı Aldır
-            </Link>
+            {paused ? (
+              <div className="flex flex-1 items-center justify-center rounded-xl border border-amber-300 bg-amber-50 px-3 py-3 text-center text-sm font-medium text-amber-800">
+                {pausedLabel} tarihine kadar sipariş almıyor
+              </div>
+            ) : (
+              <Link
+                href={`/halici/${b.id}/siparis`}
+                className="block flex-1 rounded-xl bg-brand py-3 text-center font-semibold text-white transition hover:bg-brand-dark active:scale-[0.99]"
+              >
+                Halımı Aldır
+              </Link>
+            )}
           </div>
         </div>
       </main>

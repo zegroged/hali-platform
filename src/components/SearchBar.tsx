@@ -5,9 +5,11 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { IconMapPin, IconFilter, IconX } from "@/components/icons";
 import { DISTRICTS } from "@/components/districts";
+import { resolveSearchLocation } from "@/lib/cities";
 
 type Props = {
   q?: string;
+  il?: string;
   district?: string;
   lat?: string;
   lng?: string;
@@ -34,6 +36,7 @@ export function SearchBar(p: Props) {
   function nav(over: Record<string, string | undefined>) {
     const base: Record<string, string | undefined> = {
       q: p.q,
+      il: p.il,
       district: p.district,
       lat: p.lat,
       lng: p.lng,
@@ -56,6 +59,21 @@ export function SearchBar(p: Props) {
     const term = q.trim();
     if (!term) return;
     setErr(null);
+    // Önce il/ilçe listesiyle eşleştir: "kars" → Kars ilindeki TÜM halıcılar
+    // (metni koordinata çevirip "en yakın 940 km" saçmalığına düşme).
+    const loc = resolveSearchLocation(term);
+    if (loc) {
+      nav({
+        il: loc.city,
+        district: loc.district,
+        lat: undefined,
+        lng: undefined,
+        q: undefined,
+        view: undefined,
+      });
+      return;
+    }
+    // Listeyle eşleşmedi (cadde/mahalle/adres) → koordinata çevirip yakınlık
     setLoading(true);
     try {
       const res = await fetch(`/api/geocode?q=${encodeURIComponent(term)}`);
@@ -65,6 +83,7 @@ export function SearchBar(p: Props) {
         lat: String(d.lat),
         lng: String(d.lng),
         q: term,
+        il: undefined,
         district: undefined,
         view: "map",
       });
@@ -94,6 +113,7 @@ export function SearchBar(p: Props) {
           lat: String(pos.coords.latitude),
           lng: String(pos.coords.longitude),
           q: undefined,
+          il: undefined,
           district: undefined,
           view: "map",
         }),
@@ -124,6 +144,7 @@ export function SearchBar(p: Props) {
 
   const active =
     p.q ||
+    p.il ||
     p.district ||
     p.maxPrice ||
     p.minRating ||
@@ -157,8 +178,8 @@ export function SearchBar(p: Props) {
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="Adres veya semt yaz (ör. Kadıköy, Bağdat Cad.)"
-          aria-label="Adres veya semt ara"
+          placeholder="İl, ilçe veya adres yaz (ör. Konya, Kadıköy)"
+          aria-label="İl, ilçe veya adres ara"
           disabled={idle}
           className={`w-full ${inp}`}
         />
@@ -182,6 +203,7 @@ export function SearchBar(p: Props) {
               onClick={() =>
                 nav({
                   district: d,
+                  il: undefined,
                   lat: undefined,
                   lng: undefined,
                   q: undefined,

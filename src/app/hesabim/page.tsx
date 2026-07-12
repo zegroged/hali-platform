@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { getSessionUser } from "@/lib/auth";
 import { LogoutButton } from "@/components/LogoutButton";
 import { ORDER_STATUS_META } from "@/lib/orderStatus";
+import { subscriptionActive } from "@/lib/subscription";
 import Footer from "@/components/Footer";
 
 export const metadata: Metadata = {
@@ -45,7 +46,16 @@ export default async function HesabimPage() {
         status: true,
         customerName: true,
         createdAt: true,
-        business: { select: { name: true } },
+        business: {
+          select: {
+            id: true,
+            name: true,
+            isVisible: true,
+            verification: true,
+            pausedUntil: true,
+            subscription: { select: { status: true, currentPeriodEnd: true } },
+          },
+        },
         review: { select: { rating: true } },
       },
     }),
@@ -97,41 +107,64 @@ export default async function HesabimPage() {
               {orders.map((o) => {
                 const meta = ORDER_STATUS_META[o.status];
                 const ref = o.code ?? o.trackingToken;
+                // Tekrar sipariş: yalnız teslim edilmiş sipariş + işletme hâlâ
+                // yayında, aboneliği aktif VE tatil modunda değilse
+                // (kapalı/duraklatılmış işletmeye yönlendirme çıkmaz sokak).
+                const canReorder =
+                  o.status === "DELIVERED" &&
+                  o.business.isVisible &&
+                  o.business.verification !== "REJECTED" &&
+                  subscriptionActive(o.business.subscription) &&
+                  !(
+                    o.business.pausedUntil &&
+                    o.business.pausedUntil > new Date()
+                  );
                 return (
-                  <Link
+                  <div
                     key={o.id}
-                    href={`/takip/${ref}`}
-                    className="block rounded-xl border border-slate-200 bg-white p-4 transition hover:border-brand"
+                    className="rounded-xl border border-slate-200 bg-white transition hover:border-brand"
                   >
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="font-medium text-slate-900">
-                        {o.business.name}
-                      </span>
-                      <span className="whitespace-nowrap rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">
-                        {meta?.label ?? o.status}
-                      </span>
-                    </div>
-                    <p className="mt-1 text-xs text-slate-500">
-                      Kod: {ref} ·{" "}
-                      {new Date(o.createdAt).toLocaleDateString("tr-TR")}
-                    </p>
-                    {o.status === "DELIVERED" && (
-                      <p className="mt-1 text-xs">
-                        {o.review ? (
-                          <span className="text-amber-500">
-                            {"★".repeat(o.review.rating)}
-                            <span className="text-slate-300">
-                              {"★".repeat(5 - o.review.rating)}
-                            </span>
-                          </span>
-                        ) : (
-                          <span className="font-medium text-brand-dark">
-                            Değerlendir, 50 puan kazan →
-                          </span>
-                        )}
+                    <Link href={`/takip/${ref}`} className="block p-4">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-medium text-slate-900">
+                          {o.business.name}
+                        </span>
+                        <span className="whitespace-nowrap rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">
+                          {meta?.label ?? o.status}
+                        </span>
+                      </div>
+                      <p className="mt-1 text-xs text-slate-500">
+                        Kod: {ref} ·{" "}
+                        {new Date(o.createdAt).toLocaleDateString("tr-TR")}
                       </p>
+                      {o.status === "DELIVERED" && (
+                        <p className="mt-1 text-xs">
+                          {o.review ? (
+                            <span className="text-amber-500">
+                              {"★".repeat(o.review.rating)}
+                              <span className="text-slate-300">
+                                {"★".repeat(5 - o.review.rating)}
+                              </span>
+                            </span>
+                          ) : (
+                            <span className="font-medium text-brand-dark">
+                              Değerlendir, 50 puan kazan →
+                            </span>
+                          )}
+                        </p>
+                      )}
+                    </Link>
+                    {canReorder && (
+                      <div className="border-t border-slate-100 px-4 py-2.5">
+                        <Link
+                          href={`/halici/${o.business.id}/siparis?onceki=${o.id}`}
+                          className="text-sm font-medium text-brand-dark hover:underline"
+                        >
+                          Tekrar sipariş ver — bilgilerin otomatik dolar →
+                        </Link>
+                      </div>
                     )}
-                  </Link>
+                  </div>
                 );
               })}
             </div>

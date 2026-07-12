@@ -26,12 +26,18 @@ async function purgeOldLocationData() {
   }
 }
 
-async function weeklyDigestTick() {
+async function hourlyTick() {
   try {
     const { maybeSendWeeklyDigest } = await import("@/lib/weeklyDigest");
     await maybeSendWeeklyDigest();
   } catch (e) {
     console.error("[haftalik-ozet] hata:", e);
+  }
+  try {
+    const { checkStaleOrders } = await import("@/lib/orderSla");
+    await checkStaleOrders();
+  } catch (e) {
+    console.error("[siparis-sla] hata:", e);
   }
 }
 
@@ -42,9 +48,11 @@ export async function register() {
   await purgeOldLocationData();
   const timer = setInterval(purgeOldLocationData, DAY_MS);
   if (typeof timer.unref === "function") timer.unref();
-  // Haftalık özet: saat başı yoklanır, yalnız TR pazartesi + haftada bir gider
-  // (AppState işareti — yeniden başlatmada mükerrer mail yok).
-  await weeklyDigestTick();
-  const digestTimer = setInterval(weeklyDigestTick, 60 * 60 * 1000);
-  if (typeof digestTimer.unref === "function") digestTimer.unref();
+  // Saatlik tik: haftalık özet (yalnız TR pazartesi, AppState işaretli) +
+  // sipariş SLA bekçisi (2s hatırlatma / 24s eskalasyon; sipariş başına bir kez).
+  // await ETME: birikmiş iş (e-posta döngüsü) açılışı bloklamasın — kesinti
+  // sonrası site bir an önce ayağa kalkmalı.
+  void hourlyTick();
+  const hourlyTimer = setInterval(hourlyTick, 60 * 60 * 1000);
+  if (typeof hourlyTimer.unref === "function") hourlyTimer.unref();
 }

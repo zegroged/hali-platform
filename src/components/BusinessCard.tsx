@@ -36,16 +36,23 @@ export function BusinessCard({ b }: { b: BusinessSummary }) {
             <Logo size={44} />
           </div>
         )}
-        <span
-          className={`absolute left-2 top-2 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium backdrop-blur ${
-            b.isOpenNow
-              ? "bg-green-100/90 text-green-700"
-              : "bg-white/85 text-slate-500"
-          }`}
-        >
-          <IconClock size={12} />
-          {b.isOpenNow ? "Açık" : "Kapalı"}
-        </span>
+        {/* Tatil modunda "Açık" rozetiyle çelişmesin — tek rozet göster */}
+        {b.isPaused ? (
+          <span className="absolute left-2 top-2 rounded-full bg-amber-100/95 px-2 py-0.5 text-xs font-medium text-amber-800 backdrop-blur">
+            Şu an sipariş almıyor
+          </span>
+        ) : (
+          <span
+            className={`absolute left-2 top-2 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium backdrop-blur ${
+              b.isOpenNow
+                ? "bg-green-100/90 text-green-700"
+                : "bg-white/85 text-slate-500"
+            }`}
+          >
+            <IconClock size={12} />
+            {b.isOpenNow ? "Açık" : "Kapalı"}
+          </span>
+        )}
       </div>
 
       {/* Gövde */}

@@ -22,6 +22,7 @@ import {
 export const dynamic = "force-dynamic";
 
 type SearchParams = Promise<{
+  il?: string;
   district?: string;
   lat?: string;
   lng?: string;
@@ -150,6 +151,7 @@ export default async function Home({
 
   const hasQuery = Boolean(
     sp.q ||
+      sp.il ||
       sp.district ||
       sp.maxPrice ||
       sp.minRating ||
@@ -160,6 +162,7 @@ export default async function Home({
 
   const searchProps = {
     q: sp.q,
+    il: sp.il,
     district: sp.district,
     lat: sp.lat,
     lng: sp.lng,
@@ -173,6 +176,7 @@ export default async function Home({
   // ---- Sonuç modu (arama/filtre/semt/harita) ----
   if (hasQuery) {
     const businesses = await getBusinesses({
+      city: sp.il,
       district: sp.district,
       lat,
       lng,
@@ -184,11 +188,16 @@ export default async function Home({
     const view = sp.view === "map" ? "map" : "list";
     const userCenter =
       lat != null && lng != null ? { lat, lng } : undefined;
-    const heading = sp.district
-      ? `${sp.district} halıcıları`
-      : lat != null
-        ? "Sana en yakın halıcılar"
-        : "Sonuçlar";
+    const heading =
+      sp.il && sp.district
+        ? `${sp.district}, ${sp.il} halıcıları`
+        : sp.district
+          ? `${sp.district} halıcıları`
+          : sp.il
+            ? `${sp.il} halıcıları`
+            : lat != null
+              ? "Sana en yakın halıcılar"
+              : "Sonuçlar";
 
     return (
       <>
@@ -213,8 +222,15 @@ export default async function Home({
                 Bu aramada halıcı bulunamadı
               </p>
               <p className="mx-auto mt-1 max-w-sm text-sm text-slate-600">
-                Filtreleri gevşetmeyi ya da farklı bir semtte aramayı
-                deneyebilirsin.
+                Bölgende henüz yayında halıcı olmayabilir — filtreleri
+                gevşetmeyi deneyebilir ya da{" "}
+                <Link
+                  href="/sehirler"
+                  className="font-medium text-brand-dark underline"
+                >
+                  şehrinin sayfasına
+                </Link>{" "}
+                bakabilirsin (açılınca haber verelim).
               </p>
               <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
                 {DISTRICTS.map((d) => (

@@ -673,3 +673,46 @@ export async function setOrderEta(formData: FormData) {
   revalidatePath("/panel/siparisler");
   revalidatePath(`/panel/siparisler/${orderId}`);
 }
+
+/**
+ * Tatil modu: verilen tarihe (TR gün sonu) kadar YENİ kamu siparişini kapat;
+ * profil yayında kalır, panelden manuel kayıt etkilenmez. Boş tarih = kaldır.
+ * En fazla 90 gün ileri (yanlışlıkla kalıcı kapanma olmasın).
+ */
+export async function setPauseMode(formData: FormData) {
+  const b = await biz();
+  const raw = String(formData.get("pausedUntil") || "").trim();
+  if (!raw) {
+    await prisma.cleanerBusiness.update({
+      where: { id: b.id },
+      data: { pausedUntil: null },
+    });
+    revalidatePath("/panel");
+    redirect("/panel?kaydedildi=Duraklatma+kaldırıldı");
+  }
+  const [y, m, d] = raw.split("-").map(Number);
+  if (!y || !m || !d) return;
+  // Karşılaştırma TAKVİM GÜNÜ bazında (TR): anlık saatle kıyas, takvimin izin
+  // verdiği son günü sunucuda reddediyordu (gün sonu 20:59 UTC > now+90g anı).
+  const trNow = new Date(Date.now() + 3 * 60 * 60 * 1000);
+  const todayUTC = Date.UTC(
+    trNow.getUTCFullYear(),
+    trNow.getUTCMonth(),
+    trNow.getUTCDate(),
+  );
+  const diffDays = Math.round((Date.UTC(y, m - 1, d) - todayUTC) / 86400000);
+  if (diffDays < 0 || diffDays > 90) {
+    redirect(
+      "/panel?hata=" +
+        encodeURIComponent("Duraklatma tarihi bugünden ileri ve en çok 90 gün olabilir."),
+    );
+  }
+  // TR 23:59:59 = UTC 20:59:59 (kalıcı UTC+3)
+  const until = new Date(Date.UTC(y, m - 1, d, 20, 59, 59));
+  await prisma.cleanerBusiness.update({
+    where: { id: b.id },
+    data: { pausedUntil: until },
+  });
+  revalidatePath("/panel");
+  redirect("/panel?kaydedildi=Siparişler+duraklatıldı");
+}

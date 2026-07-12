@@ -20,7 +20,8 @@ export default async function AdminHome({
 
   const { hata } = await searchParams;
 
-  const [businesses, driverCount, orderCount, cityLeads] = await Promise.all([
+  const [businesses, driverCount, orderCount, cityLeads, staleOrders] =
+    await Promise.all([
     prisma.cleanerBusiness.findMany({
       orderBy: { createdAt: "desc" },
       include: {
@@ -36,6 +37,24 @@ export default async function AdminHome({
       by: ["city"],
       _count: true,
       orderBy: { _count: { city: "desc" } },
+    }),
+    // SLA: 2 saatten uzun süredir yanıtsız siparişler — hangi işletme
+    // siparişleri çürütüyor, admin bir bakışta görsün.
+    prisma.order.findMany({
+      where: {
+        status: "CREATED",
+        createdAt: { lt: new Date(Date.now() - 2 * 60 * 60 * 1000) },
+      },
+      orderBy: { createdAt: "asc" },
+      take: 20,
+      select: {
+        id: true,
+        code: true,
+        trackingToken: true,
+        customerName: true,
+        createdAt: true,
+        business: { select: { id: true, name: true } },
+      },
     }),
   ]);
 
@@ -123,6 +142,50 @@ export default async function AdminHome({
                 </span>
               </span>
             ))}
+          </div>
+        </section>
+      )}
+
+      {/* SLA: 2 saati aşmış yanıtsız siparişler — sessizlik pazar yeri öldürür */}
+      {staleOrders.length > 0 && (
+        <section>
+          <h2 className="mb-2 font-semibold text-red-700">
+            Geciken siparişler{" "}
+            <span className="text-sm font-normal text-slate-500">
+              (2 saatten uzun süredir yanıtsız)
+            </span>
+          </h2>
+          <div className="overflow-hidden rounded-xl border border-red-200 bg-white">
+            {staleOrders.map((o) => {
+              const hours = Math.floor(
+                (Date.now() - o.createdAt.getTime()) / (60 * 60 * 1000),
+              );
+              return (
+                <div
+                  key={o.id}
+                  className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-4 py-2.5 text-sm last:border-0"
+                >
+                  <span>
+                    <Link
+                      href={`/admin/isletme/${o.business.id}`}
+                      className="font-medium text-slate-900 hover:underline"
+                    >
+                      {o.business.name}
+                    </Link>{" "}
+                    · {o.customerName} · {o.code ?? o.trackingToken}
+                  </span>
+                  <span
+                    className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                      hours >= 24
+                        ? "bg-red-100 text-red-700"
+                        : "bg-amber-100 text-amber-700"
+                    }`}
+                  >
+                    {hours} saattir bekliyor
+                  </span>
+                </div>
+              );
+            })}
           </div>
         </section>
       )}

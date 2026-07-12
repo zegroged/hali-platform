@@ -19,7 +19,7 @@ export async function GET(
   const order = await prisma.order.findFirst({
     where: { OR: [{ trackingToken: token }, { code: token.toUpperCase() }] },
     include: {
-      business: { select: { name: true, phone: true } },
+      business: { select: { name: true, phone: true, city: true } },
       driver: { select: { lastLat: true, lastLng: true, user: { select: { name: true } } } },
       events: { orderBy: { createdAt: "asc" } },
       photos: { orderBy: { createdAt: "asc" }, select: { id: true, url: true } },
@@ -41,6 +41,50 @@ export async function GET(
   const viewer = await getAuthedUser();
   const viewerIsCustomer = viewer?.role === "CUSTOMER";
 
+  // Kurtarma: sipariş reddedildi/iptal edildiyse YA DA 24 saattir yanıtsızsa
+  // müşteri çıkmaz sokakta kalmasın — aynı şehirdeki alternatif halıcıları öner.
+  // isManual hariç: panel kaydında "işletme yanıt vermedi" bandı anlamsız.
+  const waitingLong =
+    order.status === "CREATED" &&
+    !order.isManual &&
+    Date.now() - order.createdAt.getTime() > 24 * 60 * 60 * 1000;
+  const needsAlternatives =
+    order.status === "REJECTED" || order.status === "CANCELED" || waitingLong;
+  let alternatives: {
+    id: string;
+    name: string;
+    district: string;
+    ratingAvg: number;
+    ratingCount: number;
+  }[] = [];
+  if (needsAlternatives) {
+    try {
+      const { activeSubscriptionWhere } = await import("@/lib/subscription");
+      alternatives = await prisma.cleanerBusiness.findMany({
+        where: {
+          id: { not: order.businessId },
+          isVisible: true,
+          verification: { not: "REJECTED" },
+          subscription: activeSubscriptionWhere(),
+          city: { equals: order.business.city, mode: "insensitive" },
+          // Tatil modundaki işletmeyi önerme — müşteri yine çıkmaza girer.
+          OR: [{ pausedUntil: null }, { pausedUntil: { lte: new Date() } }],
+        },
+        orderBy: [{ ratingAvg: "desc" }, { ratingCount: "desc" }],
+        take: 3,
+        select: {
+          id: true,
+          name: true,
+          district: true,
+          ratingAvg: true,
+          ratingCount: true,
+        },
+      });
+    } catch (e) {
+      console.error("takip alternatif önerisi hatası:", e); // öneri süs, akışı bozmasın
+    }
+  }
+
   return NextResponse.json({
     status: order.status,
     rejectReason: order.rejectReason,
@@ -56,7 +100,11 @@ export async function GET(
     paymentMethod: order.paymentMethod,
     estimatedDays: order.estimatedDays,
     photos: order.photos,
-    business: order.business,
+    business: { name: order.business.name, phone: order.business.phone },
+    // 24 saattir yanıtsız mı? (takip sayfası "beklemek zorunda değilsin" bandı)
+    waitingLong,
+    // Red/iptal/uzun bekleme durumunda aynı şehirden alternatif halıcılar.
+    alternatives,
     // Teslim sonrası değerlendirme: varsa yıldızı göster, yoksa form çıkar.
     review: order.review,
     // Üyelik zorunlu — UI formu mu, "üye ol" bandını mı göstersin?

@@ -507,3 +507,16 @@ export async function saveAdminNote(formData: FormData) {
   });
   revalidatePath(`/admin/isletme/${id}`);
 }
+
+// Tatil modunu admin kaldırır (işletme yanlışlıkla uzun süre kapattıysa /
+// destek talebi geldiyse). Koymak paneldeki işletmenin kendi işi.
+export async function clearPauseByAdmin(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("id"));
+  await prisma.cleanerBusiness.update({
+    where: { id },
+    data: { pausedUntil: null },
+  });
+  revalidatePath(`/admin/isletme/${id}`);
+  revalidatePath("/admin");
+}

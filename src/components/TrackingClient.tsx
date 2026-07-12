@@ -46,7 +46,50 @@ type Track = {
   review: { rating: number } | null;
   // Değerlendirme için üyelik zorunlu — görüntüleyen giriş yapmış müşteri mi?
   viewerIsCustomer: boolean;
+  // Kurtarma: sipariş 24 saattir yanıtsız mı? + red/iptal/uzun beklemede
+  // aynı şehirden alternatif halıcılar (müşteri çıkmaz sokakta kalmasın).
+  waitingLong?: boolean;
+  alternatives?: {
+    id: string;
+    name: string;
+    district: string;
+    ratingAvg: number;
+    ratingCount: number;
+  }[];
 };
+
+/** Red/iptal/uzun bekleme durumunda aynı şehirdeki alternatif halıcı kartları. */
+function AlternativeBusinesses({
+  list,
+}: {
+  list: NonNullable<Track["alternatives"]>;
+}) {
+  if (list.length === 0) return null;
+  return (
+    <div>
+      <h2 className="mb-2 text-sm font-semibold text-slate-700">
+        Bölgendeki diğer halıcılar
+      </h2>
+      <div className="grid gap-2 sm:grid-cols-3">
+        {list.map((b) => (
+          <Link
+            key={b.id}
+            href={`/halici/${b.id}`}
+            className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm transition hover:border-brand"
+          >
+            <p className="text-sm font-semibold text-slate-900">{b.name}</p>
+            <p className="mt-0.5 text-xs text-slate-500">
+              {b.district}
+              {b.ratingCount > 0
+                ? ` · ★ ${b.ratingAvg.toFixed(1)} (${b.ratingCount})`
+                : " · Yeni"}
+            </p>
+          </Link>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 // Poll'un durdurulacağı nihai durumlar — teslim edilmiş sipariş sonsuza dek sorgulanmasın.
 const FINAL_STATUSES: OrderStatus[] = ["DELIVERED", "REJECTED", "CANCELED"];
@@ -427,6 +470,23 @@ export function TrackingClient({ token }: { token: string }) {
         )
       ) : (
         <>
+          {/* SLA: 24 saattir yanıtsız — müşteri beklemek zorunda değil */}
+          {data.waitingLong && (
+            <div className="space-y-3">
+              <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-800">
+                <p className="font-semibold">
+                  İşletme siparişini henüz yanıtlamadı
+                </p>
+                <p className="mt-1">
+                  24 saati geçti — beklemek zorunda değilsin. İstersen aşağıdan
+                  siparişi ücretsiz iptal edip başka bir halıcı seçebilirsin.
+                </p>
+              </div>
+              {data.alternatives && data.alternatives.length > 0 && (
+                <AlternativeBusinesses list={data.alternatives} />
+              )}
+            </div>
+          )}
           {/* Halıcının verdiği tahmini teslim süresi */}
           {data.estimatedDays != null && data.status !== "DELIVERED" && (
             <div className="rounded-lg bg-brand-light px-3 py-2 text-sm font-medium text-brand-dark">
@@ -692,6 +752,13 @@ export function TrackingClient({ token }: { token: string }) {
           ) : null}
         </>
       )}
+
+      {/* Red/iptal: müşteriyi platformda tut — aynı şehirden alternatif öner */}
+      {(rejected || canceled) &&
+        data.alternatives &&
+        data.alternatives.length > 0 && (
+          <AlternativeBusinesses list={data.alternatives} />
+        )}
 
       {/* Halıcının eklediği fotoğraflar */}
       {data.photos.length > 0 && (

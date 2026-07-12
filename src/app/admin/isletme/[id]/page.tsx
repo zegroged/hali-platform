@@ -7,6 +7,7 @@ import { subscriptionActive } from "@/lib/subscription";
 import { ORDER_STATUS_META } from "@/lib/orderStatus";
 import {
   activateSubscription,
+  clearPauseByAdmin,
   approveBusiness,
   banUser,
   deletePhoto,
@@ -153,6 +154,11 @@ export default async function AdminBusinessDetail({
         >
           {b.isVisible && subOk ? "Müşteriye görünür" : "Yayında değil"}
         </span>
+        {b.pausedUntil && b.pausedUntil > new Date() && (
+          <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-800">
+            Tatil modu: {tr(b.pausedUntil)} tarihine kadar sipariş almıyor
+          </span>
+        )}
         <span className="text-xs text-slate-400">
           Kayıt: {tr(b.createdAt)}
         </span>
@@ -186,6 +192,14 @@ export default async function AdminBusinessDetail({
             Ödeme alındı — 1 ay aktifleştir/uzat
           </button>
         </form>
+        {b.pausedUntil && b.pausedUntil > new Date() && (
+          <form action={clearPauseByAdmin}>
+            <input type="hidden" name="id" value={b.id} />
+            <button className="rounded-lg border border-amber-400 px-4 py-2 text-sm font-medium text-amber-700 hover:bg-amber-50">
+              Tatil modunu kaldır
+            </button>
+          </form>
+        )}
         {subOk && (
           <form action={suspendSubscription}>
             <input type="hidden" name="id" value={b.id} />

@@ -191,6 +191,49 @@ export function normalizeDistrictName(
   return hit ?? null;
 }
 
+/**
+ * Arama kutusu metnini il/ilçeye çözer — "kars" → Kars ili, "kadıköy" →
+ * İstanbul/Kadıköy, "konya selçuklu" → il+ilçe. Eşleşme yoksa null (arama
+ * geocode'a düşer). Birden çok ilde geçen ilçe adında (örn. "Merkez") il
+ * belirsizdir → yalnız ilçe adı döner (çapraz-il ilçe filtresi).
+ */
+export function resolveSearchLocation(
+  text: string,
+): { city?: string; district?: string } | null {
+  const t = text.trim().replace(/\s+/g, " ");
+  if (!t) return null;
+  const asCity = normalizeCityName(t);
+  if (asCity) return { city: asCity };
+  // İki parçalı: "il ilçe" veya "ilçe il"
+  const tokens = t.split(" ");
+  if (tokens.length >= 2) {
+    for (let i = 1; i < tokens.length; i++) {
+      const a = tokens.slice(0, i).join(" ");
+      const b = tokens.slice(i).join(" ");
+      const cityA = normalizeCityName(a);
+      if (cityA) {
+        const d = normalizeDistrictName(cityA, b);
+        if (d) return { city: cityA, district: d };
+      }
+      const cityB = normalizeCityName(b);
+      if (cityB) {
+        const d = normalizeDistrictName(cityB, a);
+        if (d) return { city: cityB, district: d };
+      }
+    }
+  }
+  // Tek başına ilçe adı — hangi il(ler)de geçiyor?
+  const matches: { city: string; district: string }[] = [];
+  for (const c of CITIES) {
+    const d = normalizeDistrictName(c.name, t);
+    if (d) matches.push({ city: c.name, district: d });
+    if (matches.length > 1) break; // 2+ bulunca belirsiz; devam etmeye gerek yok
+  }
+  if (matches.length === 1) return matches[0];
+  if (matches.length > 1) return { district: matches[0].district };
+  return null;
+}
+
 /** İlçe SEO sayfası URL parçası: "Eyüpsultan" → "eyupsultan", "Merkez" → "merkez". */
 export function districtSlug(district: string): string {
   return foldTr(district).replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");

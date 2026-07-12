@@ -51,6 +51,7 @@ export async function POST(req: NextRequest) {
       id: true,
       phone: true,
       ownerId: true,
+      pausedUntil: true,
       subscription: { select: { status: true, currentPeriodEnd: true } },
     },
   });
@@ -61,6 +62,16 @@ export async function POST(req: NextRequest) {
   if (!subscriptionActive(business.subscription)) {
     return NextResponse.json(
       { error: "Bu halıcı şu anda sipariş almıyor." },
+      { status: 410 },
+    );
+  }
+  // Tatil modu: işletme siparişleri duraklattıysa kamu siparişi alınmaz
+  // (profil yayında kalır; panelden manuel kayıt etkilenmez).
+  if (business.pausedUntil && business.pausedUntil > new Date()) {
+    return NextResponse.json(
+      {
+        error: `Bu işletme ${business.pausedUntil.toLocaleDateString("tr-TR", { day: "numeric", month: "long" })} tarihine kadar yeni sipariş almıyor. Başka bir halıcı seçebilirsin.`,
+      },
       { status: 410 },
     );
   }

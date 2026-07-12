@@ -31,12 +31,18 @@ export type BusinessSummary = {
   distanceKm: number | null;
   isNew: boolean;
   isOpenNow: boolean;
+  isPaused: boolean; // tatil modu — listede kalır ama "sipariş almıyor" rozeti
   rejectRate: number;
   totalOrders: number;
   coverUrl: string | null;
 };
 
 const NEW_WINDOW_MS = 21 * 24 * 60 * 60 * 1000;
+
+// Konumlu aramada hizmet yarıçapı: halı kapıdan alınır — 940 km ötedeki
+// işletme "en yakın" diye listelenmesin (Kars'ta arayana Konya çıkıyordu).
+// 75 km büyükşehirin ucundan ucuna yeter, şehirler arasını eler.
+const MAX_SERVICE_DISTANCE_KM = 75;
 
 // Red cezası güveni: 5+ siparişte tam (1.0), az veride hafif → yeni halıcı
 // tek redde orantısız cezalanmasın (A10 cold-start).
@@ -140,7 +146,16 @@ export async function getBusinesses(
       { serviceAreas: { some: { city: cityEq, district: districtEq } } },
     ];
   } else if (filter.district) {
-    where.serviceAreas = { some: { district: filter.district } };
+    // İlçe adıyla arama: işletmenin kendi ilçesi VEYA hizmet bölgesi;
+    // harf-duyarsız (arama kutusundan küçük harfle gelebilir).
+    where.OR = [
+      { district: { equals: filter.district, mode: "insensitive" } },
+      {
+        serviceAreas: {
+          some: { district: { equals: filter.district, mode: "insensitive" } },
+        },
+      },
+    ];
   } else if (filter.city) {
     // Şehir sayfaları: işletmenin kendi ili VEYA hizmet bölgesi eşleşsin;
     // serbest metin girildiği için büyük/küçük harf duyarsız karşılaştır.
@@ -200,11 +215,19 @@ export async function getBusinesses(
       distanceKm,
       isNew: Date.now() - b.createdAt.getTime() < NEW_WINDOW_MS,
       isOpenNow: isOpenNow(b.workingHours),
+      isPaused: b.pausedUntil != null && b.pausedUntil > new Date(),
       rejectRate,
       totalOrders: s?.total ?? 0,
       coverUrl: b.photos[0]?.url ?? null,
     };
   });
+
+  // Konumlu aramada hizmet yarıçapı dışını ele (bkz MAX_SERVICE_DISTANCE_KM).
+  if (filter.lat != null && filter.lng != null) {
+    list = list.filter(
+      (b) => b.distanceKm != null && b.distanceKm <= MAX_SERVICE_DISTANCE_KM,
+    );
+  }
 
   // Filtreler
   if (filter.maxPrice != null) {
@@ -349,6 +372,9 @@ export async function getBusinessById(id: string) {
     city: b.city,
     district: b.district,
     phone: b.phone,
+    // Tatil modu: geçerli bir duraklatma varsa profil sipariş butonunu kapatır.
+    pausedUntil:
+      b.pausedUntil && b.pausedUntil > new Date() ? b.pausedUntil : null,
     workingHours: b.workingHours,
     deliveryMinDays: b.deliveryEstimateMinDays,
     deliveryMaxDays: b.deliveryEstimateMaxDays,

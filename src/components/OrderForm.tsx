@@ -23,21 +23,35 @@ function parseM2(v: string): number | null {
 export function OrderForm({
   businessId,
   businessName,
+  initial,
 }: {
   businessId: string;
   businessName?: string;
+  /** "Tekrar sipariş": önceki siparişten ön-doldurma (sunucu sayfası sahiplik
+   *  kontrolünden geçirip verir; onay kutusu ASLA ön-işaretlenmez). */
+  initial?: Partial<{
+    customerName: string;
+    customerPhone: string;
+    pickupAddress: string;
+    approxM2: string;
+    note: string;
+    pickupLat: number;
+    pickupLng: number;
+  }>;
 }) {
   const router = useRouter();
   const [form, setForm] = useState({
-    customerName: "",
-    customerPhone: "",
-    pickupAddress: "",
-    approxM2: "",
-    note: "",
+    customerName: initial?.customerName ?? "",
+    customerPhone: initial?.customerPhone ?? "",
+    pickupAddress: initial?.pickupAddress ?? "",
+    approxM2: initial?.approxM2 ?? "",
+    note: initial?.note ?? "",
     paymentMethod: "CASH" as "CASH" | "CARD",
   });
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(
-    null,
+    initial?.pickupLat != null && initial?.pickupLng != null
+      ? { lat: initial.pickupLat, lng: initial.pickupLng }
+      : null,
   );
   const [geoState, setGeoState] = useState<"idle" | "loading" | "error">(
     "idle",
@@ -118,7 +132,12 @@ export function OrderForm({
         }),
       });
       if (!res.ok) {
-        setError("Sipariş oluşturulamadı. Bilgileri kontrol edin.");
+        // Sunucunun gerçek mesajını göster (tatil modu, abonelik, şoför yok
+        // gibi durumlar "bilgileri kontrol edin"le açıklanamaz).
+        const data = (await res.json().catch(() => null)) as {
+          error?: string;
+        } | null;
+        setError(data?.error ?? "Sipariş oluşturulamadı. Bilgileri kontrol edin.");
         return;
       }
       const data = await res.json();

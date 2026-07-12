@@ -35,15 +35,22 @@ export function BusinessCardCompact({ b }: { b: BusinessSummary }) {
       </div>
       <div className="flex items-center justify-between gap-1">
         <RatingPill ratingAvg={b.ratingAvg} ratingCount={b.ratingCount} />
-        <span
-          className={`shrink-0 whitespace-nowrap rounded-full px-1.5 py-0.5 text-xs font-medium ${
-            b.isOpenNow
-              ? "bg-green-100 text-green-700"
-              : "bg-slate-100 text-slate-500"
-          }`}
-        >
-          {b.isOpenNow ? "Açık" : "Kapalı"}
-        </span>
+        {/* Tatil modunda "Açık" ile çelişmesin — tek rozet */}
+        {b.isPaused ? (
+          <span className="shrink-0 whitespace-nowrap rounded-full bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-800">
+            Sipariş almıyor
+          </span>
+        ) : (
+          <span
+            className={`shrink-0 whitespace-nowrap rounded-full px-1.5 py-0.5 text-xs font-medium ${
+              b.isOpenNow
+                ? "bg-green-100 text-green-700"
+                : "bg-slate-100 text-slate-500"
+            }`}
+          >
+            {b.isOpenNow ? "Açık" : "Kapalı"}
+          </span>
+        )}
       </div>
       <h3 className="mt-1 truncate text-sm font-medium text-slate-900">
         {b.name}

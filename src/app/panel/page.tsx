@@ -7,7 +7,7 @@ import {
 } from "@/lib/panel";
 import { subscriptionActive } from "@/lib/subscription";
 import { paymentsLive } from "@/lib/config";
-import { submitForVerification } from "./actions";
+import { submitForVerification, setPauseMode } from "./actions";
 import { startSubscriptionPayment } from "./subscription-actions";
 import { acceptContractVersioned } from "./contract-actions";
 import { CONTRACT_VERSION } from "@/lib/legal";
@@ -43,11 +43,11 @@ function fmtGun(dt: Date) {
 export default async function PanelHome({
   searchParams,
 }: {
-  searchParams: Promise<{ odeme?: string }>;
+  searchParams: Promise<{ odeme?: string; hata?: string; kaydedildi?: string }>;
 }) {
   const b = await getCurrentBusiness();
   if (!b) return null;
-  const { odeme } = await searchParams;
+  const { odeme, hata, kaydedildi } = await searchParams;
 
   const [pendingOrders, activeOrders, delivered] = await Promise.all([
     prisma.order.count({ where: { businessId: b.id, status: "CREATED" } }),
@@ -86,6 +86,13 @@ export default async function PanelHome({
     },
   ];
   const subOk = subscriptionActive(b.subscription);
+  // Tatil modu durumu + tarih girişinin sınırları (TR takvim günü: bugün..+90).
+  const isPaused = b.pausedUntil != null && b.pausedUntil > new Date();
+  const TR_MS = 3 * 60 * 60 * 1000; // kalıcı UTC+3
+  const pauseMin = new Date(Date.now() + TR_MS).toISOString().slice(0, 10);
+  const pauseMax = new Date(Date.now() + TR_MS + 90 * 24 * 60 * 60 * 1000)
+    .toISOString()
+    .slice(0, 10);
   const missingCount =
     checklist.filter((c) => !c.done).length +
     (b.owner.emailVerified ? 0 : 1) +
@@ -123,6 +130,20 @@ export default async function PanelHome({
 
   return (
     <div className="space-y-6">
+      {/* Aksiyonlardan (örn. tatil modu) dönen hata/başarı mesajları */}
+      {hata && (
+        <p
+          role="alert"
+          className="rounded-xl border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700"
+        >
+          {hata}
+        </p>
+      )}
+      {kaydedildi && (
+        <p className="rounded-xl border border-green-300 bg-green-50 px-4 py-3 text-sm text-green-800">
+          {kaydedildi}.
+        </p>
+      )}
       {banner && (
         <p className={`rounded-xl border px-4 py-3 text-sm ${banner.cls}`}>
           {banner.text}
@@ -326,6 +347,54 @@ export default async function PanelHome({
         >
           Aboneliği yönet (geçmiş, iptal) →
         </Link>
+      </div>
+
+      {/* Tatil modu — yeni kamu siparişini geçici kapat; profil yayında kalır,
+          panelden manuel kayıt etkilenmez. */}
+      <div
+        className={`rounded-xl border p-4 ${
+          isPaused ? "border-amber-300 bg-amber-50" : "border-slate-200 bg-white"
+        }`}
+      >
+        <p className="font-medium text-slate-900">Tatil modu</p>
+        {isPaused ? (
+          <>
+            <p className="mt-1 text-sm text-amber-800">
+              Siparişler <strong>{fmtGun(b.pausedUntil!)}</strong> tarihine
+              kadar duraklatıldı — profilin yayında ama müşteriler yeni sipariş
+              veremiyor. Panelden manuel sipariş açmaya devam edebilirsin.
+            </p>
+            <form action={setPauseMode} className="mt-3">
+              <PendingButton className="rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark active:scale-[0.99] disabled:opacity-60">
+                Duraklatmayı kaldır — siparişleri aç
+              </PendingButton>
+            </form>
+          </>
+        ) : (
+          <>
+            <p className="mt-1 text-sm text-slate-500">
+              Bayram, tadilat gibi dönemlerde yeni siparişleri geçici kapat.
+              Profilin yayında ve aramalarda kalır; seçtiğin günün sonunda
+              siparişler otomatik açılır.
+            </p>
+            <form
+              action={setPauseMode}
+              className="mt-3 flex flex-wrap items-center gap-2"
+            >
+              <input
+                type="date"
+                name="pausedUntil"
+                required
+                min={pauseMin}
+                max={pauseMax}
+                className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand"
+              />
+              <PendingButton className="rounded-lg border border-amber-400 bg-white px-4 py-2 text-sm font-semibold text-amber-700 transition hover:bg-amber-50 active:scale-[0.99] disabled:opacity-60">
+                Bu tarihe kadar duraklat
+              </PendingButton>
+            </form>
+          </>
+        )}
       </div>
 
       {/* Yayın koşulları — eksik varsa "burayı doldur" listesi. Tümü dolunca
