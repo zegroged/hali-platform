@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
@@ -43,9 +44,14 @@ function Card({
       </View>
       <View style={s.cardTop}>
         <Text style={s.rating}>★ {b.ratingAvg.toFixed(1)}</Text>
-        <Text style={[s.badge, b.isOpenNow ? s.open : s.closed]}>
-          {b.isOpenNow ? "Açık" : "Kapalı"}
-        </Text>
+        {/* Tatil modunda "Açık" ile çelişmesin — tek rozet */}
+        {b.isPaused ? (
+          <Text style={[s.badge, s.paused]}>Sipariş almıyor</Text>
+        ) : (
+          <Text style={[s.badge, b.isOpenNow ? s.open : s.closed]}>
+            {b.isOpenNow ? "Açık" : "Kapalı"}
+          </Text>
+        )}
       </View>
       <Text style={s.name} numberOfLines={1}>
         {b.name}
@@ -101,12 +107,20 @@ export function HomeScreen({ nav }: { nav: Nav }) {
   const r = useResponsive();
   const [all, setAll] = useState<Business[]>([]);
   const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState(false); // ağ hatası ≠ "bölgende yok"
+  const [locating, setLocating] = useState(false);
   const [located, setLocated] = useState(false);
+  const [lastCoords, setLastCoords] = useState<
+    { lat: number; lng: number } | undefined
+  >(undefined);
 
   const load = useCallback(async (coords?: { lat: number; lng: number }) => {
     setLoading(true);
+    setFailed(false);
     try {
       setAll(await getBusinesses(coords));
+    } catch {
+      setFailed(true);
     } finally {
       setLoading(false);
     }
@@ -117,11 +131,29 @@ export function HomeScreen({ nav }: { nav: Nav }) {
   }, [load]);
 
   async function useMyLocation() {
-    const { status } = await Location.requestForegroundPermissionsAsync();
-    if (status !== "granted") return;
-    const pos = await Location.getCurrentPositionAsync({});
-    setLocated(true);
-    load({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+    setLocating(true);
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert(
+          "Konum izni gerekli",
+          "En yakın halıcıları sıralayabilmek için konum izni ver — telefon ayarlarından açabilirsin.",
+        );
+        return;
+      }
+      const pos = await Location.getCurrentPositionAsync({});
+      const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      setLocated(true);
+      setLastCoords(coords);
+      load(coords);
+    } catch {
+      Alert.alert(
+        "Konum alınamadı",
+        "Konum servislerinin açık olduğundan emin olup tekrar dene.",
+      );
+    } finally {
+      setLocating(false);
+    }
   }
 
   const nearest = located ? all.slice(0, 10) : [];
@@ -145,16 +177,37 @@ export function HomeScreen({ nav }: { nav: Nav }) {
             <Text style={s.headerLink}>📦 Takip</Text>
           </TouchableOpacity>
         </View>
-        <TouchableOpacity style={s.locBtn} onPress={useMyLocation}>
+        <TouchableOpacity
+          style={[s.locBtn, locating && { opacity: 0.6 }]}
+          onPress={useMyLocation}
+          disabled={locating}
+          accessibilityRole="button"
+        >
           <Text style={[s.locBtnText, { fontSize: r.scale(15) }]}>
-            📍 Konumumu kullan
+            {locating ? "Konum alınıyor…" : "📍 Konumumu kullan"}
           </Text>
         </TouchableOpacity>
 
         {loading ? (
           <ActivityIndicator style={{ marginTop: 50 }} color={C.brand} size="large" />
+        ) : failed ? (
+          <View style={{ alignItems: "center" }}>
+            <Text style={s.empty}>
+              Bağlantı kurulamadı — interneti kontrol edip tekrar dene.
+            </Text>
+            <TouchableOpacity
+              style={s.retryBtn}
+              accessibilityRole="button"
+              onPress={() => load(lastCoords)}
+            >
+              <Text style={s.retryText}>Tekrar dene</Text>
+            </TouchableOpacity>
+          </View>
         ) : all.length === 0 ? (
-          <Text style={s.empty}>Halıcı bulunamadı. Backend adresini kontrol et.</Text>
+          <Text style={s.empty}>
+            Bölgende henüz yayında halıcı yok — şehirler tek tek açılıyor, çok
+            yakında!
+          </Text>
         ) : (
           <FlatList
             data={[0]}
@@ -195,6 +248,15 @@ const s = StyleSheet.create({
   },
   locBtnText: { color: "#fff", fontWeight: "700" },
   empty: { textAlign: "center", marginTop: 40, color: C.sub, paddingHorizontal: 24 },
+  retryBtn: {
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: C.brand,
+    borderRadius: 10,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+  },
+  retryText: { color: C.brandDark, fontWeight: "700" },
   rowTitle: {
     fontSize: 16,
     fontWeight: "700",
@@ -230,6 +292,7 @@ const s = StyleSheet.create({
   },
   open: { backgroundColor: C.greenBg, color: C.green },
   closed: { backgroundColor: C.slateBg, color: C.sub },
+  paused: { backgroundColor: "#fef3c7", color: "#92400e" },
   name: { marginTop: 4, fontWeight: "600", color: C.text },
   sub: { color: C.sub, fontSize: 12 },
   meta: { color: C.sub, fontSize: 12, marginTop: 2 },

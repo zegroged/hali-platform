@@ -147,7 +147,10 @@ export default function KvkkPage() {
           <strong>OpenStreetMap Nominatim</strong> servisine iletilebilir;
           harita görüntülenirken tarayıcınız yurt dışındaki{" "}
           <strong>CARTO</strong> karo sunucusuna bağlanır ve bu sırada IP
-          adresiniz bu sunucuya iletilir. Barındırma ve güvenlik (CDN)
+          adresiniz bu sunucuya iletilir; web sitesinde ve mobil uygulamada
+          harita <strong>Google Haritalar</strong> (Google Maps) ile de
+          çizilebilir — bu durumda IP adresi ve cihaz tanımlayıcıları
+          Google&apos;a iletilir. Barındırma ve güvenlik (CDN)
           sağlayıcımız da yurt dışında yerleşik olabilir. SMS gönderimi ise
           Türkiye&apos;de yerleşik sağlayıcı üzerinden yapılır. Yurt dışına
           yapılan aktarımlar bakımından KVKK md.9 kapsamındaki güvence

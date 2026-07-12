@@ -7,11 +7,20 @@ import {
   ScrollView,
   StyleSheet,
   Alert,
+  Linking,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { createOrder } from "../lib/api";
+import { createOrder, ApiError, API_BASE } from "../lib/api";
 import { C } from "../lib/theme";
 import type { Nav } from "../lib/nav";
+
+/** m² metnini sayıya çevirir; Türkçe virgüllü ondalık da kabul eder. */
+function parseM2(v: string): number | undefined {
+  const n = Number(v.replace(",", "."));
+  return Number.isFinite(n) && n > 0 ? n : undefined;
+}
 
 export function OrderScreen({
   nav,
@@ -28,8 +37,10 @@ export function OrderScreen({
     pickupAddress: "",
     approxM2: "",
     note: "",
-    paymentMethod: "CASH" as "CASH" | "CARD",
   });
+  // Mesafeli Sözleşmeler Yön. md.7: ön bilgilendirme TEYİDİ — işaretlenmemiş
+  // başlar, işaretlenmeden sipariş gönderilmez (sunucu da bunsuz reddeder).
+  const [consent, setConsent] = useState(false);
   const [loading, setLoading] = useState(false);
 
   function set<K extends keyof typeof form>(k: K, v: (typeof form)[K]) {
@@ -37,28 +48,54 @@ export function OrderScreen({
   }
 
   async function submit() {
-    if (
-      !form.customerName ||
-      form.customerPhone.length < 10 ||
-      form.pickupAddress.length < 5
-    ) {
-      Alert.alert("Eksik bilgi", "Ad, telefon ve adres gerekli.");
+    const phone = form.customerPhone.replace(/\D/g, "");
+    // Sunucu zod şemasıyla hizalı istemci kontrolü (min uzunluklar) — sınır
+    // aşımı jenerik 400'e düşmesin.
+    if (form.customerName.trim().length < 2) {
+      Alert.alert("Eksik bilgi", "Ad soyad en az 2 karakter olmalı.");
+      return;
+    }
+    if (phone.length < 10) {
+      Alert.alert("Eksik bilgi", "Geçerli bir telefon numarası gir (05xx...).");
+      return;
+    }
+    if (form.pickupAddress.trim().length < 5) {
+      Alert.alert("Eksik bilgi", "Halının alınacağı adresi biraz daha ayrıntılı yaz.");
+      return;
+    }
+    // m² yazıldıysa geçerli olmalı — sessizce silinip m²'siz sipariş gitmesin.
+    const m2 = form.approxM2 ? parseM2(form.approxM2) : undefined;
+    if (form.approxM2 && m2 === undefined) {
+      Alert.alert("m² hatalı", "Yaklaşık m² sayı olmalı (örn. 12 veya 12,5).");
+      return;
+    }
+    if (!consent) {
+      Alert.alert(
+        "Onay gerekli",
+        "Sipariş için ön bilgilendirme ve mesafeli satış sözleşmesini onaylaman gerekiyor.",
+      );
       return;
     }
     setLoading(true);
     try {
       const res = await createOrder({
         businessId: id,
-        customerName: form.customerName,
-        customerPhone: form.customerPhone,
-        pickupAddress: form.pickupAddress,
-        approxM2: form.approxM2 ? Number(form.approxM2) : undefined,
+        customerName: form.customerName.trim(),
+        customerPhone: phone,
+        pickupAddress: form.pickupAddress.trim(),
+        approxM2: m2,
         note: form.note || undefined,
-        paymentMethod: form.paymentMethod,
+        paymentMethod: "CASH",
+        consent: true,
       });
-      nav.go({ name: "track", code: res.code ?? res.trackingToken });
-    } catch {
-      Alert.alert("Hata", "Sipariş oluşturulamadı.");
+      // replace: takipten "geri" boşalmış sipariş formuna değil profile dönsün
+      nav.replace({ name: "track", code: res.code ?? res.trackingToken });
+    } catch (e) {
+      // Sunucunun gerçek mesajı (tatil modu, şoför yok...) müşteriye gösterilir.
+      Alert.alert(
+        "Sipariş oluşturulamadı",
+        e instanceof ApiError ? e.message : "Bağlantı hatası — tekrar dene.",
+      );
     } finally {
       setLoading(false);
     }
@@ -66,7 +103,14 @@ export function OrderScreen({
 
   return (
     <SafeAreaView style={s.screen} edges={["top", "bottom"]}>
-      <ScrollView contentContainerStyle={{ padding: 16 }}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+      >
+      <ScrollView
+        contentContainerStyle={{ padding: 16, paddingBottom: 32 }}
+        keyboardShouldPersistTaps="handled"
+      >
         <TouchableOpacity onPress={nav.back}>
           <Text style={s.back}>← Geri</Text>
         </TouchableOpacity>
@@ -76,6 +120,7 @@ export function OrderScreen({
         <TextInput
           style={s.input}
           placeholder="Ad Soyad"
+          maxLength={100}
           value={form.customerName}
           onChangeText={(v) => set("customerName", v)}
         />
@@ -83,13 +128,15 @@ export function OrderScreen({
           style={s.input}
           placeholder="Telefon (05xx...)"
           keyboardType="phone-pad"
+          maxLength={11}
           value={form.customerPhone}
-          onChangeText={(v) => set("customerPhone", v)}
+          onChangeText={(v) => set("customerPhone", v.replace(/\D/g, ""))}
         />
         <TextInput
           style={[s.input, { height: 70 }]}
           placeholder="Halının alınacağı adres"
           multiline
+          maxLength={300}
           value={form.pickupAddress}
           onChangeText={(v) => set("pickupAddress", v)}
         />
@@ -104,31 +151,66 @@ export function OrderScreen({
           style={[s.input, { height: 60 }]}
           placeholder="Not (opsiyonel)"
           multiline
+          maxLength={500}
           value={form.note}
           onChangeText={(v) => set("note", v)}
         />
 
-        <Text style={s.label}>Ödeme</Text>
-        <View style={s.payRow}>
-          {(["CASH", "CARD"] as const).map((m) => (
-            <TouchableOpacity
-              key={m}
-              style={[s.payBtn, form.paymentMethod === m && s.payOn]}
-              onPress={() => set("paymentMethod", m)}
-            >
-              <Text style={form.paymentMethod === m ? s.payOnText : s.payText}>
-                {m === "CASH" ? "Kapıda Nakit" : "Kartla"}
-              </Text>
-            </TouchableOpacity>
-          ))}
+        {/* Ödeme: web ile aynı — şimdilik yalnız teslimde nakit */}
+        <View style={s.payBox}>
+          <Text style={s.payTitle}>💵 Ödeme teslimde, nakit</Text>
+          <Text style={s.payNote}>
+            Sipariş verirken ön ödeme alınmaz; halın temiz teslim edildiğinde
+            ödersin. Kartlı ödeme çok yakında.
+          </Text>
         </View>
 
-        <TouchableOpacity style={s.submit} onPress={submit} disabled={loading}>
+        {/* md.7 teyidi — sunucu consentAt + sözleşme sürümünü kaydeder.
+            Linkler onay kutusundan AYRI dokunulabilir öğeler (ekran okuyucu
+            linke ayrıca odaklanabilsin). */}
+        <View style={s.legalLinks}>
+          <TouchableOpacity
+            accessibilityRole="link"
+            onPress={() => Linking.openURL(`${API_BASE}/on-bilgilendirme`)}
+          >
+            <Text style={s.link}>Ön bilgilendirme formu ↗</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            accessibilityRole="link"
+            onPress={() => Linking.openURL(`${API_BASE}/mesafeli-satis`)}
+          >
+            <Text style={s.link}>Mesafeli satış sözleşmesi ↗</Text>
+          </TouchableOpacity>
+        </View>
+        <TouchableOpacity
+          style={s.consentRow}
+          onPress={() => setConsent((c) => !c)}
+          accessibilityRole="checkbox"
+          accessibilityState={{ checked: consent }}
+          accessibilityLabel="Ön bilgilendirme formunu ve mesafeli satış sözleşmesini okudum, onaylıyorum"
+        >
+          <View style={[s.checkbox, consent && s.checkboxOn]}>
+            {consent && <Text style={s.checkmark}>✓</Text>}
+          </View>
+          <Text style={s.consentText}>
+            Yukarıdaki ön bilgilendirme formunu ve mesafeli satış sözleşmesini
+            okudum, onaylıyorum. Kesin fiyat halım ölçüldükten sonra onayıma
+            sunulacak.
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[s.submit, (!consent || loading) && s.submitOff]}
+          onPress={submit}
+          disabled={loading}
+          accessibilityRole="button"
+        >
           <Text style={s.submitText}>
             {loading ? "Gönderiliyor…" : "Talebi Oluştur"}
           </Text>
         </TouchableOpacity>
       </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -148,25 +230,42 @@ const s = StyleSheet.create({
     backgroundColor: "#fff",
     marginTop: 10,
   },
-  label: { fontWeight: "600", color: C.text, marginTop: 16, marginBottom: 6 },
-  payRow: { flexDirection: "row", gap: 10 },
-  payBtn: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: C.border,
+  payBox: {
+    marginTop: 16,
+    backgroundColor: C.brandLight,
     borderRadius: 10,
-    paddingVertical: 11,
-    alignItems: "center",
+    padding: 12,
   },
-  payOn: { borderColor: C.brand, backgroundColor: C.brandLight },
-  payText: { color: C.sub },
-  payOnText: { color: C.brandDark, fontWeight: "600" },
+  payTitle: { color: C.brandDark, fontWeight: "700" },
+  payNote: { color: C.brandDark, fontSize: 12, marginTop: 4 },
+  consentRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 16,
+    alignItems: "flex-start",
+  },
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: C.border,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 1,
+  },
+  checkboxOn: { backgroundColor: C.brand, borderColor: C.brand },
+  checkmark: { color: "#fff", fontWeight: "800", fontSize: 14 },
+  consentText: { flex: 1, color: C.sub, fontSize: 13, lineHeight: 19 },
+  legalLinks: { marginTop: 16, gap: 6 },
+  link: { color: C.brandDark, fontWeight: "600", fontSize: 13 },
   submit: {
     backgroundColor: C.brand,
     borderRadius: 12,
     paddingVertical: 15,
     alignItems: "center",
-    marginTop: 20,
+    marginTop: 16,
   },
+  submitOff: { opacity: 0.5 },
   submitText: { color: "#fff", fontWeight: "700", fontSize: 16 },
 });

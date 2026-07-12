@@ -93,6 +93,33 @@ export default function GizlilikPage() {
         </p>
       </Section>
 
+      <Section title="Mobil Uygulamalar — Müşteri Uygulaması">
+        <p>
+          <strong>En Yakın Halı Yıkama</strong> müşteri uygulaması, yalnızca
+          siz &quot;Konumumu kullan&quot; dediğinizde cihazınızın konumunu{" "}
+          <strong>o anlık</strong> kullanır — amaç size en yakın halı
+          yıkamacıları sıralamaktır. Konumunuz kaydedilmez, arka planda
+          izlenmez, üçüncü taraflarla paylaşılmaz.
+        </p>
+        <p>
+          Sipariş verirken girdiğiniz <strong>ad, telefon ve adres</strong>{" "}
+          bilgileri, hizmetin ifası için yalnızca sipariş verdiğiniz halı
+          yıkama işletmesiyle paylaşılır (halınızın adresinizden alınıp teslim
+          edilebilmesi için). Uygulama hesap/üyelik gerektirmez; reklam
+          kimliği, analitik veya çerez kullanmaz. Veriler HTTPS ile şifreli
+          iletilir. Sipariş kayıtlarının saklama süreleri KVKK Aydınlatma
+          Metni&apos;ndeki saklama sürelerine tabidir; silme talepleri için
+          aşağıdaki iletişim adresine yazabilirsiniz.
+        </p>
+        <p>
+          Uygulamadaki canlı şoför haritası <strong>Google Haritalar</strong>{" "}
+          (Google Maps SDK) ile çizilir; harita görüntülenirken cihaz
+          tanımlayıcıları Google&apos;a iletilir ve Google&apos;ın kendi
+          gizlilik politikasına tabidir. Bu, yurt dışına veri aktarımı
+          niteliğindedir ve yalnızca harita ekranı kullanıldığında gerçekleşir.
+        </p>
+      </Section>
+
       <Section title="İletişim">
         <p>
           Gizlilikle ilgili sorularınız için{" "}

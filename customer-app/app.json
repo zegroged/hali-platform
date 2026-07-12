@@ -1,28 +1,39 @@
 {
   "expo": {
-    "name": "Halını Aldır",
+    "name": "En Yakın Halı Yıkama",
     "slug": "hali-customer",
     "version": "1.0.0",
     "orientation": "portrait",
     "scheme": "hali",
     "userInterfaceStyle": "light",
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0d9488"
+    },
     "plugins": [
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "Yakınındaki halıcıları göstermek için konumun kullanılır."
+          "locationWhenInUsePermission": "Yakınındaki halı yıkamacıları gösterebilmek için konumun kullanılır; konumun kaydedilmez, kimseyle paylaşılmaz."
         }
       ]
     ],
     "ios": {
-      "bundleIdentifier": "com.hali.customer",
+      "bundleIdentifier": "com.enyakinhaliyikamaservisi.customer",
       "supportsTablet": true,
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "Yakınındaki halıcıları göstermek için konumun kullanılır."
+        "NSLocationWhenInUseUsageDescription": "Yakınındaki halı yıkamacıları gösterebilmek için konumun kullanılır; konumun kaydedilmez, kimseyle paylaşılmaz."
       }
     },
     "android": {
-      "package": "com.hali.customer",
+      "package": "com.enyakinhaliyikamaservisi.customer",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0d9488"
+      },
       "permissions": ["ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION"],
       "config": {
         "googleMaps": {

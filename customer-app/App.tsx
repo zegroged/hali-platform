@@ -13,6 +13,7 @@ export default function App() {
 
   const nav: Nav = {
     go: (r) => setStack((s) => [...s, r]),
+    replace: (r) => setStack((s) => [...s.slice(0, -1), r]),
     back: () => setStack((s) => (s.length > 1 ? s.slice(0, -1) : s)),
   };
 
