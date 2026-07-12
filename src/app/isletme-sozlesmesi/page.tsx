@@ -29,7 +29,7 @@ export default function IsletmeSozlesmesiPage() {
           <strong>aracı hizmet sağlayıcıdır</strong>; halı yıkama hizmetinin
           tarafı değildir. İşletici: <strong>[YASAL AD]</strong> (şahıs
           işletmesi), [ADRES],
-          Selçuklu/Konya · Vergi Dairesi/No: Meram / ***KALDIRILDI***.
+          Selçuklu/Konya · Vergi Dairesi/No: Meram / [VKN].
         </p>
         <p>
           <strong>İşletme:</strong> Platformda profili yayımlanan, halı yıkama

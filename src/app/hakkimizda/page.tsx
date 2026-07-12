@@ -81,7 +81,7 @@ export default function HakkimizdaPage() {
         <p>
           İşletici: <strong>[YASAL AD]</strong> (şahıs işletmesi) ·
           [ADRES], Selçuklu/Konya ·
-          Vergi Dairesi/No: Meram / ***KALDIRILDI***. Bize ulaşmak için{" "}
+          Vergi Dairesi/No: Meram / [VKN]. Bize ulaşmak için{" "}
           <Link
             href="/iletisim"
             className="font-medium text-brand-dark hover:underline"

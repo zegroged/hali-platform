@@ -31,7 +31,7 @@ export default function OnBilgilendirmePage() {
           Platform işleticisi (aracı hizmet sağlayıcı):{" "}
           <strong>[YASAL AD]</strong> (şahıs işletmesi). Adres:
           [ADRES], Selçuklu/Konya. Vergi
-          Dairesi/No: Meram / ***KALDIRILDI***. İletişim:
+          Dairesi/No: Meram / [VKN]. İletişim:
           info@enyakinhaliyikamaservisi.com.
         </p>
       </Section>

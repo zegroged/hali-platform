@@ -89,7 +89,7 @@ export default function IletisimPage() {
           </div>
           <div>
             <dt className="inline font-medium">Vergi Dairesi/No: </dt>
-            <dd className="inline">Meram / ***KALDIRILDI***</dd>
+            <dd className="inline">Meram / [VKN]</dd>
           </div>
           <div>
             <dt className="inline font-medium">Telefon: </dt>

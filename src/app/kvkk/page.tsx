@@ -28,7 +28,7 @@ export default function KvkkPage() {
         <p>
           Veri sorumlusu: <strong>[YASAL AD]</strong> (şahıs
           işletmesi) — [ADRES],
-          Selçuklu/Konya (Vergi Dairesi/No: Meram / ***KALDIRILDI***). KVKK
+          Selçuklu/Konya (Vergi Dairesi/No: Meram / [VKN]). KVKK
           kapsamındaki başvurularınız için başvuru kanalı:{" "}
           <a
             href="mailto:info@enyakinhaliyikamaservisi.com"
