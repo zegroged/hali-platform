@@ -153,6 +153,21 @@ export function normalizeDistrictName(
   return hit ?? null;
 }
 
+/** İlçe SEO sayfası URL parçası: "Eyüpsultan" → "eyupsultan", "Merkez" → "merkez". */
+export function districtSlug(district: string): string {
+  return foldTr(district).replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+}
+
+/** İlçe slug'ından kanonik ilçe adı (il slug'ı bağlamında). Yoksa undefined. */
+export function districtBySlug(
+  citySlug: string,
+  dSlug: string,
+): string | undefined {
+  return (DISTRICTS_BY_CITY[citySlug] ?? []).find(
+    (d) => districtSlug(d) === dSlug,
+  );
+}
+
 const BACK_VOWELS = new Set(["a", "ı", "o", "u", "A", "I", "O", "U"]);
 const FRONT_VOWELS = new Set(["e", "i", "ö", "ü", "E", "İ", "Ö", "Ü"]);
 const HARD_CONSONANTS = new Set(["f", "s", "t", "k", "ç", "ş", "h", "p"]);

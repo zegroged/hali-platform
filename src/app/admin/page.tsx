@@ -20,7 +20,7 @@ export default async function AdminHome({
 
   const { hata } = await searchParams;
 
-  const [businesses, driverCount, orderCount] = await Promise.all([
+  const [businesses, driverCount, orderCount, cityLeads] = await Promise.all([
     prisma.cleanerBusiness.findMany({
       orderBy: { createdAt: "desc" },
       include: {
@@ -30,6 +30,13 @@ export default async function AdminHome({
     }),
     prisma.driver.count(),
     prisma.order.count(),
+    // "Açılınca haber ver" kayıtları — hangi şehirde müşteri talebi birikiyor
+    // (işletme kazanım görüşmelerinde koz: "X şehrinde N kişi bekliyor").
+    prisma.cityLead.groupBy({
+      by: ["city"],
+      _count: true,
+      orderBy: { _count: { city: "desc" } },
+    }),
   ]);
 
   const pending = businesses.filter((b) => b.verification === "PENDING");
@@ -85,6 +92,32 @@ export default async function AdminHome({
           </div>
         ))}
       </section>
+
+      {/* Şehir talepleri — boş şehir sayfalarında bırakılan "haber ver"
+          e-postaları. Hangi şehirde halıcı aranacağının verisi. */}
+      {cityLeads.length > 0 && (
+        <section>
+          <h2 className="mb-2 font-semibold text-slate-900">
+            Şehir talepleri{" "}
+            <span className="text-sm font-normal text-slate-500">
+              (açılınca haber ver kayıtları)
+            </span>
+          </h2>
+          <div className="flex flex-wrap gap-2">
+            {cityLeads.map((l) => (
+              <span
+                key={l.city}
+                className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700 shadow-sm"
+              >
+                {l.city}
+                <span className="rounded-full bg-brand-light px-2 py-0.5 text-xs font-semibold text-brand-dark">
+                  {l._count}
+                </span>
+              </span>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Rozet bekleyenler — yayın onaya bağlı DEĞİL (otomatik); burası yalnız
           "Doğrulanmış" rozeti incelemesi. Yayından kaldırma/engel: İncele sayfası. */}

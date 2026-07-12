@@ -97,6 +97,10 @@ export default async function HaliciProfile({
     telephone: b.phone,
     url: `${base}/halici/${b.id}`,
   };
+  // Görsel zengin sonuç şansını artırır (mutlak URL ister).
+  if (b.photos.length > 0) {
+    ld.image = b.photos.slice(0, 3).map((p) => `${base}${p.url}`);
+  }
   // 0 yorumla aggregateRating şema spam sayılır; yalnız gerçek puan varsa ekle.
   if (b.ratingCount > 0) {
     ld.aggregateRating = {

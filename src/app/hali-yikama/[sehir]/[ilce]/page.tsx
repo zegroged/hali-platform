@@ -9,44 +9,44 @@ import Footer from "@/components/Footer";
 import TrackingBar from "@/components/TrackingBar";
 import CityNotifyForm from "@/components/CityNotifyForm";
 import {
-  CITIES,
   cityBySlug,
+  districtBySlug,
   districtSlug,
   districtsOfCity,
   locative,
 } from "@/lib/cities";
 import { IconSparkles, IconTruck, IconWallet } from "@/components/icons";
 
-// DB'den işletme listesi çekilir; build anında DB yok (bkz sitemap.ts notu).
 export const dynamic = "force-dynamic";
 
-type Params = Promise<{ sehir: string }>;
+type Params = Promise<{ sehir: string; ilce: string }>;
 
 export async function generateMetadata({
   params,
 }: {
   params: Params;
 }): Promise<Metadata> {
-  const { sehir } = await params;
+  const { sehir, ilce } = await params;
   const city = cityBySlug(sehir);
-  if (!city) return {};
+  const district = city ? districtBySlug(city.slug, ilce) : undefined;
+  if (!city || !district) return {};
   return {
-    title: `${city.name} Halı Yıkama — Kapıdan Alma, Yıkama, Teslimat`,
-    description: `${locative(city.name)} halı yıkama servisi: yakınındaki halı yıkamacıları karşılaştır, halın kapından alınsın, adım adım takip et. Ön ödeme yok, ödeme teslimde.`,
-    alternates: { canonical: `/hali-yikama/${city.slug}` },
+    title: `${district} Halı Yıkama (${city.name}) — Kapıdan Alma, Teslimat`,
+    description: `${locative(district)} halı yıkama servisi: yakınındaki halı yıkamacıları karşılaştır, halın kapından alınsın, adım adım takip et. Ön ödeme yok, ödeme teslimde.`,
+    alternates: { canonical: `/hali-yikama/${city.slug}/${ilce}` },
   };
 }
 
-function cityFaqs(name: string): { q: string; a: string }[] {
-  const loc = locative(name);
+function districtFaqs(district: string, cityName: string): { q: string; a: string }[] {
+  const loc = locative(district);
   return [
     {
-      q: `${name} halı yıkama fiyatları ne kadar?`,
+      q: `${district} halı yıkama fiyatları ne kadar?`,
       a: `Fiyat, işletmeye ve halının m²'sine göre değişir. ${loc} hizmet veren halıcıların profillerinde m² başına tahmini fiyatlar yazar; halın kapından alınıp ölçüldükten sonra kesin fiyat sana bildirilir. Uygun bulmazsan halın yıkanmadan ücretsiz geri getirilir.`,
     },
     {
       q: `${loc} halım kapıdan alınıyor mu?`,
-      a: `Evet. Seçtiğin halı yıkama işletmesi halını adresinden teslim alır, yıkandıktan sonra kapına geri getirir. Sipariş verirken ön ödeme veya kapora alınmaz — ödeme teslimde yapılır.`,
+      a: `Evet. Seçtiğin halı yıkama işletmesi halını ${loc} adresinden teslim alır, yıkandıktan sonra kapına geri getirir. Ön ödeme yok — ödeme teslimde yapılır.`,
     },
     {
       q: "Halım kaç günde teslim edilir?",
@@ -57,23 +57,29 @@ function cityFaqs(name: string): { q: string; a: string }[] {
       a: "Sipariş oluşturulduğunda sana 6 haneli bir takip kodu verilir. Takip sayfasına kodu girerek halının hangi aşamada olduğunu (alındı, yıkanıyor, yolda, teslim) anlık görürsün.",
     },
     {
-      q: `${loc} hangi ilçelere hizmet var?`,
-      a: `Her işletme hizmet verdiği ilçeleri profilinde belirtir. Adresini aratarak veya konumunu kullanarak ${loc} sana hizmet veren halıcıları görebilirsin.`,
+      q: `${cityName} genelinde başka nerelerde hizmet var?`,
+      a: `İşletmeler hizmet verdikleri ilçeleri profillerinde belirtir. ${locative(cityName)} hizmet veren tüm halıcıları il sayfasından görebilirsin.`,
     },
   ];
 }
 
-export default async function CityPage({ params }: { params: Params }) {
-  const { sehir } = await params;
+export default async function DistrictPage({ params }: { params: Params }) {
+  const { sehir, ilce } = await params;
   const city = cityBySlug(sehir);
-  if (!city) notFound();
+  const district = city ? districtBySlug(city.slug, ilce) : undefined;
+  if (!city || !district) notFound();
 
-  const businesses = await getBusinesses({ city: city.name, sort: "rating" });
-  const faqs = cityFaqs(city.name);
-  const loc = locative(city.name);
-  const otherCities = CITIES.filter((c) => c.slug !== city.slug);
+  const businesses = await getBusinesses({
+    city: city.name,
+    district,
+    sort: "rating",
+  });
+  const faqs = districtFaqs(district, city.name);
+  const loc = locative(district);
+  const otherDistricts = districtsOfCity(city.name).filter(
+    (d) => d !== district,
+  );
 
-  // FAQPage yapılandırılmış verisi — şehir sayfalarının aranma amacı SEO.
   const faqJsonLd = {
     "@context": "https://schema.org",
     "@type": "FAQPage",
@@ -89,13 +95,28 @@ export default async function CityPage({ params }: { params: Params }) {
       <main className="mx-auto w-full max-w-lg px-4 pb-12 md:max-w-3xl lg:max-w-5xl">
         <SiteHeader />
 
+        <nav className="mb-2 text-xs text-slate-500">
+          <Link href="/sehirler" className="hover:text-brand-dark hover:underline">
+            Şehirler
+          </Link>
+          {" › "}
+          <Link
+            href={`/hali-yikama/${city.slug}`}
+            className="hover:text-brand-dark hover:underline"
+          >
+            {city.name} halı yıkama
+          </Link>
+          {" › "}
+          <span className="text-slate-700">{district}</span>
+        </nav>
+
         <section className="rounded-2xl bg-gradient-to-br from-brand to-brand-dark p-4 sm:p-6">
           <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
-            {city.name} Halı Yıkama
+            {district} Halı Yıkama
           </h1>
           <p className="mt-1.5 text-sm text-teal-50 sm:text-base">
-            {loc} halı yıkama servisi: halıcını seç, halın kapından alınsın,
-            adım adım takip et.
+            {city.name} {loc} halı yıkama servisi: halıcını seç, halın kapından
+            alınsın, adım adım takip et.
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
             <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-white">
@@ -113,7 +134,7 @@ export default async function CityPage({ params }: { params: Params }) {
           <section className="mt-8">
             <div className="mb-3 flex items-baseline justify-between">
               <h2 className="text-lg font-semibold text-slate-900">
-                {city.name} halı yıkama firmaları
+                {district} halı yıkama firmaları
               </h2>
               <span className="text-sm text-slate-500">
                 {businesses.length} işletme
@@ -134,23 +155,30 @@ export default async function CityPage({ params }: { params: Params }) {
               {loc} halı yıkama servisi çok yakında
             </h2>
             <p className="mx-auto mt-1 max-w-md text-sm text-slate-600">
-              Platform yepyeni — halı yıkama işletmeleri şehir şehir ekleniyor.
+              Platform yepyeni — halı yıkama işletmeleri bölge bölge ekleniyor.
               E-postanı bırak, {loc} hizmet açıldığında haber verelim.
             </p>
-            <CityNotifyForm city={city.name} />
+            <CityNotifyForm city={city.name} district={district} />
+            <p className="mt-3 text-sm text-slate-600">
+              <Link
+                href={`/hali-yikama/${city.slug}`}
+                className="font-medium text-brand-dark hover:underline"
+              >
+                {city.name} genelindeki halıcılara bak →
+              </Link>
+            </p>
           </section>
         )}
 
         <HowItWorks />
 
-        {/* Halıcılar için kayıt CTA'sı — şehir sayfaları işletme kazanımının da kanalı */}
         <section className="mt-8 rounded-2xl border border-brand/30 bg-brand-light/50 p-4 sm:p-6">
           <h2 className="font-semibold text-slate-900">
             {loc} halı yıkama işletmen mi var?
           </h2>
           <p className="mt-1 text-sm text-slate-600">
             İşletmeni platforma ekle; müşteri siparişleri, şoför takibi ve
-            değerlendirmelerle {loc} öne çık.
+            değerlendirmelerle bölgende öne çık.
           </p>
           <Link
             href="/kayit"
@@ -162,7 +190,7 @@ export default async function CityPage({ params }: { params: Params }) {
 
         <section className="mt-10">
           <h2 className="font-semibold text-slate-900">
-            {city.name} halı yıkama hakkında sık sorulanlar
+            {district} halı yıkama hakkında sık sorulanlar
           </h2>
           <div className="mt-3 space-y-2.5">
             {faqs.map((f) => (
@@ -188,42 +216,25 @@ export default async function CityPage({ params }: { params: Params }) {
         </section>
 
         <section className="mt-10">
-          <h2 className="font-semibold text-slate-900">
-            {locative(city.name)} ilçelere göre halı yıkama
-          </h2>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {districtsOfCity(city.name).map((d) => (
-              <Link
-                key={d}
-                href={`/hali-yikama/${city.slug}/${districtSlug(d)}`}
-                className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-600 shadow-sm hover:border-brand hover:text-brand-dark"
-              >
-                {d}
-              </Link>
-            ))}
-          </div>
-        </section>
-
-        <section className="mt-10">
           <div className="mb-3 flex items-baseline justify-between gap-3">
             <h2 className="font-semibold text-slate-900">
-              Diğer şehirlerde halı yıkama
+              {locative(city.name)} diğer ilçeler
             </h2>
             <Link
-              href="/sehirler"
+              href={`/hali-yikama/${city.slug}`}
               className="shrink-0 text-sm font-medium text-brand-dark hover:underline"
             >
-              Tüm şehirler
+              {city.name} sayfası
             </Link>
           </div>
           <div className="flex flex-wrap gap-x-3 gap-y-2">
-            {otherCities.map((c) => (
+            {otherDistricts.map((d) => (
               <Link
-                key={c.slug}
-                href={`/hali-yikama/${c.slug}`}
+                key={d}
+                href={`/hali-yikama/${city.slug}/${districtSlug(d)}`}
                 className="text-sm text-slate-500 hover:text-brand-dark hover:underline"
               >
-                {c.name}
+                {d}
               </Link>
             ))}
           </div>

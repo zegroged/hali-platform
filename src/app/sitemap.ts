@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
 import { prisma } from "@/lib/prisma";
-import { CITIES } from "@/lib/cities";
+import { CITIES, districtSlug, districtsOfCity } from "@/lib/cities";
 
 const BASE =
   process.env.APP_BASE_URL ?? "https://enyakinhaliyikamaservisi.com";
@@ -37,6 +37,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: "weekly" as const,
       priority: 0.7,
     })),
+    // 973 ilçe — "kadıköy halı yıkama" gibi yüksek niyetli aramalar.
+    ...CITIES.flatMap((c) =>
+      districtsOfCity(c.name).map((d) => ({
+        url: `${BASE}/hali-yikama/${c.slug}/${districtSlug(d)}`,
+        changeFrequency: "weekly" as const,
+        priority: 0.6,
+      })),
+    ),
   ];
 
   // DB'ye ulaşılamazsa sitemap yine de statik sayfalarla dönsün (500 yerine).

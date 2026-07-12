@@ -103,15 +103,15 @@ model User {
 // içerideki kullanıcılara ulaşmanın asıl yolu budur: panel/şoför başlığındaki
 // zil sayaç gösterir, açılınca liste + okundu işaretlenir.
 model Notification {
-  id        String   @id @default(cuid())
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id        String    @id @default(cuid())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId    String
   type      String // yeni-siparis | fiyat-onay | is-atandi | iptal | dogrulama | genel
   title     String
   body      String?
   href      String? // tıklanınca gidilecek panel içi yol
   readAt    DateTime?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
 
   @@index([userId, readAt])
   @@index([userId, createdAt])
@@ -368,7 +368,7 @@ model Subscription {
   updatedAt          DateTime           @updatedAt
 
   // iyzico tekrarlayan abonelik (düzenli ödeme talimatı) — her ay otomatik çekim.
-  iyzicoSubRef      String? @unique // iyzico subscriptionReferenceCode
+  iyzicoSubRef      String?   @unique // iyzico subscriptionReferenceCode
   iyzicoCustomerRef String? // iyzico customerReferenceCode (kart saklı)
   autoRenew         Boolean   @default(false) // aktif düzenli ödeme talimatı var mı
   canceledAt        DateTime? // talimat iptal anı (dönem sonuna kadar açık kalır)
@@ -377,18 +377,18 @@ model Subscription {
 // Abonelik ödemesi kaydı — iyzico Checkout. Idempotency (çift callback/replay)
 // ve yasal saklama (6563 md.11/3 on yıl) için her ödeme burada tutulur.
 model SubscriptionPayment {
-  id             String          @id @default(cuid())
-  business       CleanerBusiness @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  businessId     String
+  id              String          @id @default(cuid())
+  business        CleanerBusiness @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  businessId      String
   // iyzico'ya conversationId olarak bu kaydın id'si gider; callback bununla bulur.
-  status         String          @default("PENDING") // PENDING | PAID | FAILED
-  amount         Decimal         @db.Decimal(10, 2) // KDV dahil tahsil edilen (2400)
-  iyzicoToken    String? // checkout token
-  iyzicoPaymentId String?        @unique // iyzico ödeme kimliği — idempotency anahtarı
-  periodStart    DateTime?
-  periodEnd      DateTime?
-  createdAt      DateTime        @default(now())
-  paidAt         DateTime?
+  status          String          @default("PENDING") // PENDING | PAID | FAILED
+  amount          Decimal         @db.Decimal(10, 2) // KDV dahil tahsil edilen (2400)
+  iyzicoToken     String? // checkout token
+  iyzicoPaymentId String?         @unique // iyzico ödeme kimliği — idempotency anahtarı
+  periodStart     DateTime?
+  periodEnd       DateTime?
+  createdAt       DateTime        @default(now())
+  paidAt          DateTime?
 
   @@index([businessId])
 }
@@ -401,4 +401,18 @@ model Badge {
   grantedAt  DateTime        @default(now())
 
   @@unique([businessId, type])
+}
+
+// Boş şehir/ilçe sayfasındaki "açılınca haber ver" e-posta kaydı. İki amaç:
+// (1) şehir açılınca hazır müşteri listesi, (2) hangi şehirde talep biriktiği
+// verisi (işletme kazanım görüşmelerinde kullanılır; /admin'de sayılır).
+model CityLead {
+  id        String   @id @default(cuid())
+  city      String // kanonik il adı (src/lib/cities.ts)
+  district  String? // ilçe sayfasından geldiyse kanonik ilçe adı
+  email     String
+  createdAt DateTime @default(now())
+
+  @@unique([city, email]) // aynı il için aynı e-posta bir kez (upsert)
+  @@index([city])
 }

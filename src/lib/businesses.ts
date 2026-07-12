@@ -126,7 +126,20 @@ export async function getBusinesses(
     // Yalnız aktif abonelikli (ödemesi alınmış) halıcılar keşifte görünür.
     subscription: activeSubscriptionWhere(),
   };
-  if (filter.district) {
+  if (filter.city && filter.district) {
+    // İlçe sayfaları: il+ilçe ÇİFTİ eşleşmeli ("Merkez" gibi ilçe adları
+    // onlarca ilde var — tek başına ilçe eşleşmesi yanlış ile taşar).
+    // İşletmenin kendi konumu VEYA hizmet bölgesi sayılır.
+    const cityEq = { equals: filter.city, mode: "insensitive" as const };
+    const districtEq = {
+      equals: filter.district,
+      mode: "insensitive" as const,
+    };
+    where.OR = [
+      { AND: [{ city: cityEq }, { district: districtEq }] },
+      { serviceAreas: { some: { city: cityEq, district: districtEq } } },
+    ];
+  } else if (filter.district) {
     where.serviceAreas = { some: { district: filter.district } };
   } else if (filter.city) {
     // Şehir sayfaları: işletmenin kendi ili VEYA hizmet bölgesi eşleşsin;
