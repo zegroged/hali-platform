@@ -26,7 +26,7 @@ export async function saveOrderPhotoFile(
   let ext =
     file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
   try {
-    buf = await sharp(original)
+    buf = await sharp(original, { limitInputPixels: 50_000_000 })
       .rotate() // EXIF yönü (telefon fotoğrafları yan gelmesin)
       .resize(MAX_EDGE, MAX_EDGE, { fit: "inside", withoutEnlargement: true })
       .webp({ quality: WEBP_QUALITY })

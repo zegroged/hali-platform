@@ -103,11 +103,9 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    await sendTrackingSms(
-      d.customerPhone,
-      d.customerName,
-      order.code ?? order.trackingToken,
-    );
+    // Müşteriye giden link UZUN trackingToken (onay/iptal bu linkle yapılır);
+    // işletmeye dönen trackingUrl (aşağıda) kısa kod kalır (read-only önizleme).
+    await sendTrackingSms(d.customerPhone, d.customerName, order.trackingToken);
   } catch (e) {
     console.error("panel order SMS hatası:", e);
   }

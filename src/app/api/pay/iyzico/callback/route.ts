@@ -60,6 +60,10 @@ export async function POST(req: NextRequest) {
     })
     .catch(() => null);
 
-  const code = order.code ?? order.trackingToken;
-  return NextResponse.redirect(new URL(`/takip/${code}?paid=1`, base), 303);
+  // Ödeme sonrası müşteriyi UZUN trackingToken'lı takip sayfasına yönlendir
+  // (onay/iptal bu özel linkle yapılır; kısa kod işletme/şoförde görünür).
+  return NextResponse.redirect(
+    new URL(`/takip/${order.trackingToken}?paid=1`, base),
+    303,
+  );
 }

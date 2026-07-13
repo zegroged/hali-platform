@@ -95,8 +95,16 @@ export async function GET(
     ? order.pickupAddress
     : `${order.pickupAddress.split(/[,/]/)[0].slice(0, 24)}…`; // yalnız ilk parça
 
+  // Kesin-fiyat onayı ve iptal yalnız (a) uzun bağlantıyla YA DA (b) siparişi
+  // veren üye girişiyle yapılabilir (approve-price/cancel ile aynı kural). Kısa
+  // kod işletme/şoförde görünür. İstemci butonları buna göre gösterir/gizler.
+  const isOwnerViewer =
+    viewerIsCustomer &&
+    order.customerId != null &&
+    order.customerId === viewer!.id;
   return NextResponse.json({
     status: order.status,
+    fullAccess: viaLongToken || isOwnerViewer,
     rejectReason: order.rejectReason,
     createdAt: order.createdAt,
     customerName: order.customerName,

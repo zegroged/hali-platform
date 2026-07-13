@@ -45,10 +45,38 @@ export async function POST(
   const { token } = await params;
   const order = await prisma.order.findFirst({
     where: { OR: [{ trackingToken: token }, { code: token.toUpperCase() }] },
-    select: { id: true, status: true, businessId: true, review: { select: { id: true } } },
+    select: {
+      id: true,
+      status: true,
+      businessId: true,
+      customerId: true,
+      business: { select: { ownerId: true } },
+      review: { select: { id: true } },
+    },
   });
   if (!order) {
     return NextResponse.json({ error: "Bulunamadı" }, { status: 404 });
+  }
+  // SAHİPLİK (denetim bulgusu): yorumu yalnız siparişin GERÇEK müşterisi
+  // yazabilir. Aksi halde kodu bilen işletme sahibi ayrı bir CUSTOMER hesabı
+  // açıp kendi işletmesine sipariş başına 1 sahte 5-yıldız enjekte edip
+  // puanı/sıralamayı/rozeti şişirebiliyordu. Misafir sipariş (customerId null)
+  // önce customer-register ile (OTP'li e-posta eşleşmesi) sahiplenilmeli.
+  if (order.customerId == null || order.customerId !== viewer.id) {
+    return NextResponse.json(
+      {
+        error:
+          "Bu siparişi değerlendirme yetkiniz yok. Yalnız siparişi veren hesap değerlendirebilir.",
+      },
+      { status: 403 },
+    );
+  }
+  // Öz-yorum koruması: işletme sahibi kendi işletmesini puanlayamaz.
+  if (order.business?.ownerId === viewer.id) {
+    return NextResponse.json(
+      { error: "Kendi işletmenizi değerlendiremezsiniz." },
+      { status: 403 },
+    );
   }
   if (order.status !== "DELIVERED") {
     return NextResponse.json(

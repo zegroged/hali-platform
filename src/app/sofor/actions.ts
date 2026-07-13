@@ -129,7 +129,7 @@ export async function advanceOrder(formData: FormData) {
     try {
       await sendSms(
         o.customerPhone,
-        `Haliniz yola cikti! Canli takip: ${trackingLink(o.code ?? o.trackingToken)}`,
+        `Haliniz yola cikti! Canli takip: ${trackingLink(o.trackingToken)}`,
       );
     } catch (e) {
       console.error("advanceOrder SMS hatası:", e);

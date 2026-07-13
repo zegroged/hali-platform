@@ -92,7 +92,11 @@ export default async function OrderManagePage({
   );
   const step = PANEL_NEXT[o.status];
   const flowIdx = CUSTOMER_FLOW.indexOf(o.status);
-  const trackRef = o.code ?? o.trackingToken;
+  // Güvenlik (denetim bulgusu): işletmeye ASLA uzun trackingToken gösterme —
+  // onunla kesin-fiyat onayı/iptal yapılabiliyor. Yalnız kısa kod (her siparişte
+  // createOrderWithCode ile üretilir). "Müşteri görünümü" linki kod ile açılınca
+  // read-only olur (onay/iptal butonları görünmez).
+  const trackRef = o.code ?? "";
   const trackUrl = `${getAppBaseUrl()}/takip/${trackRef}`;
 
   return (

@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { rateLimit, clientIp, tooMany } from "@/lib/ratelimit";
 import { sendSms } from "@/lib/sms";
+import { getAuthedUser } from "@/lib/auth";
 
 // İptal öncesi sorulan "neden" seçenekleri — istatistik + işletmeye bildirim.
 // İstemcideki listeyle aynı tutulmalı (TrackingClient CANCEL_REASONS).
@@ -46,6 +47,7 @@ export async function POST(
       id: true,
       code: true,
       trackingToken: true,
+      customerId: true,
       status: true,
       customerPhone: true,
       priceApprovedAt: true,
@@ -54,6 +56,25 @@ export async function POST(
   });
   if (!order) {
     return NextResponse.json({ error: "Bulunamadı" }, { status: 404 });
+  }
+  // MÜŞTERİYE ÖZEL KANAL (denetim bulgusu): cayma/iptal geri dönüşsüz bir
+  // müşteri aksiyonu → yalnız (a) müşteriye giden UZUN takip bağlantısı
+  // (trackingToken) ile YA DA (b) siparişi veren üye girişiyle. Kısa kod
+  // işletme+şoförde görünür / tahmin edilebilir; tek başına kabul etseydik
+  // üçüncü taraf müşteri adına iptal edebilirdi.
+  const viewer = await getAuthedUser();
+  const isOwner =
+    viewer?.role === "CUSTOMER" &&
+    order.customerId != null &&
+    order.customerId === viewer.id;
+  if (order.trackingToken !== token && !isOwner) {
+    return NextResponse.json(
+      {
+        error:
+          "İptal/cayma bildirimi için size SMS/e-posta ile gönderilen takip bağlantısını açın (veya siparişi veren hesapla giriş yapın). Kısa takip kodu tek başına bu işlem için kullanılamaz.",
+      },
+      { status: 403 },
+    );
   }
 
   // CAS: cayma/iptal YALNIZ halı teslim alınmadan (CREATED/ACCEPTED) kullanılabilir.

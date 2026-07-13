@@ -26,6 +26,9 @@ const LiveMap = dynamic(() => import("@/components/LiveMap"), {
 
 type Track = {
   status: OrderStatus;
+  // Kesin-fiyat onayı / iptal yalnız uzun takip bağlantısıyla yapılabilir;
+  // kısa kod ile açıldıysa false → o butonlar yerine yönlendirme gösterilir.
+  fullAccess?: boolean;
   rejectReason: string | null;
   createdAt: string;
   customerName: string;
@@ -619,14 +622,24 @@ export function TrackingClient({ token }: { token: string }) {
                     {approveError}
                   </p>
                 )}
-                <button
-                  type="button"
-                  onClick={approvePrice}
-                  disabled={approvePending}
-                  className="mt-3 w-full rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark active:scale-[0.99] disabled:opacity-60 sm:w-auto"
-                >
-                  {approvePending ? "İşleniyor…" : "Fiyatı Onayla"}
-                </button>
+                {/* Onay yalnız müşteriye özel uzun bağlantıyla yapılır (kısa
+                    kod işletme/şoförde görünür → taklidi önlenir). */}
+                {data.fullAccess === false ? (
+                  <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                    Fiyatı onaylamak için size <strong>SMS/e-posta ile
+                    gönderilen takip bağlantısını</strong> açın. Güvenliğiniz
+                    için kısa takip kodu bu işlemde kullanılamaz.
+                  </p>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={approvePrice}
+                    disabled={approvePending}
+                    className="mt-3 w-full rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark active:scale-[0.99] disabled:opacity-60 sm:w-auto"
+                  >
+                    {approvePending ? "İşleniyor…" : "Fiyatı Onayla"}
+                  </button>
+                )}
               </div>
             )}
 
@@ -826,7 +839,15 @@ export function TrackingClient({ token }: { token: string }) {
           kısa bir anket açar; neden seçilmeden iptal gönderilmez. */}
       {CUSTOMER_CANCELABLE.includes(data.status) && !data.priceApprovedAt && (
         <div className="border-t border-slate-100 pt-3">
-          {!cancelFormOpen ? (
+          {/* İptal/cayma yalnız müşteriye özel uzun bağlantıyla (kısa kod
+              işletme/şoförde görünür → üçüncü taraf iptali önlenir). */}
+          {data.fullAccess === false ? (
+            <p className="text-xs text-slate-400">
+              İptal / cayma bildirmek için size <strong>SMS/e-posta ile
+              gönderilen takip bağlantısını</strong> açın. Güvenliğiniz için
+              kısa takip kodu bu işlemde kullanılamaz.
+            </p>
+          ) : !cancelFormOpen ? (
             <>
               <button
                 type="button"

@@ -22,7 +22,7 @@ async function optimizeImage(
   contentType: string,
 ): Promise<{ buf: Buffer; ext: string; contentType: string }> {
   try {
-    const out = await sharp(buf)
+    const out = await sharp(buf, { limitInputPixels: 50_000_000 })
       .rotate() // EXIF yönünü uygula (telefon fotoğrafları yan gelmesin)
       .resize(MAX_EDGE, MAX_EDGE, { fit: "inside", withoutEnlargement: true })
       .webp({ quality: WEBP_QUALITY })
@@ -68,7 +68,7 @@ export async function POST(req: NextRequest) {
       let contentType = file.type;
       let ext = rawExt;
       try {
-        buf = await sharp(original)
+        buf = await sharp(original, { limitInputPixels: 50_000_000 })
           .rotate()
           .resize(512, 512, { fit: "inside", withoutEnlargement: true })
           .webp({ quality: WEBP_QUALITY })

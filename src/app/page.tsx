@@ -215,7 +215,15 @@ export default async function Home({
             )}
           </div>
           {view === "map" ? (
-            <BusinessesMapView businesses={businesses} center={userCenter} />
+            // Harita görünümü CLIENT bileşeni → nesnenin TÜM alanları RSC
+            // payload'ıyla tarayıcıya gider. Rakip istihbaratı olan red oranı ve
+            // ömür-boyu sipariş sayısını soyarak geç (denetim bulgusu).
+            <BusinessesMapView
+              businesses={businesses.map(
+                ({ rejectRate: _r, totalOrders: _t, ...b }) => b,
+              )}
+              center={userCenter}
+            />
           ) : businesses.length === 0 ? (
             <div className="rounded-xl border border-dashed border-slate-300 bg-white px-6 py-10 text-center">
               <p className="text-sm font-semibold text-slate-900">

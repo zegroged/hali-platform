@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { rateLimit, clientIp, tooMany } from "@/lib/ratelimit";
 import { sendSms } from "@/lib/sms";
 import { notify } from "@/lib/notify";
+import { getAuthedUser } from "@/lib/auth";
 
 export async function POST(
   req: NextRequest,
@@ -23,6 +24,8 @@ export async function POST(
     select: {
       id: true,
       code: true,
+      trackingToken: true,
+      customerId: true,
       quotedPrice: true,
       priceApprovedAt: true,
       business: { select: { phone: true, ownerId: true } },
@@ -30,6 +33,25 @@ export async function POST(
   });
   if (!order) {
     return NextResponse.json({ error: "Bulunamadı" }, { status: 404 });
+  }
+  // MÜŞTERİYE ÖZEL KANAL (denetim bulgusu): kesin fiyat onayı yalnız (a) müşteriye
+  // SMS/e-posta ile giden UZUN takip bağlantısı (trackingToken) ile YA DA (b) o
+  // siparişin sahibi olarak giriş yapmış üye tarafından yapılabilir. Kısa kod
+  // işletme + atanan şoförde görünür; tek başına kabul etseydik işletme
+  // müşterinin dijital onayını (md.15/1-h ispatı) taklit edebilirdi.
+  const viewer = await getAuthedUser();
+  const isOwner =
+    viewer?.role === "CUSTOMER" &&
+    order.customerId != null &&
+    order.customerId === viewer.id;
+  if (order.trackingToken !== token && !isOwner) {
+    return NextResponse.json(
+      {
+        error:
+          "Fiyat onayı için size SMS/e-posta ile gönderilen takip bağlantısını açın (veya siparişi veren hesapla giriş yapın). Kısa takip kodu tek başına bu işlem için kullanılamaz.",
+      },
+      { status: 403 },
+    );
   }
   if (order.quotedPrice == null) {
     return NextResponse.json(

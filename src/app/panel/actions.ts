@@ -539,7 +539,7 @@ export async function quoteOrderPrice(formData: FormData) {
   try {
     await sendSms(
       order.customerPhone,
-      `Kesin fiyat ${price} TL. Onaylamak icin: ${trackingLink(order.code ?? order.trackingToken)}`,
+      `Kesin fiyat ${price} TL. Onaylamak icin: ${trackingLink(order.trackingToken)}`,
     );
   } catch (e) {
     console.error("quoteOrderPrice SMS hatası:", e);
@@ -601,7 +601,7 @@ export async function advanceOrderPanel(formData: FormData) {
     try {
       await sendSms(
         order.customerPhone,
-        `Haliniz yola cikti! Canli takip: ${trackingLink(order.code ?? order.trackingToken)}`,
+        `Haliniz yola cikti! Canli takip: ${trackingLink(order.trackingToken)}`,
       );
     } catch (e) {
       console.error("advanceOrderPanel SMS hatası:", e);

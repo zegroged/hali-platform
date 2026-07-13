@@ -188,7 +188,10 @@ export async function POST(req: NextRequest) {
 
   // SMS hatası sipariş oluşturmayı bozmasın (sipariş zaten kaydedildi).
   try {
-    await sendTrackingSms(d.customerPhone, d.customerName, order.code ?? order.trackingToken);
+    // Müşteriye giden takip linki UZUN trackingToken taşımalı (denetim bulgusu):
+    // kesin-fiyat onayı/iptal yalnız bu özel linkle yapılır; kısa kod işletme+
+    // şoförde görünür → onu link yapsaydık işletme müşteri onayını taklit ederdi.
+    await sendTrackingSms(d.customerPhone, d.customerName, order.trackingToken);
   } catch (e) {
     console.error("order tracking SMS hatası:", e);
     // 6563 Yön. md.9: teyidin "ayrıca" bacağı (SMS) düştü — işletme panelinde

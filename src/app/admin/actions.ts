@@ -299,7 +299,7 @@ export async function createBusinessByAdmin(formData: FormData) {
     let buf = original;
     let contentType = file.type;
     try {
-      buf = await sharp(original)
+      buf = await sharp(original, { limitInputPixels: 50_000_000 })
         .rotate()
         .resize(edge, edge, { fit: "inside", withoutEnlargement: true })
         .webp({ quality: 82 })

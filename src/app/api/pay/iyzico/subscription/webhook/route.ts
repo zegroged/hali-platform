@@ -57,10 +57,19 @@ export async function POST(req: NextRequest) {
   const failure = /FAIL|UNPAID|PAST_DUE|CANCEL|EXPIRE/.test(eventType);
 
   if (success) {
-    // İDEMPOTENCY (denetim bulgusu): iyzico webhook'ları en-az-bir-kez teslim
-    // edilir; çift teslim çift 30 gün + çift ödeme kaydı üretiyordu. eventId
-    // varsa iyzicoPaymentId @unique ile ATOMİK claim yap — daha önce işlendiyse
-    // create P2002 fırlatır, no-op döner.
+    // NULL İDEMPOTENCY GUARD (denetim bulgusu): eventId boşsa iyzicoPaymentId
+    // null yazılırdı; Postgres @unique çoklu NULL'a izin verdiğinden aynı
+    // id'siz success olayının HER tekrarı +30 gün eklerdi. Anahtarsız olayda
+    // dönem AÇMA — tekillik garanti edilemez. (Gerçek çekimde iyzico id gönderir.)
+    if (!eventId) {
+      console.warn("iyzico webhook: id'siz success olayı — dönem açılmadı", {
+        subRef,
+      });
+      return NextResponse.json({ ok: true, skipped: "no-event-id" });
+    }
+    // İDEMPOTENCY: iyzico webhook'ları en-az-bir-kez teslim edilir; çift teslim
+    // çift 30 gün + çift ödeme kaydı üretiyordu. iyzicoPaymentId @unique ile
+    // ATOMİK claim — daha önce işlendiyse create P2002 fırlatır, no-op döner.
     try {
       await prisma.$transaction(async (tx) => {
         const end = await extendSubscription(tx, sub.businessId);
@@ -72,9 +81,9 @@ export async function POST(req: NextRequest) {
             paidAt: new Date(),
             periodStart: new Date(),
             periodEnd: end,
-            // eventId yoksa null — o durumda tekillik garanti edilemez ama
-            // recurring gated olduğundan pratik risk yok (kurulumda secret+id gelir).
-            iyzicoPaymentId: eventId || null,
+            // eventId burada garanti dolu (yukarıda boşsa erken döndük) →
+            // @unique ile gerçek idempotency.
+            iyzicoPaymentId: eventId,
           },
         });
       });
