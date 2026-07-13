@@ -34,6 +34,7 @@ export function OrderScreen({
   const [form, setForm] = useState({
     customerName: "",
     customerPhone: "",
+    customerEmail: "",
     pickupAddress: "",
     approxM2: "",
     note: "",
@@ -63,6 +64,11 @@ export function OrderScreen({
       Alert.alert("Eksik bilgi", "Halının alınacağı adresi biraz daha ayrıntılı yaz.");
       return;
     }
+    const email = form.customerEmail.trim();
+    if (email && !/^\S+@\S+\.\S+$/.test(email)) {
+      Alert.alert("E-posta hatalı", "Geçerli bir e-posta gir veya boş bırak.");
+      return;
+    }
     // m² yazıldıysa geçerli olmalı — sessizce silinip m²'siz sipariş gitmesin.
     const m2 = form.approxM2 ? parseM2(form.approxM2) : undefined;
     if (form.approxM2 && m2 === undefined) {
@@ -82,6 +88,7 @@ export function OrderScreen({
         businessId: id,
         customerName: form.customerName.trim(),
         customerPhone: phone,
+        customerEmail: email || undefined,
         pickupAddress: form.pickupAddress.trim(),
         approxM2: m2,
         note: form.note || undefined,
@@ -131,6 +138,16 @@ export function OrderScreen({
           maxLength={11}
           value={form.customerPhone}
           onChangeText={(v) => set("customerPhone", v.replace(/\D/g, ""))}
+        />
+        <TextInput
+          style={s.input}
+          placeholder="E-posta (opsiyonel — takip linki gelsin)"
+          keyboardType="email-address"
+          autoCapitalize="none"
+          autoCorrect={false}
+          maxLength={120}
+          value={form.customerEmail}
+          onChangeText={(v) => set("customerEmail", v)}
         />
         <TextInput
           style={[s.input, { height: 70 }]}

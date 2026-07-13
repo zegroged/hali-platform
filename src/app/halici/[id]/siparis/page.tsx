@@ -85,6 +85,7 @@ export default async function SiparisPage({
     | {
         customerName: string;
         customerPhone: string;
+        customerEmail: string;
         pickupAddress: string;
         approxM2: string;
         note: string;
@@ -100,6 +101,7 @@ export default async function SiparisPage({
         select: {
           customerName: true,
           customerPhone: true,
+          customerEmail: true,
           pickupAddress: true,
           approxM2: true,
           note: true,
@@ -111,6 +113,7 @@ export default async function SiparisPage({
         initial = {
           customerName: prev.customerName,
           customerPhone: prev.customerPhone,
+          customerEmail: prev.customerEmail ?? "",
           pickupAddress: prev.pickupAddress,
           approxM2: prev.approxM2 != null ? String(prev.approxM2) : "",
           note: prev.note ?? "",

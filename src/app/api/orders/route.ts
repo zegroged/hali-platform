@@ -14,6 +14,9 @@ const Body = z.object({
   businessId: z.string().min(1).max(40),
   customerName: z.string().min(2).max(100),
   customerPhone: z.string().min(10).max(20),
+  // Opsiyonel: takip linki e-postayla da gitsin (SMS ertelendi — misafirin
+  // linki kaybetmemesi + md.9 kalıcı-ortam teyidinin bedava kanalı).
+  customerEmail: z.string().trim().email().max(120).optional(),
   pickupAddress: z.string().min(5).max(300),
   pickupLat: z.number().min(-90).max(90).optional(),
   pickupLng: z.number().min(-180).max(180).optional(),
@@ -101,6 +104,7 @@ export async function POST(req: NextRequest) {
         customerId: session?.role === "CUSTOMER" ? session.id : undefined,
         customerName: d.customerName,
         customerPhone: d.customerPhone,
+        customerEmail: d.customerEmail?.toLowerCase() ?? null,
         pickupAddress: d.pickupAddress,
         pickupLat: d.pickupLat,
         pickupLng: d.pickupLng,
@@ -152,6 +156,33 @@ export async function POST(req: NextRequest) {
       );
     } catch (e) {
       console.error("yeni sipariş şoför SMS hatası:", e);
+    }
+  }
+
+  // Takip linki E-POSTA ile (SMS ertelendi; e-posta canlı ve bedava) —
+  // md.9 teyidinin kalıcı-ortam bacağı. Best-effort: sipariş zaten kaydedildi.
+  if (d.customerEmail) {
+    try {
+      const url = `${getAppBaseUrl()}/takip/${order.trackingToken}`;
+      const kod = order.code ?? order.trackingToken;
+      const esc = (s: string) =>
+        s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      const { wrapEmail, sendEmail } = await import("@/lib/email");
+      await sendEmail(
+        d.customerEmail,
+        `Siparişin alındı — takip kodun: ${kod}`,
+        `Merhaba ${d.customerName}, halı yıkama talebin alındı. Takip kodun: ${kod}. Takip linki: ${url}`,
+        wrapEmail(
+          `<p style="margin:0 0 12px;">Merhaba ${esc(d.customerName)},</p>
+           <p style="margin:0 0 12px;">Halı yıkama talebin alındı. Takip kodun:</p>
+           <p style="margin:0 0 12px;font-size:26px;font-weight:bold;letter-spacing:3px;color:#0f766e;">${kod}</p>
+           <p style="margin:0 0 16px;">Halının hangi aşamada olduğunu (alındı, yıkanıyor, yolda, teslim) aşağıdaki bağlantıdan anlık izleyebilirsin. Kesin fiyat, halın ölçüldükten sonra bu sayfada onayına sunulacak.</p>
+           <p style="margin:0 0 16px;"><a href="${url}" style="display:inline-block;background-color:#0f766e;color:#ffffff;text-decoration:none;font-weight:bold;padding:12px 24px;border-radius:8px;">Siparişimi takip et</a></p>
+           <p style="margin:0;color:#64748b;font-size:13px;">Bu e-postayı sakla — takip bağlantın budur. Ödeme teslimde yapılır, ön ödeme yoktur.</p>`,
+        ),
+      );
+    } catch (e) {
+      console.error("takip e-postası hatası:", e);
     }
   }
 

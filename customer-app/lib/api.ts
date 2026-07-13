@@ -131,6 +131,8 @@ export type OrderBody = {
   businessId: string;
   customerName: string;
   customerPhone: string;
+  /** Opsiyonel — girilirse takip linki e-postayla da gider. */
+  customerEmail?: string;
   pickupAddress: string;
   approxM2?: number;
   note?: string;

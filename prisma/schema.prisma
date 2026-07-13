@@ -258,6 +258,8 @@ model Order {
   customerId    String?
   customerName  String // kayıtsız müşteri de sipariş verebilir
   customerPhone String
+  // Opsiyonel: takip linki e-postayla gider (SMS ertelendi — bedava teyit kanalı).
+  customerEmail String?
   pickupAddress String
   pickupLat     Float?
   pickupLng     Float?

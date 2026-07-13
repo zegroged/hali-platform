@@ -87,6 +87,7 @@ export async function checkStaleOrders(): Promise<void> {
       code: true,
       trackingToken: true,
       customerName: true,
+      customerEmail: true,
       business: { select: { name: true } },
       customer: { select: { email: true } },
     },
@@ -104,7 +105,8 @@ export async function checkStaleOrders(): Promise<void> {
       body: `${o.business.name} · ${ref} — işletme siparişi bekletiyor.`,
       href: "/admin",
     });
-    const email = o.customer?.email;
+    // Üye e-postası > sipariş formuna yazılan e-posta (misafir de haber alsın)
+    const email = o.customer?.email ?? o.customerEmail;
     if (email) {
       const url = `${getAppBaseUrl()}/takip/${o.trackingToken}`;
       try {

@@ -9,7 +9,12 @@ import { LocationPicker } from "@/components/LocationPicker";
 /** Alan bazlı doğrulama hataları (alan adı → mesaj). */
 type FieldErrors = Partial<
   Record<
-    "customerName" | "customerPhone" | "pickupAddress" | "approxM2" | "consent",
+    | "customerName"
+    | "customerPhone"
+    | "customerEmail"
+    | "pickupAddress"
+    | "approxM2"
+    | "consent",
     string
   >
 >;
@@ -32,6 +37,7 @@ export function OrderForm({
   initial?: Partial<{
     customerName: string;
     customerPhone: string;
+    customerEmail: string;
     pickupAddress: string;
     approxM2: string;
     note: string;
@@ -43,6 +49,7 @@ export function OrderForm({
   const [form, setForm] = useState({
     customerName: initial?.customerName ?? "",
     customerPhone: initial?.customerPhone ?? "",
+    customerEmail: initial?.customerEmail ?? "",
     pickupAddress: initial?.pickupAddress ?? "",
     approxM2: initial?.approxM2 ?? "",
     note: initial?.note ?? "",
@@ -103,6 +110,11 @@ export function OrderForm({
       errs.pickupAddress = "Lütfen açık adresi yaz (mahalle, sokak, no).";
     if (form.approxM2 && parseM2(form.approxM2) === null)
       errs.approxM2 = "Geçerli bir m² değeri gir (ör. 12,5).";
+    if (
+      form.customerEmail.trim() &&
+      !/^\S+@\S+\.\S+$/.test(form.customerEmail.trim())
+    )
+      errs.customerEmail = "Geçerli bir e-posta adresi gir (veya boş bırak).";
     if (!consent)
       errs.consent = "Devam etmek için onay kutusunu işaretleyin.";
     setFieldErrors(errs);
@@ -120,6 +132,7 @@ export function OrderForm({
           businessId,
           customerName: form.customerName,
           customerPhone: form.customerPhone,
+          customerEmail: form.customerEmail.trim() || undefined,
           pickupAddress: form.pickupAddress,
           pickupLat: coords?.lat,
           pickupLng: coords?.lng,
@@ -204,6 +217,25 @@ export function OrderForm({
             />
             {fieldErrors.customerPhone && (
               <p className={fieldErrCls}>{fieldErrors.customerPhone}</p>
+            )}
+          </div>
+          <div>
+            <label htmlFor="siparis-eposta" className={labelCls}>
+              E-posta{optionalBadge}
+            </label>
+            <input
+              id="siparis-eposta"
+              className={inputCls(fieldErrors.customerEmail)}
+              type="email"
+              inputMode="email"
+              autoComplete="email"
+              maxLength={120}
+              placeholder="Takip linkin e-postana da gelsin (önerilir)"
+              value={form.customerEmail}
+              onChange={(e) => set("customerEmail", e.target.value)}
+            />
+            {fieldErrors.customerEmail && (
+              <p className={fieldErrCls}>{fieldErrors.customerEmail}</p>
             )}
           </div>
         </div>
