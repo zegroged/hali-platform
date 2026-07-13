@@ -35,6 +35,7 @@ export type BusinessSummary = {
   rejectRate: number;
   totalOrders: number;
   coverUrl: string | null;
+  logoUrl: string | null;
 };
 
 const NEW_WINDOW_MS = 21 * 24 * 60 * 60 * 1000;
@@ -219,6 +220,7 @@ export async function getBusinesses(
       rejectRate,
       totalOrders: s?.total ?? 0,
       coverUrl: b.photos[0]?.url ?? null,
+      logoUrl: b.logoUrl,
     };
   });
 
@@ -381,6 +383,7 @@ export async function getBusinessById(id: string) {
     ratingAvg: b.ratingAvg,
     ratingCount: b.ratingCount,
     googleProfileUrl: b.googleProfileUrl,
+    logoUrl: b.logoUrl,
     badges,
     pricing: b.pricing.map((p) => ({
       label: p.label,

@@ -36,6 +36,16 @@ export function BusinessCard({ b }: { b: BusinessSummary }) {
             <Logo size={44} />
           </div>
         )}
+        {/* İşletme logosu — kapak görselinin köşesinde küçük kart */}
+        {b.logoUrl && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={b.logoUrl}
+            alt=""
+            loading="lazy"
+            className="absolute bottom-2 left-2 h-10 w-10 rounded-lg border border-slate-200 bg-white object-contain p-0.5 shadow-sm"
+          />
+        )}
         {/* Tatil modunda "Açık" rozetiyle çelişmesin — tek rozet göster */}
         {b.isPaused ? (
           <span className="absolute left-2 top-2 rounded-full bg-amber-100/95 px-2 py-0.5 text-xs font-medium text-amber-800 backdrop-blur">

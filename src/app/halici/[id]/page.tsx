@@ -143,13 +143,23 @@ export default async function HaliciProfile({
           {/* Sol kolon: başlık, fotoğraflar, açıklama */}
           <div>
             <div className="flex items-start justify-between gap-3">
-              <div>
-                <h1 className="text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">
-                  {b.name}
-                </h1>
-                <p className="text-slate-500">
-                  {b.district}, {b.city}
-                </p>
+              <div className="flex min-w-0 items-center gap-3">
+                {b.logoUrl && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={b.logoUrl}
+                    alt={`${b.name} logosu`}
+                    className="h-14 w-14 shrink-0 rounded-xl border border-slate-200 bg-white object-contain p-1"
+                  />
+                )}
+                <div className="min-w-0">
+                  <h1 className="text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">
+                    {b.name}
+                  </h1>
+                  <p className="text-slate-500">
+                    {b.district}, {b.city}
+                  </p>
+                </div>
               </div>
               {b.ratingCount > 0 ? (
                 <div className="text-right">
@@ -192,9 +202,12 @@ export default async function HaliciProfile({
                       decoding="async"
                       className="h-full w-full object-cover"
                     />
-                    <span className="absolute left-1 top-1 rounded bg-black/50 px-1.5 py-0.5 text-[11px] text-white">
-                      {p.isBefore ? "Öncesi" : "Sonrası"}
-                    </span>
+                    {/* Genel işletme fotoğrafında rozet yok */}
+                    {(p.isBefore || p.isAfter) && (
+                      <span className="absolute left-1 top-1 rounded bg-black/50 px-1.5 py-0.5 text-[11px] text-white">
+                        {p.isBefore ? "Öncesi" : "Sonrası"}
+                      </span>
+                    )}
                   </div>
                 ))}
               </div>

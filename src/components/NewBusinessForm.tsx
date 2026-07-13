@@ -152,6 +152,48 @@ export default function NewBusinessForm() {
           eklenebilir.
         </p>
       </div>
+      <div className="grid gap-4 sm:grid-cols-3">
+        <div>
+          <label htmlFor="logo" className={lbl}>
+            Logo <span className="text-slate-400">(opsiyonel, tek dosya)</span>
+          </label>
+          <input
+            id="logo"
+            name="logo"
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-brand-light file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-brand-dark"
+          />
+        </div>
+        <div>
+          <label htmlFor="photosBefore" className={lbl}>
+            Öncesi fotoğrafları{" "}
+            <span className="text-slate-400">(opsiyonel)</span>
+          </label>
+          <input
+            id="photosBefore"
+            name="photosBefore"
+            type="file"
+            multiple
+            accept="image/jpeg,image/png,image/webp"
+            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-1.5 file:text-sm"
+          />
+        </div>
+        <div>
+          <label htmlFor="photosAfter" className={lbl}>
+            Sonrası fotoğrafları{" "}
+            <span className="text-slate-400">(opsiyonel)</span>
+          </label>
+          <input
+            id="photosAfter"
+            name="photosAfter"
+            type="file"
+            multiple
+            accept="image/jpeg,image/png,image/webp"
+            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-1.5 file:text-sm"
+          />
+        </div>
+      </div>
 
       {/* Şoför yayına değil SİPARİŞE şart (admin işletmesi şoförsüz yayınlanır,
           sipariş API'si şoförsüzken 409 döner). Alanlardan biri dolarsa hepsi istenir. */}

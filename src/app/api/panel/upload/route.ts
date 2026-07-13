@@ -40,20 +40,46 @@ export async function POST(req: NextRequest) {
   }
 
   const form = await req.formData();
+  // Türler: after (sonrası) | before (öncesi) | genel (işletme fotoğrafı) |
+  // logo (tek dosya — CleanerBusiness.logoUrl'e yazılır, galeriye girmez).
   const kind = String(form.get("kind") || "after");
   const files = form
     .getAll("files")
     .filter((f): f is File => f instanceof File)
-    .slice(0, 10); // tek istekte en fazla 10 dosya (DoS/şişme koruması)
+    .slice(0, kind === "logo" ? 1 : 10); // logo tek; diğerleri ≤10 (DoS koruması)
   if (!files.length) {
     return NextResponse.json({ error: "Dosya yok" }, { status: 400 });
   }
 
   let count = 0;
+  let logoUrl: string | null = null;
   for (const file of files) {
     const rawExt = ALLOWED[file.type];
     if (!rawExt || file.size > MAX) continue;
     const original = Buffer.from(await file.arrayBuffer());
+    if (kind === "logo") {
+      // Logo: kare kutuya sığdır (512px) — kartlarda küçük gösterilir.
+      let buf = original;
+      let contentType = file.type;
+      let ext = rawExt;
+      try {
+        buf = await sharp(original)
+          .rotate()
+          .resize(512, 512, { fit: "inside", withoutEnlargement: true })
+          .webp({ quality: WEBP_QUALITY })
+          .toBuffer();
+        contentType = "image/webp";
+        ext = "webp";
+      } catch {}
+      const name = `logo-${Date.now()}.${ext}`;
+      logoUrl = await saveObject(`uploads/${b.id}/${name}`, buf, contentType);
+      await prisma.cleanerBusiness.update({
+        where: { id: b.id },
+        data: { logoUrl },
+      });
+      count++;
+      continue;
+    }
     const img = await optimizeImage(original, rawExt, file.type);
     const name = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${img.ext}`;
     const url = await saveObject(`uploads/${b.id}/${name}`, img.buf, img.contentType);
@@ -62,7 +88,7 @@ export async function POST(req: NextRequest) {
         businessId: b.id,
         url,
         isBefore: kind === "before",
-        isAfter: kind === "after",
+        isAfter: kind === "after", // "genel" → ikisi de false
       },
     });
     count++;
@@ -77,5 +103,5 @@ export async function POST(req: NextRequest) {
   // Fotoğraf, profili tamamlayan son parça olabilir — görünürlüğü yeniden değerlendir
   // (addPhoto server action'ı bunu yapıyordu, dosya yükleme ucu atlıyordu).
   await syncVisibility(b.id);
-  return NextResponse.json({ ok: true, count });
+  return NextResponse.json({ ok: true, count, logoUrl });
 }

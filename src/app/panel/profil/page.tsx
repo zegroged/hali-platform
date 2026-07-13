@@ -382,8 +382,22 @@ export default async function PanelProfile({
       {/* Fotoğraflar */}
       <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
         <h2 className="mb-3 font-semibold text-slate-900">
-          Fotoğraflar (before/after)
+          Fotoğraflar (logo · genel · öncesi/sonrası)
         </h2>
+        {b.logoUrl && (
+          <div className="mb-3 flex items-center gap-3">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={b.logoUrl}
+              alt="İşletme logosu"
+              className="h-14 w-14 rounded-xl border border-slate-200 bg-white object-contain p-1"
+            />
+            <p className="text-xs text-slate-500">
+              Mevcut logon — değiştirmek için aşağıdan &quot;Logo&quot; türüyle
+              yeni dosya yükle.
+            </p>
+          </div>
+        )}
         {b.photos.length > 0 ? (
           <div className="mb-3 grid grid-cols-3 gap-2">
             {b.photos.map((p) => (

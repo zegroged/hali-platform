@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Footer from "@/components/Footer";
@@ -110,6 +110,34 @@ export default function KayitPage() {
     setForm((f) => ({ ...f, [key]: value }));
   }
 
+  // Opsiyonel fotoğraflar: kayıt başarıyla oturum kurduktan sonra
+  // /api/panel/upload'a tür tür yüklenir (best-effort — biri düşerse kayıt
+  // bozulmaz, panelden tamamlanır).
+  const logoRef = useRef<HTMLInputElement>(null);
+  const genelRef = useRef<HTMLInputElement>(null);
+  const onceRef = useRef<HTMLInputElement>(null);
+  const sonraRef = useRef<HTMLInputElement>(null);
+  async function uploadPhotosBestEffort() {
+    const jobs: [string, HTMLInputElement | null][] = [
+      ["logo", logoRef.current],
+      ["genel", genelRef.current],
+      ["before", onceRef.current],
+      ["after", sonraRef.current],
+    ];
+    for (const [kind, input] of jobs) {
+      const files = input?.files;
+      if (!files || files.length === 0) continue;
+      try {
+        const fd = new FormData();
+        fd.append("kind", kind);
+        for (const f of Array.from(files).slice(0, 10)) fd.append("files", f);
+        await fetch("/api/panel/upload", { method: "POST", body: fd });
+      } catch {
+        // sessiz geç — panelden yüklenebilir
+      }
+    }
+  }
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -157,7 +185,9 @@ export default function KayitPage() {
         setError(data?.error ?? "Kayıt başarısız, lütfen tekrar deneyin.");
         return;
       }
-      // Hesap açıldı ve oturum kuruldu — panel eksik-tamamlama listesi yönlendirir.
+      // Hesap açıldı ve oturum kuruldu — seçilmiş fotoğraflar varsa yükle
+      // (best-effort), sonra panel eksik-tamamlama listesi yönlendirir.
+      await uploadPhotosBestEffort();
       router.push("/panel");
       router.refresh();
     } catch {
@@ -422,6 +452,71 @@ export default function KayitPage() {
               {err("district")}
             </div>
           </div>
+
+          {/* Opsiyonel fotoğraflar — kayıt sonrası otomatik yüklenir; atlanırsa
+              panelden eklenir (yayın için en az 1 fotoğraf gerekir). */}
+          <fieldset className="rounded-lg border border-slate-200 p-3">
+            <legend className="px-1 text-xs font-medium text-slate-600">
+              Fotoğraflar (opsiyonel — sonradan panelden de eklenir)
+            </legend>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label htmlFor="kayit-logo" className={labelCls}>
+                  Logo <span className="text-xs text-slate-400">(tek dosya)</span>
+                </label>
+                <input
+                  id="kayit-logo"
+                  ref={logoRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  className="w-full text-sm text-slate-600 file:mr-2 file:rounded-lg file:border-0 file:bg-brand-light file:px-3 file:py-2 file:text-sm file:font-medium file:text-brand-dark"
+                />
+              </div>
+              <div>
+                <label htmlFor="kayit-foto" className={labelCls}>
+                  İşletme fotoğrafları
+                </label>
+                <input
+                  id="kayit-foto"
+                  ref={genelRef}
+                  type="file"
+                  multiple
+                  accept="image/jpeg,image/png,image/webp"
+                  className="w-full text-sm text-slate-600 file:mr-2 file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-sm"
+                />
+              </div>
+              <div>
+                <label htmlFor="kayit-once" className={labelCls}>
+                  Öncesi fotoğrafları
+                </label>
+                <input
+                  id="kayit-once"
+                  ref={onceRef}
+                  type="file"
+                  multiple
+                  accept="image/jpeg,image/png,image/webp"
+                  className="w-full text-sm text-slate-600 file:mr-2 file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-sm"
+                />
+              </div>
+              <div>
+                <label htmlFor="kayit-sonra" className={labelCls}>
+                  Sonrası fotoğrafları
+                </label>
+                <input
+                  id="kayit-sonra"
+                  ref={sonraRef}
+                  type="file"
+                  multiple
+                  accept="image/jpeg,image/png,image/webp"
+                  className="w-full text-sm text-slate-600 file:mr-2 file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-sm"
+                />
+              </div>
+            </div>
+            <p className="mt-2 text-xs text-slate-400">
+              jpg/png/webp, adet başı ≤5MB. Öncesi/Sonrası kareleri profilinde
+              etiketli galeri olarak görünür — güven kazandırır.
+            </p>
+          </fieldset>
 
           {/* Honeypot — insanlar görmez; dolduran botların kaydı reddedilir */}
           <input

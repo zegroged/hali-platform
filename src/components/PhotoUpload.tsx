@@ -5,7 +5,9 @@ import { useRouter } from "next/navigation";
 
 export function PhotoUpload() {
   const router = useRouter();
-  const [kind, setKind] = useState<"after" | "before">("after");
+  const [kind, setKind] = useState<"after" | "before" | "genel" | "logo">(
+    "after",
+  );
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -36,17 +38,21 @@ export function PhotoUpload() {
       <div className="flex items-center gap-2">
         <select
           value={kind}
-          onChange={(e) => setKind(e.target.value as "after" | "before")}
+          onChange={(e) =>
+            setKind(e.target.value as "after" | "before" | "genel" | "logo")
+          }
           className="rounded-lg border border-slate-300 px-2 py-2 text-sm"
         >
+          <option value="genel">İşletme fotoğrafı</option>
           <option value="after">Sonrası</option>
           <option value="before">Öncesi</option>
+          <option value="logo">Logo</option>
         </select>
         <input
           ref={fileRef}
           type="file"
           accept="image/jpeg,image/png,image/webp"
-          multiple
+          multiple={kind !== "logo"}
           className="flex-1 text-sm text-slate-600 file:mr-2 file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-sm"
         />
       </div>
@@ -58,7 +64,8 @@ export function PhotoUpload() {
         {loading ? "Yükleniyor…" : "Fotoğrafları yükle"}
       </button>
       <p className="text-xs text-slate-400">
-        İstediğin kadar seçebilirsin (jpg/png/webp, her biri ≤5MB).
+        İstediğin kadar seçebilirsin (jpg/png/webp, her biri ≤5MB). Logo tek
+        dosyadır; kartlarda ve profil başlığında görünür.
       </p>
       {err && <p className="text-sm text-red-600">{err}</p>}
     </div>
