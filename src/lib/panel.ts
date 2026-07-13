@@ -70,7 +70,10 @@ export async function syncVisibility(businessId: string): Promise<void> {
     profileComplete(b) &&
     b.owner.emailVerified &&
     b.contractAcceptedAt != null &&
-    b.drivers.length > 0;
+    // Şoför şartı: öz-servis kayıtta zorunlu; admin/destek eliyle açılan
+    // işletme MUAF (2026-07-13 kullanıcı kararı — görünürlük hemen başlasın,
+    // şoförsüzken sipariş API'si zaten 409 ile engeller).
+    (b.drivers.length > 0 || b.createdByAdmin);
   if (b.isVisible !== ok) {
     await prisma.cleanerBusiness.update({
       where: { id: businessId },

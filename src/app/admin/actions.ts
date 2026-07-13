@@ -177,7 +177,8 @@ export async function createBusinessByAdmin(formData: FormData) {
             sun: null,
           },
           verification: "VERIFIED", // doğrulama kapısı yok
-          isVisible: false, // syncVisibility hesaplar (foto+şoför gelince açılır)
+          isVisible: false, // syncVisibility hesaplar (profil tamamlanınca açılır)
+          createdByAdmin: true, // şoför YAYIN şartından muaf (sipariş için yine gerekir)
           contractAcceptedAt: new Date(),
           contractVersion: CONTRACT_VERSION,
           adminNote: `${isSupport ? "Müşteri Hizmetleri" : "Admin"} (${admin.name}) tarafından açıldı — süresiz ücretsiz abonelik.`,
@@ -256,8 +257,8 @@ export async function createBusinessByAdmin(formData: FormData) {
       (username ? "" : " İlk girişte kullanıcı adı belirleyecek.") +
       (wantsDriver
         ? ` Şoför girişi: kullanıcı adı "${dUsername}" · belirlediğin şoför şifresi.`
-        : " Yayın için en az bir şoför eklenmeli.") +
-      (photos.length === 0 ? " Yayın için fotoğraf da gerekli." : ""),
+        : " Not: şoför eklenmeden sipariş alınamaz (yayına engel değil).") +
+      (photos.length === 0 ? " Yayın için fotoğraf gerekli." : ""),
   );
   // SUPPORT admin detay sayfasını göremez — kendi sayfasına döner (şifre mesajda).
   redirect(

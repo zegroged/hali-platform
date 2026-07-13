@@ -140,6 +140,9 @@ model CleanerBusiness {
   contractVersion    String? // onaylanan aracılık sözleşmesi sürümü (ETAHS Yön. md.11/2-c)
   verification       VerificationStatus @default(PENDING)
   isVisible          Boolean            @default(false) // profil tam + doğrulanmış olunca true
+  // Admin/destek eliyle açıldı: şoför YAYIN şartından muaf (sipariş almak
+  // için yine şoför gerekir — sipariş API'si engeller).
+  createdByAdmin     Boolean            @default(false)
 
   ratingAvg   Float @default(0)
   ratingCount Int   @default(0)
