@@ -17,6 +17,38 @@ const nextConfig = {
   async redirects() {
     return [{ source: "/halicilar", destination: "/", permanent: true }];
   },
+  // Güvenlik yanıt başlıkları (tüm yollar). CSP'nin script/style kuralları
+  // Next.js inline'larını kırdığından (nonce gerektirir) şimdilik yalnız
+  // frame-ancestors (clickjacking) + upgrade-insecure-requests uygulanır;
+  // tam CSP lansman sonrası nonce ile eklenecek. Konum/kamera 'self' KALIR
+  // (müşteri konum seçimi + şoför fotoğraf çekimi bunlara muhtaç).
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: [
+          {
+            key: "Strict-Transport-Security",
+            value: "max-age=31536000; includeSubDomains; preload",
+          },
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "X-Frame-Options", value: "SAMEORIGIN" },
+          {
+            key: "Referrer-Policy",
+            value: "strict-origin-when-cross-origin",
+          },
+          {
+            key: "Permissions-Policy",
+            value: "geolocation=(self), camera=(self), microphone=(), payment=()",
+          },
+          {
+            key: "Content-Security-Policy",
+            value: "frame-ancestors 'self'; upgrade-insecure-requests",
+          },
+        ],
+      },
+    ];
+  },
 };
 
 export default nextConfig;
