@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
   const files = form
     .getAll("files")
     .filter((f): f is File => f instanceof File)
-    .slice(0, kind === "logo" ? 1 : 10); // logo tek; diğerleri ≤10 (DoS koruması)
+    .slice(0, kind === "logo" ? 1 : 20); // logo tek; diğerleri istekte ≤20 (DoS koruması — üst üste yüklemeyle sınırsız birikir)
   if (!files.length) {
     return NextResponse.json({ error: "Dosya yok" }, { status: 400 });
   }

@@ -87,10 +87,10 @@ export async function createBusinessByAdmin(formData: FormData) {
       .getAll(name)
       .filter((f): f is File => f instanceof File && f.size > 0)
       .slice(0, max);
-  const photos = pickFiles("photos", 10);
+  const photos = pickFiles("photos", 20);
   const logoFile = pickFiles("logo", 1)[0] ?? null;
-  const photosBefore = pickFiles("photosBefore", 10);
-  const photosAfter = pickFiles("photosAfter", 10);
+  const photosBefore = pickFiles("photosBefore", 20);
+  const photosAfter = pickFiles("photosAfter", 20);
 
   const err = (msg: string) =>
     redirect(formPath + "?hata=" + encodeURIComponent(msg));

@@ -64,8 +64,10 @@ export function PhotoUpload() {
         {loading ? "Yükleniyor…" : "Fotoğrafları yükle"}
       </button>
       <p className="text-xs text-slate-400">
-        İstediğin kadar seçebilirsin (jpg/png/webp, her biri ≤5MB). Logo tek
-        dosyadır; kartlarda ve profil başlığında görünür.
+        Aynı kategoriye istediğin kadar fotoğraf biriktirebilirsin: dosya
+        seçerken Ctrl ile çoklu seç, dilersen üst üste tekrar yükle — yeni
+        yükleme öncekileri SİLMEZ, ekler (jpg/png/webp, her biri ≤5MB). Logo
+        tek dosyadır; yenisi eskisinin yerine geçer.
       </p>
       {err && <p className="text-sm text-red-600">{err}</p>}
     </div>
