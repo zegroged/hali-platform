@@ -43,7 +43,18 @@ export async function POST(req: NextRequest) {
   });
   if (!marker || marker.status !== "PENDING") return fail();
 
+  // ATOMİK CLAIM (denetim bulgusu): PENDING kontrolü transaction dışında yapılıp
+  // update koşulsuzdu — eşzamanlı iki callback ilk dönemi iki kez açabiliyordu.
+  // Transaction içinde CAS: yalnız hâlâ PENDING olanı PAID'e çevir; count 0 ise
+  // başka callback çoktan işledi → no-op.
+  let claimed = false;
   await prisma.$transaction(async (tx) => {
+    const claim = await tx.subscriptionPayment.updateMany({
+      where: { id: marker.id, status: "PENDING" },
+      data: { status: "PAID", paidAt: new Date(), periodStart: new Date() },
+    });
+    if (claim.count === 0) return; // başka istek sahiplendi
+    claimed = true;
     await tx.subscription.upsert({
       where: { businessId: marker.businessId },
       create: {
@@ -64,14 +75,9 @@ export async function POST(req: NextRequest) {
     const end = await extendSubscription(tx, marker.businessId);
     await tx.subscriptionPayment.update({
       where: { id: marker.id },
-      data: {
-        status: "PAID",
-        paidAt: new Date(),
-        periodStart: new Date(),
-        periodEnd: end,
-      },
+      data: { periodEnd: end },
     });
   });
-  await syncVisibility(marker.businessId);
+  if (claimed) await syncVisibility(marker.businessId);
   return ok();
 }

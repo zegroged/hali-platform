@@ -85,14 +85,24 @@ export async function GET(
     }
   }
 
+  // Savunma derinliği (denetim bulgusu): tam açık adres + kesin GPS yalnız
+  // TAHMİN EDİLEMEZ uzun link token'ıyla (trackingToken) erişimde döner. Kısa
+  // 6-haneli kodla (enumerable) erişimde bunlar kısılır — kod tahmin eden biri
+  // müşterinin ev GPS'ini/tam adresini hasat edemesin. Meşru müşteri SMS/e-posta'
+  // daki LİNKe tıklar (tam veri); kodu elle giren yine durumu görür.
+  const viaLongToken = order.trackingToken === token;
+  const safeAddress = viaLongToken
+    ? order.pickupAddress
+    : `${order.pickupAddress.split(/[,/]/)[0].slice(0, 24)}…`; // yalnız ilk parça
+
   return NextResponse.json({
     status: order.status,
     rejectReason: order.rejectReason,
     createdAt: order.createdAt,
     customerName: order.customerName,
-    pickupAddress: order.pickupAddress,
-    pickupLat: order.pickupLat,
-    pickupLng: order.pickupLng,
+    pickupAddress: safeAddress,
+    pickupLat: viaLongToken ? order.pickupLat : null,
+    pickupLng: viaLongToken ? order.pickupLng : null,
     priceTotal: order.priceTotal != null ? Number(order.priceTotal) : null,
     // md.15/1-h: işletmenin bildirdiği kesin fiyat + müşterinin onay anı
     quotedPrice: order.quotedPrice != null ? Number(order.quotedPrice) : null,

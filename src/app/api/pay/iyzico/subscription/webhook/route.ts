@@ -13,6 +13,20 @@ import { paymentsLive } from "@/lib/config";
 export async function POST(req: NextRequest) {
   if (!paymentsLive) return NextResponse.json({ ok: true });
 
+  // KİMLİK DOĞRULAMA (denetim bulgusu): webhook imzasız/açıktı — subRef bilen
+  // saldırgan {…,SUCCESS} POST'uyla bedava abonelik uzatabiliyordu. iyzico
+  // panelinde webhook URL'ine ?key=<IYZICO_WEBHOOK_SECRET> ekle; sır tanımlıysa
+  // eşleşmeyen istekler reddedilir. (Sır yoksa — henüz kurulmadıysa — recurring
+  // zaten gated; yine de log'la ve işleme.)
+  const secret = process.env.IYZICO_WEBHOOK_SECRET;
+  if (secret) {
+    const key =
+      req.nextUrl.searchParams.get("key") ?? req.headers.get("x-webhook-key");
+    if (key !== secret) {
+      return NextResponse.json({ error: "yetkisiz" }, { status: 401 });
+    }
+  }
+
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
   const subRef = String(
     body.subscriptionReferenceCode ??
@@ -23,6 +37,14 @@ export async function POST(req: NextRequest) {
   const eventType = String(
     body.iyziEventType ?? body.eventType ?? body.subscriptionStatus ?? "",
   ).toUpperCase();
+  // İdempotency anahtarı: iyzico'nun bu çekim/olay için gönderdiği benzersiz id.
+  const eventId = String(
+    body.paymentId ??
+      body.iyzicoPaymentId ??
+      body.orderReferenceCode ??
+      body.referenceCode ??
+      "",
+  );
   if (!subRef) return NextResponse.json({ ok: true }); // bağsız event — yut
 
   const sub = await prisma.subscription.findFirst({
@@ -35,21 +57,40 @@ export async function POST(req: NextRequest) {
   const failure = /FAIL|UNPAID|PAST_DUE|CANCEL|EXPIRE/.test(eventType);
 
   if (success) {
-    // Aylık çekim başarılı → dönemi uzat + ödeme kaydı + görünürlük.
-    await prisma.$transaction(async (tx) => {
-      const end = await extendSubscription(tx, sub.businessId);
-      await tx.subscriptionPayment.create({
-        data: {
-          businessId: sub.businessId,
-          status: "PAID",
-          amount: 2400,
-          paidAt: new Date(),
-          periodStart: new Date(),
-          periodEnd: end,
-        },
+    // İDEMPOTENCY (denetim bulgusu): iyzico webhook'ları en-az-bir-kez teslim
+    // edilir; çift teslim çift 30 gün + çift ödeme kaydı üretiyordu. eventId
+    // varsa iyzicoPaymentId @unique ile ATOMİK claim yap — daha önce işlendiyse
+    // create P2002 fırlatır, no-op döner.
+    try {
+      await prisma.$transaction(async (tx) => {
+        const end = await extendSubscription(tx, sub.businessId);
+        await tx.subscriptionPayment.create({
+          data: {
+            businessId: sub.businessId,
+            status: "PAID",
+            amount: 2400,
+            paidAt: new Date(),
+            periodStart: new Date(),
+            periodEnd: end,
+            // eventId yoksa null — o durumda tekillik garanti edilemez ama
+            // recurring gated olduğundan pratik risk yok (kurulumda secret+id gelir).
+            iyzicoPaymentId: eventId || null,
+          },
+        });
       });
-    });
-    await syncVisibility(sub.businessId);
+      await syncVisibility(sub.businessId);
+    } catch (e) {
+      // Prisma P2002 = bu eventId zaten işlendi → sessizce yut (idempotent).
+      if (
+        e &&
+        typeof e === "object" &&
+        "code" in e &&
+        (e as { code?: string }).code === "P2002"
+      ) {
+        return NextResponse.json({ ok: true, duplicate: true });
+      }
+      throw e;
+    }
   } else if (failure) {
     // Çekim başarısız → PAST_DUE (dönem sonunda subscriptionActive false olur).
     await prisma.subscription.updateMany({

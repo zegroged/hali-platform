@@ -26,7 +26,7 @@ async function geocodeDistrict(district: string, city: string) {
       "https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=tr&q=" +
         encodeURIComponent(`${district}, ${city}`),
       {
-        headers: { "User-Agent": "HaliYikamaPlatformu/1.0", "Accept-Language": "tr" },
+        headers: { "User-Agent": "EnYakinHaliYikama/1.0 (+https://enyakinhaliyikamaservisi.com; destek@enyakinhaliyikamaservisim.com)", "Accept-Language": "tr" },
         cache: "no-store",
         signal: AbortSignal.timeout(5000),
       },
@@ -413,6 +413,24 @@ export async function approveBusiness(formData: FormData) {
 export async function activateSubscription(formData: FormData) {
   await requireAdmin();
   const id = String(formData.get("id"));
+  // Çift-tık koruması (denetim bulgusu): extendSubscription kümülatiftir
+  // (+30 gün), buton iki kez basılırsa tek havale için 60 gün açılırdı.
+  // Dönem sonu hâlâ 25+ gün ilerideyse "zaten aktif" say, tekrar uzatma.
+  const sub = await prisma.subscription.findUnique({
+    where: { businessId: id },
+    select: { status: true, currentPeriodEnd: true },
+  });
+  const farEnough =
+    sub?.currentPeriodEnd != null &&
+    sub.currentPeriodEnd.getTime() > Date.now() + 25 * 24 * 60 * 60 * 1000;
+  if (farEnough) {
+    redirect(
+      `/admin/isletme/${id}?mesaj=` +
+        encodeURIComponent(
+          "Abonelik zaten aktif (dönem sonu 25+ gün ileride). Tekrar uzatılmadı.",
+        ),
+    );
+  }
   await extendSubscription(prisma, id); // havale/EFT — kartlı ödeme callback'iyle aynı mantık
   await syncVisibility(id); // ödeme sonrası profil tamsa yayına al
   revalidatePath("/admin");

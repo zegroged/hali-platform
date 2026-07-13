@@ -53,7 +53,7 @@ async function geocodeDistrict(
       encodeURIComponent(`${district}, ${city}`);
     const res = await fetch(url, {
       headers: {
-        "User-Agent": "HaliYikamaPlatformu/1.0",
+        "User-Agent": "EnYakinHaliYikama/1.0 (+https://enyakinhaliyikamaservisi.com; destek@enyakinhaliyikamaservisim.com)",
         "Accept-Language": "tr",
       },
       cache: "no-store",

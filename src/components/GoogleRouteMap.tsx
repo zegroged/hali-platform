@@ -8,6 +8,7 @@ import {
   useJsApiLoader,
 } from "@react-google-maps/api";
 import { GOOGLE_MAPS_KEY } from "@/lib/maps";
+import LeafletRouteMap from "@/components/LeafletRouteMap";
 
 type Stop = {
   lat: number;
@@ -49,7 +50,7 @@ export default function GoogleRouteMap({
   onDone,
   height = 360,
 }: Props) {
-  const { isLoaded } = useJsApiLoader({
+  const { isLoaded, loadError } = useJsApiLoader({
     id: "hali-gmaps",
     googleMapsApiKey: GOOGLE_MAPS_KEY,
   });
@@ -121,6 +122,18 @@ export default function GoogleRouteMap({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playing, points, onDone]);
 
+  // Anahtar geçersiz/kısıtlıysa OSM rota haritasına düş (kilitlenmesin).
+  if (loadError) {
+    return (
+      <LeafletRouteMap
+        points={points}
+        stops={stops}
+        playing={playing}
+        onDone={onDone}
+        height={height}
+      />
+    );
+  }
   if (!isLoaded) {
     return (
       <div

@@ -30,11 +30,25 @@ export function rateLimit(key: string, limit: number, windowMs: number): RateRes
   return { ok: true, retryAfterSec: 0, remaining: limit - b.count };
 }
 
-/** İstek IP'si (ters proxy arkasında x-forwarded-for ilk değer). */
+/**
+ * Gerçek istemci IP'si. Cloudflare arkasındayız: CF-Connecting-IP'yi Cloudflare
+ * kendisi set eder ve istemcinin gönderdiğini EZER — güvenilir tek kaynak budur.
+ * X-Forwarded-For'un EN SOLU istemci tarafından uydurulabilir (nginx/CF sağa
+ * ekler), o yüzden onu kullanmak rate-limit'i tamamen atlatır (denetim bulgusu).
+ * XFF yalnız CF-Connecting-IP yoksa, en SAĞDAN (güvenilir peer'a en yakın) alınır.
+ */
 export function clientIp(req: Request): string {
+  const cf = req.headers.get("cf-connecting-ip");
+  if (cf) return cf.trim();
+  const real = req.headers.get("x-real-ip");
+  if (real) return real.trim();
   const xff = req.headers.get("x-forwarded-for");
-  if (xff) return xff.split(",")[0].trim();
-  return req.headers.get("x-real-ip") ?? "unknown";
+  if (xff) {
+    const parts = xff.split(",").map((s) => s.trim()).filter(Boolean);
+    // En sağdaki = zincirdeki son (bize en yakın, güvenilir) proxy'nin gördüğü IP.
+    if (parts.length) return parts[parts.length - 1];
+  }
+  return "unknown";
 }
 
 /** 429 yanıtı (Retry-After başlığıyla). */

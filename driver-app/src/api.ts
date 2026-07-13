@@ -36,8 +36,8 @@ export async function logout() {
 
 export async function setShift(on: boolean) {
   const token = await getToken();
-  if (!token) return;
-  await fetch(`${API_BASE}/api/driver/shift`, {
+  if (!token) throw new Error("Oturum bulunamadı");
+  const res = await fetch(`${API_BASE}/api/driver/shift`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -45,6 +45,15 @@ export async function setShift(on: boolean) {
     },
     body: JSON.stringify({ on }),
   });
+  // fetch HTTP hatasında throw ETMEZ — 401/500'de "Mesaidesin" gösterip
+  // sunucunun kaydetmediği durum oluşuyordu (denetim bulgusu). Kontrol et.
+  if (!res.ok) {
+    if (res.status === 401 || res.status === 403) {
+      await logout();
+      throw new Error("Oturum süresi doldu, tekrar giriş yap");
+    }
+    throw new Error("Mesai durumu kaydedilemedi, tekrar dene");
+  }
 }
 
 // Arka plan görevinden çağrılır. Canlı takip için EN GÜNCEL konum önemlidir;

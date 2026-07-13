@@ -67,22 +67,39 @@ export async function POST(
   for (const file of files) {
     const rawExt = ALLOWED[file.type];
     if (!rawExt || file.size > MAX) continue;
-    const original = Buffer.from(await file.arrayBuffer());
-    const img = await optimizeImage(original, rawExt, file.type);
-    const name = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${img.ext}`;
-    const url = await saveObject(
-      `uploads/${b.id}/orders/${order.id}/${name}`,
-      img.buf,
-      img.contentType,
-    );
-    const row = await prisma.orderPhoto.create({
-      data: { orderId: order.id, url },
-      select: { id: true, url: true },
-    });
-    created.push(row);
+    // Her dosya kendi try/catch'inde: disk/S3 hatası döngüyü kesip başarılıları
+    // kaybetmesin ve 500'e düşmesin (denetim bulgusu) — hatalıyı atla.
+    try {
+      const original = Buffer.from(await file.arrayBuffer());
+      const img = await optimizeImage(original, rawExt, file.type);
+      const name = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${img.ext}`;
+      const url = await saveObject(
+        `uploads/${b.id}/orders/${order.id}/${name}`,
+        img.buf,
+        img.contentType,
+      );
+      const row = await prisma.orderPhoto.create({
+        data: { orderId: order.id, url },
+        select: { id: true, url: true },
+      });
+      created.push(row);
+    } catch (e) {
+      console.error("sipariş fotoğrafı kaydedilemedi:", e);
+    }
   }
 
-  return NextResponse.json({ ok: true, count: created.length, photos: created });
+  if (created.length === 0) {
+    return NextResponse.json(
+      { error: "Fotoğraf kaydedilemedi, tekrar dene." },
+      { status: 500 },
+    );
+  }
+  return NextResponse.json({
+    ok: true,
+    count: created.length,
+    failed: files.length - created.length,
+    photos: created,
+  });
 }
 
 // Fotoğraf silme (yanlış yükleme düzeltilebilsin).

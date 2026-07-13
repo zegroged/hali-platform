@@ -4,6 +4,7 @@ import { getAuthedUser } from "@/lib/auth";
 import { evaluateStop } from "@/lib/tracking";
 import { maybePrunePings } from "@/lib/retention";
 import { trYearMonth } from "@/lib/time";
+import { rateLimit, tooMany } from "@/lib/ratelimit";
 
 // Şoför konum gönderir; her konumda stay-point durak tespiti çalışır.
 export async function POST(req: NextRequest) {
@@ -11,6 +12,9 @@ export async function POST(req: NextRequest) {
   if (!u || u.role !== "DRIVER") {
     return NextResponse.json({ error: "Yetkisiz" }, { status: 401 });
   }
+  // Ping seli koruması: normal izleme ~15 sn'de bir; şoför başına 60/dk yeter.
+  const rl = rateLimit(`loc:${u.id}`, 60, 60 * 1000);
+  if (!rl.ok) return tooMany(rl.retryAfterSec);
   const body = await req.json().catch(() => null);
   const lat = Number(body?.lat);
   const lng = Number(body?.lng);

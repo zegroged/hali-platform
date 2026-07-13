@@ -16,6 +16,7 @@ async function sendNetgsm(to: string, body: string) {
   });
   const res = await fetch(
     "https://api.netgsm.com.tr/sms/send/get?" + params.toString(),
+    { signal: AbortSignal.timeout(8000) }, // sağlayıcı takılırsa isteği bloklama
   );
   const text = (await res.text()).trim();
   // Netgsm başarı kodu "00 <id>"; diğerleri hata (20/30/40/70...)
@@ -38,6 +39,7 @@ async function sendTwilio(to: string, body: string) {
         "Content-Type": "application/x-www-form-urlencoded",
       },
       body: new URLSearchParams({ To: to, From: from, Body: body }),
+      signal: AbortSignal.timeout(8000),
     },
   );
   if (!res.ok) throw new Error("Twilio SMS hatası: " + (await res.text()));

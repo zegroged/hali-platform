@@ -1,12 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
 import { rateLimit, clientIp, tooMany } from "@/lib/ratelimit";
 
+// Nominatim genel kullanım politikası: sunucu genelinde ≈1 istek/sn. Tek IP'nin
+// sınırlanması yetmez (denetim bulgusu) — TÜM istekler tek sunucu IP'sinden
+// gider; global bir kapı da koy ki Nominatim bizi banlamasın.
+let lastNominatimAt = 0;
+
 // Ücretsiz geocoding — OpenStreetMap Nominatim. Adres/semt -> koordinat.
 export async function GET(req: NextRequest) {
-  // Nominatim kullanım politikası (≈1 istek/sn) — IP başına sınırla, aksi halde
-  // sunucu IP'si yasaklanabilir; ayrıca dışa-yönelik abuse'i bound'la.
+  // (1) IP başına: 30/dk.
   const rl = rateLimit(`geocode:${clientIp(req)}`, 30, 60 * 1000);
   if (!rl.ok) return tooMany(rl.retryAfterSec);
+  // (2) Global (sunucu geneli): son çağrıdan 1 sn geçmediyse reddet.
+  const now = Date.now();
+  if (now - lastNominatimAt < 1000) {
+    return NextResponse.json(
+      { error: "Çok hızlı, biraz sonra tekrar dene." },
+      { status: 429, headers: { "retry-after": "1" } },
+    );
+  }
+  lastNominatimAt = now;
 
   const q = req.nextUrl.searchParams.get("q");
   if (!q || q.trim().length < 2 || q.length > 200) {
@@ -18,10 +31,13 @@ export async function GET(req: NextRequest) {
       encodeURIComponent(q);
     const res = await fetch(url, {
       headers: {
-        "User-Agent": "HaliYikamaPlatformu/1.0 (dev)",
+        // Nominatim politikası: gerçek iletişim bilgisi içeren UA ister.
+        "User-Agent":
+          "EnYakinHaliYikama/1.0 (+https://enyakinhaliyikamaservisi.com; destek@enyakinhaliyikamaservisim.com)",
         "Accept-Language": "tr",
       },
       cache: "no-store",
+      signal: AbortSignal.timeout(5000), // takılırsa akışı bloklama (register ile aynı)
     });
     if (!res.ok) throw new Error("geocode failed");
     const data = (await res.json()) as Array<{

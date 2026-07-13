@@ -1,3 +1,4 @@
+import { jsonLdSafe } from "@/lib/htmlSafe";
 import type { Metadata } from "next";
 import { cache } from "react";
 import Link from "next/link";
@@ -133,7 +134,7 @@ export default async function HaliciProfile({
       <main className="mx-auto max-w-lg px-4 py-6 pb-28 md:max-w-3xl md:pb-12 lg:max-w-5xl">
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(ld) }}
+          dangerouslySetInnerHTML={{ __html: jsonLdSafe(ld) }}
         />
         <Link href="/" className="text-sm text-brand-dark hover:underline">
           ← Halıcılar

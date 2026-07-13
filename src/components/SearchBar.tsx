@@ -110,8 +110,10 @@ export function SearchBar(p: Props) {
     navigator.geolocation.getCurrentPosition(
       (pos) =>
         nav({
-          lat: String(pos.coords.latitude),
-          lng: String(pos.coords.longitude),
+          // Koordinatı ~3 ondalığa (~100m) yuvarla: yakınlık sıralaması için
+          // yeterli, tam GPS'i tarayıcı geçmişine/Referer'a sızdırma (gizlilik).
+          lat: pos.coords.latitude.toFixed(3),
+          lng: pos.coords.longitude.toFixed(3),
           q: undefined,
           il: undefined,
           district: undefined,

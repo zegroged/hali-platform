@@ -1,3 +1,4 @@
+import { jsonLdSafe } from "@/lib/htmlSafe";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -274,7 +275,7 @@ export default async function CityPage({ params }: { params: Params }) {
       <Footer />
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
+        dangerouslySetInnerHTML={{ __html: jsonLdSafe(faqJsonLd) }}
       />
     </>
   );

@@ -29,12 +29,14 @@ export async function notifyCityLeadsIfOpen(businessId: string): Promise<void> {
   });
   if (leads.length === 0) return;
 
-  // Önce işaretle (yarışta çift mail yerine tekil kayıp tercih edilir —
-  // müjde maili kritik veri değil, mükerrer pazarlama maili daha zararlı).
-  await prisma.cityLead.updateMany({
-    where: { id: { in: leads.map((l) => l.id) } },
+  // ATOMİK CLAIM (denetim bulgusu): eşzamanlı iki syncVisibility aynı lead'i
+  // notifiedAt=null okuyup ikisi de mail atabiliyordu. updateMany yalnız hâlâ
+  // null olanları işaretler; count sıfırsa başka çağrı çoktan sahiplendi → çık.
+  const claim = await prisma.cityLead.updateMany({
+    where: { id: { in: leads.map((l) => l.id) }, notifiedAt: null },
     data: { notifiedAt: new Date() },
   });
+  if (claim.count === 0) return;
 
   const slug = CITIES.find((c) => c.name === b.city)?.slug;
   const base = getAppBaseUrl();

@@ -98,6 +98,13 @@ export async function initCheckout(p: InitParams): Promise<InitResult> {
     ],
   };
   return new Promise((resolve) => {
+    // SDK callback'i hiç dönmezse (ağ/servis takılması) worker sonsuza dek
+    // asılı kalmasın — 25 sn sonra hata olarak çöz (denetim bulgusu).
+    const _to = setTimeout(
+      () => resolve({ ok: false, error: "iyzico zaman aşımı" } as any),
+      25000,
+    );
+    void _to;
     client.checkoutFormInitialize.create(request, (err: any, result: any) => {
       if (err || result?.status !== "success") {
         resolve({ ok: false, error: result?.errorMessage ?? String(err) });
@@ -181,6 +188,13 @@ export async function initSubscriptionCheckout(
     ],
   };
   return new Promise((resolve) => {
+    // SDK callback'i hiç dönmezse (ağ/servis takılması) worker sonsuza dek
+    // asılı kalmasın — 25 sn sonra hata olarak çöz (denetim bulgusu).
+    const _to = setTimeout(
+      () => resolve({ ok: false, error: "iyzico zaman aşımı" } as any),
+      25000,
+    );
+    void _to;
     client.checkoutFormInitialize.create(request, (err: any, result: any) => {
       if (err || result?.status !== "success") {
         resolve({ ok: false, error: result?.errorMessage ?? String(err) });
@@ -261,6 +275,13 @@ export async function initRecurringCheckout(
     },
   };
   return new Promise((resolve) => {
+    // SDK callback'i hiç dönmezse (ağ/servis takılması) worker sonsuza dek
+    // asılı kalmasın — 25 sn sonra hata olarak çöz (denetim bulgusu).
+    const _to = setTimeout(
+      () => resolve({ ok: false, error: "iyzico zaman aşımı" } as any),
+      25000,
+    );
+    void _to;
     client.subscriptionCheckoutForm.initialize(request, (err: any, result: any) => {
       if (err || result?.status !== "success") {
         resolve({ ok: false, error: result?.errorMessage ?? String(err) });
@@ -291,6 +312,13 @@ export async function retrieveRecurringResult(
   if (!client)
     return { ok: true, active: true, subscriptionRef: "MOCK-SUB", conversationId: "" };
   return new Promise((resolve) => {
+    // SDK callback'i hiç dönmezse (ağ/servis takılması) worker sonsuza dek
+    // asılı kalmasın — 25 sn sonra hata olarak çöz (denetim bulgusu).
+    const _to = setTimeout(
+      () => resolve({ ok: false, error: "iyzico zaman aşımı" } as any),
+      25000,
+    );
+    void _to;
     client.subscriptionCheckoutForm.retrieve(
       { token },
       (err: any, result: any) => {
@@ -318,6 +346,13 @@ export async function cancelRecurring(
 ): Promise<{ ok: boolean; error?: string }> {
   if (!client) return { ok: true };
   return new Promise((resolve) => {
+    // SDK callback'i hiç dönmezse (ağ/servis takılması) worker sonsuza dek
+    // asılı kalmasın — 25 sn sonra hata olarak çöz (denetim bulgusu).
+    const _to = setTimeout(
+      () => resolve({ ok: false, error: "iyzico zaman aşımı" } as any),
+      25000,
+    );
+    void _to;
     client.subscription.cancel(
       { subscriptionReferenceCode: subscriptionRef },
       (err: any, result: any) => {
@@ -359,6 +394,13 @@ function signatureValid(result: any): boolean {
 export async function retrieveCheckout(token: string): Promise<RetrieveResult> {
   if (!client) return { ok: true, paid: true }; // mock (yalnız dev; callback canlı-modda çalışır)
   return new Promise((resolve) => {
+    // SDK callback'i hiç dönmezse (ağ/servis takılması) worker sonsuza dek
+    // asılı kalmasın — 25 sn sonra hata olarak çöz (denetim bulgusu).
+    const _to = setTimeout(
+      () => resolve({ ok: false, error: "iyzico zaman aşımı" } as any),
+      25000,
+    );
+    void _to;
     client.checkoutForm.retrieve({ locale: "tr", token }, (err: any, result: any) => {
       if (err || result?.status !== "success" || !signatureValid(result)) {
         resolve({ ok: false, paid: false });

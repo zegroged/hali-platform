@@ -89,10 +89,15 @@ export async function POST(req: NextRequest) {
     select: { id: true },
   });
 
-  // Geçmişte MİSAFİR olarak (aynı telefonla) verilmiş siparişleri bu hesaba bağla
-  // → üye, eski teslim edilmiş siparişlerine de yorum yapabilsin + puan.
+  // Geçmişte misafir olarak verilmiş siparişleri bu hesaba bağla — AMA yalnız
+  // OTP ile DOĞRULANMIŞ e-posta eşleşmesiyle (sahiplik kanıtı). Telefonla
+  // bağlamak GÜVENSİZDİ: SMS mock olduğundan telefon kanıtlanamıyor, saldırgan
+  // kurbanın telefonunu yazıp kendi e-postasıyla kayıt olarak kurbanın
+  // adres/GPS/foto verisini ele geçirebiliyordu (denetim bulgusu). E-posta
+  // sipariş formunda opsiyonel; girmemiş misafir siparişi bağlanmaz (kayıp
+  // değil — kullanıcı takip koduyla erişmeye devam eder).
   await prisma.order.updateMany({
-    where: { customerPhone: phone, customerId: null },
+    where: { customerEmail: email, customerId: null },
     data: { customerId: user.id },
   });
 

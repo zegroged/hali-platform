@@ -92,10 +92,18 @@ function Driver() {
         // Sunucuya yazamadıysak cihazdaki izlemeyi geri al — "cihazda açık,
         // sunucuda kapalı" tutarsızlığı olmasın.
         if (next) await stopTracking();
-        Alert.alert(
-          "Bağlantı hatası",
-          "Sunucuya ulaşılamadı, mesai durumu değişmedi. Tekrar dene.",
-        );
+        const msg = e instanceof Error ? e.message : "";
+        // 401 → setShift logout() yaptı; oturumu düşür.
+        if (msg.includes("Oturum süresi doldu")) {
+          setAuthed(false);
+          setOnShift(false);
+          Alert.alert("Oturum süresi doldu", "Lütfen tekrar giriş yap.");
+        } else {
+          Alert.alert(
+            "Bağlantı hatası",
+            "Mesai durumu değişmedi. Tekrar dene.",
+          );
+        }
         return;
       }
       setOnShift(next);

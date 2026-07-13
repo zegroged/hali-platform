@@ -8,6 +8,7 @@ import {
   useJsApiLoader,
 } from "@react-google-maps/api";
 import { GOOGLE_MAPS_KEY } from "@/lib/maps";
+import LeafletMap from "@/components/LeafletMap";
 import type { MapProps } from "@/components/mapTypes";
 
 const COLORS: Record<string, string> = {
@@ -28,7 +29,7 @@ export default function GoogleMapView({
   height = 300,
   follow,
 }: MapProps) {
-  const { isLoaded } = useJsApiLoader({
+  const { isLoaded, loadError } = useJsApiLoader({
     id: "hali-gmaps",
     googleMapsApiKey: GOOGLE_MAPS_KEY,
   });
@@ -40,6 +41,14 @@ export default function GoogleMapView({
     if (home || follow || !markers.length) return;
     setHome({ lat: markers[0].lat, lng: markers[0].lng });
   }, [home, follow, markers]);
+
+  // Anahtar geçerli ama yanlış (referrer/kısıt uyuşmazlığı) olursa Google JS
+  // hata döndürür ve isLoaded hep false kalır → sonsuz spinner. Bu durumda
+  // OSM/Leaflet'e düş. NOT: erken-return TÜM hook'lardan SONRA olmalı (yoksa
+  // loadError anında hook sayısı düşer → "Rendered fewer hooks" çökmesi).
+  if (loadError) {
+    return <LeafletMap markers={markers} paths={paths} height={height} follow={follow} />;
+  }
 
   if (!isLoaded) {
     return (

@@ -3,6 +3,7 @@ import sharp from "sharp";
 import { prisma } from "@/lib/prisma";
 import { getCurrentBusiness, syncVisibility } from "@/lib/panel";
 import { saveObject } from "@/lib/storage";
+import { rateLimit, tooMany } from "@/lib/ratelimit";
 
 const MAX = 5 * 1024 * 1024; // 5 MB
 const MAX_EDGE = 1600; // uzun kenar üst sınırı (px)
@@ -38,6 +39,10 @@ export async function POST(req: NextRequest) {
   if (!b) {
     return NextResponse.json({ error: "Yetkisiz" }, { status: 401 });
   }
+  // CPU/depolama DoS koruması: her istek ≤20 dosyayı sharp'la işler (denetim
+  // bulgusu) — işletme başına 20/dk sınırla.
+  const rl = rateLimit(`upload:${b.id}`, 20, 60 * 1000);
+  if (!rl.ok) return tooMany(rl.retryAfterSec);
 
   const form = await req.formData();
   // Türler: after (sonrası) | before (öncesi) | genel (işletme fotoğrafı) |

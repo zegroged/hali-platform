@@ -15,6 +15,7 @@ import { taxIdError } from "@/lib/taxId";
 import { normalizeGoogleProfileUrl } from "@/lib/googleUrl";
 import { normalizeCityName, normalizeDistrictName } from "@/lib/cities";
 import { normalizeUsername, validateUsername } from "@/lib/username";
+import { escapeHtml } from "@/lib/htmlSafe";
 import type { PricingUnit } from "@prisma/client";
 
 async function biz() {
@@ -344,9 +345,11 @@ export async function submitForVerification() {
     href: `/admin/isletme/${b.id}`,
   });
   try {
+    // İşletme adı/il/ilçe serbest metin → HTML'e kaçırarak göm (admin mailine
+    // link/img enjeksiyonu olmasın, denetim bulgusu).
     await sendAdminEmail(
       `Doğrulama talebi: ${b.name}`,
-      `<p style="margin:0 0 12px;"><strong>${b.name}</strong> (${b.district}/${b.city}) doğrulanmış rozeti için başvurdu.</p>
+      `<p style="margin:0 0 12px;"><strong>${escapeHtml(b.name)}</strong> (${escapeHtml(b.district)}/${escapeHtml(b.city)}) doğrulanmış rozeti için başvurdu.</p>
        <p style="margin:0;"><a href="${getAppBaseUrl()}/admin/isletme/${b.id}" style="color:#0f766e;">Admin panelinde incele →</a></p>`,
     );
   } catch (e) {
