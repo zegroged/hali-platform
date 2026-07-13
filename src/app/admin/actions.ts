@@ -99,8 +99,12 @@ export async function createBusinessByAdmin(formData: FormData) {
     if (uErr) err(uErr);
   }
   if (!city || !district) err("İl ve ilçe listeden seçilmeli.");
-  const taxErr = taxIdError(taxNumber);
-  if (taxErr) err("Vergi/kimlik no: " + taxErr);
+  // AYRICALIK (2026-07-13, kullanıcı kararı): ADMIN/SUPPORT işletme açarken
+  // vergi/TC checksum'ı ARANMAZ — sahadan hızlı kayıt için; numara boş ya da
+  // doğrulanmamış girilebilir, sahibi sonradan panelden düzeltir. Kamuya yalnız
+  // 10 haneli değer gösterildiğinden (publicTaxNumber) TC sızmaz; uydurma VKN
+  // görünme riski bilinçli kabul edildi. Öz-servis kayıt + panel profili
+  // checksum'lı kalır (taxIdError orada aranmaya devam eder).
   if (wantsDriver) {
     // Şoför alanlarından biri doldurulduysa hepsi gerekli (yarım hesap olmasın).
     if (dName.length < 2) err("Şoför adı gerekli.");
