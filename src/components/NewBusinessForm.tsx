@@ -15,9 +15,10 @@ export default function NewBusinessForm() {
     >
       <div>
         <label htmlFor="businessName" className={lbl}>
-          İşletme adı
+          İşletme adı{" "}
+          <span className="text-slate-400">(boşsa otomatik ad verilir)</span>
         </label>
-        <input id="businessName" name="businessName" required className={inp} />
+        <input id="businessName" name="businessName" className={inp} />
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
@@ -29,13 +30,13 @@ export default function NewBusinessForm() {
         </div>
         <div>
           <label htmlFor="phone" className={lbl}>
-            Telefon (iletişim)
+            Telefon (iletişim){" "}
+            <span className="text-slate-400">(boşsa geçici üretilir)</span>
           </label>
           <input
             id="phone"
             name="phone"
             placeholder="05xxxxxxxxx"
-            required
             className={inp}
           />
         </div>
@@ -136,14 +137,15 @@ export default function NewBusinessForm() {
       <div>
         <label htmlFor="photos" className={lbl}>
           İşletme fotoğrafları{" "}
-          <span className="font-semibold text-red-600">(zorunlu — en az 1)</span>
+          <span className="text-slate-400">
+            (opsiyonel — yayına girmesi için en az 1 gerekir)
+          </span>
         </label>
         <input
           id="photos"
           name="photos"
           type="file"
           multiple
-          required
           accept="image/jpeg,image/png,image/webp"
           className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-brand-light file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-brand-dark"
         />

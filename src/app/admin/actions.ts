@@ -79,22 +79,29 @@ export async function createBusinessByAdmin(formData: FormData) {
   const dUsername = normalizeUsername(String(formData.get("driverUsername") || ""));
   const dPassword = String(formData.get("driverPassword") || "");
   const wantsDriver = Boolean(dName || dPhone || dUsername || dPassword);
-  // İşletme fotoğrafları (jpg/png/webp, ≤5MB/adet; action gövdesi toplam 8MB).
-  const photos = formData
-    .getAll("photos")
-    .filter((f): f is File => f instanceof File && f.size > 0)
-    .slice(0, 10);
+  // Fotoğraflar (jpg/png/webp, ≤5MB/adet; action gövdesi toplam 8MB):
+  // photos = genel işletme fotoğrafları (ZORUNLU ≥1), logo tek dosya (ops.),
+  // photosBefore/photosAfter = öncesi/sonrası galerisi (ops.).
+  const pickFiles = (name: string, max: number) =>
+    formData
+      .getAll(name)
+      .filter((f): f is File => f instanceof File && f.size > 0)
+      .slice(0, max);
+  const photos = pickFiles("photos", 10);
+  const logoFile = pickFiles("logo", 1)[0] ?? null;
+  const photosBefore = pickFiles("photosBefore", 10);
+  const photosAfter = pickFiles("photosAfter", 10);
 
   const err = (msg: string) =>
     redirect(formPath + "?hata=" + encodeURIComponent(msg));
 
   // TAM YETKİ (2026-07-13, kullanıcı kararı): admin/destek işletme açarken
-  // ZORUNLU olan yalnız İŞLETME ADI + TELEFON + EN AZ 1 FOTOĞRAF. Diğer her
-  // alan boş kalabilir (girildiyse biçimi doğrulanır). Giriş kimliği boşsa
-  // aşağıda otomatik üretilir — hesap girilemez durumda kalmaz.
-  if (businessName.length < 2) err("İşletme adı gerekli.");
-  if (!/^05\d{9}$/.test(phone)) err("Telefon 05xx ile 11 hane olmalı.");
-  if (photos.length === 0) err("En az bir işletme fotoğrafı ekleyin.");
+  // HİÇBİR ALAN ZORUNLU DEĞİL — girilenlerin yalnız biçimi doğrulanır, boş
+  // kalan her şey otomatik üretilir (ad, telefon, kullanıcı adı, şifre).
+  // Yayın için tek şart FOTOĞRAF (hesap fotoğrafsız da açılır, foto gelince
+  // otomatik yayınlanır); sipariş için şoför şartı API katmanında sürer.
+  if (phone && !/^05\d{9}$/.test(phone))
+    err("Telefon girildiyse 05xx ile 11 hane olmalı (boş da bırakabilirsin).");
   if (email && !/^\S+@\S+\.\S+$/.test(email))
     err("E-posta girildiyse geçerli olmalı (ya da boş bırak).");
   if (password && password.length < 8)
@@ -125,18 +132,40 @@ export async function createBusinessByAdmin(formData: FormData) {
   }
 
   const exists = await prisma.user.findFirst({
-    where: { OR: [{ phone }, ...(email ? [{ email }] : [])] },
+    where: {
+      OR: [...(phone ? [{ phone }] : []), ...(email ? [{ email }] : [])],
+    },
     select: { id: true },
   });
   if (exists) err("Bu telefon veya e-posta ile zaten bir hesap var.");
+
+  // İşletme adı boşsa üret ("Yeni İşletme 123") — panelden düzeltilir.
+  const finalBusinessName =
+    businessName || `Yeni İşletme ${crypto.randomInt(100, 1000)}`;
+  // Telefon boşsa benzersiz GEÇİCİ numara üret (User.phone unique — boş
+  // bırakılamaz); mesajda gösterilir, sahibi panelden gerçeğini yazar.
+  let finalPhone = phone;
+  let generatedPhone = false;
+  while (!finalPhone) {
+    const aday = `05${crypto.randomInt(100000000, 1000000000)}`;
+    const taken = await prisma.user.findFirst({
+      where: { phone: aday },
+      select: { id: true },
+    });
+    if (!taken) {
+      finalPhone = aday;
+      generatedPhone = true;
+    }
+  }
 
   // Giriş kimliği garantisi: e-posta VE kullanıcı adı boşsa işletme adından
   // benzersiz kullanıcı adı, şifre boşsa geçici şifre üret (mesajda gösterilir).
   let finalUsername = username;
   if (!email && !finalUsername) {
     const base =
-      normalizeUsername(businessName).replace(/[^a-z0-9._-]/g, "").slice(0, 20) ||
-      "isletme";
+      normalizeUsername(finalBusinessName)
+        .replace(/[^a-z0-9._-]/g, "")
+        .slice(0, 20) || "isletme";
     for (let i = 0; i < 5 && !finalUsername; i++) {
       const aday = `${base}${crypto.randomInt(10, 100)}`;
       if (validateUsername(aday)) continue;
@@ -182,21 +211,21 @@ export async function createBusinessByAdmin(formData: FormData) {
   const owner = await prisma.user.create({
     data: {
       role: "CLEANER",
-      name: ownerName || businessName, // yetkili adı boşsa işletme adı
-      phone,
+      name: ownerName || finalBusinessName, // yetkili adı boşsa işletme adı
+      phone: finalPhone,
       username: finalUsername, // boşsa yukarıda üretildi (e-posta varsa null olabilir)
       email: email || null,
       emailVerified: Boolean(email), // e-posta yoksa doğrulanacak şey de yok
       password: await hashPassword(finalPassword),
       ownedBusiness: {
         create: {
-          name: businessName,
+          name: finalBusinessName,
           address: city && district ? `${district}, ${city}` : "",
           city,
           district,
           lat,
           lng,
-          phone,
+          phone: finalPhone,
           taxNumber: taxNumber || null,
           deliveryEstimateMinDays: minDays,
           deliveryEstimateMaxDays: maxDays,
@@ -260,16 +289,19 @@ export async function createBusinessByAdmin(formData: FormData) {
     "image/png": "png",
     "image/webp": "webp",
   };
-  for (const file of photos) {
+  const saveImage = async (
+    file: File,
+    edge: number,
+  ): Promise<string | null> => {
     const rawExt = PHOTO_TYPES[file.type];
-    if (!rawExt || file.size > 5 * 1024 * 1024) continue;
+    if (!rawExt || file.size > 5 * 1024 * 1024) return null;
     const original = Buffer.from(await file.arrayBuffer());
     let buf = original;
     let contentType = file.type;
     try {
       buf = await sharp(original)
         .rotate()
-        .resize(1600, 1600, { fit: "inside", withoutEnlargement: true })
+        .resize(edge, edge, { fit: "inside", withoutEnlargement: true })
         .webp({ quality: 82 })
         .toBuffer();
       contentType = "image/webp";
@@ -278,10 +310,31 @@ export async function createBusinessByAdmin(formData: FormData) {
     }
     const ext = contentType === "image/webp" ? "webp" : rawExt;
     const name = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-    const url = await saveObject(`uploads/${businessId}/${name}`, buf, contentType);
-    await prisma.businessPhoto.create({
-      data: { businessId, url, isBefore: false, isAfter: true },
-    });
+    return saveObject(`uploads/${businessId}/${name}`, buf, contentType);
+  };
+  // Genel + öncesi + sonrası galeriye; logo işletme kaydına.
+  const batches: [File[], boolean, boolean][] = [
+    [photos, false, false], // genel
+    [photosBefore, true, false],
+    [photosAfter, false, true],
+  ];
+  for (const [list, isBefore, isAfter] of batches) {
+    for (const file of list) {
+      const url = await saveImage(file, 1600);
+      if (!url) continue;
+      await prisma.businessPhoto.create({
+        data: { businessId, url, isBefore, isAfter },
+      });
+    }
+  }
+  if (logoFile) {
+    const url = await saveImage(logoFile, 512);
+    if (url) {
+      await prisma.cleanerBusiness.update({
+        where: { id: businessId },
+        data: { logoUrl: url },
+      });
+    }
   }
 
   await syncVisibility(businessId); // foto+şoför varsa hemen yayına al
@@ -291,15 +344,19 @@ export async function createBusinessByAdmin(formData: FormData) {
     ? `${email}${finalUsername ? ` veya kullanıcı adı "${finalUsername}"` : ""}`
     : `kullanıcı adı "${finalUsername}"`;
   const mesaj = encodeURIComponent(
-    `İşletme oluşturuldu. Giriş: ${girisKimlik}` +
+    `İşletme oluşturuldu: ${finalBusinessName}. Giriş: ${girisKimlik}` +
       (generatedPassword
         ? ` · geçici şifre: ${finalPassword}`
         : " · belirlediğin şifre") +
       " (sahibine ilet)." +
+      (generatedPhone
+        ? ` Geçici telefon üretildi: ${finalPhone} — panelden gerçeğiyle değiştirin.`
+        : "") +
       (email && !finalUsername ? " İlk girişte kullanıcı adı belirleyecek." : "") +
+      (photos.length === 0 ? " Fotoğraf eklenince yayına girer." : "") +
       (wantsDriver
         ? ` Şoför girişi: kullanıcı adı "${dUsername}" · belirlediğin şoför şifresi.`
-        : " Not: şoför eklenmeden sipariş alınamaz (yayına engel değil)."),
+        : " Not: şoför eklenmeden sipariş alınamaz."),
   );
   // SUPPORT admin detay sayfasını göremez — kendi sayfasına döner (şifre mesajda).
   redirect(
