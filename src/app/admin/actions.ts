@@ -88,17 +88,23 @@ export async function createBusinessByAdmin(formData: FormData) {
   const err = (msg: string) =>
     redirect(formPath + "?hata=" + encodeURIComponent(msg));
 
-  if (businessName.length < 2 || ownerName.length < 2)
-    err("İşletme adı ve yetkili adı gerekli.");
+  // TAM YETKİ (2026-07-13, kullanıcı kararı): admin/destek işletme açarken
+  // ZORUNLU olan yalnız İŞLETME ADI + TELEFON + EN AZ 1 FOTOĞRAF. Diğer her
+  // alan boş kalabilir (girildiyse biçimi doğrulanır). Giriş kimliği boşsa
+  // aşağıda otomatik üretilir — hesap girilemez durumda kalmaz.
+  if (businessName.length < 2) err("İşletme adı gerekli.");
   if (!/^05\d{9}$/.test(phone)) err("Telefon 05xx ile 11 hane olmalı.");
-  if (!/^\S+@\S+\.\S+$/.test(email)) err("Geçerli bir e-posta gerekli.");
-  if (password.length < 8) err("Şifre en az 8 karakter olmalı.");
+  if (photos.length === 0) err("En az bir işletme fotoğrafı ekleyin.");
+  if (email && !/^\S+@\S+\.\S+$/.test(email))
+    err("E-posta girildiyse geçerli olmalı (ya da boş bırak).");
+  if (password && password.length < 8)
+    err("Şifre girildiyse en az 8 karakter olmalı (boşsa geçici şifre üretilir).");
   const username = usernameRaw ? normalizeUsername(usernameRaw) : null;
   if (username) {
     const uErr = validateUsername(username);
     if (uErr) err(uErr);
   }
-  if (!city || !district) err("İl ve ilçe listeden seçilmeli.");
+  // İl/ilçe de boş kalabilir — sahibi sonradan panelden listeden seçer.
   // AYRICALIK (2026-07-13, kullanıcı kararı): ADMIN/SUPPORT işletme açarken
   // vergi/TC checksum'ı ARANMAZ — sahadan hızlı kayıt için; numara boş ya da
   // doğrulanmamış girilebilir, sahibi sonradan panelden düzeltir. Kamuya yalnız
@@ -119,10 +125,31 @@ export async function createBusinessByAdmin(formData: FormData) {
   }
 
   const exists = await prisma.user.findFirst({
-    where: { OR: [{ phone }, { email }] },
+    where: { OR: [{ phone }, ...(email ? [{ email }] : [])] },
     select: { id: true },
   });
   if (exists) err("Bu telefon veya e-posta ile zaten bir hesap var.");
+
+  // Giriş kimliği garantisi: e-posta VE kullanıcı adı boşsa işletme adından
+  // benzersiz kullanıcı adı, şifre boşsa geçici şifre üret (mesajda gösterilir).
+  let finalUsername = username;
+  if (!email && !finalUsername) {
+    const base =
+      normalizeUsername(businessName).replace(/[^a-z0-9._-]/g, "").slice(0, 20) ||
+      "isletme";
+    for (let i = 0; i < 5 && !finalUsername; i++) {
+      const aday = `${base}${crypto.randomInt(10, 100)}`;
+      if (validateUsername(aday)) continue;
+      const taken = await prisma.user.findUnique({
+        where: { username: aday },
+        select: { id: true },
+      });
+      if (!taken) finalUsername = aday;
+    }
+    if (!finalUsername) finalUsername = `isletme.${crypto.randomInt(100000, 1000000)}`;
+  }
+  const generatedPassword = !password;
+  const finalPassword = password || `Gecici-${crypto.randomInt(100000, 1000000)}`;
   if (username) {
     const taken = await prisma.user.findUnique({
       where: { username },
@@ -143,22 +170,28 @@ export async function createBusinessByAdmin(formData: FormData) {
       );
   }
 
-  const { lat, lng } = await geocodeDistrict(district, city);
+  // Konum: il/ilçe girildiyse geocode; boşsa İstanbul merkezi ile açılır
+  // (sahibi panelden ilini seçince keşif "mesafe" sıralaması ona göre düzelmez —
+  // bilinen sınır; kritik değil çünkü şehir eşleşmesi metin bazlı).
+  const { lat, lng } =
+    city && district
+      ? await geocodeDistrict(district, city)
+      : { lat: 41.0082, lng: 28.9784 };
   const farFuture = new Date("2099-12-31T00:00:00.000Z"); // süresiz ücretsiz
 
   const owner = await prisma.user.create({
     data: {
       role: "CLEANER",
-      name: ownerName,
+      name: ownerName || businessName, // yetkili adı boşsa işletme adı
       phone,
-      username, // opsiyonel — yoksa sahibi ilk girişte belirler (/kullanici-adi)
-      email,
-      emailVerified: true, // admin açtı — e-posta doğrulaması atlanır
-      password: await hashPassword(password),
+      username: finalUsername, // boşsa yukarıda üretildi (e-posta varsa null olabilir)
+      email: email || null,
+      emailVerified: Boolean(email), // e-posta yoksa doğrulanacak şey de yok
+      password: await hashPassword(finalPassword),
       ownedBusiness: {
         create: {
           name: businessName,
-          address: `${district}, ${city}`,
+          address: city && district ? `${district}, ${city}` : "",
           city,
           district,
           lat,
@@ -182,7 +215,10 @@ export async function createBusinessByAdmin(formData: FormData) {
           contractAcceptedAt: new Date(),
           contractVersion: CONTRACT_VERSION,
           adminNote: `${isSupport ? "Müşteri Hizmetleri" : "Admin"} (${admin.name}) tarafından açıldı — süresiz ücretsiz abonelik.`,
-          serviceAreas: { create: [{ city, district }] },
+          // Hizmet bölgesi yalnız il+ilçe girildiyse (boş bölge kaydı olmasın)
+          ...(city && district
+            ? { serviceAreas: { create: [{ city, district }] } }
+            : {}),
           ...(pricePerM2
             ? { pricing: { create: [{ label: "Makine Halısı", unit: "PER_M2", price: pricePerM2 }] } }
             : {}),
@@ -250,15 +286,20 @@ export async function createBusinessByAdmin(formData: FormData) {
 
   await syncVisibility(businessId); // foto+şoför varsa hemen yayına al
   revalidatePath("/admin");
-  // Giriş kimliği: e-posta (+ girildiyse kullanıcı adı) + belirlenen şifre.
-  const girisKimlik = username ? `${email} veya kullanıcı adı "${username}"` : email;
+  // Giriş kimliği: e-posta/kullanıcı adı (boşsa üretilen) + şifre (boşsa geçici).
+  const girisKimlik = email
+    ? `${email}${finalUsername ? ` veya kullanıcı adı "${finalUsername}"` : ""}`
+    : `kullanıcı adı "${finalUsername}"`;
   const mesaj = encodeURIComponent(
-    `İşletme oluşturuldu. Giriş: ${girisKimlik} · belirlediğin şifre (sahibine ilet).` +
-      (username ? "" : " İlk girişte kullanıcı adı belirleyecek.") +
+    `İşletme oluşturuldu. Giriş: ${girisKimlik}` +
+      (generatedPassword
+        ? ` · geçici şifre: ${finalPassword}`
+        : " · belirlediğin şifre") +
+      " (sahibine ilet)." +
+      (email && !finalUsername ? " İlk girişte kullanıcı adı belirleyecek." : "") +
       (wantsDriver
         ? ` Şoför girişi: kullanıcı adı "${dUsername}" · belirlediğin şoför şifresi.`
-        : " Not: şoför eklenmeden sipariş alınamaz (yayına engel değil).") +
-      (photos.length === 0 ? " Yayın için fotoğraf gerekli." : ""),
+        : " Not: şoför eklenmeden sipariş alınamaz (yayına engel değil)."),
   );
   // SUPPORT admin detay sayfasını göremez — kendi sayfasına döner (şifre mesajda).
   redirect(

@@ -65,15 +65,19 @@ export async function syncVisibility(businessId: string): Promise<void> {
     },
   });
   if (!b) return;
+  // TAM YETKİ (2026-07-13, kullanıcı kararı): admin/destek eliyle açılan
+  // işletmede yayın şartı yalnız FOTOĞRAF (ad+telefon oluşturmada zaten
+  // zorunlu). Profil eksikleri (fiyat, bölge, vergi, şoför, e-posta) yayına
+  // engel değil — sipariş güvenliği ayrı katmanda (şoförsüz sipariş API 409).
+  // Öz-servis kayıtta tam şart seti aynen sürer.
   const ok =
     b.verification !== "REJECTED" &&
-    profileComplete(b) &&
-    b.owner.emailVerified &&
-    b.contractAcceptedAt != null &&
-    // Şoför şartı: öz-servis kayıtta zorunlu; admin/destek eliyle açılan
-    // işletme MUAF (2026-07-13 kullanıcı kararı — görünürlük hemen başlasın,
-    // şoförsüzken sipariş API'si zaten 409 ile engeller).
-    (b.drivers.length > 0 || b.createdByAdmin);
+    (b.createdByAdmin
+      ? b.photos.length > 0
+      : profileComplete(b) &&
+        b.owner.emailVerified &&
+        b.contractAcceptedAt != null &&
+        b.drivers.length > 0);
   if (b.isVisible !== ok) {
     await prisma.cleanerBusiness.update({
       where: { id: businessId },

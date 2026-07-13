@@ -22,9 +22,10 @@ export default function NewBusinessForm() {
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
           <label htmlFor="ownerName" className={lbl}>
-            Yetkili ad soyad
+            Yetkili ad soyad{" "}
+            <span className="text-slate-400">(opsiyonel)</span>
           </label>
-          <input id="ownerName" name="ownerName" required className={inp} />
+          <input id="ownerName" name="ownerName" className={inp} />
         </div>
         <div>
           <label htmlFor="phone" className={lbl}>
@@ -41,9 +42,10 @@ export default function NewBusinessForm() {
       </div>
       <div>
         <label htmlFor="email" className={lbl}>
-          E-posta (giriş için)
+          E-posta (giriş için){" "}
+          <span className="text-slate-400">(opsiyonel — boşsa kullanıcı adı üretilir)</span>
         </label>
-        <input id="email" name="email" type="email" required className={inp} />
+        <input id="email" name="email" type="email" className={inp} />
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
@@ -62,25 +64,26 @@ export default function NewBusinessForm() {
         </div>
         <div>
           <label htmlFor="password" className={lbl}>
-            Şifre (giriş için)
+            Şifre (giriş için){" "}
+            <span className="text-slate-400">(boşsa geçici şifre üretilir)</span>
           </label>
           <input
             id="password"
             name="password"
             type="password"
             minLength={8}
-            required
             autoComplete="new-password"
             className={inp}
           />
         </div>
       </div>
       <p className="-mt-2 text-xs text-slate-500">
-        Sahibi e-postası (veya kullanıcı adı) + bu şifreyle giriş yapar — ikisini
-        de ona sen ilet. En az 8 karakter.
+        Giriş bilgileri (e-posta/kullanıcı adı + şifre) oluşturma sonrası ekranda
+        gösterilir — sahibine sen iletirsin. Boş bıraktıkların otomatik üretilir.
       </p>
       <div className="grid gap-4 sm:grid-cols-2">
-        <CityDistrictSelect selectClass={inp} labelClass={lbl} required />
+        {/* Opsiyonel — boşsa sahibi panelden seçer (yayına engel değil) */}
+        <CityDistrictSelect selectClass={inp} labelClass={lbl} />
       </div>
       <div>
         <label htmlFor="taxNumber" className={lbl}>
@@ -133,13 +136,14 @@ export default function NewBusinessForm() {
       <div>
         <label htmlFor="photos" className={lbl}>
           İşletme fotoğrafları{" "}
-          <span className="text-slate-400">(yayın için en az 1 gerekli)</span>
+          <span className="font-semibold text-red-600">(zorunlu — en az 1)</span>
         </label>
         <input
           id="photos"
           name="photos"
           type="file"
           multiple
+          required
           accept="image/jpeg,image/png,image/webp"
           className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-brand-light file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-brand-dark"
         />
@@ -149,11 +153,11 @@ export default function NewBusinessForm() {
         </p>
       </div>
 
-      {/* Yayın şartı: foto + ≥1 şoför. Şoför burada da açılabilsin ki işletme
-          tek ekranda yayına hazır olsun. Alanlardan biri dolarsa hepsi istenir. */}
+      {/* Şoför yayına değil SİPARİŞE şart (admin işletmesi şoförsüz yayınlanır,
+          sipariş API'si şoförsüzken 409 döner). Alanlardan biri dolarsa hepsi istenir. */}
       <fieldset className="rounded-lg border border-slate-200 p-3">
         <legend className="px-1 text-xs font-medium text-slate-600">
-          İlk şoför (opsiyonel — yayın için en az 1 şoför şart)
+          İlk şoför (opsiyonel — sipariş alabilmek için gerekir)
         </legend>
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
