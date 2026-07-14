@@ -47,6 +47,9 @@ services:
       args:
         # Google Maps anahtarı (.env'den) — build'e gömülür; boşsa OSM kullanılır.
         NEXT_PUBLIC_GOOGLE_MAPS_KEY: ${NEXT_PUBLIC_GOOGLE_MAPS_KEY:-}
+        # Sabit Server Action anahtarı — deploy'lar arası action kimlikleri sabit
+        # kalsın diye build'e gömülür (aynı değer .env'de runtime için de var).
+        NEXT_SERVER_ACTIONS_ENCRYPTION_KEY: ${NEXT_SERVER_ACTIONS_ENCRYPTION_KEY:-}
     restart: unless-stopped
     depends_on:
       db:

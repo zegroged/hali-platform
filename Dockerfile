@@ -15,6 +15,11 @@ RUN npx prisma generate
 # Boş gelirse LiveMap ücretsiz OSM'ye düşer — güvenli varsayılan.
 ARG NEXT_PUBLIC_GOOGLE_MAPS_KEY
 ENV NEXT_PUBLIC_GOOGLE_MAPS_KEY=$NEXT_PUBLIC_GOOGLE_MAPS_KEY
+# Server Action şifreleme anahtarı: build'e gömülünce action kimlikleri deploy'lar
+# arası SABİT kalır → yeniden dağıtım, kullanıcının açık sekmesindeki formu
+# "Failed to find Server Action" ile bozmaz. Runtime'da da (.env) aynısı verilir.
+ARG NEXT_SERVER_ACTIONS_ENCRYPTION_KEY
+ENV NEXT_SERVER_ACTIONS_ENCRYPTION_KEY=$NEXT_SERVER_ACTIONS_ENCRYPTION_KEY
 RUN npm run build
 
 # --- çalıştırma ---
