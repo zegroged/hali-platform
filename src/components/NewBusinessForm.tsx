@@ -36,7 +36,7 @@ export default function NewBusinessForm() {
           <input
             id="phone"
             name="phone"
-            placeholder="05xxxxxxxxx"
+            placeholder="05xx… veya sabit hat 0342…"
             className={inp}
           />
         </div>

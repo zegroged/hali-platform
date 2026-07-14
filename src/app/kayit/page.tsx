@@ -146,8 +146,8 @@ export default function KayitPage() {
     if (form.businessName.trim().length < 2)
       errs.businessName = "İşletme adı gerekli.";
     if (form.name.trim().length < 2) errs.name = "Ad soyad gerekli.";
-    if (!/^05\d{9}$/.test(form.phone))
-      errs.phone = "Telefon 05xx ile başlamalı ve 11 hane olmalı.";
+    if (!/^0[2-5]\d{9}$/.test(form.phone))
+      errs.phone = "Telefon 11 hane olmalı (05xx cep veya 0xxx sabit hat).";
     {
       // Sunucudakiyle aynı kural (src/lib/username.ts) — erken geri bildirim.
       const u = form.username.trim().toLowerCase();
@@ -283,7 +283,7 @@ export default function KayitPage() {
               type="tel"
               inputMode="tel"
               maxLength={11}
-              placeholder="05xxxxxxxxx"
+              placeholder="05xx… veya sabit hat 0342…"
               className={inputCls(fieldErrors.phone)}
               autoComplete="tel"
             />

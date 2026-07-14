@@ -9,6 +9,7 @@ import { getSessionUser, hashPassword } from "@/lib/auth";
 import { profileComplete, syncVisibility } from "@/lib/panel";
 import { extendSubscription } from "@/lib/subscription";
 import { taxIdError } from "@/lib/taxId";
+import { isTrPhone, normalizePhone } from "@/lib/phone";
 import { normalizeCityName, normalizeDistrictName } from "@/lib/cities";
 import { normalizeUsername, validateUsername } from "@/lib/username";
 import { saveObject } from "@/lib/storage";
@@ -28,7 +29,7 @@ export async function createAccountant(formData: FormData) {
   await requireAdmin();
   const name = String(formData.get("name") || "").trim();
   const usernameRaw = String(formData.get("username") || "").trim();
-  const phone = String(formData.get("phone") || "").replace(/\D/g, "");
+  const phone = normalizePhone(String(formData.get("phone") || ""));
   const password = String(formData.get("password") || "");
   const err = (m: string) =>
     redirect("/admin/mali-musavir?hata=" + encodeURIComponent(m));
@@ -102,7 +103,7 @@ export async function createBusinessByAdmin(formData: FormData) {
 
   const businessName = String(formData.get("businessName") || "").trim();
   const ownerName = String(formData.get("ownerName") || "").trim();
-  const phone = String(formData.get("phone") || "").replace(/\D/g, "");
+  const phone = normalizePhone(String(formData.get("phone") || ""));
   const email = String(formData.get("email") || "").trim().toLowerCase();
   // Giriş bilgileri oluşturan kişi tarafından belirlenir (sahibine iletir).
   const password = String(formData.get("password") || "");
@@ -120,7 +121,7 @@ export async function createBusinessByAdmin(formData: FormData) {
   const maxDays = Number(formData.get("maxDays")) || null;
   // Opsiyonel ilk şoför — yayın şartı (foto + ≥1 şoför) tek ekranda tamamlansın.
   const dName = String(formData.get("driverName") || "").trim();
-  const dPhone = String(formData.get("driverPhone") || "").replace(/\D/g, "");
+  const dPhone = normalizePhone(String(formData.get("driverPhone") || ""));
   const dUsername = normalizeUsername(String(formData.get("driverUsername") || ""));
   const dPassword = String(formData.get("driverPassword") || "");
   const wantsDriver = Boolean(dName || dPhone || dUsername || dPassword);
@@ -145,8 +146,10 @@ export async function createBusinessByAdmin(formData: FormData) {
   // kalan her şey otomatik üretilir (ad, telefon, kullanıcı adı, şifre).
   // Yayın için tek şart FOTOĞRAF (hesap fotoğrafsız da açılır, foto gelince
   // otomatik yayınlanır); sipariş için şoför şartı API katmanında sürer.
-  if (phone && !/^05\d{9}$/.test(phone))
-    err("Telefon girildiyse 05xx ile 11 hane olmalı (boş da bırakabilirsin).");
+  if (phone && !isTrPhone(phone))
+    err(
+      "Telefon 11 hane olmalı — 05xx cep ya da 0xxx sabit hat (0212, 0342…). Boş da bırakabilirsin.",
+    );
   if (email && !/^\S+@\S+\.\S+$/.test(email))
     err("E-posta girildiyse geçerli olmalı (ya da boş bırak).");
   if (password && password.length < 8)
@@ -166,8 +169,8 @@ export async function createBusinessByAdmin(formData: FormData) {
   if (wantsDriver) {
     // Şoför alanlarından biri doldurulduysa hepsi gerekli (yarım hesap olmasın).
     if (dName.length < 2) err("Şoför adı gerekli.");
-    if (!/^05\d{9}$/.test(dPhone))
-      err("Şoför telefonu 05xx ile 11 hane olmalı.");
+    if (!isTrPhone(dPhone))
+      err("Şoför telefonu 11 hane olmalı (05xx cep ya da 0xxx sabit hat).");
     const dErr = validateUsername(dUsername);
     if (dErr) err("Şoför kullanıcı adı: " + dErr);
     if (dPassword.length < 8) err("Şoför şifresi en az 8 karakter olmalı.");

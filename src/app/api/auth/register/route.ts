@@ -6,14 +6,18 @@ import { rateLimit, clientIp, tooMany } from "@/lib/ratelimit";
 import { CONTRACT_VERSION } from "@/lib/legal";
 import { normalizeUsername, validateUsername } from "@/lib/username";
 import { normalizeCityName, normalizeDistrictName } from "@/lib/cities";
+import { TR_PHONE_RE } from "@/lib/phone";
 
 // İşletme self-servis kaydı. Hesap PENDING açılır ve görünmez;
 // panel akışı (e-posta doğrulama → profil → admin onayı) tamamlar.
 const Body = z.object({
   businessName: z.string().trim().min(2).max(80),
   name: z.string().trim().min(2).max(60),
-  // Telefon giriş kimliği DEĞİL — işletmenin iletişim numarası (müşteriye gösterilir).
-  phone: z.string().regex(/^05\d{9}$/, "Telefon 05xx ile 11 hane olmalı"),
+  // Telefon giriş kimliği DEĞİL — işletmenin iletişim numarası (müşteriye
+  // gösterilir). Sabit hat da olabilir (halı yıkamacıların çoğu sabit hat kullanır).
+  phone: z
+    .string()
+    .regex(TR_PHONE_RE, "Telefon 11 hane olmalı (05xx cep veya 0xxx sabit hat)"),
   // Giriş kimliği: kullanıcı adı (e-posta da giriş için kullanılabilir).
   username: z.string().trim().min(3).max(30),
   email: z.string().trim().email().max(120),

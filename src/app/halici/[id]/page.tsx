@@ -11,6 +11,7 @@ import PriceEstimator from "@/components/PriceEstimator";
 import { IconStar, IconTruck, IconWhatsApp } from "@/components/icons";
 import EmptyState from "@/components/EmptyState";
 import Footer from "@/components/Footer";
+import { isMobilePhone } from "@/lib/phone";
 
 // generateMetadata + sayfa aynı isteği paylaşsın diye tek render içinde önbellekle.
 const getBusiness = cache(getBusinessById);
@@ -77,10 +78,14 @@ export default async function HaliciProfile({
   );
 
   // WhatsApp linki — Türkiye'de müşteri aramak yerine yazmayı tercih eder.
-  // 05xx... → 905xx... (wa.me uluslararası biçim ister).
-  const waHref = `https://wa.me/${b.phone.replace(/\D/g, "").replace(/^0/, "90")}?text=${encodeURIComponent(
-    "Merhaba, halı yıkama hizmetiniz için yazıyorum.",
-  )}`;
+  // 05xx... → 905xx... (wa.me uluslararası biçim ister). YALNIZ cep telefonunda:
+  // sabit hatta (0212/0342…) WhatsApp yok → kırık buton gösterme (null → gizlenir).
+  const waPhone = b.phone.replace(/\D/g, "");
+  const waHref = isMobilePhone(waPhone)
+    ? `https://wa.me/${waPhone.replace(/^0/, "90")}?text=${encodeURIComponent(
+        "Merhaba, halı yıkama hizmetiniz için yazıyorum.",
+      )}`
+    : null;
 
   // Tatil modu: duraklatılmışsa sipariş butonları kapanır (profil yayında kalır).
   const paused = b.pausedUntil != null;
@@ -240,14 +245,16 @@ export default async function HaliciProfile({
                 Halımı Aldır
               </Link>
             )}
-            <a
-              href={waHref}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-2 hidden items-center justify-center gap-2 rounded-xl border-2 border-[#25D366] py-2.5 text-center font-semibold text-[#1da851] transition hover:bg-[#25D366]/10 active:scale-[0.99] md:flex"
-            >
-              <IconWhatsApp size={18} /> WhatsApp&apos;tan Yaz
-            </a>
+            {waHref && (
+              <a
+                href={waHref}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-2 hidden items-center justify-center gap-2 rounded-xl border-2 border-[#25D366] py-2.5 text-center font-semibold text-[#1da851] transition hover:bg-[#25D366]/10 active:scale-[0.99] md:flex"
+              >
+                <IconWhatsApp size={18} /> WhatsApp&apos;tan Yaz
+              </a>
+            )}
 
             {/* Fiyatlandırma */}
             <section className="mt-6">
@@ -425,15 +432,17 @@ export default async function HaliciProfile({
         {/* Sabit CTA (mobil) — md+ ekranda sağ kolondaki butonlar kullanılır */}
         <div className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-white p-3 md:hidden">
           <div className="mx-auto flex max-w-lg gap-2 md:max-w-3xl lg:max-w-5xl">
-            <a
-              href={waHref}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="WhatsApp'tan yaz"
-              className="flex w-14 shrink-0 items-center justify-center rounded-xl border-2 border-[#25D366] text-[#1da851] transition hover:bg-[#25D366]/10 active:scale-[0.99]"
-            >
-              <IconWhatsApp size={22} />
-            </a>
+            {waHref && (
+              <a
+                href={waHref}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="WhatsApp'tan yaz"
+                className="flex w-14 shrink-0 items-center justify-center rounded-xl border-2 border-[#25D366] text-[#1da851] transition hover:bg-[#25D366]/10 active:scale-[0.99]"
+              >
+                <IconWhatsApp size={22} />
+              </a>
+            )}
             {paused ? (
               <div className="flex flex-1 items-center justify-center rounded-xl border border-amber-300 bg-amber-50 px-3 py-3 text-center text-sm font-medium text-amber-800">
                 {pausedLabel} tarihine kadar sipariş almıyor
