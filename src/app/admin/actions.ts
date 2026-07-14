@@ -19,6 +19,51 @@ async function requireAdmin() {
   if (!u || u.role !== "ADMIN") redirect("/giris");
 }
 
+/**
+ * Mali müşavir (ACCOUNTANT) hesabı oluştur. YALNIZ admin. Bu hesap admin paneline
+ * giremez; yalnız /muhasebe'de fatura bilgileri + ödemeleri görür (salt-okunur).
+ * Admin kullanıcı adı + şifre belirler, mali müşavire verir.
+ */
+export async function createAccountant(formData: FormData) {
+  await requireAdmin();
+  const name = String(formData.get("name") || "").trim();
+  const usernameRaw = String(formData.get("username") || "").trim();
+  const phone = String(formData.get("phone") || "").replace(/\D/g, "");
+  const password = String(formData.get("password") || "");
+  const err = (m: string) =>
+    redirect("/admin/mali-musavir?hata=" + encodeURIComponent(m));
+
+  if (name.length < 2) err("Ad girin.");
+  if (phone.length < 10) err("Geçerli bir telefon girin.");
+  const username = normalizeUsername(usernameRaw);
+  const uErr = validateUsername(username);
+  if (uErr) err(uErr);
+  if (password.length < 8) err("Şifre en az 8 karakter olmalı.");
+
+  // Telefon ve kullanıcı adı benzersiz olmalı (User @unique).
+  const exists = await prisma.user.findFirst({
+    where: { OR: [{ username }, { phone }] },
+  });
+  if (exists) {
+    err(
+      exists.username === username
+        ? "Bu kullanıcı adı zaten kullanımda."
+        : "Bu telefon zaten kayıtlı.",
+    );
+  }
+  await prisma.user.create({
+    data: {
+      role: "ACCOUNTANT",
+      name,
+      phone,
+      username,
+      password: await hashPassword(password),
+    },
+  });
+  revalidatePath("/admin/mali-musavir");
+  redirect("/admin/mali-musavir?ok=" + encodeURIComponent(username));
+}
+
 // Admin'in ilçe koordinatı çözmesi (kayıt route'uyla aynı; erişilemezse İstanbul).
 async function geocodeDistrict(district: string, city: string) {
   try {

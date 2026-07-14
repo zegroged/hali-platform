@@ -10,6 +10,7 @@ const ROLE_HOME: Record<string, string> = {
   DRIVER: "/sofor",
   ADMIN: "/admin",
   SUPPORT: "/destek",
+  ACCOUNTANT: "/muhasebe",
   CUSTOMER: "/hesabim",
 };
 

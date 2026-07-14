@@ -71,6 +71,11 @@ export async function updateProfileBasics(formData: FormData) {
       city: cityCanon,
       phone: String(formData.get("phone") || b.phone),
       taxNumber: taxRaw || null,
+      // Fatura bilgileri (abonelik faturası için) — boş→null.
+      billingTitle: String(formData.get("billingTitle") || "").trim() || null,
+      taxOffice: String(formData.get("taxOffice") || "").trim() || null,
+      billingAddress:
+        String(formData.get("billingAddress") || "").trim() || null,
       googleProfileUrl: googleUrl,
       deliveryEstimateMinDays: minDays,
       deliveryEstimateMaxDays: maxDays,

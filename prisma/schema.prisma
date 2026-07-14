@@ -19,6 +19,7 @@ enum UserRole {
   DRIVER // şoför
   ADMIN
   SUPPORT // müşteri hizmetleri — TEK yetkisi: doğrulamasız işletme açmak (/destek)
+  ACCOUNTANT // mali müşavir — YALNIZ /muhasebe: fatura bilgileri + ödemeleri görür
 }
 
 enum VerificationStatus {
@@ -134,7 +135,12 @@ model CleanerBusiness {
   deliveryEstimateMinDays Int? // örn 2
   deliveryEstimateMaxDays Int? // örn 3
 
-  taxNumber          String? // vergi no (doğrulama için)
+  taxNumber          String? // vergi no (doğrulama için) — VKN(10)/TCKN(11)
+  // FATURA BİLGİLERİ: platform işletmeye abonelik faturası keserken (mali müşavir
+  // /muhasebe'de görür) mevzuaten gerekli alanlar. Abonelik ödemesinden ÖNCE zorunlu.
+  billingTitle       String? // fatura ünvanı (yasal unvan; name yalnız görünen ad)
+  taxOffice          String? // vergi dairesi
+  billingAddress     String? // fatura adresi (boşsa address kullanılır)
   // İşletme logosu (kare, ≤512px WebP) — kartta ve profil başlığında gösterilir.
   logoUrl            String?
   googleProfileUrl   String? // işletmenin Google Haritalar/İşletme profili linki (gerçek Google yorumları)

@@ -36,11 +36,22 @@ const UNIT_LABEL: Record<string, string> = {
 export default async function PanelProfile({
   searchParams,
 }: {
-  searchParams: Promise<{ hata?: string; kaydedildi?: string }>;
+  searchParams: Promise<{
+    hata?: string;
+    kaydedildi?: string;
+    odeme?: string;
+  }>;
 }) {
   const b = await getCurrentBusiness();
   if (!b) return null;
-  const { hata, kaydedildi } = await searchParams;
+  const { hata, kaydedildi, odeme } = await searchParams;
+  // Abonelik ödeme adımından yönlendirme: eksik alanı net söyle.
+  const odemeUyari =
+    odeme === "fatura"
+      ? "Aboneliğe geçmeden önce Fatura Bilgileri'ni (ünvan + vergi dairesi) doldurun — size bu bilgilerle fatura kesilecek."
+      : odeme === "vergino"
+        ? "Aboneliğe geçmeden önce vergi / T.C. kimlik numaranızı girin."
+        : null;
 
   const hours = (b.workingHours ?? {}) as Record<
     string,
@@ -53,6 +64,8 @@ export default async function PanelProfile({
   const checklist = completenessChecklist(b);
   const missing = checklist.filter((c) => !c.done);
   const taxMissing = !b.taxNumber;
+  // Abonelik faturası için ünvan + vergi dairesi zorunlu (ödeme kapısı kontrol eder).
+  const billingMissing = !b.billingTitle || !b.taxOffice;
   const daysMissing = !(b.deliveryEstimateMinDays && b.deliveryEstimateMaxDays);
 
   return (
@@ -71,6 +84,14 @@ export default async function PanelProfile({
           className="rounded-xl border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700"
         >
           {hata}
+        </p>
+      )}
+      {odemeUyari && (
+        <p
+          role="alert"
+          className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800"
+        >
+          {odemeUyari}
         </p>
       )}
       <div>
@@ -157,6 +178,50 @@ export default async function PanelProfile({
                 Şahıs işletmesi 11 haneli T.C. kimlik, şirket 10 haneli vergi
                 numarası girer. Müşteriye yalnız şirket vergi numarası gösterilir.
               </p>
+            </div>
+          </div>
+
+          {/* FATURA BİLGİLERİ — abonelik ödemesi öncesi zorunlu (platform sana
+              bu bilgilerle fatura keser). Ünvan/vergi dairesi eksikse ödeme
+              adımı buraya yönlendirir. */}
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <p className="text-sm font-semibold text-slate-800">
+              Fatura Bilgileri{billingMissing && reqBadge}
+            </p>
+            <p className="mb-3 mt-0.5 text-xs text-slate-500">
+              Aboneliğin için sana kesilecek faturada kullanılır. Aboneliğe
+              geçmeden önce ünvan ve vergi dairesi zorunludur.
+            </p>
+            <div className="space-y-3">
+              <div>
+                <label className={lbl}>Fatura ünvanı (yasal unvan)</label>
+                <input
+                  name="billingTitle"
+                  defaultValue={b.billingTitle ?? ""}
+                  placeholder="Örn. Ersan Temizlik Ltd. Şti. / Ahmet Yılmaz"
+                  className={billingMissing && !b.billingTitle ? inpMissing : inp}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={lbl}>Vergi dairesi</label>
+                  <input
+                    name="taxOffice"
+                    defaultValue={b.taxOffice ?? ""}
+                    placeholder="Örn. Şehitkamil"
+                    className={billingMissing && !b.taxOffice ? inpMissing : inp}
+                  />
+                </div>
+                <div>
+                  <label className={lbl}>Fatura adresi (opsiyonel)</label>
+                  <input
+                    name="billingAddress"
+                    defaultValue={b.billingAddress ?? ""}
+                    placeholder="Boşsa işletme adresi kullanılır"
+                    className={inp}
+                  />
+                </div>
+              </div>
             </div>
           </div>
           <div>

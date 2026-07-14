@@ -23,6 +23,11 @@ export async function startSubscriptionPayment() {
   if (identity.length < 10) {
     redirect("/panel/profil?odeme=vergino"); // vergi/kimlik no gerekli
   }
+  // FATURA BİLGİLERİ zorunlu: platform bu işletmeye abonelik faturası kesecek
+  // (mali müşavir /muhasebe'de görür). Ünvan + vergi dairesi eksikse ödeme yok.
+  if (!b.billingTitle?.trim() || !b.taxOffice?.trim()) {
+    redirect("/panel/profil?odeme=fatura");
+  }
 
   const payment = await prisma.subscriptionPayment.create({
     data: {
