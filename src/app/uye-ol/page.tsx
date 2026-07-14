@@ -12,8 +12,12 @@ function UyeOlInner() {
   const router = useRouter();
   const search = useSearchParams();
   // Dönüş adresi (ör. yorum için takip sayfasından geldiyse oraya döner).
+  // OPEN REDIRECT koruması (denetim bulgusu): yalnız startsWith("/") yetmez —
+  // "//evil.com" ve "/\\evil.com" (tarayıcı \ → /) de "/" ile başlar ve
+  // protokol-göreli dış origin'e çözülür → phishing. Yalnız TEK "/" ile başlayan
+  // (ikinci karakteri / veya \ OLMAYAN) göreli iç yolu kabul et.
   const donus = search.get("donus") || "/hesabim";
-  const safeDonus = donus.startsWith("/") ? donus : "/hesabim";
+  const safeDonus = /^\/(?![/\\])/.test(donus) ? donus : "/hesabim";
 
   const [mode, setMode] = useState<"kayit" | "giris">("kayit");
   const [form, setForm] = useState({

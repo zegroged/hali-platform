@@ -21,11 +21,15 @@ async function currentDriver() {
 export async function acceptOrder(formData: FormData) {
   const d = await currentDriver();
   const id = String(formData.get("orderId"));
-  const o = await prisma.order.findFirst({
+  // CAS (denetim bulgusu): findFirst→update({where:id}) koşulsuz yazıyordu;
+  // tam o sırada işletme panelden reddederse (CREATED→REJECTED) şoförün isteği
+  // REJECTED'i ACCEPTED'e ezip reddedilen siparişi diriltiyordu. updateMany yalnız
+  // hâlâ CREATED + bu şoföre atanmışsa yazar; count 0 ise yarışı kaybettik → çık.
+  const accepted = await prisma.order.updateMany({
     where: { id, driverId: d.id, status: "CREATED" },
+    data: { status: "ACCEPTED" },
   });
-  if (!o) return;
-  await prisma.order.update({ where: { id }, data: { status: "ACCEPTED" } });
+  if (accepted.count === 0) return;
   await prisma.orderEvent.create({
     data: { orderId: id, status: "ACCEPTED", note: "Şoför kabul etti" },
   });
@@ -42,10 +46,15 @@ export async function rejectOrder(formData: FormData) {
     where: { id, driverId: d.id, status: "CREATED" },
   });
   if (!o) return;
-  await prisma.order.update({
-    where: { id },
+  // CAS (denetim bulgusu — kardeş fix): koşulsuz yazım, tam o sırada işletme
+  // panelden KABUL ederse (CREATED→ACCEPTED) şoförün reddi ACCEPTED'i REJECTED'e
+  // ezip devam eden siparişi yanlışlıkla kapatıp müşteriye "karşılanamadı" SMS'i
+  // atıyordu. Yalnız hâlâ CREATED ise reddet; count 0 ise yarışı kaybettik → çık.
+  const rejected = await prisma.order.updateMany({
+    where: { id, driverId: d.id, status: "CREATED" },
     data: { status: "REJECTED", rejectReason: reason },
   });
+  if (rejected.count === 0) return;
   await prisma.orderEvent.create({
     data: { orderId: id, status: "REJECTED", note: `Reddedildi: ${reason}` },
   });
@@ -77,10 +86,13 @@ export async function savePickup(formData: FormData) {
     o.id,
   );
 
-  await prisma.order.update({
-    where: { id },
+  // CAS (denetim bulgusu): koşulsuz yazım, eşzamanlı panel iptali/reddini
+  // (ACCEPTED→CANCELED/REJECTED) ezip siparişi PICKED_UP'a diriltiyordu.
+  const picked = await prisma.order.updateMany({
+    where: { id, driverId: d.id, status: "ACCEPTED" },
     data: { status: "PICKED_UP", pickupPhotoUrl: photoUrl },
   });
+  if (picked.count === 0) return; // yarış: durum değişti → yazma, yan etki yok
   await prisma.orderEvent.create({
     data: { orderId: id, status: "PICKED_UP", note: "Halı alındı" },
   });
@@ -98,7 +110,15 @@ export async function advanceOrder(formData: FormData) {
   const next = DRIVER_NEXT[o.status];
   if (!next) return;
 
-  await prisma.order.update({ where: { id }, data: { status: next } });
+  // CAS (denetim bulgusu): koşulsuz yazım, tam o sırada işletme panelden iptal
+  // ederse (PICKED_UP/WASHING→CANCELED) müşteriye "iptal/ücretsiz" denmiş
+  // siparişi WASHING'e diriltip teslim+tahsilata götürüyordu. Yalnız hâlâ o.status
+  // ise ilerlet; count 0 ise durum değişmiş → TÜM yan etkileri (SMS/konum) atla.
+  const advanced = await prisma.order.updateMany({
+    where: { id, driverId: d.id, status: o.status },
+    data: { status: next },
+  });
+  if (advanced.count === 0) return;
   await prisma.orderEvent.create({
     data: { orderId: id, status: next, note: ORDER_STATUS_META[next].label },
   });
