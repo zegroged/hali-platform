@@ -87,11 +87,10 @@ export async function savePickup(formData: FormData) {
     o.businessId,
     o.id,
   );
-  if (!photoUrl) {
-    throw new Error(
-      "Halının fotoğrafını çekmen zorunlu (hasar/kayıp kanıtı). Fotoğraf ekleyip tekrar dene.",
-    );
-  }
+  // Arayüz (PhotoForm) fotoğrafsız göndermeyi zaten alanın altında net uyarıyla
+  // engelliyor. Atlatılırsa TAM-EKRAN hata yerine sessizce /sofor'a dön —
+  // fotoğraf olmadan halı PICKED_UP olmaz.
+  if (!photoUrl) redirect("/sofor");
 
   // CAS (denetim bulgusu): koşulsuz yazım, eşzamanlı panel iptali/reddini
   // (ACCEPTED→CANCELED/REJECTED) ezip siparişi PICKED_UP'a diriltiyordu.
@@ -192,11 +191,9 @@ export async function deliverOrder(formData: FormData) {
     o.businessId,
     id,
   );
-  if (!deliveryPhotoUrl) {
-    throw new Error(
-      "Teslim fotoğrafını çekmen zorunlu (teslim + hasar kanıtı). Fotoğraf ekleyip tekrar dene.",
-    );
-  }
+  // Arayüz zaten engelliyor; atlatılırsa tam-ekran hata yerine sessizce dön —
+  // fotoğraf olmadan DELIVERED olmaz / para kaydı açılmaz.
+  if (!deliveryPhotoUrl) redirect("/sofor");
 
   const isCash = o.paymentMethod === "CASH";
   // Nakitte teslimde tahsil edilir; kartta ödeme iyzico callback'ine bırakılır.

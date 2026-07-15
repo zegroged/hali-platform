@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { PendingButton } from "@/components/PendingButton";
+import { PhotoForm } from "@/components/PhotoForm";
 import { prisma } from "@/lib/prisma";
 import { getSessionUser } from "@/lib/auth";
 import { DriverShift } from "@/components/DriverShift";
@@ -163,36 +164,29 @@ export default async function SoforPage() {
 
               {/* ACCEPTED: halıyı aldım — sadece foto, PARA YOK */}
               {o.status === "ACCEPTED" && (
-                <form action={savePickup} className="space-y-2">
-                  <input type="hidden" name="orderId" value={o.id} />
-                  <label
-                    htmlFor={`foto-alim-${o.id}`}
-                    className="block text-xs font-medium text-slate-600"
-                  >
-                    Halının fotoğrafını çek veya seç{" "}
-                    <span className="text-red-600">(zorunlu — hasar/kayıp
-                    kanıtı)</span>
-                  </label>
-                  {/* capture="environment" KULLANMA: doğrudan kamerayı zorlayıp
-                      "dosya seç"i kilitliyordu (izin yoksa hiç açılmıyor).
-                      Şimdi tarayıcı kamera/galeri/dosya seçeneğini kendisi sunar.
-                      Input label İÇİNE de gömülmez — çift tetiklenme dosya
-                      penceresini bazı tarayıcılarda açar açmaz kapatıyordu. */}
-                  <input
-                    id={`foto-alim-${o.id}`}
-                    name="photo"
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp"
-                    required
-                    className="mt-1 w-full text-sm text-slate-600 file:mr-2 file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-sm"
-                  />
-                  <PendingButton className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-brand py-2 text-sm font-semibold text-white hover:bg-brand-dark">
-                    <IconPackage size={16} /> Halıyı Aldım
-                  </PendingButton>
-                  <p className="text-center text-xs text-slate-500">
-                    Ödeme teslimde alınır.
-                  </p>
-                </form>
+                <PhotoForm
+                  action={savePickup}
+                  orderId={o.id}
+                  photoLabel={
+                    <>
+                      Aldığın halının fotoğrafını çek veya seç{" "}
+                      <span className="text-red-600">
+                        (zorunlu — hasar/kayıp kanıtı)
+                      </span>
+                    </>
+                  }
+                  errorMessage="Lütfen aldığınız halıyı fotoğraf ile doğrulayın — fotoğraf eklemeden devam edemezsiniz."
+                  buttonLabel={
+                    <>
+                      <IconPackage size={16} /> Halıyı Aldım
+                    </>
+                  }
+                  footer={
+                    <p className="text-center text-xs text-slate-500">
+                      Ödeme teslimde alınır.
+                    </p>
+                  }
+                />
               )}
 
               {/* PICKED_UP / WASHING: ara adımlar (para yok) */}
@@ -215,8 +209,29 @@ export default async function SoforPage() {
 
               {/* OUT_FOR_DELIVERY: teslim + TAHSİLAT (para burada alınır) */}
               {o.status === "OUT_FOR_DELIVERY" && (
-                <form action={deliverOrder} className="space-y-2">
-                  <input type="hidden" name="orderId" value={o.id} />
+                <PhotoForm
+                  action={deliverOrder}
+                  orderId={o.id}
+                  photoLabel={
+                    <>
+                      Bıraktığın halının fotoğrafını çek veya seç{" "}
+                      <span className="text-red-600">
+                        (zorunlu — teslim + hasar kanıtı)
+                      </span>
+                    </>
+                  }
+                  errorMessage="Lütfen bıraktığınız halıyı fotoğraf ile doğrulayın — fotoğraf eklemeden teslim edemezsiniz."
+                  buttonLabel={
+                    <>
+                      <IconHome size={16} /> Teslim Et &amp; Tahsilatı Gir
+                    </>
+                  }
+                  footer={
+                    <p className="text-center text-xs text-slate-500">
+                      Kapıda nakit tahsil et — teslim anında.
+                    </p>
+                  }
+                >
                   <input
                     name="price"
                     type="number"
@@ -226,29 +241,7 @@ export default async function SoforPage() {
                     placeholder="Tahsil edilen tutar (TL)"
                     className={inp}
                   />
-                  <label
-                    htmlFor={`foto-teslim-${o.id}`}
-                    className="block text-xs font-medium text-slate-600"
-                  >
-                    Teslim ettiğin halının fotoğrafını çek veya seç{" "}
-                    <span className="text-red-600">(zorunlu — teslim + hasar
-                    kanıtı)</span>
-                  </label>
-                  <input
-                    id={`foto-teslim-${o.id}`}
-                    name="photo"
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp"
-                    required
-                    className="mt-1 w-full text-sm text-slate-600 file:mr-2 file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-sm"
-                  />
-                  <p className="text-xs text-slate-500">
-                    Kapıda nakit tahsil et — teslim anında.
-                  </p>
-                  <PendingButton className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-brand py-2 text-sm font-semibold text-white hover:bg-brand-dark">
-                    <IconHome size={16} /> Teslim Et &amp; Tahsilatı Gir
-                  </PendingButton>
-                </form>
+                </PhotoForm>
               )}
             </div>
           </div>
