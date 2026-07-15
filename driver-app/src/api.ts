@@ -95,3 +95,101 @@ export async function postLocation(
   }
   return "failed";
 }
+
+// ————————————————————— Sipariş yönetimi (native) —————————————————————
+
+export type DriverOrder = {
+  id: string;
+  code: string | null;
+  status: string;
+  customerName: string;
+  customerPhone: string;
+  pickupAddress: string;
+  pickupLat: number | null;
+  pickupLng: number | null;
+  approxM2: number | null;
+  note: string | null;
+  quotedPrice: number | null;
+  priceApprovedAt: string | null;
+  paymentMethod: string;
+  createdAt: string;
+};
+
+async function authHeaders(): Promise<Record<string, string>> {
+  const token = await getToken();
+  if (!token) throw new Error("Oturum bulunamadı");
+  return { Authorization: `Bearer ${token}` };
+}
+
+async function jsonPost(path: string, body?: unknown): Promise<void> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...(await authHeaders()) },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (!res.ok) {
+    if (res.status === 401 || res.status === 403) {
+      await logout();
+      throw new Error("Oturum süresi doldu, tekrar giriş yap");
+    }
+    const d = (await res.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(d?.error ?? "İşlem yapılamadı, tekrar dene");
+  }
+}
+
+export async function listOrders(): Promise<DriverOrder[]> {
+  const res = await fetch(`${API_BASE}/api/driver/orders`, {
+    headers: await authHeaders(),
+  });
+  if (!res.ok) {
+    if (res.status === 401 || res.status === 403) {
+      await logout();
+      throw new Error("Oturum süresi doldu, tekrar giriş yap");
+    }
+    throw new Error("Siparişler alınamadı");
+  }
+  return ((await res.json()).orders ?? []) as DriverOrder[];
+}
+
+export const acceptOrder = (id: string) =>
+  jsonPost(`/api/driver/orders/${id}/accept`);
+export const rejectOrder = (id: string, reason: string, note?: string) =>
+  jsonPost(`/api/driver/orders/${id}/reject`, { reason, note });
+export const advanceOrder = (id: string, verbalConsent?: boolean) =>
+  jsonPost(`/api/driver/orders/${id}/advance`, { verbalConsent });
+
+// Fotoğraflı uçlar: multipart. photoUri = ImagePicker'dan gelen yerel dosya.
+async function photoPost(
+  path: string,
+  photoUri: string,
+  extra?: Record<string, string>,
+): Promise<void> {
+  const form = new FormData();
+  // React Native FormData dosya biçimi (uri/name/type).
+  form.append("photo", {
+    uri: photoUri,
+    name: "foto.jpg",
+    type: "image/jpeg",
+  } as unknown as Blob);
+  if (extra) for (const k in extra) form.append(k, extra[k]);
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: "POST",
+    headers: await authHeaders(), // Content-Type'ı FormData kendi set eder
+    body: form,
+  });
+  if (!res.ok) {
+    if (res.status === 401 || res.status === 403) {
+      await logout();
+      throw new Error("Oturum süresi doldu, tekrar giriş yap");
+    }
+    const d = (await res.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(d?.error ?? "Gönderilemedi, tekrar dene");
+  }
+}
+
+export const pickupOrder = (id: string, photoUri: string) =>
+  photoPost(`/api/driver/orders/${id}/pickup`, photoUri);
+export const deliverOrder = (id: string, price: number, photoUri: string) =>
+  photoPost(`/api/driver/orders/${id}/deliver`, photoUri, {
+    price: String(price),
+  });

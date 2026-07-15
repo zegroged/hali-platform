@@ -22,6 +22,12 @@
           "isAndroidBackgroundLocationEnabled": true,
           "isAndroidForegroundServiceEnabled": true
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Halının alım ve teslim fotoğrafını çekmek için kamera kullanılır (hasar/kayıp kanıtı)."
+        }
       ]
     ],
     "ios": {

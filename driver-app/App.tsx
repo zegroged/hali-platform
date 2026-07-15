@@ -12,6 +12,7 @@ import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { login, getToken, logout, setShift } from "./src/api";
 import { startTracking, stopTracking, isTracking } from "./src/tracking";
+import { Orders } from "./src/Orders";
 
 const NAME_KEY = "hali_driver_name";
 const PRIVACY_URL = "https://enyakinhaliyikamaservisi.com/gizlilik";
@@ -159,28 +160,32 @@ function Driver() {
   }
 
   return (
-    <SafeAreaView style={s.screen}>
-      <View style={s.box}>
-        <Text style={s.title}>{name || "Şoför"}</Text>
-        <Text style={[s.status, onShift ? s.on : s.off]}>
-          {onShift
-            ? "🟢 Mesaidesin — konumun paylaşılıyor"
-            : "Mesai dışısın"}
-        </Text>
-        <Text style={s.hint}>
-          {onShift
-            ? "Uygulamayı kapatabilir, telefonla konuşabilirsin — konum arka planda iletilmeye devam eder."
-            : "Mesaiye başlayınca konumun, uygulama kapalıyken bile halıcına iletilir."}
-        </Text>
+    <SafeAreaView style={s.screenTop}>
+      <View style={s.topBar}>
+        <View style={{ flex: 1 }}>
+          <Text style={s.titleSmall}>{name || "Şoför"}</Text>
+          <Text style={[s.statusSmall, onShift ? s.on : s.off]}>
+            {onShift ? "🟢 Mesaidesin — konum paylaşılıyor" : "Mesai dışısın"}
+          </Text>
+        </View>
         <TouchableOpacity
-          style={[s.btn, onShift && s.btnStop]}
+          style={[s.shiftBtn, onShift && s.btnStop]}
           onPress={toggleShift}
           disabled={busy}
         >
-          <Text style={s.btnText}>
-            {onShift ? "Mesaiyi Bitir" : "Mesaiye Başla"}
-          </Text>
+          <Text style={s.shiftBtnText}>{onShift ? "Mesaiyi Bitir" : "Mesaiye Başla"}</Text>
         </TouchableOpacity>
+      </View>
+
+      <Orders
+        onSessionExpired={() => {
+          stopTracking();
+          setAuthed(false);
+          setOnShift(false);
+        }}
+      />
+
+      <View style={s.bottomBar}>
         <TouchableOpacity onPress={doLogout}>
           <Text style={s.link}>Çıkış</Text>
         </TouchableOpacity>
@@ -200,7 +205,35 @@ export default function App() {
 
 const s = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "#f8fafc", justifyContent: "center" },
+  screenTop: { flex: 1, backgroundColor: "#f8fafc" },
   box: { padding: 24, gap: 12 },
+  topBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#e2e8f0",
+    backgroundColor: "#fff",
+  },
+  titleSmall: { fontSize: 18, fontWeight: "700", color: "#0f172a" },
+  statusSmall: { fontSize: 13, fontWeight: "600", marginTop: 1 },
+  shiftBtn: {
+    backgroundColor: "#0d9488",
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+  },
+  shiftBtnText: { color: "#fff", fontWeight: "700" },
+  bottomBar: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderTopWidth: 1,
+    borderTopColor: "#e2e8f0",
+  },
   title: { fontSize: 26, fontWeight: "700", color: "#0f172a", textAlign: "center" },
   status: { fontSize: 16, fontWeight: "600", textAlign: "center" },
   on: { color: "#15803d" },

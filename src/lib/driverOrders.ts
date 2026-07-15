@@ -24,14 +24,6 @@ export type DriverActionResult =
   | { ok: true }
   | { ok: false; error: string; code?: number };
 
-const CANCEL_REASONS = new Set([
-  "Vazgeçtim",
-  "Fiyat beklentimi aştı",
-  "Başka işletmeyle anlaştım",
-  "Zamanlama uygun değil",
-  "Diğer",
-]);
-
 /** Şoförün aktif (kapanmamış) siparişleri — app listesi için. */
 export async function listDriverOrders(driverId: string) {
   const orders = await prisma.order.findMany({
@@ -89,7 +81,8 @@ export async function driverReject(
   presetReason: string,
   note: string,
 ): Promise<DriverActionResult> {
-  const preset = CANCEL_REASONS.has(presetReason) ? presetReason : "Belirtilmedi";
+  // Şoför red sebebi serbest metindir (web /sofor ile aynı) — boşsa "Belirtilmedi".
+  const preset = presetReason.trim().slice(0, 120) || "Belirtilmedi";
   const reason = [preset, note.trim().slice(0, 300)].filter(Boolean).join(" — ");
   const o = await prisma.order.findFirst({
     where: { id: orderId, driverId, status: "CREATED" },
