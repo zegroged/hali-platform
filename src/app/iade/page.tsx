@@ -51,22 +51,37 @@ export default function IadePage() {
         </p>
       </Section>
 
-      <Section title="4. Kusurlu Hizmet / Hasar">
+      <Section title="4. Kusurlu (Ayıplı) Hizmet / Hasar">
         <p>
-          Teslim aldığınız halıda yıkamadan kaynaklı bir kusur (leke, hasar,
-          renk atması vb.) tespit ederseniz, takip sayfanızdaki telefon
-          üzerinden işletmeye veya platforma bildirin. Kusuru fark eder etmez,
-          tercihen teslimden itibaren 48 saat içinde bildirmenizi öneririz —
-          bu bir <strong>hak düşürücü süre değildir</strong>; 6502 sayılı
-          Kanun md. 15-16&apos;daki yasal haklarınız saklıdır. Ayıplı hizmette{" "}
-          <strong>seçiminize bağlı olarak</strong>: hizmetin yeniden
-          görülmesi, bedel indirimi, ücretsiz onarım/yeniden yıkama veya
-          sözleşmeden dönme (bedel iadesi) haklarına sahipsiniz.
+          Teslim aldığınız halıda yıkamadan veya taşımadan kaynaklı bir kusur ya
+          da hasar (leke, hasar, renk atması, çekme/boyut değişimi, yırtılma,
+          kayıp vb.) tespit ederseniz, takip sayfanızdan veya{" "}
+          <strong>info@enyakinhaliyikamaservisi.com</strong> adresinden bildirin.
+          Kusuru fark eder etmez bildirmenizi öneririz; bu bir{" "}
+          <strong>hak düşürücü süre değildir</strong> — ayıplı hizmete ilişkin
+          yasal haklarınız hizmetin ifasından itibaren <strong>iki yıl</strong>{" "}
+          (ağır kusur/hile ile gizlenmiş ayıpta süresiz) saklıdır (6502 sayılı
+          Kanun md.16).
         </p>
         <p>
-          Platform, çözüm sürecinde müşteri ile işletme arasında aracılık
-          eder. Şoförün teslimde çektiği fotoğraflar ve sipariş kayıtları
-          süreçte delil olarak kullanılır.
+          Ayıplı hizmette <strong>seçiminize bağlı olarak</strong>: (a) halının
+          ücretsiz yeniden yıkanması, (b) ayıp oranında bedel indirimi, (c)
+          eserin ücretsiz onarımı veya (d) sözleşmeden dönerek bedel iadesi
+          haklarına sahipsiniz; yeniden yıkama/onarım en geç{" "}
+          <strong>30 iş günü</strong> içinde ve masrafı işletmeye ait olacak
+          şekilde yapılır (6502 sayılı Kanun md.15). Halının hasar görmesi veya
+          kaybolması hâlinde halının <strong>rayiç değeri</strong> üzerinden
+          ayrıca tazminat isteme hakkınız saklıdır (6098 sayılı Kanun md.112).
+        </p>
+        <p>
+          <strong>Çözüm akışı:</strong> Platform başvurunuzu gecikmeksizin
+          işletmeye iletir; halının alım (öncesi) ve teslim (sonrası)
+          fotoğrafları ile sipariş kayıtları esas alınır; işletme en geç{" "}
+          <strong>5 iş günü</strong> içinde çözüm sunar; uzlaşılamazsa Platform
+          en geç <strong>15 gün</strong> içinde değerlendirip sonucu bildirir.
+          Yerleşim yerinizdeki Tüketici Hakem Heyeti&apos;ne, Tüketici
+          Mahkemesi&apos;ne ve dava şartı arabuluculuğa başvurma hakkınız her
+          zaman saklıdır.
         </p>
       </Section>
 

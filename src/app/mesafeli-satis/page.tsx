@@ -106,19 +106,30 @@ export default function MesafeliSatisPage() {
         </p>
       </Section>
 
-      <Section title="6. Kusurlu İfa">
+      <Section title="6. Kusurlu (Ayıplı) İfa">
         <p>
-          Kusuru fark eder etmez, tercihen teslimden itibaren 48 saat içinde
-          bildirmenizi öneririz — bu bir{" "}
-          <strong>hak düşürücü süre değildir</strong>; 6502 sayılı Kanun md.
-          15-16&apos;daki yasal haklarınız saklıdır. Ayıplı hizmette{" "}
-          <strong>seçiminize bağlı olarak</strong>: hizmetin yeniden
-          görülmesi, bedel indirimi, ücretsiz onarım/yeniden yıkama veya
-          sözleşmeden dönme (bedel iadesi) haklarına sahipsiniz.
+          Kusuru fark eder etmez bildirmenizi öneririz — bu bir{" "}
+          <strong>hak düşürücü süre değildir</strong>; ayıplı hizmete ilişkin
+          yasal haklarınız hizmetin ifasından itibaren <strong>iki yıl</strong>{" "}
+          (ağır kusur veya hile ile gizlenmiş ayıpta süresiz) saklıdır (6502
+          sayılı Kanun md.16). Ayıplı hizmette <strong>seçiminize bağlı
+          olarak</strong>: hizmetin yeniden görülmesi, ayıp oranında bedel
+          indirimi, eserin ücretsiz onarımı veya sözleşmeden dönerek bedel
+          iadesi haklarına sahipsiniz. Yeniden yıkama/onarım, talep tarihinden
+          itibaren <strong>en geç 30 iş günü</strong> içinde ve masrafı işletmeye
+          ait olacak şekilde yapılır (6502 sayılı Kanun md.15). Halının hasar
+          görmesi veya kaybolması hâlinde, seçimlik haklarınızın yanında halının
+          <strong> rayiç değeri</strong> üzerinden tazminat isteme hakkınız
+          saklıdır (6098 sayılı Kanun md.112).
         </p>
         <p>
-          Platform çözüm sürecine aracılık eder; sipariş kayıtları ve teslim
-          fotoğrafları delil niteliğindedir.
+          Bildiriminiz, Kullanım Koşulları&apos;nda tanımlanan çözüm süreciyle
+          değerlendirilir: Platform başvuruyu işletmeye iletir, halının alım ve
+          teslim fotoğrafları esas alınır, işletme en geç{" "}
+          <strong>5 iş günü</strong> içinde çözüm sunar, uzlaşılamazsa Platform
+          en geç <strong>15 gün</strong> içinde sonucu bildirir. Bu süreç,
+          Tüketici Hakem Heyeti / Tüketici Mahkemesi ve arabuluculuk yollarına
+          başvurma hakkınızı sınırlamaz.
         </p>
       </Section>
 

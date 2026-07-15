@@ -163,6 +163,56 @@ export default function IsletmeSozlesmesiPage() {
             akışına uyar.
           </li>
         </ul>
+
+        <h3 className="mt-4 font-semibold text-slate-900">
+          Halının Korunması, Sorumluluk ve Tazmin
+        </h3>
+        <ul className="list-disc space-y-1 pl-5">
+          <li>
+            İşletme, halıyı müşteriden fiilen teslim aldığı andan müşteriye geri
+            teslim edene kadar geçen tüm süreçte (taşıma, depolama, yıkama,
+            kurutma dâhil) halıyı <strong>basiretli bir tacir ve meslek sahibi
+            özeniyle korumakla</strong> yükümlüdür. Halının bu süreçte
+            kaybolması, çalınması, değer kaybetmesi veya hasar görmesi hâlinde
+            işletme, zararın kendi kusuru olmaksızın gerçekleştiğini ispat
+            etmedikçe sorumludur; <strong>ispat yükü işletmededir</strong> (6098
+            sayılı Kanun md.112, md.471; saklama/emanet hükümleri md.561 vd.
+            kıyasen).
+          </li>
+          <li>
+            İşletme; hizmetin ayıplı ifasından, özensiz ifadan ve halının
+            korunmasından müşteriye karşı{" "}
+            <strong>birinci derecede sorumlu</strong> olduğunu, Platform&apos;un
+            aracı sıfatının bu sorumluluğu değiştirmediğini kabul eder (6502
+            sayılı Kanun md.13-16). Müşterinin hasar/kayıp/kötü yıkama kaynaklı
+            zararını, Kullanım Koşulları&apos;ndaki çözüm süreci uyarınca
+            birinci derecede karşılar.
+          </li>
+          <li>
+            <strong>Platform&apos;u tazmin (indemnity):</strong> İşletme;
+            profil bilgilerinin yanlışlığı, hizmetin ayıplı ifası, halının hasar
+            görmesi/kaybolması veya müşteriye karşı yükümlülüklerini ihlal etmesi
+            nedeniyle müşteri veya üçüncü kişilerce Platform&apos;a yöneltilen
+            her türlü talep, dava, idari para cezası, tazminat, avukatlık ücreti
+            ve yargılama gideri bakımından Platform&apos;u tam olarak tazmin
+            etmeyi taahhüt eder. Platform bir ödeme yapmak zorunda kalırsa,
+            ödenen tutar için işletmeye <strong>rücu hakkı</strong> saklı olup
+            bu tutar işletmenin (online kartlı ödeme aktif olduğunda)
+            hakedişinden ya da abonelik alacağından mahsup edilebilir. Bu hüküm
+            Platform&apos;un kendi münhasır kusurundan doğan zararları kapsamaz
+            (6098 sayılı Kanun md.128).
+          </li>
+          <li>
+            <strong>Teminat:</strong> Platform, müşteri zararlarının
+            karşılanmasını güvence altına almak amacıyla gerektiğinde işletmeden
+            makul tutarda nakdi teminat, teminat mektubu veya mesleki sorumluluk
+            sigortası yaptırmasını talep edebilir; bu talep, işletme aleyhine
+            sonuç doğuran değişiklik usulüyle (§9) bildirilir. Sözleşmeye aykırı
+            davranış hâlinde işletme, doğan zararın yanı sıra kararlaştırılan
+            cezai şartı da öder (6098 sayılı Kanun md.128, md.179-180; kefalet
+            için md.581 vd.).
+          </li>
+        </ul>
       </Section>
 
       <Section title="6. Hizmet Kesintileri">

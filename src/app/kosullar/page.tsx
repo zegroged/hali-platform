@@ -70,13 +70,116 @@ export default function KosullarPage() {
 
       <Section title="5. Sorumluluk Sınırı">
         <p>
-          Halının alınması, yıkanması, korunması ve tesliminden hizmeti veren
-          işletme sorumludur. Platform, işletmeleri doğrulamak ve süreç
-          şeffaflığını sağlamak için makul özeni gösterir; ancak hizmetin
-          sonucuna ilişkin doğrudan taraf değildir. Hasar/kayıp durumlarında
-          müşteri ile işletme arasındaki çözüme aracılık ederiz. Tüketicilerin
-          6502 sayılı Tüketicinin Korunması Hakkında Kanun&apos;dan doğan
-          hakları saklıdır.
+          Halının alınması, taşınması, yıkanması, saklanması, korunması ve
+          tesliminden <strong>hizmeti veren işletme</strong> sorumludur; işletme
+          bu hizmeti kendi nam ve hesabına sunan bağımsız hizmet sağlayıcıdır.
+          Platform, halı yıkama hizmetinin tarafı değildir ve hizmetin
+          sonucundan (yıkama kalitesi, hasar, kayıp) doğrudan sorumlu tutulamaz.
+        </p>
+        <p>
+          Bununla birlikte Platform; işletmeyi doğrulamak, işletmenin ticari
+          unvanı, adresi ve iletişim bilgisini sipariş akışında ve takip
+          sayfasında <strong>eksiksiz göstermek</strong>, doğru tanıtım yapmak
+          ve tüketici bildirimlerini (iptal, cayma, hasar, şikâyet) gecikmeksizin
+          işletmeye iletmek yükümlülüklerini üstlenir. Müşteri, siparişin her
+          aşamasında hizmeti veren işletmeye doğrudan ulaşabilir. Platform bu
+          kendi yükümlülüklerini ihmal ederse (örneğin işletmenin kimlik/iletişim
+          bilgisini erişilebilir sunmaması ya da bildirimi işletmeye iletmemesi),{" "}
+          <strong>yalnızca bu ihmalinden doğan zarardan</strong> sorumlu olabilir
+          (6563 sayılı Kanun md.9; Anayasa Mahkemesi&apos;nin E.2024/187,
+          K.2026/42 sayılı kararıyla md.9/1&apos;in tüketici sözleşmeleri yönünden
+          iptali — yürürlük 2 Mart 2027; 6502 sayılı Kanun md.48).
+        </p>
+        <p>
+          Uygulamada gösterilen &quot;Doğrulanmış İşletme&quot; işareti yalnızca
+          işletmenin kimlik ve iletişim bilgilerinin doğrulandığını gösterir;
+          hizmet kalitesine ilişkin bir taahhüt veya Platform&apos;un hizmeti
+          bizzat verdiği anlamına gelmez. Tüketicilerin 6502 sayılı Kanun&apos;dan
+          doğan hakları her hâlde saklıdır; işbu koşulların hiçbir hükmü
+          tüketicinin yasal haklarını sınırlayacak veya kaldıracak biçimde
+          yorumlanamaz (6502 sayılı Kanun md.5).
+        </p>
+      </Section>
+
+      <Section title="5/A. Ayıplı Hizmette Haklarınız">
+        <p>
+          Halı yıkama, sonucunda temizlenmiş bir eser (halı) meydana getiren bir
+          hizmettir; hem 6502 sayılı Kanun&apos;un ayıplı hizmet hükümlerine hem
+          de 6098 sayılı Türk Borçlar Kanunu&apos;nun eser sözleşmesi hükümlerine
+          tabidir. Teslim aldığınız halı taşıması gereken özellikleri taşımıyorsa
+          (leke çıkmaması, renk akması, boyut değişimi/çekme, yırtılma, hasar,
+          kayıp vb.) hizmet ayıplıdır ve aşağıdaki{" "}
+          <strong>seçimlik haklardan</strong> dilediğinizi kullanabilirsiniz;
+          işletme bunu yerine getirmek zorundadır:
+        </p>
+        <ul className="list-disc space-y-1 pl-5">
+          <li>hizmetin ücretsiz yeniden görülmesi (halının yeniden yıkanması),</li>
+          <li>hizmet sonucu ortaya çıkan eserin ücretsiz onarımı,</li>
+          <li>ayıp oranında bedelden indirim,</li>
+          <li>sözleşmeden dönerek ödenen bedelin iadesi.</li>
+        </ul>
+        <p>
+          Yeniden yıkama veya onarım, talep tarihinden itibaren{" "}
+          <strong>en geç 30 iş günü</strong> içinde ve doğan tüm masraflar
+          (halının yeniden alınıp götürülmesi dâhil){" "}
+          <strong>işletmeye ait olacak şekilde</strong> yapılır. Bu seçimlik
+          hakların yanında, halının hasar görmesi, değer kaybetmesi veya
+          kaybolması hâlinde halının <strong>rayiç değeri</strong> ve şartları
+          varsa dolaylı zararlarınız için ayrıca tazminat isteme hakkınız
+          saklıdır (6502 sayılı Kanun md.15; 6098 sayılı Kanun md.112).
+        </p>
+      </Section>
+
+      <Section title="5/B. Hasar / Kayıp / Kötü Yıkama Çözüm Süreci">
+        <p>
+          Hasar, kayıp veya kötü yıkama iddialarında aşağıdaki çözüm süreci
+          uygulanır:
+        </p>
+        <ol className="list-decimal space-y-1 pl-5">
+          <li>
+            Durumu, takip sayfası üzerinden veya{" "}
+            <strong>info@enyakinhaliyikamaservisi.com</strong> adresinden
+            Platform&apos;a bildirirsiniz; başvuru için hak düşürücü bir süre
+            öngörülmez.
+          </li>
+          <li>
+            Platform başvuruyu gecikmeksizin işletmeye iletir; halının alım anında
+            (öncesi) ve teslim anında (sonrası) çekilen fotoğrafları ile sipariş
+            kayıtları objektif delil olarak karşılaştırılır.
+          </li>
+          <li>
+            İşletme, başvuru kendisine iletildikten sonra{" "}
+            <strong>en geç 5 iş günü</strong> içinde 5/A maddesindeki talebinizi
+            karşılamak üzere çözüm önerisini sunar.
+          </li>
+          <li>
+            Uzlaşılamazsa Platform, <strong>en geç 15 gün</strong> içinde
+            başvuruyu değerlendirip sonucu size ve işletmeye bildirir.
+          </li>
+          <li>
+            Bu aşamaların hiçbiri, yerleşim yerinizdeki veya işlemin yapıldığı
+            yerdeki Tüketici Hakem Heyeti ile Tüketici Mahkemesi&apos;ne ve dava
+            şartı arabuluculuğa başvurma hakkınızı ortadan kaldırmaz.
+          </li>
+        </ol>
+        <p>
+          Halının durumu alım ve teslim anlarında fotoğrafla kayıt altına alınır
+          ve hasar/kayıp değerlendirmesi öncelikle bu kayıtlara göre yapılır;
+          ancak bu kayıtlar münhasır delil değildir, her türlü yasal delille
+          ispat hakkınız saklıdır (6502 sayılı Kanun md.48; 6100 sayılı HMK
+          md.193).
+        </p>
+      </Section>
+
+      <Section title="5/C. Fotoğraflı Güvence">
+        <p>
+          Platform üzerinden verilen siparişlerde halınızın durumu,{" "}
+          <strong>alım (yıkama öncesi) ve teslim (yıkama sonrası) anlarında
+          fotoğrafla kayıt altına alınır</strong>. Hasar, kayıp veya kötü yıkama
+          hâlinde zarar; bu fotoğraf kayıtları esas alınarak, işletmenin
+          sorumluluğu kapsamında yukarıdaki 5/B çözüm süreciyle karşılanır. Bu
+          düzenleme bir sigorta poliçesi değildir; Platform &quot;sigortalı&quot;
+          güvencesi vermez, süreç işletmenin yasal sorumluluğu üzerinden işler.
         </p>
       </Section>
 
@@ -136,6 +239,18 @@ export default function KosullarPage() {
           eder. Bu kayıtlar <strong>münhasır delil değildir</strong>;
           tüketicinin her türlü yasal delille ispat hakkı saklıdır (6100
           sayılı HMK md.193/2; 6502 sayılı Kanun md.5).
+        </p>
+        <p>
+          Halının alım (yıkama öncesi) ve teslim (yıkama sonrası) fotoğrafları,
+          ayıp/hasar/kayıp tespitinde esas delil olarak kullanılır. İşletme,
+          halıyı teslim aldığı andan geri teslime kadar özenle korumakla
+          yükümlüdür; halının bu süreçte kaybolması, hasar görmesi veya değer
+          kaybetmesi hâlinde zararın kendi kusuru olmaksızın gerçekleştiğini{" "}
+          <strong>ispat yükü işletmededir</strong> (6098 sayılı Kanun md.112 ve
+          md.471). Ayıplı hizmetten doğan talepler, hizmetin ifasından itibaren{" "}
+          <strong>iki yıllık zamanaşımına</strong> tabidir; ayıbın işletmenin
+          ağır kusuru veya hilesiyle gizlenmesi hâlinde zamanaşımı süresi
+          işlemez (6502 sayılı Kanun md.16).
         </p>
       </Section>
 

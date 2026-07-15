@@ -12,7 +12,10 @@ const BADGE_META: Record<
   { label: string; Icon: (p: { size?: number }) => React.ReactNode }
 > = {
   VERIFIED: { label: "Doğrulanmış", Icon: (p) => <IconCheck {...p} /> },
-  INSURED: { label: "Sigortalı", Icon: (p) => <IconShield {...p} /> },
+  // Gerçek sigorta poliçesi olmadan "Sigortalı" yanıltıcı ticari uygulama sayılır
+  // (6502 md.61/62). Etiket, öncesi-sonrası fotoğraf + işletme sorumluluğu
+  // güvencesini dürüstçe yansıtır (bkz. Kullanım Koşulları §5/C).
+  INSURED: { label: "Fotoğraflı Güvence", Icon: (p) => <IconShield {...p} /> },
   FAST_DELIVERY: { label: "Hızlı Teslim", Icon: (p) => <IconBolt {...p} /> },
   TOP_RATED: { label: "Çok Tercih Edilen", Icon: (p) => <IconStar {...p} filled /> },
   // Ölçtüğü şey düşük red oranı (kabul güvenilirliği) — yanıt SÜRESİ değil.
