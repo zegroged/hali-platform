@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { hashPassword, createSession } from "@/lib/auth";
+import { hashPassword, createSession, signSession } from "@/lib/auth";
 import { rateLimit, clientIp, tooMany } from "@/lib/ratelimit";
 
 // Müşteri (üye) kaydı: yorum yapabilmek + puan biriktirmek için. Kayıt öncesi
@@ -102,5 +102,6 @@ export async function POST(req: NextRequest) {
   });
 
   await createSession(user.id);
-  return NextResponse.json({ ok: true });
+  // token: native müşteri uygulaması Bearer ile oturum açsın (web çerezi de set).
+  return NextResponse.json({ ok: true, token: signSession(user.id), name });
 }

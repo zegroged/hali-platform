@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { getSessionUser } from "@/lib/auth";
+import { getAuthedUser } from "@/lib/auth";
 import { sendSms, sendTrackingSms } from "@/lib/sms";
 import { createOrderWithCode } from "@/lib/ordercode";
 import { rateLimit, clientIp, tooMany } from "@/lib/ratelimit";
@@ -79,7 +79,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const session = await getSessionUser();
+  const session = await getAuthedUser(); // çerez VEYA Bearer (native app)
 
   // Otomatik atama: işi halıcının kendi şoförüne düşür (mesaideki öncelikli)
   const driver = await prisma.driver.findFirst({
