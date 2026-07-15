@@ -24,7 +24,9 @@ export default function App() {
       {route.name === "order" && (
         <OrderScreen nav={nav} id={route.id} businessName={route.businessName} />
       )}
-      {route.name === "track" && <TrackScreen nav={nav} code={route.code} />}
+      {route.name === "track" && (
+        <TrackScreen nav={nav} code={route.code} token={route.token} />
+      )}
     </SafeAreaProvider>
   );
 }

@@ -15,6 +15,7 @@ import {
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
 import { getBusiness, imageUrl, type BusinessDetail } from "../lib/api";
+import { whatsappHref } from "../lib/phone";
 import { C } from "../lib/theme";
 import type { Nav } from "../lib/nav";
 
@@ -92,10 +93,12 @@ const UNIT: Record<string, string> = {
   FLAT: "sabit",
 };
 
-// Rozet kodları → Türkçe etiket (web Badges.tsx ile aynı; ham enum basma).
+// Rozet kodları → Türkçe etiket (web src/components/Badges.tsx ile senkron).
+// INSURED "Sigortalı" DEĞİL: gerçek poliçe yok, "Sigortalı" 6502 md.61/62
+// yanıltıcı ticari uygulama sayılır → "Fotoğraflı Güvence" (Koşullar §5/C).
 const BADGE_LABEL: Record<string, string> = {
   VERIFIED: "✓ Doğrulanmış",
-  INSURED: "🛡 Sigortalı",
+  INSURED: "🛡 Fotoğraflı Güvence",
   FAST_DELIVERY: "⚡ Hızlı Teslim",
   TOP_RATED: "★ Çok Tercih Edilen",
   FAST_RESPONDER: "👍 Güvenilir",
@@ -162,8 +165,12 @@ export function ProfileScreen({ nav, id }: { nav: Nav; id: string }) {
         month: "long",
       })
     : null;
-  // WhatsApp: 05xx → 905xx (Türkiye'de müşteri aramak yerine yazmayı sever)
-  const waHref = `https://wa.me/${b.phone.replace(/\D/g, "").replace(/^0/, "90")}?text=${encodeURIComponent("Merhaba, halı yıkama hizmetiniz için yazıyorum.")}`;
+  // WhatsApp yalnız CEP numarasında (sabit hatta WhatsApp yok → buton gizlenir,
+  // kırık wa.me linki oluşmaz; web ile aynı kural).
+  const waHref = whatsappHref(
+    b.phone,
+    "Merhaba, halı yıkama hizmetiniz için yazıyorum.",
+  );
 
   return (
     <SafeAreaView style={s.screen} edges={["top"]}>
@@ -174,7 +181,10 @@ export function ProfileScreen({ nav, id }: { nav: Nav; id: string }) {
 
         <Text style={s.title}>{b.name}</Text>
         <Text style={s.sub}>
-          {b.district}, {b.city} · ★ {b.ratingAvg.toFixed(1)} ({b.ratingCount})
+          {b.district}, {b.city}
+          {b.ratingCount > 0
+            ? ` · ★ ${b.ratingAvg.toFixed(1)} (${b.ratingCount})`
+            : " · Yeni işletme · henüz yorum yok"}
         </Text>
 
         {paused && (
@@ -195,6 +205,27 @@ export function ProfileScreen({ nav, id }: { nav: Nav; id: string }) {
           </View>
         )}
 
+        {!!b.description && <Text style={s.desc}>{b.description}</Text>}
+
+        {/* İşletme Bilgileri — sipariş ÖNCESİ açık adres + tıklanır telefon
+            (Mesafeli Söz. Yön. md.5/1-c; VKN ETAHS md.5/2). */}
+        <View style={s.infoBox}>
+          <Text style={s.infoTitle}>İşletme Bilgileri</Text>
+          <Text style={s.infoRow}>📍 {b.address}</Text>
+          <TouchableOpacity
+            accessibilityRole="button"
+            onPress={() => Linking.openURL(`tel:${b.phone}`)}
+          >
+            <Text style={[s.infoRow, { color: C.brand }]}>📞 {b.phone}</Text>
+          </TouchableOpacity>
+          {!!b.taxNumber && (
+            <Text style={s.infoRow}>Vergi No: {b.taxNumber}</Text>
+          )}
+          <Text style={s.infoNote}>
+            İletişim bilgileri platform tarafından doğrulanmıştır.
+          </Text>
+        </View>
+
         {b.photos.length > 0 && (
           <View style={s.photoGrid}>
             {b.photos.map((p, i) => {
@@ -202,7 +233,11 @@ export function ProfileScreen({ nav, id }: { nav: Nav; id: string }) {
               return (
                 <View key={i} style={s.photo}>
                   {u && <Image source={{ uri: u }} style={s.photoImg} />}
-                  <Text style={s.photoTag}>{p.isBefore ? "Öncesi" : "Sonrası"}</Text>
+                  {(p.isBefore || p.isAfter) && (
+                    <Text style={s.photoTag}>
+                      {p.isBefore ? "Öncesi" : "Sonrası"}
+                    </Text>
+                  )}
                 </View>
               );
             })}
@@ -256,31 +291,43 @@ export function ProfileScreen({ nav, id }: { nav: Nav; id: string }) {
           );
         })}
 
-        {b.reviews.length > 0 && (
-          <>
-            <Text style={s.h2}>Yorumlar</Text>
-            {b.reviews.map((rv, i) => (
-              <View key={i} style={s.review}>
-                <Text style={s.reviewTop}>
-                  {rv.customerName} · {"★".repeat(rv.rating)}
-                </Text>
-                {rv.comment && <Text style={s.reviewText}>{rv.comment}</Text>}
-              </View>
-            ))}
-          </>
+        <View style={s.reviewHead}>
+          <Text style={s.h2}>Yorumlar</Text>
+          {!!b.googleProfileUrl && (
+            <TouchableOpacity
+              accessibilityRole="button"
+              onPress={() => Linking.openURL(b.googleProfileUrl!)}
+            >
+              <Text style={s.googleLink}>Google Yorumları →</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+        {b.reviews.length > 0 ? (
+          b.reviews.map((rv, i) => (
+            <View key={i} style={s.review}>
+              <Text style={s.reviewTop}>
+                {rv.customerName} · {"★".repeat(rv.rating)}
+              </Text>
+              {rv.comment && <Text style={s.reviewText}>{rv.comment}</Text>}
+            </View>
+          ))
+        ) : (
+          <Text style={s.reviewEmpty}>Henüz yorum yok — ilk yorumu sen bırak.</Text>
         )}
       </ScrollView>
 
       {/* Alt çubuk home-indicator'lı cihazlarda ezilmesin (safe-area) */}
       <View style={[s.cta, { paddingBottom: 14 + insets.bottom }]}>
         <View style={{ flexDirection: "row", gap: 10 }}>
-          <TouchableOpacity
-            style={s.waBtn}
-            onPress={() => Linking.openURL(waHref)}
-            accessibilityLabel="WhatsApp'tan yaz"
-          >
-            <Text style={s.waText}>💬</Text>
-          </TouchableOpacity>
+          {waHref && (
+            <TouchableOpacity
+              style={s.waBtn}
+              onPress={() => Linking.openURL(waHref)}
+              accessibilityLabel="WhatsApp'tan yaz"
+            >
+              <Text style={s.waText}>💬</Text>
+            </TouchableOpacity>
+          )}
           {paused ? (
             <View style={s.ctaPaused}>
               <Text style={s.ctaPausedText}>
@@ -309,6 +356,27 @@ const s = StyleSheet.create({
   backText: { color: C.brandDark, fontWeight: "600" },
   title: { fontSize: 24, fontWeight: "800", color: C.text },
   sub: { color: C.sub, marginTop: 2 },
+  desc: { color: C.text, marginTop: 10, lineHeight: 20 },
+  infoBox: {
+    marginTop: 12,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: C.card,
+    borderWidth: 1,
+    borderColor: C.border,
+    gap: 3,
+  },
+  infoTitle: { fontWeight: "700", color: C.text, marginBottom: 2 },
+  infoRow: { color: C.text, fontSize: 14 },
+  infoNote: { color: C.sub, fontSize: 12, marginTop: 4 },
+  reviewHead: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 20,
+  },
+  googleLink: { color: C.brandDark, fontWeight: "600", fontSize: 13 },
+  reviewEmpty: { color: C.sub, marginTop: 8 },
   badges: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 8 },
   badge: {
     backgroundColor: C.brandLight,

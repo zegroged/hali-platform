@@ -12,6 +12,7 @@ import {
   Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import * as Location from "expo-location";
 import { createOrder, ApiError, API_BASE } from "../lib/api";
 import { C } from "../lib/theme";
 import type { Nav } from "../lib/nav";
@@ -43,9 +44,36 @@ export function OrderScreen({
   // başlar, işaretlenmeden sipariş gönderilmez (sunucu da bunsuz reddeder).
   const [consent, setConsent] = useState(false);
   const [loading, setLoading] = useState(false);
+  // Konum: şoför navigasyonu için (native GPS en doğru). Opsiyonel.
+  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(
+    null,
+  );
+  const [locBusy, setLocBusy] = useState(false);
 
   function set<K extends keyof typeof form>(k: K, v: (typeof form)[K]) {
     setForm((f) => ({ ...f, [k]: v }));
+  }
+
+  async function captureLocation() {
+    setLocBusy(true);
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert(
+          "Konum izni yok",
+          "Konum eklenmeden de sipariş verebilirsin; adresi yazman yeterli. İzin verirsen şoför halını daha kolay bulur.",
+        );
+        return;
+      }
+      const pos = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.High,
+      });
+      setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+    } catch {
+      Alert.alert("Konum alınamadı", "Tekrar dene veya adresi yazarak devam et.");
+    } finally {
+      setLocBusy(false);
+    }
   }
 
   async function submit() {
@@ -90,13 +118,21 @@ export function OrderScreen({
         customerPhone: phone,
         customerEmail: email || undefined,
         pickupAddress: form.pickupAddress.trim(),
+        pickupLat: coords?.lat,
+        pickupLng: coords?.lng,
         approxM2: m2,
         note: form.note || undefined,
         paymentMethod: "CASH",
         consent: true,
       });
-      // replace: takipten "geri" boşalmış sipariş formuna değil profile dönsün
-      nav.replace({ name: "track", code: res.code ?? res.trackingToken });
+      // replace: takipten "geri" boşalmış sipariş formuna değil profile dönsün.
+      // token=UZUN takip token'ı (kesin-fiyat onayı/iptal bununla çalışır —
+      // kısa kod yetkisiz); code=ekranda gösterilecek kısa referans.
+      nav.replace({
+        name: "track",
+        token: res.trackingToken,
+        code: res.code ?? undefined,
+      });
     } catch (e) {
       // Sunucunun gerçek mesajı (tatil modu, şoför yok...) müşteriye gösterilir.
       Alert.alert(
@@ -157,6 +193,21 @@ export function OrderScreen({
           value={form.pickupAddress}
           onChangeText={(v) => set("pickupAddress", v)}
         />
+        {/* Konum: şoför halını tam noktada bulsun (opsiyonel). */}
+        <TouchableOpacity
+          style={[s.locBtn, coords && s.locBtnOn]}
+          onPress={captureLocation}
+          disabled={locBusy}
+          accessibilityRole="button"
+        >
+          <Text style={[s.locText, coords && s.locTextOn]}>
+            {locBusy
+              ? "Konum alınıyor…"
+              : coords
+                ? "📍 Konum eklendi ✓ (değiştirmek için tekrar dokun)"
+                : "📍 Konumumu ekle (şoför halını kolay bulsun)"}
+          </Text>
+        </TouchableOpacity>
         <TextInput
           style={s.input}
           placeholder="Yaklaşık m² (opsiyonel)"
@@ -182,23 +233,53 @@ export function OrderScreen({
           </Text>
         </View>
 
-        {/* md.7 teyidi — sunucu consentAt + sözleşme sürümünü kaydeder.
-            Linkler onay kutusundan AYRI dokunulabilir öğeler (ekran okuyucu
-            linke ayrıca odaklanabilsin). */}
+        {/* Ön bilgilendirme özeti (Mesafeli Söz. Yön. md.6/1-2) — zorunlu
+            asgari açıklamalar, sipariş ONAYINDAN ÖNCE. */}
+        <View style={s.infoSummary}>
+          <Text style={s.infoSummaryTitle}>Sipariş özeti — önemli bilgiler</Text>
+          <Text style={s.infoSummaryText}>
+            • Hizmet: halının adresten alınması, yıkanması ve adrese teslimi.{"\n"}
+            • Fiyat: profildeki birim fiyatlar tahminidir; kesin bedel halı
+            ölçüldükten sonra bildirilir ve onayına sunulur.{"\n"}
+            • Ödeme: ön ödeme yok; teslimde nakit alınır.{"\n"}
+            • Cayma: halı yıkanmadan her an ücretsiz iptal/iade; kesin fiyatı
+            onaylayıp yıkama başladıktan sonra cayma hakkı kullanılamaz
+            (md.15/1-h).{"\n"}
+            • Kusurlu hizmette 2 yıl içinde yasal haklarınız saklıdır.
+          </Text>
+        </View>
+
+        {/* md.7 teyidi — sunucu consentAt + sözleşme sürümünü kaydeder. */}
         <View style={s.legalLinks}>
           <TouchableOpacity
             accessibilityRole="link"
             onPress={() => Linking.openURL(`${API_BASE}/on-bilgilendirme`)}
           >
-            <Text style={s.link}>Ön bilgilendirme formu ↗</Text>
+            <Text style={s.link}>Ön bilgilendirme ↗</Text>
           </TouchableOpacity>
           <TouchableOpacity
             accessibilityRole="link"
             onPress={() => Linking.openURL(`${API_BASE}/mesafeli-satis`)}
           >
-            <Text style={s.link}>Mesafeli satış sözleşmesi ↗</Text>
+            <Text style={s.link}>Mesafeli satış ↗</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            accessibilityRole="link"
+            onPress={() => Linking.openURL(`${API_BASE}/iade`)}
+          >
+            <Text style={s.link}>İptal/İade ↗</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            accessibilityRole="link"
+            onPress={() => Linking.openURL(`${API_BASE}/kvkk`)}
+          >
+            <Text style={s.link}>KVKK Aydınlatma ↗</Text>
           </TouchableOpacity>
         </View>
+        <Text style={s.kvkkNote}>
+          Sipariş bilgilerin yalnız seçtiğin işletmeyle, hizmetin ifası için
+          paylaşılır (bkz. KVKK Aydınlatma Metni).
+        </Text>
         <TouchableOpacity
           style={s.consentRow}
           onPress={() => setConsent((c) => !c)}
@@ -247,6 +328,29 @@ const s = StyleSheet.create({
     backgroundColor: "#fff",
     marginTop: 10,
   },
+  locBtn: {
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: C.border,
+    borderRadius: 10,
+    paddingVertical: 11,
+    paddingHorizontal: 12,
+    backgroundColor: "#fff",
+  },
+  locBtnOn: { borderColor: C.brand, backgroundColor: C.brandLight },
+  locText: { color: C.sub, fontSize: 14 },
+  locTextOn: { color: C.brandDark, fontWeight: "600" },
+  infoSummary: {
+    marginTop: 16,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: C.slateBg,
+    borderWidth: 1,
+    borderColor: C.border,
+  },
+  infoSummaryTitle: { fontWeight: "700", color: C.text, marginBottom: 6 },
+  infoSummaryText: { color: C.text, fontSize: 15, lineHeight: 22 },
+  kvkkNote: { color: C.sub, fontSize: 12, marginTop: 6 },
   payBox: {
     marginTop: 16,
     backgroundColor: C.brandLight,

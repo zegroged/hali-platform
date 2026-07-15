@@ -2,12 +2,14 @@ import { useCallback, useEffect, useState } from "react";
 import {
   View,
   Text,
+  TextInput,
   Image,
   FlatList,
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
   Alert,
+  Keyboard,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
@@ -113,22 +115,37 @@ export function HomeScreen({ nav }: { nav: Nav }) {
   const [lastCoords, setLastCoords] = useState<
     { lat: number; lng: number } | undefined
   >(undefined);
+  const [query, setQuery] = useState("");
+  const [searchLabel, setSearchLabel] = useState<string | null>(null);
 
-  const load = useCallback(async (coords?: { lat: number; lng: number }) => {
-    setLoading(true);
-    setFailed(false);
-    try {
-      setAll(await getBusinesses(coords));
-    } catch {
-      setFailed(true);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const load = useCallback(
+    async (opts?: { coords?: { lat: number; lng: number }; query?: string }) => {
+      setLoading(true);
+      setFailed(false);
+      try {
+        setAll(
+          await getBusinesses({ coords: opts?.coords, query: opts?.query }),
+        );
+      } catch {
+        setFailed(true);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
     load();
   }, [load]);
+
+  function doSearch() {
+    const qq = query.trim();
+    Keyboard.dismiss();
+    setSearchLabel(qq || null);
+    setLocated(false); // arama sonuçları konumdan bağımsız
+    load(qq ? { query: qq } : undefined);
+  }
 
   async function useMyLocation() {
     setLocating(true);
@@ -145,7 +162,9 @@ export function HomeScreen({ nav }: { nav: Nav }) {
       const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
       setLocated(true);
       setLastCoords(coords);
-      load(coords);
+      setSearchLabel(null);
+      setQuery("");
+      load({ coords });
     } catch {
       Alert.alert(
         "Konum alınamadı",
@@ -177,6 +196,25 @@ export function HomeScreen({ nav }: { nav: Nav }) {
             <Text style={s.headerLink}>📦 Takip</Text>
           </TouchableOpacity>
         </View>
+        <View style={s.searchRow}>
+          <TextInput
+            style={s.searchInput}
+            placeholder="Şehir, ilçe veya işletme ara (örn. Konya)"
+            value={query}
+            onChangeText={setQuery}
+            autoCapitalize="none"
+            autoCorrect={false}
+            returnKeyType="search"
+            onSubmitEditing={doSearch}
+          />
+          <TouchableOpacity
+            style={s.searchBtn}
+            onPress={doSearch}
+            accessibilityRole="button"
+          >
+            <Text style={s.searchBtnText}>Ara</Text>
+          </TouchableOpacity>
+        </View>
         <TouchableOpacity
           style={[s.locBtn, locating && { opacity: 0.6 }]}
           onPress={useMyLocation}
@@ -198,15 +236,24 @@ export function HomeScreen({ nav }: { nav: Nav }) {
             <TouchableOpacity
               style={s.retryBtn}
               accessibilityRole="button"
-              onPress={() => load(lastCoords)}
+              onPress={() =>
+                load(
+                  searchLabel
+                    ? { query: searchLabel }
+                    : lastCoords
+                      ? { coords: lastCoords }
+                      : undefined,
+                )
+              }
             >
               <Text style={s.retryText}>Tekrar dene</Text>
             </TouchableOpacity>
           </View>
         ) : all.length === 0 ? (
           <Text style={s.empty}>
-            Bölgende henüz yayında halıcı yok — şehirler tek tek açılıyor, çok
-            yakında!
+            {searchLabel
+              ? `"${searchLabel}" için sonuç bulunamadı. Farklı bir şehir/ilçe dene ya da konumunu kullan.`
+              : "Bölgende henüz yayında halıcı yok — şehirler tek tek açılıyor, çok yakında!"}
           </Text>
         ) : (
           <FlatList
@@ -214,6 +261,14 @@ export function HomeScreen({ nav }: { nav: Nav }) {
             keyExtractor={() => "root"}
             renderItem={() => (
               <View style={{ paddingBottom: 32 }}>
+                {searchLabel && (
+                  <Row
+                    title={`🔎 "${searchLabel}" sonuçları (${all.length})`}
+                    items={all}
+                    cardWidth={r.cardWidth}
+                    nav={nav}
+                  />
+                )}
                 <Row title="📍 Sana en yakın" items={nearest} cardWidth={r.cardWidth} nav={nav} />
                 <Row title="⭐ En çok tercih edilenler" items={topRated} cardWidth={r.cardWidth} nav={nav} />
                 <Row title="⚡ Hızlı teslim" items={fastest} cardWidth={r.cardWidth} nav={nav} />
@@ -238,6 +293,29 @@ const s = StyleSheet.create({
   },
   brand: { fontWeight: "800", color: C.text },
   headerLink: { color: C.sub, fontSize: 14 },
+  searchRow: {
+    flexDirection: "row",
+    gap: 8,
+    paddingHorizontal: 16,
+    marginTop: 10,
+  },
+  searchInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: C.border,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 15,
+    backgroundColor: "#fff",
+  },
+  searchBtn: {
+    backgroundColor: C.brand,
+    borderRadius: 10,
+    paddingHorizontal: 18,
+    justifyContent: "center",
+  },
+  searchBtnText: { color: "#fff", fontWeight: "700" },
   locBtn: {
     marginHorizontal: 16,
     marginTop: 12,

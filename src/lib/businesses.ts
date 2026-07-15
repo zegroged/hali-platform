@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { haversineKm } from "@/lib/geo";
+import { publicTaxNumber } from "@/lib/taxId";
 import { activeSubscriptionWhere } from "@/lib/subscription";
 import { trNowParts } from "@/lib/time";
 import type { BadgeType, PricingUnit } from "@prisma/client";
@@ -7,6 +8,9 @@ import type { BadgeType, PricingUnit } from "@prisma/client";
 export type BusinessFilter = {
   city?: string;
   district?: string;
+  // Serbest metin araması (şehir VEYA ilçe VEYA işletme adı) — mobil tek arama
+  // kutusu için; city/district verilmediğinde kullanılır.
+  q?: string;
   lat?: number;
   lng?: number;
   maxPrice?: number;
@@ -167,6 +171,16 @@ export async function getBusinesses(
           some: { city: { equals: filter.city, mode: "insensitive" } },
         },
       },
+    ];
+  } else if (filter.q) {
+    // Serbest metin (mobil tek kutu): il VEYA ilçe (tam, harf-duyarsız) ya da
+    // işletme adı (içerir). Kullanıcı "Konya" ya da "Kadıköy" ya da isim yazabilir.
+    const eq = { equals: filter.q, mode: "insensitive" as const };
+    where.OR = [
+      { city: eq },
+      { district: eq },
+      { name: { contains: filter.q, mode: "insensitive" } },
+      { serviceAreas: { some: { OR: [{ city: eq }, { district: eq }] } } },
     ];
   }
 
@@ -374,6 +388,9 @@ export async function getBusinessById(id: string) {
     city: b.city,
     district: b.district,
     phone: b.phone,
+    // Müşteriye YALNIZ 10 haneli VKN (tüzel kişi) gösterilir; 11 haneli TCKN
+    // kişisel veridir (KVKK) → publicTaxNumber null'lar.
+    taxNumber: publicTaxNumber(b.taxNumber),
     // Tatil modu: geçerli bir duraklatma varsa profil sipariş butonunu kapatır.
     pausedUntil:
       b.pausedUntil && b.pausedUntil > new Date() ? b.pausedUntil : null,

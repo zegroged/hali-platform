@@ -38,11 +38,22 @@ const CANCELABLE = ["CREATED", "ACCEPTED"];
 // Nihai durumlarda polling durur (web FINAL_STATUSES ile aynı).
 const FINAL = ["DELIVERED", "REJECTED", "CANCELED"];
 
-export function TrackScreen({ nav, code }: { nav: Nav; code?: string }) {
+export function TrackScreen({
+  nav,
+  code,
+  token,
+}: {
+  nav: Nav;
+  code?: string;
+  token?: string;
+}) {
   // Kod BÜYÜK harfe çevrilmez: takip linkindeki token küçük harfli cuid'dir,
   // sunucu code'u zaten kendisi uppercase'ler.
   const [input, setInput] = useState(code ?? "");
   const [activeCode, setActiveCode] = useState(code?.trim() ?? "");
+  // API ANAHTARI: sipariş sonrası UZUN token verilir (kesin-fiyat onayı/iptal
+  // bununla çalışır); yoksa elle girilen kısa kod (yalnız salt-okunur takip).
+  const apiKey = token ?? activeCode;
   const [data, setData] = useState<Tracking | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -78,21 +89,21 @@ export function TrackScreen({ nav, code }: { nav: Nav; code?: string }) {
   }, []);
 
   useEffect(() => {
-    if (!activeCode) return;
-    load(activeCode);
-    pollRef.current = setInterval(() => load(activeCode), 6000);
+    if (!apiKey) return;
+    load(apiKey);
+    pollRef.current = setInterval(() => load(apiKey), 6000);
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
       pollRef.current = null;
     };
-  }, [activeCode, load]);
+  }, [apiKey, load]);
 
   async function onApprovePrice() {
     setBusy(true);
     busyRef.current = true;
     let okMsg: string | null = null;
     try {
-      await approvePrice(activeCode);
+      await approvePrice(apiKey);
       okMsg = "Fiyat onayın işletmeye iletildi — yıkama başlıyor.";
     } catch (e) {
       Alert.alert(
@@ -107,7 +118,7 @@ export function TrackScreen({ nav, code }: { nav: Nav; code?: string }) {
     // "onaylanamadı" uyarısına dönüşmesin.
     if (okMsg) {
       Alert.alert("Onaylandı", okMsg);
-      load(activeCode);
+      load(apiKey);
     }
   }
 
@@ -117,7 +128,7 @@ export function TrackScreen({ nav, code }: { nav: Nav; code?: string }) {
     busyRef.current = true;
     let ok = false;
     try {
-      await cancelOrder(activeCode, cancelReason, cancelNote || undefined);
+      await cancelOrder(apiKey, cancelReason, cancelNote || undefined);
       ok = true;
     } catch (e) {
       Alert.alert(
@@ -134,7 +145,7 @@ export function TrackScreen({ nav, code }: { nav: Nav; code?: string }) {
         "İptal edildi",
         "Cayma bildirimin işletmeye iletildi. Ücret talep edilmez.",
       );
-      load(activeCode);
+      load(apiKey);
     }
   }
 
@@ -143,14 +154,22 @@ export function TrackScreen({ nav, code }: { nav: Nav; code?: string }) {
   const canceled = data?.status === "CANCELED";
   // md.15/1-h: kesin fiyat bildirildi, DİJİTAL onay bekleniyor — yalnız
   // PICKED_UP'ta (sunucu başka durumda onayı reddeder; web ile aynı kapı).
-  const needsPriceApproval =
+  // Kesin-fiyat onayı ve iptal yalnız TAM ERİŞİMLE (uzun token) yapılabilir.
+  // Elle kısa kod girildiyse fullAccess=false → butonlar gizlenir, net not çıkar
+  // (web'deki fullAccess kapısıyla birebir; kısa kodla 403 hatası yerine).
+  const fullAccess = data?.fullAccess !== false; // undefined (eski) → izin
+  const pricePending =
     !!data &&
     data.status === "PICKED_UP" &&
     data.quotedPrice != null &&
     data.priceApprovedAt == null;
+  const needsPriceApproval = pricePending && fullAccess;
   const priceApproved =
     !!data && data.quotedPrice != null && data.priceApprovedAt != null;
-  const canCancel = !!data && CANCELABLE.includes(data.status);
+  const cancelable = !!data && CANCELABLE.includes(data.status);
+  const canCancel = cancelable && fullAccess;
+  // Aksiyon mümkün AMA tam erişim yok (elle kısa kod ile bakılıyor).
+  const actionNeedsToken = (pricePending || cancelable) && !fullAccess;
   const alternatives = data?.alternatives ?? [];
 
   return (
@@ -240,6 +259,22 @@ export function TrackScreen({ nav, code }: { nav: Nav; code?: string }) {
                   </View>
                 );
               })
+            )}
+
+            {/* Elle kısa kodla bakılıyor → onay/iptal için tam erişim gerekli */}
+            {actionNeedsToken && (
+              <View style={s.warnBox}>
+                <Text style={s.warnTitle}>
+                  {pricePending
+                    ? "Kesin fiyat onayı bekliyor"
+                    : "Bu siparişi iptal edebilirsin"}
+                </Text>
+                <Text style={s.warnText}>
+                  Fiyat onayı ve iptal için siparişi <Text style={{ fontWeight: "700" }}>verdiğin
+                  cihazdaki takip ekranından</Text> devam et. Güvenlik için kısa
+                  takip koduyla bu işlemler yapılamaz.
+                </Text>
+              </View>
             )}
 
             {/* md.15/1-h: KESİN FİYAT ONAYI — yıkama ancak onayla başlar */}
@@ -344,7 +379,8 @@ export function TrackScreen({ nav, code }: { nav: Nav; code?: string }) {
             {data.priceTotal != null && (
               <View style={s.priceBox}>
                 <Text style={s.priceText}>
-                  Tutar: {data.priceTotal} TL · Kapıda nakit
+                  Tutar: {data.priceTotal} TL ·{" "}
+                  {data.paymentMethod === "CARD" ? "Kartla ödeme" : "Kapıda nakit"}
                 </Text>
               </View>
             )}

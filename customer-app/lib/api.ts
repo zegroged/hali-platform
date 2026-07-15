@@ -66,6 +66,8 @@ export type BusinessDetail = {
   city: string;
   district: string;
   phone: string;
+  // Yalnız 10 haneli VKN (tüzel kişi); TCKN sunucuda null'lanır (sızmasın).
+  taxNumber?: string | null;
   workingHours: Record<string, { open: string; close: string } | null> | null;
   deliveryMinDays: number | null;
   deliveryMaxDays: number | null;
@@ -82,6 +84,10 @@ export type BusinessDetail = {
 
 export type Tracking = {
   status: string;
+  // Kesin-fiyat onayı ve iptal yalnız UZUN takip token'ıyla (veya giriş yapmış
+  // sahip) yapılabilir; kısa kodla açılınca false → o butonlar gizlenir (web
+  // ile aynı kapı). Sunucu /api/orders/[token] yanıtında döndürür.
+  fullAccess?: boolean;
   rejectReason: string | null;
   createdAt: string;
   customerName: string;
@@ -107,16 +113,21 @@ export type Tracking = {
   }[];
 };
 
-export async function getBusinesses(coords?: {
-  lat: number;
-  lng: number;
+export async function getBusinesses(opts?: {
+  coords?: { lat: number; lng: number };
+  /** Serbest metin: şehir/ilçe/işletme adı araması. */
+  query?: string;
 }): Promise<Business[]> {
+  const p = new URLSearchParams();
   // Koordinat ~110 m'ye yuvarlanır: sıralama için fazlası gereksiz, kesin
   // konum URL/erişim loglarında kalıcılaşmasın (gizlilik beyanıyla tutarlı).
-  const q = coords
-    ? `?lat=${coords.lat.toFixed(3)}&lng=${coords.lng.toFixed(3)}`
-    : "";
-  const res = await fetch(`${API_BASE}/api/businesses${q}`);
+  if (opts?.coords) {
+    p.set("lat", opts.coords.lat.toFixed(3));
+    p.set("lng", opts.coords.lng.toFixed(3));
+  }
+  if (opts?.query?.trim()) p.set("q", opts.query.trim());
+  const qs = p.toString();
+  const res = await fetch(`${API_BASE}/api/businesses${qs ? "?" + qs : ""}`);
   if (!res.ok) throw new ApiError("Liste alınamadı.", res.status);
   return (await res.json()).businesses ?? [];
 }
@@ -134,6 +145,10 @@ export type OrderBody = {
   /** Opsiyonel — girilirse takip linki e-postayla da gider. */
   customerEmail?: string;
   pickupAddress: string;
+  // Konum: şoför navigasyonu + hizmet-bölgesi kontrolü için (native GPS en
+  // doğru kaynak). Opsiyonel — kullanıcı izin vermezse sipariş yine oluşur.
+  pickupLat?: number;
+  pickupLng?: number;
   approxM2?: number;
   note?: string;
   paymentMethod: "CASH" | "CARD";

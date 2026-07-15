@@ -30,6 +30,7 @@ export async function GET(req: NextRequest) {
   const businesses = await getBusinesses({
     city: sp.get("city") ?? undefined,
     district: sp.get("district") ?? undefined,
+    q: sp.get("q")?.trim() || undefined,
     // lat/lng yalnız İKİSİ de geçerliyse kullanılır (yarım koordinat mesafeyi bozar)
     lat: lat != null && lng != null ? lat : undefined,
     lng: lat != null && lng != null ? lng : undefined,
