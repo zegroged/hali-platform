@@ -8,6 +8,7 @@ import { getAuthedUser } from "@/lib/auth";
 import { saveOrderPhotoFile } from "@/lib/orderPhoto";
 import { sendSms, trackingLink } from "@/lib/sms";
 import { DRIVER_NEXT, ORDER_STATUS_META } from "@/lib/orderStatus";
+import { getAppBaseUrl } from "@/lib/config";
 
 /** Bearer (native) VEYA çerez ile giriş yapmış ŞOFÖRÜN driver.id'si; yoksa null. */
 export async function currentDriverId(): Promise<string | null> {
@@ -101,7 +102,7 @@ export async function driverReject(
   try {
     await sendSms(
       o.customerPhone,
-      `Talebiniz maalesef karsilanamadi. Sebep: ${reason}. Baska halici secebilirsiniz.`,
+      `Talebiniz maalesef karsilanamadi. Sebep: ${reason}. Baska halici secebilirsiniz: ${getAppBaseUrl()}/halicilar`,
     );
   } catch {
     /* SMS hatası akışı bozmaz */

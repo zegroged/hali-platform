@@ -92,13 +92,17 @@ export function Orders({ onSessionExpired }: { onSessionExpired: () => void }) {
   }
 
   function confirmReject(o: DriverOrder) {
-    Alert.alert("Siparişi reddet", "Bu talebi reddetmek istediğine emin misin?", [
-      { text: "Vazgeç", style: "cancel" },
+    Alert.alert("Siparişi reddet — sebep?", "Müşteriye bu sebep iletilir.", [
       {
-        text: "Reddet",
-        style: "destructive",
-        onPress: () => run(o.id, () => rejectOrder(o.id, "Uygun değil")),
+        text: "Yoğunluk / kapasite",
+        onPress: () =>
+          run(o.id, () => rejectOrder(o.id, "Yoğunluk / kapasite dolu")),
       },
+      {
+        text: "Hizmet bölgesi dışı",
+        onPress: () => run(o.id, () => rejectOrder(o.id, "Hizmet bölgesi dışı")),
+      },
+      { text: "Vazgeç", style: "cancel" },
     ]);
   }
 
