@@ -16,6 +16,7 @@ import {
   getTracking,
   approvePrice,
   cancelOrder,
+  submitReview,
   imageUrl,
   ApiError,
   CANCEL_REASONS,
@@ -60,6 +61,10 @@ export function TrackScreen({
   const [showCancel, setShowCancel] = useState(false);
   const [cancelReason, setCancelReason] = useState<string | null>(null);
   const [cancelNote, setCancelNote] = useState("");
+  // Değerlendirme (teslim sonrası)
+  const [reviewRating, setReviewRating] = useState(0);
+  const [reviewComment, setReviewComment] = useState("");
+  const [reviewBusy, setReviewBusy] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const busyRef = useRef(false);
 
@@ -145,6 +150,32 @@ export function TrackScreen({
         "İptal edildi",
         "Cayma bildirimin işletmeye iletildi. Ücret talep edilmez.",
       );
+      load(apiKey);
+    }
+  }
+
+  async function onSubmitReview() {
+    if (reviewRating < 1) {
+      Alert.alert("Puan gerekli", "Lütfen 1-5 arası bir yıldız seç.");
+      return;
+    }
+    setReviewBusy(true);
+    busyRef.current = true;
+    let ok = false;
+    try {
+      await submitReview(apiKey, reviewRating, reviewComment.trim() || undefined);
+      ok = true;
+    } catch (e) {
+      Alert.alert(
+        "Gönderilemedi",
+        e instanceof ApiError ? e.message : "Bağlantı hatası — tekrar dene.",
+      );
+    } finally {
+      setReviewBusy(false);
+      busyRef.current = false;
+    }
+    if (ok) {
+      Alert.alert("Teşekkürler", "Değerlendirmen kaydedildi.");
       load(apiKey);
     }
   }
@@ -307,6 +338,66 @@ export function TrackScreen({
                 <Text style={s.approvedLineText}>
                   ✓ Kesin fiyatı onayladın: {data.quotedPrice} TL
                 </Text>
+              </View>
+            )}
+
+            {/* DEĞERLENDİRME — teslim edildiyse (web TrackingClient ile aynı) */}
+            {data.status === "DELIVERED" && (
+              <View style={s.reviewBox}>
+                {data.review ? (
+                  <Text style={s.reviewDone}>
+                    ⭐ Değerlendirdin: {"★".repeat(data.review.rating)} — teşekkürler!
+                  </Text>
+                ) : data.viewerIsCustomer ? (
+                  <>
+                    <Text style={s.reviewTitle}>Hizmeti değerlendir</Text>
+                    <View style={s.stars}>
+                      {[1, 2, 3, 4, 5].map((n) => (
+                        <TouchableOpacity
+                          key={n}
+                          onPress={() => setReviewRating(n)}
+                          accessibilityRole="button"
+                          accessibilityLabel={`${n} yıldız`}
+                        >
+                          <Text style={s.star}>
+                            {n <= reviewRating ? "★" : "☆"}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                    <TextInput
+                      style={s.reviewInput}
+                      placeholder="Yorumun (opsiyonel)"
+                      multiline
+                      maxLength={500}
+                      value={reviewComment}
+                      onChangeText={setReviewComment}
+                    />
+                    <TouchableOpacity
+                      style={[s.approveBtn, reviewBusy && { opacity: 0.6 }]}
+                      onPress={onSubmitReview}
+                      disabled={reviewBusy}
+                    >
+                      <Text style={s.approveText}>
+                        {reviewBusy ? "Gönderiliyor…" : "Değerlendirmeyi Gönder"}
+                      </Text>
+                    </TouchableOpacity>
+                  </>
+                ) : (
+                  <>
+                    <Text style={s.reviewTitle}>Hizmeti değerlendirmek ister misin?</Text>
+                    <Text style={s.reviewHint}>
+                      Değerlendirme yapmak için üye girişi gerekir (siparişi veren
+                      hesapla).
+                    </Text>
+                    <TouchableOpacity
+                      style={s.approveBtn}
+                      onPress={() => nav.go({ name: "auth" })}
+                    >
+                      <Text style={s.approveText}>Giriş Yap / Üye Ol</Text>
+                    </TouchableOpacity>
+                  </>
+                )}
               </View>
             )}
 
@@ -561,6 +652,30 @@ const s = StyleSheet.create({
     marginTop: 12,
   },
   approveText: { color: "#fff", fontWeight: "700" },
+  reviewBox: {
+    marginTop: 16,
+    padding: 14,
+    borderRadius: 12,
+    backgroundColor: C.card,
+    borderWidth: 1,
+    borderColor: C.border,
+  },
+  reviewTitle: { fontWeight: "700", color: C.text, fontSize: 15 },
+  reviewHint: { color: C.sub, fontSize: 13, marginTop: 4 },
+  reviewDone: { color: C.green, fontWeight: "600", fontSize: 15 },
+  stars: { flexDirection: "row", gap: 6, marginTop: 8, marginBottom: 4 },
+  star: { fontSize: 32, color: C.amber },
+  reviewInput: {
+    borderWidth: 1,
+    borderColor: C.border,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 15,
+    backgroundColor: "#fff",
+    marginTop: 8,
+    height: 64,
+  },
   approvedLine: {
     marginTop: 12,
     backgroundColor: "#ecfdf5",

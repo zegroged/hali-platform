@@ -1,3 +1,5 @@
+import { authHeader, saveSession } from "./auth";
+
 // Backend adresi ORTAMDAN gelir (sabit IP gömme — mağaza derlemesinde kırılır).
 // Üretim derlemesi EAS profilinden `EXPO_PUBLIC_API_BASE=https://...` alır
 // (eas.json); dev için kabuk: EXPO_PUBLIC_API_BASE=http://192.168.0.11:3000
@@ -102,6 +104,10 @@ export type Tracking = {
   priceApprovedAt: string | null;
   estimatedDays: number | null;
   photos: { id: string; url: string }[];
+  // Teslim sonrası değerlendirme: yorumlandıysa yıldızı, yoksa (üye+sahipse)
+  // yorum formunu göster (web TrackingClient ile aynı).
+  review: { rating: number } | null;
+  viewerIsCustomer?: boolean;
   // SLA/kurtarma: 24 saattir yanıtsız mı + aynı şehirden alternatif halıcılar
   waitingLong?: boolean;
   alternatives?: {
@@ -162,7 +168,9 @@ export async function createOrder(
 ): Promise<{ trackingToken: string; code: string | null }> {
   const res = await fetch(`${API_BASE}/api/orders`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    // Giriş yapılmışsa Bearer gönder → sipariş customerId alır, sonradan
+    // değerlendirilebilir. Misafirse başlık boş, sipariş yine oluşur.
+    headers: { "Content-Type": "application/json", ...(await authHeader()) },
     body: JSON.stringify(body),
   });
   if (!res.ok) {
@@ -182,6 +190,9 @@ export async function getTracking(
 ): Promise<Tracking | null> {
   const res = await fetch(
     `${API_BASE}/api/orders/${encodeURIComponent(codeOrToken)}`,
+    // Giriş varsa Bearer → sunucu viewerIsCustomer + sahip fullAccess'i döndürür
+    // (kısa kodla bile sahip onay/iptal/yorum yapabilsin).
+    { headers: { ...(await authHeader()) } },
   );
   if (res.status === 404) return null;
   if (!res.ok) throw await readError(res, "Takip bilgisi alınamadı.");
@@ -226,4 +237,74 @@ export async function cancelOrder(
 export function imageUrl(path: string | null): string | null {
   if (!path) return null;
   return path.startsWith("http") ? path : API_BASE + path;
+}
+
+// ————————————————————— Üyelik + Değerlendirme —————————————————————
+
+/** E-posta + şifre ile giriş; başarıda token SecureStore'a yazılır. */
+export async function customerLogin(
+  email: string,
+  password: string,
+): Promise<{ name: string }> {
+  const res = await fetch(`${API_BASE}/api/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ identifier: email, password }),
+  });
+  if (!res.ok) throw await readError(res, "Giriş başarısız.");
+  const d = (await res.json()) as {
+    token?: string;
+    name?: string;
+    role?: string;
+  };
+  if (!d.token) throw new ApiError("Oturum açılamadı.", 500);
+  await saveSession(d.token, d.name ?? "");
+  return { name: d.name ?? "" };
+}
+
+/** Kayıt için e-postaya 6 haneli doğrulama kodu gönder. */
+export async function requestRegisterCode(email: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/auth/register/request-code`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  });
+  if (!res.ok) throw await readError(res, "Kod gönderilemedi.");
+}
+
+/** Kayıt (kod doğrulaması ile); başarıda token SecureStore'a yazılır. */
+export async function customerRegister(input: {
+  name: string;
+  email: string;
+  phone: string;
+  password: string;
+  emailCode: string;
+}): Promise<{ name: string }> {
+  const res = await fetch(`${API_BASE}/api/auth/customer-register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) throw await readError(res, "Kayıt tamamlanamadı.");
+  const d = (await res.json()) as { token?: string; name?: string };
+  if (!d.token) throw new ApiError("Oturum açılamadı.", 500);
+  await saveSession(d.token, d.name ?? input.name);
+  return { name: d.name ?? input.name };
+}
+
+/** Teslim edilen siparişe yıldız + yorum (yalnız giriş yapmış SAHİP müşteri). */
+export async function submitReview(
+  codeOrToken: string,
+  rating: number,
+  comment?: string,
+): Promise<void> {
+  const res = await fetch(
+    `${API_BASE}/api/orders/${encodeURIComponent(codeOrToken)}/review`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...(await authHeader()) },
+      body: JSON.stringify({ rating, comment }),
+    },
+  );
+  if (!res.ok) throw await readError(res, "Değerlendirme gönderilemedi.");
 }

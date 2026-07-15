@@ -4,7 +4,9 @@ export type Route =
   | { name: "order"; id: string; businessName: string }
   // code = ekranda gösterilen kısa referans; token = API için UZUN takip token'ı
   // (kesin-fiyat onayı/iptal bununla çalışır — kısa kod yetkisiz).
-  | { name: "track"; code?: string; token?: string };
+  | { name: "track"; code?: string; token?: string }
+  // Giriş / kayıt (değerlendirme + sipariş geçmişi için üyelik).
+  | { name: "auth" };
 
 export type Nav = {
   go: (r: Route) => void;

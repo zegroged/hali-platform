@@ -105,7 +105,13 @@ function Row({
   );
 }
 
-export function HomeScreen({ nav }: { nav: Nav }) {
+export function HomeScreen({
+  nav,
+  authName,
+}: {
+  nav: Nav;
+  authName?: string | null;
+}) {
   const r = useResponsive();
   const [all, setAll] = useState<Business[]>([]);
   const [loading, setLoading] = useState(true);
@@ -192,9 +198,16 @@ export function HomeScreen({ nav }: { nav: Nav }) {
       <View style={{ width: "100%", maxWidth: r.contentMaxWidth, alignSelf: "center", flex: 1 }}>
         <View style={s.headerRow}>
           <Text style={[s.brand, { fontSize: r.scale(22) }]}>🧼 Halını Aldır</Text>
-          <TouchableOpacity onPress={() => nav.go({ name: "track" })}>
-            <Text style={s.headerLink}>📦 Takip</Text>
-          </TouchableOpacity>
+          <View style={{ flexDirection: "row", gap: 14, alignItems: "center" }}>
+            <TouchableOpacity onPress={() => nav.go({ name: "track" })}>
+              <Text style={s.headerLink}>📦 Takip</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => nav.go({ name: "auth" })}>
+              <Text style={s.headerLink}>
+                {authName ? `👤 ${authName.split(" ")[0]}` : "Giriş"}
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
         <View style={s.searchRow}>
           <TextInput
