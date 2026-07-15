@@ -169,7 +169,9 @@ export default async function SoforPage() {
                     htmlFor={`foto-alim-${o.id}`}
                     className="block text-xs font-medium text-slate-600"
                   >
-                    Halının fotoğrafını çek veya seç (opsiyonel)
+                    Halının fotoğrafını çek veya seç{" "}
+                    <span className="text-red-600">(zorunlu — hasar/kayıp
+                    kanıtı)</span>
                   </label>
                   {/* capture="environment" KULLANMA: doğrudan kamerayı zorlayıp
                       "dosya seç"i kilitliyordu (izin yoksa hiç açılmıyor).
@@ -181,6 +183,7 @@ export default async function SoforPage() {
                     name="photo"
                     type="file"
                     accept="image/jpeg,image/png,image/webp"
+                    required
                     className="mt-1 w-full text-sm text-slate-600 file:mr-2 file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-sm"
                   />
                   <PendingButton className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-brand py-2 text-sm font-semibold text-white hover:bg-brand-dark">
@@ -227,14 +230,16 @@ export default async function SoforPage() {
                     htmlFor={`foto-teslim-${o.id}`}
                     className="block text-xs font-medium text-slate-600"
                   >
-                    Teslim ettiğin halının fotoğrafını çek veya seç (kanıt —
-                    patron ve müşteri görür)
+                    Teslim ettiğin halının fotoğrafını çek veya seç{" "}
+                    <span className="text-red-600">(zorunlu — teslim + hasar
+                    kanıtı)</span>
                   </label>
                   <input
                     id={`foto-teslim-${o.id}`}
                     name="photo"
                     type="file"
                     accept="image/jpeg,image/png,image/webp"
+                    required
                     className="mt-1 w-full text-sm text-slate-600 file:mr-2 file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-sm"
                   />
                   <p className="text-xs text-slate-500">

@@ -79,12 +79,19 @@ export async function savePickup(formData: FormData) {
   });
   if (!o) return;
 
-  // Gerçek dosya yüklemesi (kamera/galeri) — geçersizse null, akış bloklanmaz.
+  // ALIM (öncesi) FOTOĞRAFI ZORUNLU: halının işletmeye teslim edildiği andaki
+  // durumunun kanıtı — hasar/kayıp uyuşmazlığında "Fotoğraflı Güvence"nin
+  // temeli. Arayüz required; sunucuda da zorunlu (arayüz atlatılabilir).
   const photoUrl = await saveOrderPhotoFile(
     formData.get("photo"),
     o.businessId,
     o.id,
   );
+  if (!photoUrl) {
+    throw new Error(
+      "Halının fotoğrafını çekmen zorunlu (hasar/kayıp kanıtı). Fotoğraf ekleyip tekrar dene.",
+    );
+  }
 
   // CAS (denetim bulgusu): koşulsuz yazım, eşzamanlı panel iptali/reddini
   // (ACCEPTED→CANCELED/REJECTED) ezip siparişi PICKED_UP'a diriltiyordu.
@@ -176,6 +183,21 @@ export async function deliverOrder(formData: FormData) {
   });
   if (!o) return;
 
+  // TESLİM (sonrası) FOTOĞRAFI ZORUNLU: teslim kanıtı + halının iade anındaki
+  // durumu. CAS'ten ÖNCE al ki foto yoksa sipariş DELIVERED işaretlenip para
+  // kaydı açılmasın (yoksa foto-suz "teslim edildi" kalırdı). Arayüz required;
+  // sunucuda da zorunlu.
+  const deliveryPhotoUrl = await saveOrderPhotoFile(
+    formData.get("photo"),
+    o.businessId,
+    id,
+  );
+  if (!deliveryPhotoUrl) {
+    throw new Error(
+      "Teslim fotoğrafını çekmen zorunlu (teslim + hasar kanıtı). Fotoğraf ekleyip tekrar dene.",
+    );
+  }
+
   const isCash = o.paymentMethod === "CASH";
   // Nakitte teslimde tahsil edilir; kartta ödeme iyzico callback'ine bırakılır.
   const paymentStatus = isCash ? "PAID" : o.paymentStatus;
@@ -186,6 +208,7 @@ export async function deliverOrder(formData: FormData) {
     data: {
       status: "DELIVERED",
       priceTotal: price,
+      deliveryPhotoUrl,
       // Komisyon yalnız tahsilat gerçekleşince yazılır: nakit→şimdi (0),
       // kart→callback'te PAID ile birlikte (B6, çift-yazım yok).
       commission: isCash ? 0 : undefined,
@@ -193,19 +216,6 @@ export async function deliverOrder(formData: FormData) {
     },
   });
   if (updated.count === 0) return; // başka istek önce teslim etti
-
-  // Teslim kanıtı fotoğrafı: patron Özet'te görür, müşteri takipte görür.
-  const deliveryPhotoUrl = await saveOrderPhotoFile(
-    formData.get("photo"),
-    o.businessId,
-    id,
-  );
-  if (deliveryPhotoUrl) {
-    await prisma.order.update({
-      where: { id },
-      data: { deliveryPhotoUrl },
-    });
-  }
 
   const note =
     o.paymentMethod === "CASH"
