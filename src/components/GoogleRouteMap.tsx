@@ -28,6 +28,16 @@ function pinUrl(color: string) {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28"><circle cx="14" cy="14" r="9" fill="${color}" stroke="#ffffff" stroke-width="3"/></svg>`;
   return "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(svg);
 }
+// ÇAPA ŞART: Google özel ikonda varsayılan çapa görselin ALT-ORTASI'dır —
+// dairenin merkezi koordinatın 14 px kuzeyine düşer, nokta çizgiden "kayar".
+// Daire ikonun çapası merkezi (14,14) olmalı.
+const iconCache: Record<string, google.maps.Icon> = {};
+function pinIcon(color: string): google.maps.Icon {
+  return (iconCache[color] ??= {
+    url: pinUrl(color),
+    anchor: new google.maps.Point(14, 14),
+  });
+}
 function lerp(a: number, b: number, t: number) {
   return a + (b - a) * t;
 }
@@ -76,7 +86,7 @@ export default function GoogleRouteMap({
     markerRef.current = new google.maps.Marker({
       position: posAt(points, 0),
       map: m,
-      icon: pinUrl("#0d9488"),
+      icon: pinIcon("#0d9488"),
       zIndex: 1000,
     });
   }
@@ -171,7 +181,7 @@ export default function GoogleRouteMap({
         <MarkerF
           key={i}
           position={{ lat: s.lat, lng: s.lng }}
-          icon={pinUrl("#dc2626")}
+          icon={pinIcon("#dc2626")}
           title={`${s.durationMin} dk durdu`}
         />
       ))}

@@ -22,6 +22,16 @@ function pinUrl(color: string) {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28"><circle cx="14" cy="14" r="9" fill="${color}" stroke="#ffffff" stroke-width="3"/></svg>`;
   return "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(svg);
 }
+// ÇAPA ŞART: Google özel ikonda varsayılan çapa görselin ALT-ORTASI'dır —
+// dairenin merkezi koordinatın 14 px kuzeyine düşer (rota/iz çizgisinden
+// "kaymış" görünürdü). Daire ikonun çapası merkezi (14,14) olmalı.
+const iconCache: Record<string, google.maps.Icon> = {};
+function pinIcon(color: string): google.maps.Icon {
+  return (iconCache[color] ??= {
+    url: pinUrl(color),
+    anchor: new google.maps.Point(14, 14),
+  });
+}
 
 export default function GoogleMapView({
   markers,
@@ -107,7 +117,7 @@ export default function GoogleMapView({
           key={i}
           position={{ lat: m.lat, lng: m.lng }}
           title={m.label}
-          icon={pinUrl(COLORS[m.kind ?? "shop"] ?? "#0d9488")}
+          icon={pinIcon(COLORS[m.kind ?? "shop"] ?? "#0d9488")}
           onClick={
             m.href
               ? () => {
