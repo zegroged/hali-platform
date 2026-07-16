@@ -68,11 +68,23 @@ export default function GoogleMapView({
       ? { lat: markers[0].lat, lng: markers[0].lng }
       : { lat: 41.0082, lng: 28.9784 });
 
+  // Birden çok işaret varsa haritayı hepsini kapsayacak şekilde aç (arama
+  // sonuçları şehir geneline yayılıyor; sabit zoom 14 çoğunu ekran dışında
+  // bırakıyordu). Canlı takipte (follow) sabit zoom kalır; yalnız ilk
+  // yüklemede çalışır ki kullanıcının pan/zoom'u yoklamalarda ezilmesin.
+  const fitOnLoad = (map: google.maps.Map) => {
+    if (follow || markers.length < 2) return;
+    const bounds = new google.maps.LatLngBounds();
+    markers.forEach((m) => bounds.extend({ lat: m.lat, lng: m.lng }));
+    map.fitBounds(bounds, 48);
+  };
+
   return (
     <GoogleMap
       mapContainerStyle={{ width: "100%", height, borderRadius: 12 }}
       center={center}
       zoom={14}
+      onLoad={fitOnLoad}
       options={{
         streetViewControl: false,
         mapTypeControl: false,

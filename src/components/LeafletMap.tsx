@@ -46,6 +46,21 @@ function Recenter({ lat, lng }: { lat: number; lng: number }) {
   return null;
 }
 
+// Google tarafındaki fitBounds paritesi: birden çok işaret varsa hepsini
+// kapsa. Yalnız ilk yüklemede — bağımlılık bilinçli boş.
+function FitToMarkers({ markers }: { markers: MapProps["markers"] }) {
+  const map = useMap();
+  useEffect(() => {
+    if (markers.length < 2) return;
+    map.fitBounds(
+      L.latLngBounds(markers.map((m) => [m.lat, m.lng] as [number, number])),
+      { padding: [48, 48] },
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  return null;
+}
+
 export default function LeafletMap({
   markers,
   paths,
@@ -96,6 +111,7 @@ export default function LeafletMap({
         </Marker>
       ))}
       {follow && <Recenter lat={follow.lat} lng={follow.lng} />}
+      {!follow && <FitToMarkers markers={markers} />}
     </MapContainer>
   );
 }

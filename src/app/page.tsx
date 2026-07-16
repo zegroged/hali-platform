@@ -21,6 +21,12 @@ import {
 
 export const dynamic = "force-dynamic";
 
+// Ana sayfanın tüm sorgu-parametreli varyantları (?il=, ?view=map…) tek
+// standart adrese işaret etsin — Google'da kopya sayfa oluşmasın.
+export const metadata = {
+  alternates: { canonical: "/" },
+};
+
 type SearchParams = Promise<{
   il?: string;
   district?: string;
