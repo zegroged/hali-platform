@@ -85,6 +85,27 @@ export function DriverShift({ initialOnShift }: { initialOnShift: boolean }) {
     return stop;
   }, [on]);
 
+  // Kalp atışı: duran şoförde watchPosition yeni konum üretmez (+25m/8sn
+  // süzgeci de keser) → 5 dk sonra panel onu "çevrimdışı" gösteriyordu.
+  // Hareket olmasa da dakikada bir son bilinen konumu yeniden gönder —
+  // "hâlâ buradayım" der, durak tespitini de besler.
+  useEffect(() => {
+    if (!on) return;
+    const hb = setInterval(() => {
+      const last = lastPost.current;
+      if (!last || Date.now() - last.t < 55_000) return;
+      last.t = Date.now();
+      fetch("/api/driver/location", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lat: last.lat, lng: last.lng }),
+      })
+        .then(() => setSent((n) => n + 1))
+        .catch(() => {});
+    }, 60_000);
+    return () => clearInterval(hb);
+  }, [on]);
+
   useEffect(() => {
     if (!on || sent > 0) {
       setNoFix(false);

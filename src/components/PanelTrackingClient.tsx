@@ -48,8 +48,16 @@ export function PanelTrackingClient() {
     };
   }, []);
 
+  // Haritaya yalnız TAZE konum (≤5 dk) — listede "çevrimdışı" yazan şoförün
+  // günler önceki konumunu canlıymış gibi basmayalım (B10 ile tutarlı).
+  const FRESH_MS = 5 * 60 * 1000;
   const located = drivers.filter(
-    (d) => d.isOnShift && d.lat != null && d.lng != null,
+    (d) =>
+      d.isOnShift &&
+      d.lat != null &&
+      d.lng != null &&
+      d.lastSeenAt != null &&
+      Date.now() - new Date(d.lastSeenAt).getTime() <= FRESH_MS,
   );
   const markers: MapMarker[] = located.map((d) => ({
     lat: d.lat as number,
