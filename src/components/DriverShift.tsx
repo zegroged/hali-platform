@@ -75,7 +75,13 @@ export function DriverShift({ initialOnShift }: { initialOnShift: boolean }) {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ lat: latitude, lng: longitude, acc: accuracy }),
-          }).then(() => setSent((n) => n + 1));
+          })
+            .then(() => setSent((n) => n + 1))
+            .catch(() => {
+              // Mobil veride baz geçişi anlık koparabilir — kalp atışını
+              // beklemeden bir SONRAKİ fix'te hemen yeniden denesin.
+              if (lastPost.current) lastPost.current.t = 0;
+            });
         },
         () => setErr("Konum alınamıyor — izin verildiğinden emin olun."),
         { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 },

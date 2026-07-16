@@ -45,8 +45,12 @@ TaskManager.defineTask(LOCATION_TASK, async ({ data, error }) => {
     // Oturum düştüyse izlemeyi durdur — "Mesaidesin" bildirimi asılı kalmasın,
     // boşuna GPS/pil yakmasın (şoför açınca tekrar giriş yapar).
     if (result === "unauthorized") await stopTracking();
+    // Baz istasyonu geçişi vb. anlık ağ kopmasında gönderim düştüyse, 60 sn
+    // süzgecini beklemeden bir SONRAKİ fix'te (≤15 sn) hemen yeniden dene.
+    if (result === "failed") lastSent = null;
   } catch {
     // ağ hatasında sessizce geç; sonraki konumda tekrar denenir
+    lastSent = null;
   }
 });
 
