@@ -63,10 +63,11 @@ export async function setShift(on: boolean) {
 export async function postLocation(
   lat: number,
   lng: number,
+  acc?: number,
 ): Promise<"ok" | "unauthorized" | "failed"> {
   const token = await getToken();
   if (!token) return "unauthorized";
-  const body = JSON.stringify({ lat, lng });
+  const body = JSON.stringify({ lat, lng, acc });
   const headers = {
     "Content-Type": "application/json",
     Authorization: `Bearer ${token}`,

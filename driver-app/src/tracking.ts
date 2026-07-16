@@ -27,7 +27,10 @@ TaskManager.defineTask(LOCATION_TASK, async ({ data, error }) => {
   const locs = (data as { locations?: Location.LocationObject[] })?.locations;
   const loc = locs?.[locs.length - 1];
   if (!loc) return;
-  const { latitude, longitude } = loc.coords;
+  const { latitude, longitude, accuracy } = loc.coords;
+  // KAYMA SÜZGECİ (webdeki DriverShift ile aynı eşik): GPS oturmadan gelen
+  // kaba fix yüzlerce metre sapar — hiç gönderme, sonraki fix'i bekle.
+  if (accuracy != null && accuracy > 150) return;
   const now = Date.now();
   if (
     lastSent &&
@@ -38,7 +41,7 @@ TaskManager.defineTask(LOCATION_TASK, async ({ data, error }) => {
   }
   lastSent = { lat: latitude, lng: longitude, t: now };
   try {
-    const result = await postLocation(latitude, longitude);
+    const result = await postLocation(latitude, longitude, accuracy ?? undefined);
     // Oturum düştüyse izlemeyi durdur — "Mesaidesin" bildirimi asılı kalmasın,
     // boşuna GPS/pil yakmasın (şoför açınca tekrar giriş yapar).
     if (result === "unauthorized") await stopTracking();
@@ -62,7 +65,9 @@ export async function startTracking(): Promise<string | null> {
   if (already) return null;
 
   await Location.startLocationUpdatesAsync(LOCATION_TASK, {
-    accuracy: Location.Accuracy.Balanced,
+    // Balanced (~100 m, Wi-Fi/baz) sürüş takibi için kaba — haritada kayma
+    // yapıyordu. High = gerçek GPS (~10 m); mesai saatinde pil maliyeti kabul.
+    accuracy: Location.Accuracy.High,
     // distanceInterval 25 idi — duran cihaz HİÇ güncelleme üretmiyordu, şoför
     // 5 dk sonra panelde "çevrimdışı" görünüyordu. 0 + 15 sn: sistem düzenli
     // güncelleme verir, gönderimi yukarıdaki süzgeç (25 m / 60 sn) kısar.

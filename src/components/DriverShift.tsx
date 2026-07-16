@@ -11,6 +11,8 @@ export function DriverShift({ initialOnShift }: { initialOnShift: boolean }) {
   // İzin diyaloğu cevapsız kalırsa hiçbir geolocation callback'i tetiklenmez —
   // 20 sn boyunca tek konum gelmediyse proaktif uyarı göster.
   const [noFix, setNoFix] = useState(false);
+  // Son fix kaba ise (GPS oturmadı) ± metre değeri — gönderilmez, uyarı gösterilir.
+  const [lowAcc, setLowAcc] = useState<number | null>(null);
   const watchRef = useRef<number | null>(null);
   const wakeRef = useRef<{ release?: () => void } | null>(null);
   const lastPost = useRef<{ lat: number; lng: number; t: number } | null>(null);
@@ -51,7 +53,15 @@ export function DriverShift({ initialOnShift }: { initialOnShift: boolean }) {
     if ("geolocation" in navigator) {
       watchRef.current = navigator.geolocation.watchPosition(
         (pos) => {
-          const { latitude, longitude } = pos.coords;
+          const { latitude, longitude, accuracy } = pos.coords;
+          // KAYMA SÜZGECİ: GPS oturmadan gelen kaba fix (Wi-Fi/baz, yüzlerce
+          // metre sapar) HİÇ gönderilmez — haritada "gitmediği yere gitmiş"
+          // izlerinin köküydü. GPS oturunca (≤150 m) gönderim başlar.
+          if (accuracy != null && accuracy > 150) {
+            setLowAcc(Math.round(accuracy));
+            return;
+          }
+          setLowAcc(null);
           const now = Date.now();
           const last = lastPost.current;
           const movedM = last
@@ -64,7 +74,7 @@ export function DriverShift({ initialOnShift }: { initialOnShift: boolean }) {
           fetch("/api/driver/location", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ lat: latitude, lng: longitude }),
+            body: JSON.stringify({ lat: latitude, lng: longitude, acc: accuracy }),
           }).then(() => setSent((n) => n + 1));
         },
         () => setErr("Konum alınamıyor — izin verildiğinden emin olun."),
@@ -132,11 +142,17 @@ export function DriverShift({ initialOnShift }: { initialOnShift: boolean }) {
               : "Mesaiyi başlat, halıcı seni canlı görsün."}
           </p>
           {err && <p className="mt-1 text-xs text-red-600">{err}</p>}
-          {!err && noFix && sent === 0 && (
+          {!err && noFix && sent === 0 && lowAcc == null && (
             <p className="mt-1 text-xs text-amber-700">
               Henüz konum alınamadı. Tarayıcının konum iznini ve cihazın konum
               servisini (Windows/telefon ayarları) kontrol et; sayfa açık ve
               önde kalmalı.
+            </p>
+          )}
+          {!err && lowAcc != null && (
+            <p className="mt-1 text-xs text-amber-700">
+              Konum hassasiyeti düşük (±{lowAcc} m) — yanlış yer görünmesin
+              diye gönderilmiyor. Açık alanda GPS oturunca otomatik başlar.
             </p>
           )}
         </div>

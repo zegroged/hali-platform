@@ -5,6 +5,14 @@ import { evaluateStop } from "@/lib/tracking";
 import { maybePrunePings } from "@/lib/retention";
 import { trYearMonth } from "@/lib/time";
 import { rateLimit, tooMany } from "@/lib/ratelimit";
+import { haversineKm } from "@/lib/geo";
+
+// Kayma süzgeçleri: GPS oturmadan gelen kaba konum (Wi-Fi/baz, yüzlerce metre
+// sapar) ve fiziksel olarak imkânsız sıçramalar KAYDEDİLMEZ — haritada
+// "gitmediği yeri gitmiş göster" izlerinin köküydü.
+const MAX_ACCURACY_M = 150; // bundan kaba fix'ler çöp
+const TELEPORT_WINDOW_SEC = 120; // yalnız taze önceki ping'e karşı bak (yapışma olmasın)
+const TELEPORT_SPEED_MPS = 50; // ~180 km/sa üstü = ışınlanma, at
 
 // Şoför konum gönderir; her konumda stay-point durak tespiti çalışır.
 export async function POST(req: NextRequest) {
@@ -28,6 +36,11 @@ export async function POST(req: NextRequest) {
   ) {
     return NextResponse.json({ error: "Geçersiz konum" }, { status: 400 });
   }
+  // Opsiyonel hassasiyet (metre): eski istemciler göndermez → süzgeç atlanır.
+  const acc = body?.acc == null ? null : Number(body.acc);
+  if (acc != null && Number.isFinite(acc) && acc > MAX_ACCURACY_M) {
+    return NextResponse.json({ ok: true, skipped: "accuracy" });
+  }
 
   const driver = await prisma.driver.findUnique({ where: { userId: u.id } });
   if (!driver) {
@@ -40,6 +53,19 @@ export async function POST(req: NextRequest) {
     where: { driverId: driver.id },
     orderBy: { recordedAt: "desc" },
   });
+
+  // Işınlanma süzgeci: taze bir önceki ping varken imkânsız hız = sapmış fix.
+  // Eski ping'e karşı bakılmaz — yanlış kayıt sonrası doğru konuma "yapışıp"
+  // her yeni fix'i reddetme durumu oluşmasın.
+  if (last) {
+    const dtSec = (now.getTime() - last.recordedAt.getTime()) / 1000;
+    if (dtSec >= 0 && dtSec < TELEPORT_WINDOW_SEC) {
+      const distM = haversineKm(last.lat, last.lng, lat, lng) * 1000;
+      if (distM / Math.max(dtSec, 1) > TELEPORT_SPEED_MPS) {
+        return NextResponse.json({ ok: true, skipped: "teleport" });
+      }
+    }
+  }
 
   await prisma.$transaction([
     prisma.driver.update({
