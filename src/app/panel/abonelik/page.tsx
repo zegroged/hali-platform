@@ -103,6 +103,12 @@ export default async function AbonelikYonetim({
           </span>
         </div>
         <dl className="mt-4 space-y-1.5 text-sm">
+          {b.billingCode && (
+            <div className="flex justify-between">
+              <dt className="text-slate-500">Cari (abone) kodu</dt>
+              <dd className="font-mono text-slate-800">{b.billingCode}</dd>
+            </div>
+          )}
           {sub?.currentPeriodEnd && (
             <div className="flex justify-between">
               <dt className="text-slate-500">

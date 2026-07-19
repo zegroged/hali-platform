@@ -39,6 +39,7 @@ export default async function MuhasebePage() {
         select: {
           name: true,
           billingTitle: true,
+          billingCode: true,
           taxNumber: true,
           taxOffice: true,
           billingAddress: true,
@@ -84,6 +85,7 @@ export default async function MuhasebePage() {
             <thead className="bg-slate-50">
               <tr>
                 <th className={th}>Ödeme tarihi</th>
+                <th className={th}>Cari kodu</th>
                 <th className={th}>Ünvan</th>
                 <th className={th}>VKN / TCKN</th>
                 <th className={th}>Vergi dairesi</th>
@@ -103,6 +105,7 @@ export default async function MuhasebePage() {
                 return (
                   <tr key={p.id} className={eksik ? "bg-red-50" : ""}>
                     <td className={td}>{fmtDate(p.paidAt)}</td>
+                    <td className={`${td} font-mono`}>{b.billingCode ?? "—"}</td>
                     <td className={td}>
                       <div className="font-medium">
                         {b.billingTitle || (
