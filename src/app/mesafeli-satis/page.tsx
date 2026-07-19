@@ -33,7 +33,8 @@ export default function MesafeliSatisPage() {
           enyakinhaliyikamaservisi.com — işleticisi{" "}
           <strong>[YASAL AD]</strong> (şahıs işletmesi). Adres:
           [ADRES], Selçuklu/Konya ·
-          Vergi Dairesi/No: Meram / [VKN]. İletişim:
+          Vergi Dairesi/No: Meram / [VKN]. KEP:
+          [KEP]. İletişim:
           info@enyakinhaliyikamaservisi.com (
           <Link href="/iletisim" className="text-brand-dark underline">
             iletişim sayfası

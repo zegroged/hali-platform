@@ -92,6 +92,10 @@ export default function IletisimPage() {
             <dd className="inline">Meram / [VKN]</dd>
           </div>
           <div>
+            <dt className="inline font-medium">KEP: </dt>
+            <dd className="inline">[KEP]</dd>
+          </div>
+          <div>
             <dt className="inline font-medium">Telefon: </dt>
             <dd className="inline">[TELEFON]</dd>
           </div>
