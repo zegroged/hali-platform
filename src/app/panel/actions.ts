@@ -17,6 +17,7 @@ import { normalizeCityName, normalizeDistrictName } from "@/lib/cities";
 import { normalizeUsername, validateUsername } from "@/lib/username";
 import { escapeHtml } from "@/lib/htmlSafe";
 import type { PricingUnit } from "@prisma/client";
+import { normalizeBusinessName, normalizeBusinessDescription } from "@/lib/text";
 
 async function biz() {
   const b = await getCurrentBusiness();
@@ -64,8 +65,11 @@ export async function updateProfileBasics(formData: FormData) {
   await prisma.cleanerBusiness.update({
     where: { id: b.id },
     data: {
-      name: String(formData.get("name") || b.name),
-      description: String(formData.get("description") || ""),
+      // BÜYÜK HARF normalize: herkes bağırarak yazıyordu, kartlar çirkinleşiyordu.
+      name: normalizeBusinessName(String(formData.get("name") || b.name)),
+      description: normalizeBusinessDescription(
+        String(formData.get("description") || ""),
+      ),
       address: String(formData.get("address") || b.address),
       district: districtCanon,
       city: cityCanon,

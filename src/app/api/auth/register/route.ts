@@ -7,6 +7,8 @@ import { CONTRACT_VERSION } from "@/lib/legal";
 import { normalizeUsername, validateUsername } from "@/lib/username";
 import { normalizeCityName, normalizeDistrictName } from "@/lib/cities";
 import { TR_PHONE_RE } from "@/lib/phone";
+import { normalizeBusinessName } from "@/lib/text";
+import { ensureBillingCode } from "@/lib/billing";
 
 // İşletme self-servis kaydı. Hesap PENDING açılır ve görünmez;
 // panel akışı (e-posta doğrulama → profil → admin onayı) tamamlar.
@@ -181,7 +183,8 @@ export async function POST(req: NextRequest) {
       password: hashed,
       ownedBusiness: {
         create: {
-          name: businessName,
+          // BÜYÜK HARF normalize — kartlarda tekdüze görünüm.
+          name: normalizeBusinessName(businessName),
           address: `${districtCanon}, ${cityCanon}`,
           city: cityCanon,
           district: districtCanon,
@@ -201,6 +204,13 @@ export async function POST(req: NextRequest) {
       },
     },
   });
+
+  // Cari/abone kodu ata (muhasebe eşleştirmesi) — kayıt başarısını engellemesin.
+  const biz = await prisma.cleanerBusiness.findUnique({
+    where: { ownerId: owner.id },
+    select: { id: true },
+  });
+  if (biz) await ensureBillingCode(biz.id).catch(() => {});
 
   await createSession(owner.id);
   return NextResponse.json({ ok: true });

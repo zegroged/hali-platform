@@ -14,6 +14,8 @@ import { normalizeCityName, normalizeDistrictName } from "@/lib/cities";
 import { normalizeUsername, validateUsername } from "@/lib/username";
 import { saveObject } from "@/lib/storage";
 import { CONTRACT_VERSION } from "@/lib/legal";
+import { normalizeBusinessName } from "@/lib/text";
+import { ensureBillingCode } from "@/lib/billing";
 
 async function requireAdmin() {
   const u = await getSessionUser();
@@ -188,8 +190,10 @@ export async function createBusinessByAdmin(formData: FormData) {
   if (exists) err("Bu telefon veya e-posta ile zaten bir hesap var.");
 
   // İşletme adı boşsa üret ("Yeni İşletme 123") — panelden düzeltilir.
-  const finalBusinessName =
-    businessName || `Yeni İşletme ${crypto.randomInt(100, 1000)}`;
+  // Doluysa BÜYÜK HARF normalize (destek sahadan çoğunlukla bağıran ad girer).
+  const finalBusinessName = businessName
+    ? normalizeBusinessName(businessName)
+    : `Yeni İşletme ${crypto.randomInt(100, 1000)}`;
   // Telefon boşsa benzersiz GEÇİCİ numara üret (User.phone unique — boş
   // bırakılamaz); mesajda gösterilir, sahibi panelden gerçeğini yazar.
   let finalPhone = phone;
@@ -314,6 +318,9 @@ export async function createBusinessByAdmin(formData: FormData) {
   });
 
   const businessId = owner.ownedBusiness!.id;
+
+  // Cari/abone kodu (muhasebe eşleştirmesi) — hata hesabı engellemesin.
+  await ensureBillingCode(businessId).catch(() => {});
 
   // Opsiyonel ilk şoför (yayın şartı) — panel addDriver ile aynı mantık.
   if (wantsDriver) {
