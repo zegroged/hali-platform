@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { retrieveRecurringResult } from "@/lib/iyzico";
 import { getAppBaseUrl, paymentsLive } from "@/lib/config";
 import { extendSubscription } from "@/lib/subscription";
+import { notifySubscriptionPaid } from "@/lib/paymentNotify";
 import { syncVisibility } from "@/lib/panel";
 
 // Tekrarlayan abonelik Checkout dönüşü. iyzico'nun sunucu-sunucu doğrulamasıyla
@@ -78,6 +79,19 @@ export async function POST(req: NextRequest) {
       data: { periodEnd: end },
     });
   });
-  if (claimed) await syncVisibility(marker.businessId);
+  if (claimed) {
+    await syncVisibility(marker.businessId);
+    // Otomatik bilgilendirme (best-effort; claimed guard'i cift maili engeller).
+    const son = await prisma.subscriptionPayment.findUnique({
+      where: { id: marker.id },
+      select: { periodEnd: true },
+    });
+    await notifySubscriptionPaid({
+      businessId: marker.businessId,
+      amount: Number(marker.amount),
+      periodEnd: son?.periodEnd ?? null,
+      kind: "ilk-odeme",
+    });
+  }
   return ok();
 }

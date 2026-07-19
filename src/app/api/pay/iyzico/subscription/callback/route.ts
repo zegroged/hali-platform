@@ -4,6 +4,7 @@ import { retrieveCheckout } from "@/lib/iyzico";
 import { getAppBaseUrl, paymentsLive } from "@/lib/config";
 import { extendSubscription } from "@/lib/subscription";
 import { syncVisibility } from "@/lib/panel";
+import { notifySubscriptionPaid } from "@/lib/paymentNotify";
 
 // iyzico abonelik ödemesi dönüşü. YALNIZ iyzico'nun kimlik-doğrulamalı sunucu
 // yanıtına güvenir; tutarı beklenenle karşılaştırır; idempotenttir (çift
@@ -77,7 +78,22 @@ export async function POST(req: NextRequest) {
 
   // Görünürlük idempotent; commit'ten SONRA, transaction dışında (yalnız bu
   // istekte gerçekten dönem açıldıysa yeterli — ama çift çalışması da zararsız).
-  if (processed) await syncVisibility(payment.businessId);
+  if (processed) {
+    await syncVisibility(payment.businessId);
+    // Otomatik bilgilendirme: işletmeye makbuz + zil, admin'e FATURA KES maili.
+    // processed guard'ı sayesinde çift callback'te İKİNCİ kez gitmez.
+    const son = await prisma.subscriptionPayment.findUnique({
+      where: { id: payment.id },
+      select: { periodEnd: true },
+    });
+    await notifySubscriptionPaid({
+      businessId: payment.businessId,
+      amount: expected,
+      periodEnd: son?.periodEnd ?? null,
+      iyzicoPaymentId: r.paymentId ?? null,
+      kind: "ilk-odeme",
+    });
+  }
 
   return ok();
 }

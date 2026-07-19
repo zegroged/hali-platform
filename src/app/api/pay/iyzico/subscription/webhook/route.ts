@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { extendSubscription } from "@/lib/subscription";
+import { notifySubscriptionPaid } from "@/lib/paymentNotify";
 import { syncVisibility } from "@/lib/panel";
 import { paymentsLive } from "@/lib/config";
 
@@ -70,9 +71,11 @@ export async function POST(req: NextRequest) {
     // İDEMPOTENCY: iyzico webhook'ları en-az-bir-kez teslim edilir; çift teslim
     // çift 30 gün + çift ödeme kaydı üretiyordu. iyzicoPaymentId @unique ile
     // ATOMİK claim — daha önce işlendiyse create P2002 fırlatır, no-op döner.
+    let yeniDonemSonu: Date | null = null;
     try {
       await prisma.$transaction(async (tx) => {
         const end = await extendSubscription(tx, sub.businessId);
+        yeniDonemSonu = end;
         await tx.subscriptionPayment.create({
           data: {
             businessId: sub.businessId,
@@ -88,6 +91,15 @@ export async function POST(req: NextRequest) {
         });
       });
       await syncVisibility(sub.businessId);
+      // Otomatik bilgilendirme (best-effort): makbuz + zil + admin FATURA KES.
+      // Idempotency claim'i gectik = bu olay ILK kez islendi, cift mail gitmez.
+      await notifySubscriptionPaid({
+        businessId: sub.businessId,
+        amount: 2400,
+        periodEnd: yeniDonemSonu,
+        iyzicoPaymentId: eventId,
+        kind: "yenileme",
+      });
     } catch (e) {
       // Prisma P2002 = bu eventId zaten işlendi → sessizce yut (idempotent).
       if (
