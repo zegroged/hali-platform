@@ -48,7 +48,7 @@ export default async function PanelProfile({
   // Abonelik ödeme adımından yönlendirme: eksik alanı net söyle.
   const odemeUyari =
     odeme === "fatura"
-      ? "Aboneliğe geçmeden önce Fatura Bilgileri'ni (ünvan + vergi dairesi) doldurun — size bu bilgilerle fatura kesilecek."
+      ? "Aboneliğe geçmeden önce Fatura Bilgileri'ni (ünvan + vergi dairesi + fatura adresi) doldurun — size bu bilgilerle fatura kesilecek."
       : odeme === "vergino"
         ? "Aboneliğe geçmeden önce vergi / T.C. kimlik numaranızı girin."
         : null;
@@ -65,7 +65,7 @@ export default async function PanelProfile({
   const missing = checklist.filter((c) => !c.done);
   const taxMissing = !b.taxNumber;
   // Abonelik faturası için ünvan + vergi dairesi zorunlu (ödeme kapısı kontrol eder).
-  const billingMissing = !b.billingTitle || !b.taxOffice;
+  const billingMissing = !b.billingTitle || !b.taxOffice || !b.billingAddress;
   const daysMissing = !(b.deliveryEstimateMinDays && b.deliveryEstimateMaxDays);
 
   return (
@@ -190,7 +190,7 @@ export default async function PanelProfile({
             </p>
             <p className="mb-3 mt-0.5 text-xs text-slate-500">
               Aboneliğin için sana kesilecek faturada kullanılır. Aboneliğe
-              geçmeden önce ünvan ve vergi dairesi zorunludur.
+              geçmeden önce ünvan, vergi dairesi ve fatura adresi zorunludur.
             </p>
             <div className="space-y-3">
               <div>
@@ -213,12 +213,14 @@ export default async function PanelProfile({
                   />
                 </div>
                 <div>
-                  <label className={lbl}>Fatura adresi (opsiyonel)</label>
+                  <label className={lbl}>Fatura adresi</label>
                   <input
                     name="billingAddress"
                     defaultValue={b.billingAddress ?? ""}
-                    placeholder="Boşsa işletme adresi kullanılır"
-                    className={inp}
+                    placeholder="Örn. Fevzi Çakmak Mah. No:12, Selçuklu/Konya"
+                    className={
+                      billingMissing && !b.billingAddress ? inpMissing : inp
+                    }
                   />
                 </div>
               </div>
@@ -479,7 +481,9 @@ export default async function PanelProfile({
                   className="h-full w-full object-cover"
                 />
                 <span className="absolute left-1 top-1 rounded bg-black/50 px-1 text-[10px] text-white">
-                  {p.isBefore ? "Öncesi" : "Sonrası"}
+                  {/* "genel" fotoğrafta iki bayrak da false — ikili ternary onu
+                      yanlışlıkla "Sonrası" gösteriyordu (kullanıcı bildirdi). */}
+                  {p.isBefore ? "Öncesi" : p.isAfter ? "Sonrası" : "Genel"}
                 </span>
                 <form action={removePhoto} className="absolute right-1 top-1">
                   <input type="hidden" name="id" value={p.id} />

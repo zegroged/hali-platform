@@ -7,6 +7,7 @@ import { getCurrentBusiness } from "@/lib/panel";
 import { initSubscriptionCheckout, cancelRecurring } from "@/lib/iyzico";
 import { getAppBaseUrl } from "@/lib/config";
 import { PLAN } from "@/lib/plan";
+import { ensureBillingCode } from "@/lib/billing";
 
 // Halıcının abonelik ödemesini başlatır: SubscriptionPayment(PENDING) kaydı
 // açar, iyzico Checkout Form başlatır ve tarayıcıyı iyzico'nun GÜVENLİ kart
@@ -24,10 +25,17 @@ export async function startSubscriptionPayment() {
     redirect("/panel/profil?odeme=vergino"); // vergi/kimlik no gerekli
   }
   // FATURA BİLGİLERİ zorunlu: platform bu işletmeye abonelik faturası kesecek
-  // (mali müşavir /muhasebe'de görür). Ünvan + vergi dairesi eksikse ödeme yok.
-  if (!b.billingTitle?.trim() || !b.taxOffice?.trim()) {
+  // (mali müşavir /muhasebe'de görür). Ünvan + vergi dairesi + fatura adresi
+  // eksikse ödeme yok.
+  if (
+    !b.billingTitle?.trim() ||
+    !b.taxOffice?.trim() ||
+    !b.billingAddress?.trim()
+  ) {
     redirect("/panel/profil?odeme=fatura");
   }
+  // Emniyet kemeri: kodu olmayan eski hesaba ödeme öncesi cari kodu ata.
+  if (!b.billingCode) await ensureBillingCode(b.id).catch(() => {});
 
   const payment = await prisma.subscriptionPayment.create({
     data: {
