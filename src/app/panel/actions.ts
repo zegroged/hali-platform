@@ -17,7 +17,11 @@ import { normalizeCityName, normalizeDistrictName } from "@/lib/cities";
 import { normalizeUsername, validateUsername } from "@/lib/username";
 import { escapeHtml } from "@/lib/htmlSafe";
 import type { PricingUnit } from "@prisma/client";
-import { normalizeBusinessName, normalizeBusinessDescription } from "@/lib/text";
+import {
+  normalizeBusinessName,
+  normalizeBusinessDescription,
+  normalizeAddress,
+} from "@/lib/text";
 
 async function biz() {
   const b = await getCurrentBusiness();
@@ -70,7 +74,7 @@ export async function updateProfileBasics(formData: FormData) {
       description: normalizeBusinessDescription(
         String(formData.get("description") || ""),
       ),
-      address: String(formData.get("address") || b.address),
+      address: normalizeAddress(String(formData.get("address") || b.address)),
       district: districtCanon,
       city: cityCanon,
       phone: String(formData.get("phone") || b.phone),
@@ -79,7 +83,7 @@ export async function updateProfileBasics(formData: FormData) {
       billingTitle: String(formData.get("billingTitle") || "").trim() || null,
       taxOffice: String(formData.get("taxOffice") || "").trim() || null,
       billingAddress:
-        String(formData.get("billingAddress") || "").trim() || null,
+        normalizeAddress(String(formData.get("billingAddress") || "")) || null,
       googleProfileUrl: googleUrl,
       deliveryEstimateMinDays: minDays,
       deliveryEstimateMaxDays: maxDays,

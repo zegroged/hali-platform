@@ -43,3 +43,9 @@ export function normalizeBusinessDescription(text: string): string {
   if (t.length > 10 && upperRatio(t) > 0.6) return trSentenceCase(t);
   return t;
 }
+
+/** Adres (işletme/fatura/sipariş alım): kelime-başı büyük düzen —
+ *  "PARSANA MAH. YAŞİYAN SK. NO: 30" → "[ADRES]". */
+export function normalizeAddress(address: string): string {
+  return trTitleCase(address);
+}

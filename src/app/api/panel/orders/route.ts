@@ -6,6 +6,7 @@ import { createOrderWithCode } from "@/lib/ordercode";
 import { sendTrackingSms, trackingLink } from "@/lib/sms";
 import { subscriptionActive } from "@/lib/subscription";
 import { notify } from "@/lib/notify";
+import { normalizeAddress } from "@/lib/text";
 
 const Body = z.object({
   customerName: z.string().min(2, "Müşteri adı en az 2 karakter olmalı.").max(100),
@@ -77,7 +78,7 @@ export async function POST(req: NextRequest) {
         code,
         customerName: d.customerName,
         customerPhone: d.customerPhone,
-        pickupAddress: d.pickupAddress,
+        pickupAddress: normalizeAddress(d.pickupAddress),
         pickupLat: d.pickupLat,
         pickupLng: d.pickupLng,
         approxM2: d.approxM2,

@@ -9,6 +9,7 @@ import { subscriptionActive } from "@/lib/subscription";
 import { getAppBaseUrl } from "@/lib/config";
 import { notify } from "@/lib/notify";
 import { CONTRACT_VERSION } from "@/lib/legal";
+import { normalizeAddress } from "@/lib/text";
 
 const Body = z.object({
   businessId: z.string().min(1).max(40),
@@ -95,6 +96,9 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // Adres BÜYÜK HARF düzeni — şoför/panel ekranlarında bağırmasın.
+  const adres = normalizeAddress(d.pickupAddress);
+
   const order = await createOrderWithCode((code) =>
     prisma.order.create({
       data: {
@@ -105,7 +109,7 @@ export async function POST(req: NextRequest) {
         customerName: d.customerName,
         customerPhone: d.customerPhone,
         customerEmail: d.customerEmail?.toLowerCase() ?? null,
-        pickupAddress: d.pickupAddress,
+        pickupAddress: adres,
         pickupLat: d.pickupLat,
         pickupLng: d.pickupLng,
         approxM2: d.approxM2,
@@ -128,7 +132,7 @@ export async function POST(req: NextRequest) {
     userId: business.ownerId,
     type: "yeni-siparis",
     title: "Yeni sipariş geldi",
-    body: `${d.customerName} · ${d.pickupAddress.slice(0, 50)}`,
+    body: `${d.customerName} · ${adres.slice(0, 50)}`,
     href: "/panel/siparisler",
   });
   if (driver.userId !== business.ownerId) {
@@ -143,7 +147,7 @@ export async function POST(req: NextRequest) {
   try {
     await sendSms(
       business.phone,
-      `Yeni siparis! Kod: ${ref} · ${d.customerName} · ${d.pickupAddress.slice(0, 60)}. Panel: ${getAppBaseUrl()}/panel/siparisler`,
+      `Yeni siparis! Kod: ${ref} · ${d.customerName} · ${adres.slice(0, 60)}. Panel: ${getAppBaseUrl()}/panel/siparisler`,
     );
   } catch (e) {
     console.error("yeni sipariş işletme SMS hatası:", e);
