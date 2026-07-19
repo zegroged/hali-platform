@@ -92,9 +92,13 @@ export function OrderScreen({
       Alert.alert("Eksik bilgi", "Halının alınacağı adresi biraz daha ayrıntılı yaz.");
       return;
     }
+    // E-posta ZORUNLU (weble aynı kural): takip kodu/linki bu adrese gider.
     const email = form.customerEmail.trim();
-    if (email && !/^\S+@\S+\.\S+$/.test(email)) {
-      Alert.alert("E-posta hatalı", "Geçerli bir e-posta gir veya boş bırak.");
+    if (!/^\S+@\S+\.\S+$/.test(email)) {
+      Alert.alert(
+        "E-posta gerekli",
+        "Takip linkinin gönderilmesi için geçerli bir e-posta adresi gir.",
+      );
       return;
     }
     // m² yazıldıysa geçerli olmalı — sessizce silinip m²'siz sipariş gitmesin.
@@ -116,7 +120,7 @@ export function OrderScreen({
         businessId: id,
         customerName: form.customerName.trim(),
         customerPhone: phone,
-        customerEmail: email || undefined,
+        customerEmail: email,
         pickupAddress: form.pickupAddress.trim(),
         pickupLat: coords?.lat,
         pickupLng: coords?.lng,
@@ -177,7 +181,7 @@ export function OrderScreen({
         />
         <TextInput
           style={s.input}
-          placeholder="E-posta (opsiyonel — takip linki gelsin)"
+          placeholder="E-posta (takip linkin buraya gönderilir)"
           keyboardType="email-address"
           autoCapitalize="none"
           autoCorrect={false}

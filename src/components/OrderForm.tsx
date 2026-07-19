@@ -110,11 +110,11 @@ export function OrderForm({
       errs.pickupAddress = "Lütfen açık adresi yaz (mahalle, sokak, no).";
     if (form.approxM2 && parseM2(form.approxM2) === null)
       errs.approxM2 = "Geçerli bir m² değeri gir (ör. 12,5).";
-    if (
-      form.customerEmail.trim() &&
-      !/^\S+@\S+\.\S+$/.test(form.customerEmail.trim())
-    )
-      errs.customerEmail = "Geçerli bir e-posta adresi gir (veya boş bırak).";
+    // E-posta ZORUNLU: SMS henüz yokken takip kodunun kalıcı kanalı bu —
+    // müşteri sekmeyi kapatınca kodunu kaybetmesin.
+    if (!/^\S+@\S+\.\S+$/.test(form.customerEmail.trim()))
+      errs.customerEmail =
+        "Takip linkinin gönderilmesi için geçerli bir e-posta adresi gir.";
     if (!consent)
       errs.consent = "Devam etmek için onay kutusunu işaretleyin.";
     setFieldErrors(errs);
@@ -132,7 +132,7 @@ export function OrderForm({
           businessId,
           customerName: form.customerName,
           customerPhone: form.customerPhone,
-          customerEmail: form.customerEmail.trim() || undefined,
+          customerEmail: form.customerEmail.trim(),
           pickupAddress: form.pickupAddress,
           pickupLat: coords?.lat,
           pickupLng: coords?.lng,
@@ -221,7 +221,7 @@ export function OrderForm({
           </div>
           <div>
             <label htmlFor="siparis-eposta" className={labelCls}>
-              E-posta{optionalBadge}
+              E-posta
             </label>
             <input
               id="siparis-eposta"
@@ -230,10 +230,13 @@ export function OrderForm({
               inputMode="email"
               autoComplete="email"
               maxLength={120}
-              placeholder="Takip linkin e-postana da gelsin (önerilir)"
+              placeholder="ornek@eposta.com"
               value={form.customerEmail}
               onChange={(e) => set("customerEmail", e.target.value)}
             />
+            <p className="mt-1 text-xs text-slate-500">
+              Takip kodun ve takip linkin bu adrese gönderilir.
+            </p>
             {fieldErrors.customerEmail && (
               <p className={fieldErrCls}>{fieldErrors.customerEmail}</p>
             )}

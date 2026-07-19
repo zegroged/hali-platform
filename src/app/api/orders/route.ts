@@ -15,9 +15,9 @@ const Body = z.object({
   businessId: z.string().min(1).max(40),
   customerName: z.string().min(2).max(100),
   customerPhone: z.string().min(10).max(20),
-  // Opsiyonel: takip linki e-postayla da gitsin (SMS ertelendi — misafirin
-  // linki kaybetmemesi + md.9 kalıcı-ortam teyidinin bedava kanalı).
-  customerEmail: z.string().trim().email().max(120).optional(),
+  // ZORUNLU: takip kodu/linki e-postayla gider (SMS ertelendi — misafirin
+  // linki kaybetmemesi + md.9 kalıcı-ortam teyidinin garantili kanalı).
+  customerEmail: z.string().trim().email().max(120),
   pickupAddress: z.string().min(5).max(300),
   pickupLat: z.number().min(-90).max(90).optional(),
   pickupLng: z.number().min(-180).max(180).optional(),
