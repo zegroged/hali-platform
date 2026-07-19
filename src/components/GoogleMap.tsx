@@ -99,6 +99,9 @@ export default function GoogleMapView({
         streetViewControl: false,
         mapTypeControl: false,
         fullscreenControl: false,
+        // Tek parmakla kaydirma + Ctrl'siz zoom (varsayilan "cooperative"
+        // mobilde iki parmak, masaustunde Ctrl+tekerlek istiyordu).
+        gestureHandling: "greedy",
       }}
     >
       {paths?.map((p, i) => (

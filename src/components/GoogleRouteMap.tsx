@@ -169,6 +169,9 @@ export default function GoogleRouteMap({
         streetViewControl: false,
         mapTypeControl: false,
         fullscreenControl: false,
+        // Tek parmakla kaydirma + Ctrl'siz zoom (varsayilan "cooperative"
+        // mobilde iki parmak, masaustunde Ctrl+tekerlek istiyordu).
+        gestureHandling: "greedy",
       }}
     >
       {points.length >= 2 && (

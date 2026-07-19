@@ -45,6 +45,9 @@ export default function GooglePickMap({
         streetViewControl: false,
         mapTypeControl: false,
         fullscreenControl: false,
+        // Tek parmakla kaydirma + Ctrl'siz zoom (varsayilan "cooperative"
+        // mobilde iki parmak, masaustunde Ctrl+tekerlek istiyordu).
+        gestureHandling: "greedy",
       }}
       onClick={(e) => {
         if (e.latLng) onPick({ lat: e.latLng.lat(), lng: e.latLng.lng() });
