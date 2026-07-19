@@ -357,7 +357,7 @@ export async function createBusinessByAdmin(formData: FormData) {
       buf = await sharp(original, { limitInputPixels: 50_000_000 })
         .rotate()
         .resize(edge, edge, { fit: "inside", withoutEnlargement: true })
-        .webp({ quality: 82 })
+        .webp({ quality: 90 })
         .toBuffer();
       contentType = "image/webp";
     } catch {
@@ -375,7 +375,7 @@ export async function createBusinessByAdmin(formData: FormData) {
   ];
   for (const [list, isBefore, isAfter] of batches) {
     for (const file of list) {
-      const url = await saveImage(file, 1600);
+      const url = await saveImage(file, 2560);
       if (!url) continue;
       await prisma.businessPhoto.create({
         data: { businessId, url, isBefore, isAfter },

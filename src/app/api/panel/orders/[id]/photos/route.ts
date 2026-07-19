@@ -5,8 +5,8 @@ import { getCurrentBusiness } from "@/lib/panel";
 import { saveObject } from "@/lib/storage";
 
 const MAX = 5 * 1024 * 1024; // 5 MB
-const MAX_EDGE = 1600;
-const WEBP_QUALITY = 82;
+const MAX_EDGE = 2560;
+const WEBP_QUALITY = 90;
 const MAX_PER_ORDER = 20; // sipariş başına toplam fotoğraf sınırı
 const ALLOWED: Record<string, string> = {
   "image/jpeg": "jpg",

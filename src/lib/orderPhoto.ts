@@ -3,8 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { saveObject } from "@/lib/storage";
 
 const MAX = 8 * 1024 * 1024; // 8 MB (server action gövde limitiyle uyumlu)
-const MAX_EDGE = 1600;
-const WEBP_QUALITY = 82;
+const MAX_EDGE = 2560;
+const WEBP_QUALITY = 90;
 const ALLOWED = new Set(["image/jpeg", "image/png", "image/webp"]);
 
 /**

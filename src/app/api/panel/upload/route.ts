@@ -6,8 +6,8 @@ import { saveObject } from "@/lib/storage";
 import { rateLimit, tooMany } from "@/lib/ratelimit";
 
 const MAX = 5 * 1024 * 1024; // 5 MB
-const MAX_EDGE = 1600; // uzun kenar üst sınırı (px)
-const WEBP_QUALITY = 82;
+const MAX_EDGE = 2560; // uzun kenar üst sınırı (px)
+const WEBP_QUALITY = 90;
 const ALLOWED: Record<string, string> = {
   "image/jpeg": "jpg",
   "image/png": "png",
