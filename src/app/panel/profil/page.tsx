@@ -159,11 +159,55 @@ export default async function PanelProfile({
             <label className={lbl}>Adres</label>
             <input name="address" defaultValue={b.address} className={inp} />
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className={lbl}>Telefon</label>
-              <input name="phone" defaultValue={b.phone} className={inp} />
+          {/* İLETİŞİM NUMARALARI — müşteri vitrininde "GSM & WhatsApp" ve
+              "Sabit Hat" olarak gruplu gösterilir. Birincil GSM zorunlu:
+              sipariş SMS'leri ve WhatsApp butonu bu numarayla çalışır. */}
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <p className="text-sm font-semibold text-slate-800">
+              İletişim Numaraları
+            </p>
+            <p className="mb-3 mt-0.5 text-xs text-slate-500">
+              GSM numaraları müşteriye WhatsApp butonuyla gösterilir; sipariş
+              SMS bildirimleri birincil GSM&apos;e gider. Sabit hat profilde
+              ayrı satırda görünür.
+            </p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label className={lbl}>GSM &amp; WhatsApp (birincil)</label>
+                <input
+                  name="phone"
+                  defaultValue={b.phone}
+                  type="tel"
+                  maxLength={11}
+                  placeholder="05xx xxx xx xx"
+                  className={inp}
+                />
+              </div>
+              <div>
+                <label className={lbl}>GSM &amp; WhatsApp (2. numara)</label>
+                <input
+                  name="gsmPhone2"
+                  defaultValue={b.gsmPhone2 ?? ""}
+                  type="tel"
+                  maxLength={11}
+                  placeholder="Varsa ikinci cep numarası"
+                  className={inp}
+                />
+              </div>
+              <div>
+                <label className={lbl}>Telefon (Sabit Hat)</label>
+                <input
+                  name="landlinePhone"
+                  defaultValue={b.landlinePhone ?? ""}
+                  type="tel"
+                  maxLength={11}
+                  placeholder="0324 320 16 42"
+                  className={inp}
+                />
+              </div>
             </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
             <div>
               <label className={lbl}>
                 Vergi / T.C. kimlik no{taxMissing && reqBadge}

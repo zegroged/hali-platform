@@ -80,12 +80,17 @@ export default async function HaliciProfile({
   // WhatsApp linki — Türkiye'de müşteri aramak yerine yazmayı tercih eder.
   // 05xx... → 905xx... (wa.me uluslararası biçim ister). YALNIZ cep telefonunda:
   // sabit hatta (0212/0342…) WhatsApp yok → kırık buton gösterme (null → gizlenir).
-  const waPhone = b.phone.replace(/\D/g, "");
-  const waHref = isMobilePhone(waPhone)
-    ? `https://wa.me/${waPhone.replace(/^0/, "90")}?text=${encodeURIComponent(
-        "Merhaba, halı yıkama hizmetiniz için yazıyorum.",
-      )}`
-    : null;
+  const toWaHref = (raw: string) => {
+    const d = raw.replace(/\D/g, "");
+    return isMobilePhone(d)
+      ? `https://wa.me/${d.replace(/^0/, "90")}?text=${encodeURIComponent(
+          "Merhaba, halı yıkama hizmetiniz için yazıyorum.",
+        )}`
+      : null;
+  };
+  // Ana buton birincil GSM'i, o cep değilse ikinci GSM'i kullanır.
+  const waHref = toWaHref(b.phone) ?? (b.gsmPhone2 ? toWaHref(b.gsmPhone2) : null);
+  const gsmNumbers = [b.phone, ...(b.gsmPhone2 ? [b.gsmPhone2] : [])];
 
   // Tatil modu: duraklatılmışsa sipariş butonları kapanır (profil yayında kalır).
   const paused = b.pausedUntil != null;
@@ -314,14 +319,29 @@ export default async function HaliciProfile({
                     {b.address}, {b.district} / {b.city}
                   </div>
                 </div>
+                {b.landlinePhone && (
+                  <div className="border-b border-slate-100 px-3 py-2 last:border-0">
+                    <div className="text-slate-600">Telefon (Sabit Hat)</div>
+                    <a
+                      href={`tel:${b.landlinePhone}`}
+                      className="font-medium text-brand-dark hover:underline"
+                    >
+                      {b.landlinePhone}
+                    </a>
+                  </div>
+                )}
                 <div className="border-b border-slate-100 px-3 py-2 last:border-0">
-                  <div className="text-slate-600">Telefon</div>
-                  <a
-                    href={`tel:${b.phone}`}
-                    className="font-medium text-brand-dark hover:underline"
-                  >
-                    {b.phone}
-                  </a>
+                  <div className="text-slate-600">GSM &amp; WhatsApp</div>
+                  {gsmNumbers.map((num) => (
+                    <div key={num}>
+                      <a
+                        href={`tel:${num}`}
+                        className="font-medium text-brand-dark hover:underline"
+                      >
+                        {num}
+                      </a>
+                    </div>
+                  ))}
                 </div>
                 {taxNumber && (
                   <div className="border-b border-slate-100 px-3 py-2 last:border-0">

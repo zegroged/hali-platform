@@ -9,6 +9,8 @@
 export const TR_PHONE_RE = /^0[2-5]\d{9}$/;
 /** Yalnız cep — SMS/OTP gönderilecek numaralar için. */
 export const TR_MOBILE_RE = /^05\d{9}$/;
+/** Yalnız sabit hat — 0 + il kodu (2/3/4 ile başlar), 11 hane. */
+export const TR_LANDLINE_RE = /^0[2-4]\d{9}$/;
 
 /** Girişi 11 haneli 0XXXXXXXXXX biçimine getirir (+90/90 ön eki, eksik 0). */
 export function normalizePhone(raw: string): string {
@@ -26,4 +28,9 @@ export function isTrPhone(p: string): boolean {
 /** Cep telefonu — SMS/OTP alacak numaralar için. */
 export function isMobilePhone(p: string): boolean {
   return TR_MOBILE_RE.test(p);
+}
+
+/** Sabit hat — işletme profilindeki "Sabit Hat" alanı için. */
+export function isLandlinePhone(p: string): boolean {
+  return TR_LANDLINE_RE.test(p);
 }

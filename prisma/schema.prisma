@@ -130,6 +130,10 @@ model CleanerBusiness {
   lat         Float
   lng         Float
   phone       String
+  // Ek iletişim numaraları — müşteri vitrini "Sabit Hat" + "GSM & WhatsApp"
+  // gruplu gösterir. phone birincil GSM'dir (SMS bildirimleri oraya gider).
+  gsmPhone2     String? // ikinci GSM & WhatsApp numarası
+  landlinePhone String? // sabit hat (0 2xx/3xx/4xx...)
 
   workingHours            Json? // {"mon":{"open":"09:00","close":"19:00"}, ...}
   deliveryEstimateMinDays Int? // örn 2

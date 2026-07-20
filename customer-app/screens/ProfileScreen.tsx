@@ -166,11 +166,12 @@ export function ProfileScreen({ nav, id }: { nav: Nav; id: string }) {
       })
     : null;
   // WhatsApp yalnız CEP numarasında (sabit hatta WhatsApp yok → buton gizlenir,
-  // kırık wa.me linki oluşmaz; web ile aynı kural).
-  const waHref = whatsappHref(
-    b.phone,
-    "Merhaba, halı yıkama hizmetiniz için yazıyorum.",
-  );
+  // kırık wa.me linki oluşmaz; web ile aynı kural). Birincil cep değilse
+  // ikinci GSM'e düşer — web halici/[id] waHref İKİZİ.
+  const waMsg = "Merhaba, halı yıkama hizmetiniz için yazıyorum.";
+  const waHref =
+    whatsappHref(b.phone, waMsg) ??
+    (b.gsmPhone2 ? whatsappHref(b.gsmPhone2, waMsg) : null);
 
   return (
     <SafeAreaView style={s.screen} edges={["top"]}>
@@ -212,12 +213,27 @@ export function ProfileScreen({ nav, id }: { nav: Nav; id: string }) {
         <View style={s.infoBox}>
           <Text style={s.infoTitle}>İşletme Bilgileri</Text>
           <Text style={s.infoRow}>📍 {b.address}</Text>
-          <TouchableOpacity
-            accessibilityRole="button"
-            onPress={() => Linking.openURL(`tel:${b.phone}`)}
-          >
-            <Text style={[s.infoRow, { color: C.brand }]}>📞 {b.phone}</Text>
-          </TouchableOpacity>
+          {/* Numara grupları — web İKİZİ (halici/[id] İşletme Bilgileri):
+              sabit hat ayrı satır, GSM'ler tek etiket altında tıklanır. */}
+          {!!b.landlinePhone && (
+            <TouchableOpacity
+              accessibilityRole="button"
+              onPress={() => Linking.openURL(`tel:${b.landlinePhone}`)}
+            >
+              <Text style={[s.infoRow, { color: C.brand }]}>
+                ☎️ Sabit Hat: {b.landlinePhone}
+              </Text>
+            </TouchableOpacity>
+          )}
+          {[b.phone, ...(b.gsmPhone2 ? [b.gsmPhone2] : [])].map((num) => (
+            <TouchableOpacity
+              key={num}
+              accessibilityRole="button"
+              onPress={() => Linking.openURL(`tel:${num}`)}
+            >
+              <Text style={[s.infoRow, { color: C.brand }]}>📞 {num}</Text>
+            </TouchableOpacity>
+          ))}
           {!!b.taxNumber && (
             <Text style={s.infoRow}>Vergi No: {b.taxNumber}</Text>
           )}

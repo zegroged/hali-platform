@@ -12,6 +12,7 @@ import { notify, notifyAdmins } from "@/lib/notify";
 import { getAppBaseUrl } from "@/lib/config";
 import { ORDER_STATUS_META, PANEL_NEXT } from "@/lib/orderStatus";
 import { taxIdError } from "@/lib/taxId";
+import { normalizePhone, isMobilePhone, isLandlinePhone } from "@/lib/phone";
 import { normalizeGoogleProfileUrl } from "@/lib/googleUrl";
 import { normalizeCityName, normalizeDistrictName } from "@/lib/cities";
 import { normalizeUsername, validateUsername } from "@/lib/username";
@@ -51,6 +52,42 @@ export async function updateProfileBasics(formData: FormData) {
         ),
     );
   }
+  // TELEFONLAR — birincil GSM zorunlu (SMS bildirimleri + WhatsApp), ikinci GSM
+  // ve sabit hat opsiyonel. Eskiden burada hiç doğrulama yoktu; ham string
+  // yazılıyordu (kayıttaki regex güncellemede uygulanmıyordu).
+  const phone = normalizePhone(String(formData.get("phone") || b.phone));
+  const gsm2Raw = String(formData.get("gsmPhone2") || "").trim();
+  const gsmPhone2 = gsm2Raw ? normalizePhone(gsm2Raw) : null;
+  const landRaw = String(formData.get("landlinePhone") || "").trim();
+  const landlinePhone = landRaw ? normalizePhone(landRaw) : null;
+  if (!isMobilePhone(phone)) {
+    redirect(
+      "/panel/profil?hata=" +
+        encodeURIComponent(
+          "Birincil telefon 05xx ile başlayan 11 haneli GSM olmalı (SMS bildirimleri ve WhatsApp bu numaraya göre çalışır). Sabit hattını alttaki Sabit Hat alanına yaz.",
+        ),
+    );
+  }
+  if (gsmPhone2 && !isMobilePhone(gsmPhone2)) {
+    redirect(
+      "/panel/profil?hata=" +
+        encodeURIComponent("İkinci GSM numarası 05xx ile başlayan 11 hane olmalı."),
+    );
+  }
+  if (gsmPhone2 === phone) {
+    redirect(
+      "/panel/profil?hata=" +
+        encodeURIComponent("İkinci GSM, birincil numarayla aynı olamaz."),
+    );
+  }
+  if (landlinePhone && !isLandlinePhone(landlinePhone)) {
+    redirect(
+      "/panel/profil?hata=" +
+        encodeURIComponent(
+          "Sabit hat 0 + il koduyla başlayan 11 hane olmalı (örn. 0324 320 16 42). Cep numaranı GSM alanına yaz.",
+        ),
+    );
+  }
   // İl/ilçe yalnız resmî listeden: yazım hatası şehir sayfası (/hali-yikama/..)
   // ve ilçe eşleşmesini bozuyordu. Kanonik ada normalize edilir, listede yoksa red.
   const cityCanon = normalizeCityName(String(formData.get("city") || b.city));
@@ -77,7 +114,9 @@ export async function updateProfileBasics(formData: FormData) {
       address: normalizeAddress(String(formData.get("address") || b.address)),
       district: districtCanon,
       city: cityCanon,
-      phone: String(formData.get("phone") || b.phone),
+      phone,
+      gsmPhone2,
+      landlinePhone,
       taxNumber: taxRaw || null,
       // Fatura bilgileri (abonelik faturası için) — boş→null.
       billingTitle: String(formData.get("billingTitle") || "").trim() || null,

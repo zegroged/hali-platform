@@ -68,6 +68,9 @@ export type BusinessDetail = {
   city: string;
   district: string;
   phone: string;
+  // Ek numaralar — web İKİZİ: profil "Sabit Hat" + "GSM & WhatsApp" gruplu gösterir.
+  gsmPhone2?: string | null;
+  landlinePhone?: string | null;
   // Yalnız 10 haneli VKN (tüzel kişi); TCKN sunucuda null'lanır (sızmasın).
   taxNumber?: string | null;
   workingHours: Record<string, { open: string; close: string } | null> | null;

@@ -388,6 +388,8 @@ export async function getBusinessById(id: string) {
     city: b.city,
     district: b.district,
     phone: b.phone,
+    gsmPhone2: b.gsmPhone2,
+    landlinePhone: b.landlinePhone,
     // Müşteriye YALNIZ 10 haneli VKN (tüzel kişi) gösterilir; 11 haneli TCKN
     // kişisel veridir (KVKK) → publicTaxNumber null'lar.
     taxNumber: publicTaxNumber(b.taxNumber),
