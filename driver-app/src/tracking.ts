@@ -1,6 +1,7 @@
 import * as Location from "expo-location";
 import * as TaskManager from "expo-task-manager";
 import { postLocation } from "./api";
+import { checkNewOrdersAndNotify } from "./notify";
 
 export const LOCATION_TASK = "hali-driver-location";
 
@@ -22,11 +23,22 @@ function movedMeters(a: { lat: number; lng: number }, lat: number, lng: number) 
 }
 
 // Arka plan konum görevi — uygulama kapalı/kilitliyken bile çalışır (native).
+// Yeni-iş yoklaması için ayrı sayaç: konum 15 sn'de bir gelir ama sipariş
+// listesini her seferinde çekmek israf — 45 sn'de bir yeter.
+let lastOrderCheck = 0;
+
 TaskManager.defineTask(LOCATION_TASK, async ({ data, error }) => {
   if (error) return;
   const locs = (data as { locations?: Location.LocationObject[] })?.locations;
   const loc = locs?.[locs.length - 1];
   if (!loc) return;
+  // YENİ İŞ BİLDİRİMİ: konum süzgeçlerinden ÖNCE (duran/kaba-konumlu şoför de
+  // yeni işten haberdar olmalı). Mesai açıkken ~45 sn'de bir yoklar.
+  const simdi = Date.now();
+  if (simdi - lastOrderCheck > 45_000) {
+    lastOrderCheck = simdi;
+    await checkNewOrdersAndNotify();
+  }
   const { latitude, longitude, accuracy } = loc.coords;
   // KAYMA SÜZGECİ (webdeki DriverShift ile aynı eşik): GPS oturmadan gelen
   // kaba fix yüzlerce metre sapar — hiç gönderme, sonraki fix'i bekle.

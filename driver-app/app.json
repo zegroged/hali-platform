@@ -34,7 +34,9 @@
       "bundleIdentifier": "com.enyakinhaliyikamaservisi.driver",
       "supportsTablet": false,
       "infoPlist": {
-        "UIBackgroundModes": ["location"],
+        "UIBackgroundModes": [
+          "location"
+        ],
         "NSLocationWhenInUseUsageDescription": "Konumun halıcına iletilir.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "Mesai boyunca konumun, uygulama kapalıyken bile halıcına iletilir."
       }
@@ -47,13 +49,20 @@
         "backgroundColor": "#0d9488"
       },
       "permissions": [
-        "ACCESS_COARSE_LOCATION",
-        "ACCESS_FINE_LOCATION",
-        "ACCESS_BACKGROUND_LOCATION",
-        "FOREGROUND_SERVICE",
-        "FOREGROUND_SERVICE_LOCATION",
-        "POST_NOTIFICATIONS"
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_BACKGROUND_LOCATION",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_LOCATION",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.RECORD_AUDIO"
       ]
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "bd1f8e08-a13b-49ab-8eb3-8b836f0bc390"
+      }
+    },
+    "owner": "enyakinhaliyikamaservisi"
   }
 }

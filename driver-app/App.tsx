@@ -12,6 +12,7 @@ import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { login, getToken, logout, setShift } from "./src/api";
 import { startTracking, stopTracking, isTracking } from "./src/tracking";
+import { ensureNotifPermission } from "./src/notify";
 import { Orders } from "./src/Orders";
 
 const NAME_KEY = "hali_driver_name";
@@ -84,6 +85,9 @@ function Driver() {
           Alert.alert("İzin gerekli", err);
           return;
         }
+        // Yeni-iş bildirimi izni (Android 13+): mesai bağlamında iste —
+        // reddedilirse mesai yine açılır, yalnız bildirim düşmez.
+        ensureNotifPermission().catch(() => {});
       } else {
         await stopTracking();
       }
