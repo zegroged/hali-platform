@@ -9,6 +9,7 @@ import { normalizeCityName, normalizeDistrictName } from "@/lib/cities";
 import { TR_PHONE_RE } from "@/lib/phone";
 import { normalizeBusinessName } from "@/lib/text";
 import { ensureBillingCode } from "@/lib/billing";
+import { findUsableCode, claimCode, attachCodeToBusiness } from "@/lib/referralCode";
 
 // İşletme self-servis kaydı. Hesap PENDING açılır ve görünmez;
 // panel akışı (e-posta doğrulama → profil → admin onayı) tamamlar.
@@ -169,16 +170,28 @@ export async function POST(req: NextRequest) {
   // Komisyoncu referans kodu: doluysa geçerli olmalı (OTP tüketilmeden önce
   // kontrol — yazım hatasında kod boşa yanmasın, düzeltip tekrar denesin).
   let agentId: string | null = null;
+  let claimedCodeId: string | null = null;
   const referralCode = (parsed.data.referralCode ?? "").trim().toUpperCase();
   if (referralCode) {
-    const agent = await prisma.agent.findUnique({ where: { code: referralCode } });
-    if (!agent || !agent.active) {
+    // TEK KULLANIMLIK kod: önce dostane ön-kontrol, sonra atomik tüketim.
+    const bulunan = await findUsableCode(referralCode);
+    if (!bulunan) {
       return NextResponse.json(
-        { error: "Referans kodu geçersiz. Kodu kontrol et ya da boş bırak." },
+        {
+          error:
+            "Referans kodu geçersiz ya da kullanılmış. Komisyoncudan yeni kod iste ya da boş bırak.",
+        },
         { status: 400 },
       );
     }
-    agentId = agent.id;
+    if (!(await claimCode(bulunan.codeId))) {
+      return NextResponse.json(
+        { error: "Referans kodu az önce kullanıldı — komisyoncudan yeni kod iste." },
+        { status: 400 },
+      );
+    }
+    agentId = bulunan.agentId;
+    claimedCodeId = bulunan.codeId;
   }
 
   // Kod doğru + çakışma yok → kodu tüket (tekrar kullanılamaz).
@@ -228,7 +241,10 @@ export async function POST(req: NextRequest) {
     where: { ownerId: owner.id },
     select: { id: true },
   });
-  if (biz) await ensureBillingCode(biz.id).catch(() => {});
+  if (biz) {
+    await ensureBillingCode(biz.id).catch(() => {});
+    if (claimedCodeId) await attachCodeToBusiness(claimedCodeId, biz.id);
+  }
 
   await createSession(owner.id);
   return NextResponse.json({ ok: true });

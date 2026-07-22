@@ -307,9 +307,6 @@ export default async function AdminBusinessDetail({
           {b.referredByAgent ? (
             <p className="text-sm text-slate-700">
               <span className="font-medium">{b.referredByAgent.user.name}</span>{" "}
-              <span className="font-mono text-brand-dark">
-                {b.referredByAgent.code}
-              </span>{" "}
               · %{Number(b.referredByAgent.percent)} (KDV hariç net üzerinden,
               her yenilemede işler)
             </p>
@@ -322,12 +319,11 @@ export default async function AdminBusinessDetail({
             <input type="hidden" name="businessId" value={b.id} />
             <div className="flex-1">
               <label className="mb-1 block text-xs text-slate-500">
-                Komisyoncu kodu (boş gönder = bağı kaldır)
+                Tek kullanımlık komisyoncu kodu (boş gönder = bağı kaldır)
               </label>
               <input
                 name="code"
-                defaultValue={b.referredByAgent?.code ?? ""}
-                placeholder="HYK-1234"
+                placeholder="HYK-XXXXXX"
                 className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
               />
             </div>

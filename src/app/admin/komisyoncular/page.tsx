@@ -87,7 +87,7 @@ export default async function AdminAgents({
       <div>
         <h1 className="text-lg font-semibold text-slate-900">Komisyoncular</h1>
         <p className="mt-1 text-sm text-slate-500">
-          Komisyoncu, koduyla getirdiği her işletmenin <strong>her abonelik
+          Komisyoncu, kendi panelinden ürettiği TEK KULLANIMLIK kodlarla getirdiği her işletmenin <strong>her abonelik
           ödemesinden</strong> (yenileme dahil), hesap açılırken belirlediğin
           yüzde kadar — <strong>KDV hariç net tutar üzerinden</strong> — pay
           alır. Abonelik yenilenmezse tahakkuk durur. Komisyoncu yalnız{" "}
@@ -97,9 +97,9 @@ export default async function AdminAgents({
 
       {ok && (
         <p className="rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-          Komisyoncu oluşturuldu: <strong>{ok}</strong>. Kullanıcı adı, şifre ve
-          kodu kendisine iletin; <strong>/giris</strong> adresinden girer, kodu
-          işletmelere dağıtır.
+          Komisyoncu oluşturuldu: <strong>{ok}</strong>. Kullanıcı adı ve şifreyi
+          kendisine iletin; girişten sonra her müşteri için kendi panelinden
+          tek kullanımlık kod üretir.
         </p>
       )}
       {hata && (
@@ -144,10 +144,6 @@ export default async function AdminAgents({
               className={inp}
             />
           </div>
-          <div>
-            <label className={lbl}>Kod (boşsa otomatik: HYK-1234)</label>
-            <input name="code" placeholder="Örn. AHMET50" className={inp} />
-          </div>
         </div>
         <PendingButton className="rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-dark">
           Komisyoncu Oluştur
@@ -173,9 +169,6 @@ export default async function AdminAgents({
                 <div>
                   <p className="font-semibold text-slate-900">
                     {a.user.name}{" "}
-                    <span className="font-mono text-sm text-brand-dark">
-                      {a.code}
-                    </span>{" "}
                     <span className="text-sm text-slate-500">%{Number(a.percent)}</span>
                   </p>
                   <p className="text-xs text-slate-500">

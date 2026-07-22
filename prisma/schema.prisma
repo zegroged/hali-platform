@@ -185,6 +185,7 @@ model CleanerBusiness {
   // Her abonelik ödemesinde (yenileme dahil) komisyon tahakkuku üretir.
   referredByAgent   Agent?  @relation(fields: [referredByAgentId], references: [id], onDelete: SetNull)
   referredByAgentId String?
+  usedReferralCodes AgentReferralCode[] @relation("CodeUsedBy")
 
   @@index([city, district])
 }
@@ -439,13 +440,29 @@ model Agent {
   id        String   @id @default(cuid())
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId    String   @unique
-  code      String   @unique // işletmelere dağıttığı referans kodu (örn. HYK-1234)
   percent   Decimal  @db.Decimal(5, 2) // NET (KDV hariç) tutar üzerinden yüzde
   active    Boolean  @default(true) // pasif komisyoncuya YENİ tahakkuk işlemez
   createdAt DateTime @default(now())
 
   referrals CleanerBusiness[]
   entries   CommissionEntry[]
+  codes     AgentReferralCode[]
+}
+
+// TEK KULLANIMLIK referans kodu (2026-07-23 kullanıcı kararı: kalıcı kod YOK):
+// komisyoncu her müşteri için panelinden yeni kod üretir; kod bir işletmeye
+// bağlanınca YANAR (usedAt dolar), tekrar kullanılamaz.
+model AgentReferralCode {
+  id        String    @id @default(cuid())
+  agent     Agent     @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  agentId   String
+  code      String    @unique // HYK-XXXXXX
+  createdAt DateTime  @default(now())
+  usedAt    DateTime? // dolunca kod tükenmiştir
+  usedByBusiness   CleanerBusiness? @relation("CodeUsedBy", fields: [usedByBusinessId], references: [id], onDelete: SetNull)
+  usedByBusinessId String?
+
+  @@index([agentId, createdAt])
 }
 
 model CommissionEntry {

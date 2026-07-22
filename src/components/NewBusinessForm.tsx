@@ -96,7 +96,7 @@ export default function NewBusinessForm() {
 
       <div>
         <label htmlFor="agentCode" className={lbl}>
-          Komisyoncu kodu <span className="text-slate-400">(varsa)</span>
+          Komisyoncu kodu <span className="text-slate-400">(tek kullanımlık, varsa)</span>
         </label>
         <input
           id="agentCode"

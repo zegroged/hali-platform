@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { subscriptionActive } from "@/lib/subscription";
+import { generateReferralCode } from "./actions";
+import { PendingButton } from "@/components/PendingButton";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +14,12 @@ const fmtTarih = (d: Date) =>
 
 // Komisyoncu ekranı (YALNIZ AGENT rolü): kendi kodu, getirdiği işletmeler ve
 // komisyon tahakkukları — salt-okunur. Admin/panele giremez.
-export default async function KomisyoncuSayfasi() {
+export default async function KomisyoncuSayfasi({
+  searchParams,
+}: {
+  searchParams: Promise<{ yeni?: string; hata?: string }>;
+}) {
+  const { yeni, hata } = await searchParams;
   // YETKİ KAPISI prisma'dan ÖNCE (app-router-auth-leak dersi).
   const u = await getSessionUser();
   if (!u || u.role !== "AGENT") redirect("/giris");
@@ -34,6 +41,11 @@ export default async function KomisyoncuSayfasi() {
         orderBy: { createdAt: "desc" },
         take: 60,
         include: { business: { select: { name: true } } },
+      },
+      codes: {
+        orderBy: { createdAt: "desc" },
+        take: 40,
+        include: { usedByBusiness: { select: { name: true } } },
       },
     },
   });
@@ -60,15 +72,65 @@ export default async function KomisyoncuSayfasi() {
           Komisyoncu Paneli — {u.name}
         </h1>
         <p className="mt-1 text-sm text-slate-500">
-          Referans kodun:{" "}
-          <span className="rounded bg-brand-light/60 px-2 py-0.5 font-mono font-semibold text-brand-dark">
-            {agent.code}
-          </span>{" "}
-          · Komisyon oranın: <strong>%{Number(agent.percent)}</strong> (KDV hariç
-          net abonelik tutarı üzerinden). Kodunla kaydolan her işletmenin
-          aboneliği yenilendikçe komisyonun işlemeye devam eder.
+          Komisyon oranın: <strong>%{Number(agent.percent)}</strong> (KDV hariç
+          net abonelik tutarı üzerinden). <strong>Her müşteri için aşağıdan
+          TEK KULLANIMLIK kod üret</strong> — kod bir işletmeye bağlanınca
+          yanar; işletmenin aboneliği yenilendikçe komisyonun işlemeye devam
+          eder.
         </p>
       </div>
+
+      {yeni && (
+        <p className="rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+          Yeni kodun hazır:{" "}
+          <span className="font-mono text-base font-bold">{yeni}</span> — bu
+          kodu müşterine ver; kayıt sırasında girecek (tek kullanımlık).
+        </p>
+      )}
+      {hata && (
+        <p
+          role="alert"
+          className="rounded-xl border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700"
+        >
+          {hata}
+        </p>
+      )}
+
+      <section className="rounded-2xl border border-slate-200 bg-white p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="font-semibold text-slate-900">Referans Kodların</h2>
+            <p className="text-sm text-slate-500">
+              Her müşteri için ayrı kod üret — aynı kod ikinci kez kullanılamaz.
+            </p>
+          </div>
+          <form action={generateReferralCode}>
+            <PendingButton className="rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-dark">
+              + Kod Üret
+            </PendingButton>
+          </form>
+        </div>
+        {agent.codes.length > 0 && (
+          <ul className="mt-3 divide-y divide-slate-100 text-sm">
+            {agent.codes.map((k) => (
+              <li key={k.id} className="flex items-center justify-between py-2">
+                <span className="font-mono font-semibold text-slate-800">
+                  {k.code}
+                </span>
+                {k.usedAt ? (
+                  <span className="text-xs text-slate-500">
+                    Kullanıldı{k.usedByBusiness ? ` · ${k.usedByBusiness.name}` : ""}
+                  </span>
+                ) : (
+                  <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                    Kullanıma hazır
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
 
       <div className="grid grid-cols-3 gap-2 text-center">
         <div className="rounded-xl border border-slate-200 bg-white p-3">
@@ -91,8 +153,8 @@ export default async function KomisyoncuSayfasi() {
         <h2 className="font-semibold text-slate-900">Getirdiğin İşletmeler</h2>
         {agent.referrals.length === 0 ? (
           <p className="mt-2 text-sm text-slate-500">
-            Henüz kodunla kaydolan işletme yok. Kodunu halıcılarla paylaş —
-            kayıt sırasında ya da sonradan yöneticiye bildirerek kullanılabilir.
+            Henüz kodunla kaydolan işletme yok. Yukarıdan kod üretip müşterine
+            ver — kayıt sırasında girer ya da yönetici senin adına bağlar.
           </p>
         ) : (
           <ul className="mt-2 divide-y divide-slate-100 text-sm">

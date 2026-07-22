@@ -315,7 +315,7 @@ export default function KayitPage() {
           </div>
           <div>
             <label htmlFor="kayit-referans" className={labelCls}>
-              Komisyoncu / referans kodu{" "}
+              Komisyoncu referans kodu (tek kullanımlık){" "}
               <span className="text-xs font-normal text-slate-400">(varsa)</span>
             </label>
             <input
