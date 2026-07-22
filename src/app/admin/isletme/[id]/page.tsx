@@ -21,6 +21,8 @@ import {
   unbanUser,
   unrejectBusiness,
 } from "../../actions";
+import { setBusinessAgent } from "../../actions";
+import { PendingButton } from "@/components/PendingButton";
 
 export const dynamic = "force-dynamic";
 
@@ -81,6 +83,7 @@ export default async function AdminBusinessDetail({
     include: {
       owner: true,
       subscription: true,
+      referredByAgent: { include: { user: { select: { name: true } } } },
       serviceAreas: true,
       pricing: { orderBy: { createdAt: "asc" } },
       photos: { orderBy: { createdAt: "desc" } },
@@ -298,6 +301,40 @@ export default async function AdminBusinessDetail({
               </li>
             ))}
           </ul>
+        </Card>
+
+        <Card title="Komisyoncu">
+          {b.referredByAgent ? (
+            <p className="text-sm text-slate-700">
+              <span className="font-medium">{b.referredByAgent.user.name}</span>{" "}
+              <span className="font-mono text-brand-dark">
+                {b.referredByAgent.code}
+              </span>{" "}
+              · %{Number(b.referredByAgent.percent)} (KDV hariç net üzerinden,
+              her yenilemede işler)
+            </p>
+          ) : (
+            <p className="text-sm text-slate-500">
+              Bağlı komisyoncu yok. Kod girerek bağlayabilirsin.
+            </p>
+          )}
+          <form action={setBusinessAgent} className="mt-2 flex items-end gap-2">
+            <input type="hidden" name="businessId" value={b.id} />
+            <div className="flex-1">
+              <label className="mb-1 block text-xs text-slate-500">
+                Komisyoncu kodu (boş gönder = bağı kaldır)
+              </label>
+              <input
+                name="code"
+                defaultValue={b.referredByAgent?.code ?? ""}
+                placeholder="HYK-1234"
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              />
+            </div>
+            <PendingButton className="rounded-lg bg-brand px-3 py-2 text-sm font-semibold text-white hover:bg-brand-dark">
+              Kaydet
+            </PendingButton>
+          </form>
         </Card>
 
         <Card title="Abonelik">

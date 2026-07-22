@@ -93,6 +93,18 @@ export default function NewBusinessForm() {
         </label>
         <input id="taxNumber" name="taxNumber" className={inp} />
       </div>
+
+      <div>
+        <label htmlFor="agentCode" className={lbl}>
+          Komisyoncu kodu <span className="text-slate-400">(varsa)</span>
+        </label>
+        <input
+          id="agentCode"
+          name="agentCode"
+          placeholder="HYK-1234"
+          className={inp}
+        />
+      </div>
       <div className="grid gap-4 sm:grid-cols-3">
         <div>
           <label htmlFor="pricePerM2" className={lbl}>

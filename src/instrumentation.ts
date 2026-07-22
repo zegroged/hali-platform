@@ -39,6 +39,12 @@ async function hourlyTick() {
   } catch (e) {
     console.error("[siparis-sla] hata:", e);
   }
+  try {
+    const { backfillMissingCommissions } = await import("@/lib/commission");
+    await backfillMissingCommissions();
+  } catch (e) {
+    console.error("[komisyon-backfill] hata:", e);
+  }
 }
 
 export async function register() {
@@ -54,5 +60,8 @@ export async function register() {
   // sonrası site bir an önce ayağa kalkmalı.
   void hourlyTick();
   const hourlyTimer = setInterval(hourlyTick, 60 * 60 * 1000);
+  // Açılışta da bir kez (30 sn sonra): deploy sonrası SLA/komisyon-backfill
+  // taraması bir saat beklemesin.
+  setTimeout(hourlyTick, 30_000);
   if (typeof hourlyTimer.unref === "function") hourlyTimer.unref();
 }

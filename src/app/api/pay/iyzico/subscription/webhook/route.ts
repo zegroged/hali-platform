@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { extendSubscription } from "@/lib/subscription";
 import { notifySubscriptionPaid } from "@/lib/paymentNotify";
+import { accrueCommissionForPayment } from "@/lib/commission";
 import { syncVisibility } from "@/lib/panel";
 import { paymentsLive } from "@/lib/config";
 
@@ -72,11 +73,12 @@ export async function POST(req: NextRequest) {
     // çift 30 gün + çift ödeme kaydı üretiyordu. iyzicoPaymentId @unique ile
     // ATOMİK claim — daha önce işlendiyse create P2002 fırlatır, no-op döner.
     let yeniDonemSonu: Date | null = null;
+    let yeniOdemeId: string | null = null;
     try {
       await prisma.$transaction(async (tx) => {
         const end = await extendSubscription(tx, sub.businessId);
         yeniDonemSonu = end;
-        await tx.subscriptionPayment.create({
+        const olusan = await tx.subscriptionPayment.create({
           data: {
             businessId: sub.businessId,
             status: "PAID",
@@ -89,8 +91,11 @@ export async function POST(req: NextRequest) {
             iyzicoPaymentId: eventId,
           },
         });
+        yeniOdemeId = olusan.id;
       });
       await syncVisibility(sub.businessId);
+      // Komisyoncu tahakkuku (varsa) — idempotent, best-effort.
+      if (yeniOdemeId) await accrueCommissionForPayment(yeniOdemeId);
       // Otomatik bilgilendirme (best-effort): makbuz + zil + admin FATURA KES.
       // Idempotency claim'i gectik = bu olay ILK kez islendi, cift mail gitmez.
       await notifySubscriptionPaid({
@@ -108,6 +113,12 @@ export async function POST(req: NextRequest) {
         "code" in e &&
         (e as { code?: string }).code === "P2002"
       ) {
+        // Replay: ödeme satırı zaten var — tahakkuk eksikse tamamla (idempotent).
+        const mevcut = await prisma.subscriptionPayment.findUnique({
+          where: { iyzicoPaymentId: eventId },
+          select: { id: true },
+        });
+        if (mevcut) await accrueCommissionForPayment(mevcut.id);
         return NextResponse.json({ ok: true, duplicate: true });
       }
       throw e;

@@ -4,6 +4,7 @@ import { retrieveRecurringResult } from "@/lib/iyzico";
 import { getAppBaseUrl, paymentsLive } from "@/lib/config";
 import { extendSubscription } from "@/lib/subscription";
 import { notifySubscriptionPaid } from "@/lib/paymentNotify";
+import { accrueCommissionForPayment } from "@/lib/commission";
 import { syncVisibility } from "@/lib/panel";
 
 // Tekrarlayan abonelik Checkout dönüşü. iyzico'nun sunucu-sunucu doğrulamasıyla
@@ -42,7 +43,12 @@ export async function POST(req: NextRequest) {
   const marker = await prisma.subscriptionPayment.findUnique({
     where: { id: r.conversationId },
   });
-  if (!marker || marker.status !== "PENDING") return fail();
+  if (!marker) return fail();
+  if (marker.status !== "PENDING") {
+    // Replay: ödeme zaten işlenmiş — tahakkuk eksik kaldıysa tamamla (idempotent).
+    if (marker.status === "PAID") await accrueCommissionForPayment(marker.id);
+    return fail();
+  }
 
   // ATOMİK CLAIM (denetim bulgusu): PENDING kontrolü transaction dışında yapılıp
   // update koşulsuzdu — eşzamanlı iki callback ilk dönemi iki kez açabiliyordu.
@@ -81,6 +87,8 @@ export async function POST(req: NextRequest) {
   });
   if (claimed) {
     await syncVisibility(marker.businessId);
+    // Komisyoncu tahakkuku (varsa) — idempotent, best-effort.
+    await accrueCommissionForPayment(marker.id);
     // Otomatik bilgilendirme (best-effort; claimed guard'i cift maili engeller).
     const son = await prisma.subscriptionPayment.findUnique({
       where: { id: marker.id },

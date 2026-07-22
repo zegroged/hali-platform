@@ -31,6 +31,8 @@ const Body = z.object({
   consent: z.literal(true),
   // Kayıt öncesi e-postaya gönderilen 6 haneli doğrulama kodu.
   emailCode: z.string().trim().length(6),
+  // Komisyoncu referans kodu (opsiyonel): doluysa geçerli olmalı.
+  referralCode: z.string().trim().max(20).optional(),
   // Honeypot: gerçek kullanıcı bu gizli alanı görmez/doldurmaz; botlar doldurur.
   website: z.string().max(200).optional(),
 });
@@ -164,6 +166,21 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // Komisyoncu referans kodu: doluysa geçerli olmalı (OTP tüketilmeden önce
+  // kontrol — yazım hatasında kod boşa yanmasın, düzeltip tekrar denesin).
+  let agentId: string | null = null;
+  const referralCode = (parsed.data.referralCode ?? "").trim().toUpperCase();
+  if (referralCode) {
+    const agent = await prisma.agent.findUnique({ where: { code: referralCode } });
+    if (!agent || !agent.active) {
+      return NextResponse.json(
+        { error: "Referans kodu geçersiz. Kodu kontrol et ya da boş bırak." },
+        { status: 400 },
+      );
+    }
+    agentId = agent.id;
+  }
+
   // Kod doğru + çakışma yok → kodu tüket (tekrar kullanılamaz).
   await prisma.signupOtp.delete({ where: { email } });
 
@@ -185,6 +202,7 @@ export async function POST(req: NextRequest) {
         create: {
           // BÜYÜK HARF normalize — kartlarda tekdüze görünüm.
           name: normalizeBusinessName(businessName),
+          ...(agentId ? { referredByAgent: { connect: { id: agentId } } } : {}),
           address: `${districtCanon}, ${cityCanon}`,
           city: cityCanon,
           district: districtCanon,

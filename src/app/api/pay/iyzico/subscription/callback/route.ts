@@ -5,6 +5,7 @@ import { getAppBaseUrl, paymentsLive } from "@/lib/config";
 import { extendSubscription } from "@/lib/subscription";
 import { syncVisibility } from "@/lib/panel";
 import { notifySubscriptionPaid } from "@/lib/paymentNotify";
+import { accrueCommissionForPayment } from "@/lib/commission";
 
 // iyzico abonelik ödemesi dönüşü. YALNIZ iyzico'nun kimlik-doğrulamalı sunucu
 // yanıtına güvenir; tutarı beklenenle karşılaştırır; idempotenttir (çift
@@ -78,6 +79,11 @@ export async function POST(req: NextRequest) {
 
   // Görünürlük idempotent; commit'ten SONRA, transaction dışında (yalnız bu
   // istekte gerçekten dönem açıldıysa yeterli — ama çift çalışması da zararsız).
+  // Komisyoncu tahakkuku: KAPININ DIŞINDA — idempotent (paymentId @unique)
+  // olduğundan replay'de de çağrılır; ilk denemede geçici hatayla yutulduysa
+  // iyzico'nun tekrar callback'i tahakkuku tamamlar (inceleme bulgusu).
+  await accrueCommissionForPayment(payment.id);
+
   if (processed) {
     await syncVisibility(payment.businessId);
     // Otomatik bilgilendirme: işletmeye makbuz + zil, admin'e FATURA KES maili.

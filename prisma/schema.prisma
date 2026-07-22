@@ -20,6 +20,7 @@ enum UserRole {
   ADMIN
   SUPPORT // müşteri hizmetleri — TEK yetkisi: doğrulamasız işletme açmak (/destek)
   ACCOUNTANT // mali müşavir — YALNIZ /muhasebe: fatura bilgileri + ödemeleri görür
+  AGENT // komisyoncu — YALNIZ /komisyoncu: getirdiği işletmeler + komisyon kazançları
 }
 
 enum VerificationStatus {
@@ -94,6 +95,7 @@ model User {
   updatedAt         DateTime  @updatedAt
 
   ownedBusiness CleanerBusiness? @relation("BusinessOwner")
+  agentProfile  Agent?
   driverProfile Driver?
   orders        Order[]          @relation("CustomerOrders")
   reviews       Review[]
@@ -178,6 +180,11 @@ model CleanerBusiness {
   badges       Badge[]
   subscription Subscription?
   payments     SubscriptionPayment[]
+  commissions  CommissionEntry[]
+  // Komisyoncu referansı: bu işletmeyi platforma hangi komisyoncu getirdi.
+  // Her abonelik ödemesinde (yenileme dahil) komisyon tahakkuku üretir.
+  referredByAgent   Agent?  @relation(fields: [referredByAgentId], references: [id], onDelete: SetNull)
+  referredByAgentId String?
 
   @@index([city, district])
 }
@@ -421,6 +428,44 @@ model SubscriptionPayment {
   paidAt          DateTime?
 
   @@index([businessId])
+  commission CommissionEntry?
+}
+
+// ---- KOMİSYONCU (satış ortağı) sistemi ----
+// Admin hesap açarken yüzdeyi belirler; komisyoncunun koduyla gelen her
+// işletmenin HER abonelik ödemesinde (ilk + yenileme) KDV HARİÇ net tutar
+// üzerinden komisyon tahakkuk eder — abonelik sürdükçe devam eder.
+model Agent {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String   @unique
+  code      String   @unique // işletmelere dağıttığı referans kodu (örn. HYK-1234)
+  percent   Decimal  @db.Decimal(5, 2) // NET (KDV hariç) tutar üzerinden yüzde
+  active    Boolean  @default(true) // pasif komisyoncuya YENİ tahakkuk işlemez
+  createdAt DateTime @default(now())
+
+  referrals CleanerBusiness[]
+  entries   CommissionEntry[]
+}
+
+model CommissionEntry {
+  id         String              @id @default(cuid())
+  // Restrict (inceleme bulgusu): komisyon DEFTERİ silinme zincirleriyle yok
+  // olmasın — ödenmemiş borç kaydı, bağlı kayıt silinse bile korunur.
+  agent      Agent               @relation(fields: [agentId], references: [id], onDelete: Restrict)
+  agentId    String
+  business   CleanerBusiness     @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  businessId String
+  payment    SubscriptionPayment @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+  paymentId  String              @unique // idempotency: her ödemeye EN FAZLA 1 komisyon
+  grossAmount Decimal @db.Decimal(10, 2) // tahsil edilen (KDV dahil)
+  netAmount   Decimal @db.Decimal(10, 2) // KDV hariç matrah
+  percent     Decimal @db.Decimal(5, 2) // tahakkuk anındaki yüzde (sonradan değişse de sabit)
+  amount      Decimal @db.Decimal(10, 2) // komisyoncuya ödenecek tutar
+  paidAt      DateTime? // admin "ödendi" işaretleyince dolar
+  createdAt   DateTime  @default(now())
+
+  @@index([agentId, createdAt])
 }
 
 model Badge {

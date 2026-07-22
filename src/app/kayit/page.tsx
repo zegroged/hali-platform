@@ -37,6 +37,7 @@ export default function KayitPage() {
     password: "",
     city: "",
     district: "",
+    referralCode: "",
   });
   // Aracılık sözleşmesi teyidi — işaretlenmemiş başlar, zorunludur
   // (ETAHS Yönetmeliği: işletme ile elektronik aracılık sözleşmesi kurulması).
@@ -311,6 +312,20 @@ export default function KayitPage() {
               (büyük/küçük harf farketmez).
             </p>
             {err("username")}
+          </div>
+          <div>
+            <label htmlFor="kayit-referans" className={labelCls}>
+              Komisyoncu / referans kodu{" "}
+              <span className="text-xs font-normal text-slate-400">(varsa)</span>
+            </label>
+            <input
+              id="kayit-referans"
+              className={inputCls(undefined)}
+              placeholder="HYK-1234"
+              maxLength={20}
+              value={form.referralCode}
+              onChange={(e) => set("referralCode", e.target.value)}
+            />
           </div>
           <div>
             <label htmlFor="kayit-eposta" className={labelCls}>

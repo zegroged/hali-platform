@@ -118,6 +118,9 @@ export async function createBusinessByAdmin(formData: FormData) {
     ? (normalizeDistrictName(city, String(formData.get("district") || "")) ?? "")
     : "";
   const taxNumber = String(formData.get("taxNumber") || "").replace(/\D/g, "");
+  // Komisyoncu kodu (opsiyonel): doluysa geçerli olmalı — işletme bu
+  // komisyoncuya bağlanır, her abonelik ödemesinde komisyon işler.
+  const agentCode = String(formData.get("agentCode") || "").trim().toUpperCase();
   const pricePerM2 = Number(formData.get("pricePerM2")) || null;
   const minDays = Number(formData.get("minDays")) || null;
   const maxDays = Number(formData.get("maxDays")) || null;
@@ -160,6 +163,13 @@ export async function createBusinessByAdmin(formData: FormData) {
   if (username) {
     const uErr = validateUsername(username);
     if (uErr) err(uErr);
+  }
+  let agentId: string | null = null;
+  if (agentCode) {
+    const agent = await prisma.agent.findUnique({ where: { code: agentCode } });
+    if (!agent) err("Komisyoncu kodu bulunamadı: " + agentCode);
+    if (!agent!.active) err("Bu komisyoncu pasif — kod kullanılamaz.");
+    agentId = agent!.id;
   }
   // İl/ilçe de boş kalabilir — sahibi sonradan panelden listeden seçer.
   // AYRICALIK (2026-07-13, kullanıcı kararı): ADMIN/SUPPORT işletme açarken
@@ -272,6 +282,7 @@ export async function createBusinessByAdmin(formData: FormData) {
       ownedBusiness: {
         create: {
           name: finalBusinessName,
+          ...(agentId ? { referredByAgent: { connect: { id: agentId } } } : {}),
           address: city && district ? `${district}, ${city}` : "",
           city,
           district,
@@ -695,4 +706,149 @@ export async function clearPauseByAdmin(formData: FormData) {
   });
   revalidatePath(`/admin/isletme/${id}`);
   revalidatePath("/admin");
+}
+
+
+// ---- KOMİSYONCU (AGENT) yönetimi ----
+
+/**
+ * Komisyoncu hesabı oluştur (YALNIZ admin). Yüzde, hesap açılırken admin
+ * tarafından belirlenir ve KDV HARİÇ net abonelik tutarı üzerinden işler.
+ * Komisyoncu /komisyoncu sayfasında yalnız kendi kazançlarını görür.
+ */
+export async function createAgent(formData: FormData) {
+  await requireAdmin();
+  const name = String(formData.get("name") || "").trim();
+  const phone = normalizePhone(String(formData.get("phone") || ""));
+  const usernameRaw = String(formData.get("username") || "").trim();
+  const password = String(formData.get("password") || "");
+  const percentRaw = String(formData.get("percent") || "").replace(",", ".");
+  const codeRaw = String(formData.get("code") || "").trim().toUpperCase();
+  const err = (m: string) =>
+    redirect("/admin/komisyoncular?hata=" + encodeURIComponent(m));
+
+  if (name.length < 2) err("Ad girin.");
+  if (!isTrPhone(phone)) err("Geçerli bir telefon girin (11 hane).");
+  const username = normalizeUsername(usernameRaw);
+  const uErr = validateUsername(username);
+  if (uErr) err(uErr);
+  if (password.length < 8) err("Şifre en az 8 karakter olmalı.");
+  const percent = Number(percentRaw);
+  if (!Number.isFinite(percent) || percent <= 0 || percent > 100)
+    err("Komisyon yüzdesi 0 ile 100 arasında olmalı (örn. 50).");
+  if (codeRaw && !/^[A-Z0-9-]{4,20}$/.test(codeRaw))
+    err("Kod 4-20 karakter olmalı; harf, rakam ve tire kullanılabilir.");
+
+  const exists = await prisma.user.findFirst({
+    where: { OR: [{ username }, { phone }] },
+  });
+  if (exists) {
+    err(
+      exists.username === username
+        ? "Bu kullanıcı adı zaten kullanımda."
+        : "Bu telefon zaten kayıtlı.",
+    );
+  }
+
+  // Kod: boşsa benzersiz üret (HYK-1234); doluysa çakışma kontrolü.
+  let code = codeRaw;
+  if (code) {
+    const taken = await prisma.agent.findUnique({ where: { code } });
+    if (taken) err("Bu kod başka bir komisyoncuda. Farklı bir kod seçin.");
+  } else {
+    for (let i = 0; i < 20 && !code; i++) {
+      const aday = `HYK-${crypto.randomInt(1000, 10000)}`;
+      if (!(await prisma.agent.findUnique({ where: { code: aday } }))) code = aday;
+    }
+    if (!code) err("Kod üretilemedi, elle bir kod girin.");
+  }
+
+  // TEK transaction (inceleme bulgusu): agent.create patlarsa yetim AGENT
+  // kullanıcısı kalmasın; kod yarışında P2002 anlaşılır hataya çevrilir.
+  try {
+    await prisma.$transaction(async (tx) => {
+      const user = await tx.user.create({
+        data: {
+          role: "AGENT",
+          name,
+          phone,
+          username,
+          password: await hashPassword(password),
+        },
+      });
+      await tx.agent.create({ data: { userId: user.id, code, percent } });
+    });
+  } catch (e) {
+    if (e && typeof e === "object" && "code" in e && (e as { code?: string }).code === "P2002") {
+      err("Kod/telefon/kullanıcı adı az önce başkası tarafından alındı — tekrar deneyin.");
+    }
+    throw e;
+  }
+  revalidatePath("/admin/komisyoncular");
+  redirect(
+    "/admin/komisyoncular?ok=" + encodeURIComponent(`${username} · kod: ${code}`),
+  );
+}
+
+/** İşletmeye komisyoncu bağla/kaldır (admin işletme detayından, kodla). */
+export async function setBusinessAgent(formData: FormData) {
+  await requireAdmin();
+  const businessId = String(formData.get("businessId") || "");
+  const code = String(formData.get("code") || "").trim().toUpperCase();
+  const geri = "/admin/isletme/" + businessId;
+  if (!businessId) redirect("/admin");
+
+  const biz = await prisma.cleanerBusiness.findUnique({
+    where: { id: businessId },
+    select: { id: true },
+  });
+  if (!biz) redirect("/admin");
+
+  if (!code) {
+    await prisma.cleanerBusiness.update({
+      where: { id: businessId },
+      data: { referredByAgentId: null },
+    });
+  } else {
+    const agent = await prisma.agent.findUnique({ where: { code } });
+    if (!agent) redirect(geri + "?hata=" + encodeURIComponent("Komisyoncu kodu bulunamadı: " + code));
+    if (!agent!.active)
+      redirect(geri + "?hata=" + encodeURIComponent("Bu komisyoncu pasif — önce aktive edin."));
+    await prisma.cleanerBusiness.update({
+      where: { id: businessId },
+      data: { referredByAgentId: agent!.id },
+    });
+  }
+  revalidatePath(geri);
+  redirect(geri);
+}
+
+/** Komisyon kaydını ödendi/geri-al işaretle (admin). */
+export async function toggleCommissionPaid(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("id") || "");
+  const entry = await prisma.commissionEntry.findUnique({ where: { id } });
+  if (entry) {
+    // Koşullu yaz (TOCTOU): eşzamanlı iki tıklama niyetin tersine çevirmesin.
+    await prisma.commissionEntry.updateMany({
+      where: { id, paidAt: entry.paidAt ? { not: null } : null },
+      data: { paidAt: entry.paidAt ? null : new Date() },
+    });
+  }
+  revalidatePath("/admin/komisyoncular");
+}
+
+/** Komisyoncuyu pasife al / aktive et — pasifken YENİ tahakkuk işlemez. */
+export async function toggleAgentActive(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("id") || "");
+  const agent = await prisma.agent.findUnique({ where: { id } });
+  if (agent) {
+    // Koşullu yaz (TOCTOU).
+    await prisma.agent.updateMany({
+      where: { id, active: agent.active },
+      data: { active: !agent.active },
+    });
+  }
+  revalidatePath("/admin/komisyoncular");
 }
