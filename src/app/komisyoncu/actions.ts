@@ -8,13 +8,14 @@ import { uretKodMetni } from "@/lib/referralCode";
 
 // Komisyoncunun TEK yetkili aksiyonu: kendi adına tek kullanımlık kod üretmek.
 // Her müşteri için ayrı kod üretilir; kod bir işletmeye bağlanınca yanar.
-export async function generateReferralCode() {
+// PREMIUM (canDiscount) komisyoncu koda indirim gömebilir: yüzde + kaç ay.
+export async function generateReferralCode(formData: FormData) {
   const u = await getSessionUser();
   if (!u || u.role !== "AGENT") redirect("/giris");
 
   const agent = await prisma.agent.findUnique({
     where: { userId: u.id },
-    select: { id: true, active: true },
+    select: { id: true, active: true, canDiscount: true },
   });
   if (!agent) redirect("/giris");
   if (!agent.active) {
@@ -22,6 +23,27 @@ export async function generateReferralCode() {
       "/komisyoncu?hata=" +
         encodeURIComponent("Hesabın pasif — kod üretmek için yöneticiyle görüş."),
     );
+  }
+
+  // Opsiyonel indirim (yalnız premium): ikisi birlikte dolu olmalı.
+  const hataDon = (m: string) => {
+    redirect("/komisyoncu?hata=" + encodeURIComponent(m));
+  };
+  const pctRaw = String(formData.get("discountPercent") || "").replace(",", ".").trim();
+  const ayRaw = String(formData.get("discountMonths") || "").trim();
+  let discountPercent: number | null = null;
+  let discountMonths: number | null = null;
+  if (pctRaw || ayRaw) {
+    if (!agent.canDiscount)
+      hataDon("İndirim tanımlama yetkin yok — yöneticiyle görüş.");
+    const pct = Number(pctRaw);
+    const ay = Number(ayRaw);
+    if (!Number.isFinite(pct) || pct <= 0 || pct > 100)
+      hataDon("İndirim yüzdesi 1 ile 100 arasında olmalı.");
+    if (!Number.isInteger(ay) || ay < 1 || ay > 1200)
+      hataDon("İndirim süresi ay olarak girilmeli (en az 1).");
+    discountPercent = Math.round(pct * 100) / 100;
+    discountMonths = ay;
   }
 
   // Spam freni: aynı anda en fazla 25 kullanılmamış kod.
@@ -42,7 +64,7 @@ export async function generateReferralCode() {
     const kod = uretKodMetni();
     try {
       await prisma.agentReferralCode.create({
-        data: { agentId: agent.id, code: kod },
+        data: { agentId: agent.id, code: kod, discountPercent, discountMonths },
       });
       revalidatePath("/komisyoncu");
       redirect("/komisyoncu?yeni=" + encodeURIComponent(kod));

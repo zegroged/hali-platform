@@ -16,14 +16,22 @@ export function uretKodMetni(): string {
 }
 
 /** Kod ön-kontrolü (dostane hata için): geçerli + kullanılmamış + aktif
- *  komisyoncuya ait mi? Yarış güvencesi DEĞİLDİR — tüketim claim ile yapılır. */
+ *  komisyoncuya ait mi? Yarış güvencesi DEĞİLDİR — tüketim claim ile yapılır.
+ *  Koda gömülü indirim varsa döner (claim eden akış işletmeye işler). */
 export async function findUsableCode(code: string) {
   const row = await prisma.agentReferralCode.findUnique({
     where: { code },
     include: { agent: { select: { id: true, active: true } } },
   });
   if (!row || row.usedAt || !row.agent.active) return null;
-  return { codeId: row.id, agentId: row.agent.id };
+  const pct = Number(row.discountPercent ?? 0);
+  const ay = row.discountMonths ?? 0;
+  return {
+    codeId: row.id,
+    agentId: row.agent.id,
+    discountPercent: pct > 0 && ay > 0 ? pct : null,
+    discountMonths: pct > 0 && ay > 0 ? ay : null,
+  };
 }
 
 /** Kodu ATOMİK tüket (işletme OLUŞMADAN önce çağrılır — yarışı kaybeden

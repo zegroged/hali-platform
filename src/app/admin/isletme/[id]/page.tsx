@@ -21,7 +21,7 @@ import {
   unbanUser,
   unrejectBusiness,
 } from "../../actions";
-import { setBusinessAgent } from "../../actions";
+import { setBusinessAgent, setBusinessDiscount } from "../../actions";
 import { PendingButton } from "@/components/PendingButton";
 
 export const dynamic = "force-dynamic";
@@ -325,6 +325,51 @@ export default async function AdminBusinessDetail({
                 name="code"
                 placeholder="HYK-XXXXXX"
                 className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              />
+            </div>
+            <PendingButton className="rounded-lg bg-brand px-3 py-2 text-sm font-semibold text-white hover:bg-brand-dark">
+              Kaydet
+            </PendingButton>
+          </form>
+        </Card>
+
+        <Card title="Abonelik İndirimi">
+          {Number(b.discountPercent ?? 0) > 0 &&
+          b.discountUntil &&
+          b.discountUntil.getTime() > Date.now() ? (
+            <p className="text-sm text-slate-700">
+              <span className="rounded-full bg-violet-100 px-2.5 py-0.5 text-xs font-medium text-violet-700">
+                %{Number(b.discountPercent).toLocaleString("tr-TR", { maximumFractionDigits: 2 })} indirim
+              </span>{" "}
+              — {tr(b.discountUntil)} tarihine kadar her tahsilat indirimli
+              (%100 = dönem ücretsiz açılır).
+            </p>
+          ) : (
+            <p className="text-sm text-slate-500">
+              Aktif indirim yok. İstediğin yüzdeyi + süreyi ver; süre kaydettiğin
+              andan itibaren işler (uzatmak için tekrar kaydet).
+            </p>
+          )}
+          <form action={setBusinessDiscount} className="mt-2 flex items-end gap-2">
+            <input type="hidden" name="businessId" value={b.id} />
+            <div>
+              <label className="mb-1 block text-xs text-slate-500">
+                İndirim % (boş = kaldır)
+              </label>
+              <input
+                name="percent"
+                inputMode="decimal"
+                placeholder="Örn. 50"
+                className="w-28 rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs text-slate-500">Süre (ay)</label>
+              <input
+                name="months"
+                inputMode="numeric"
+                placeholder="Örn. 6"
+                className="w-24 rounded-lg border border-slate-300 px-3 py-2 text-sm"
               />
             </div>
             <PendingButton className="rounded-lg bg-brand px-3 py-2 text-sm font-semibold text-white hover:bg-brand-dark">

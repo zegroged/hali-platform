@@ -10,6 +10,7 @@ import { TR_PHONE_RE } from "@/lib/phone";
 import { normalizeBusinessName } from "@/lib/text";
 import { ensureBillingCode } from "@/lib/billing";
 import { findUsableCode, claimCode, attachCodeToBusiness } from "@/lib/referralCode";
+import { discountUntilFromMonths } from "@/lib/discount";
 
 // İşletme self-servis kaydı. Hesap PENDING açılır ve görünmez;
 // panel akışı (e-posta doğrulama → profil → admin onayı) tamamlar.
@@ -171,6 +172,7 @@ export async function POST(req: NextRequest) {
   // kontrol — yazım hatasında kod boşa yanmasın, düzeltip tekrar denesin).
   let agentId: string | null = null;
   let claimedCodeId: string | null = null;
+  let kodIndirim: { percent: number; months: number } | null = null;
   const referralCode = (parsed.data.referralCode ?? "").trim().toUpperCase();
   if (referralCode) {
     // TEK KULLANIMLIK kod: önce dostane ön-kontrol, sonra atomik tüketim.
@@ -192,6 +194,8 @@ export async function POST(req: NextRequest) {
     }
     agentId = bulunan.agentId;
     claimedCodeId = bulunan.codeId;
+    if (bulunan.discountPercent && bulunan.discountMonths)
+      kodIndirim = { percent: bulunan.discountPercent, months: bulunan.discountMonths };
   }
 
   // Kod doğru + çakışma yok → kodu tüket (tekrar kullanılamaz).
@@ -216,6 +220,13 @@ export async function POST(req: NextRequest) {
           // BÜYÜK HARF normalize — kartlarda tekdüze görünüm.
           name: normalizeBusinessName(businessName),
           ...(agentId ? { referredByAgent: { connect: { id: agentId } } } : {}),
+          // Koda gömülü abonelik indirimi (premium komisyoncu tanımladıysa).
+          ...(kodIndirim
+            ? {
+                discountPercent: kodIndirim.percent,
+                discountUntil: discountUntilFromMonths(kodIndirim.months),
+              }
+            : {}),
           address: `${districtCanon}, ${cityCanon}`,
           city: cityCanon,
           district: districtCanon,

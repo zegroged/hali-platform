@@ -32,7 +32,8 @@ export default async function MuhasebePage() {
   if (!u || (u.role !== "ACCOUNTANT" && u.role !== "ADMIN")) redirect("/giris");
 
   const payments = await prisma.subscriptionPayment.findMany({
-    where: { status: "PAID" },
+    // 0 TL = %100 indirimli ücretsiz dönem — fatura kesilecek işlem değildir.
+    where: { status: "PAID", amount: { gt: 0 } },
     orderBy: { paidAt: "desc" },
     include: {
       business: {

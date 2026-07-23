@@ -77,6 +77,9 @@ export async function backfillMissingCommissions(): Promise<void> {
     const eksikler = await prisma.subscriptionPayment.findMany({
       where: {
         status: "PAID",
+        // 0 TL'lik ücretsiz-dönem kayıtları hariç: tahakkuk üretmezler ama
+        // "commission: null" kaldıkları için take:50 penceresini tıkarlardı.
+        amount: { gt: 0 },
         paidAt: { gte: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000) },
         commission: null,
         business: { referredByAgentId: { not: null } },

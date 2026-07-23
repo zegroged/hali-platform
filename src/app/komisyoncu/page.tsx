@@ -104,18 +104,60 @@ export default async function KomisyoncuSayfasi({
               Her müşteri için ayrı kod üret — aynı kod ikinci kez kullanılamaz.
             </p>
           </div>
-          <form action={generateReferralCode}>
+          <form
+            action={generateReferralCode}
+            className="flex flex-wrap items-end gap-2"
+          >
+            {agent.canDiscount && (
+              <>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-slate-600">
+                    İndirim % (ops.)
+                  </label>
+                  <input
+                    name="discountPercent"
+                    inputMode="decimal"
+                    placeholder="Örn. 25"
+                    className="w-24 rounded-lg border border-slate-300 px-2.5 py-2 text-sm focus:border-brand focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-slate-600">
+                    Süre (ay)
+                  </label>
+                  <input
+                    name="discountMonths"
+                    inputMode="numeric"
+                    placeholder="Örn. 3"
+                    className="w-20 rounded-lg border border-slate-300 px-2.5 py-2 text-sm focus:border-brand focus:outline-none"
+                  />
+                </div>
+              </>
+            )}
             <PendingButton className="rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-dark">
               + Kod Üret
             </PendingButton>
           </form>
         </div>
+        {agent.canDiscount && (
+          <p className="mt-2 text-xs text-slate-500">
+            <strong>Premium yetkin var:</strong> istersen koda indirim göm —
+            kodla kaydolan işletme, seçtiğin süre boyunca aboneliği o yüzde
+            indirimli öder (komisyonun da indirimli tutar üzerinden hesaplanır).
+            Boş bırakırsan kod indirimsiz olur.
+          </p>
+        )}
         {agent.codes.length > 0 && (
           <ul className="mt-3 divide-y divide-slate-100 text-sm">
             {agent.codes.map((k) => (
-              <li key={k.id} className="flex items-center justify-between py-2">
+              <li key={k.id} className="flex items-center justify-between gap-2 py-2">
                 <span className="font-mono font-semibold text-slate-800">
                   {k.code}
+                  {Number(k.discountPercent ?? 0) > 0 && (
+                    <span className="ml-2 rounded-full bg-violet-100 px-2 py-0.5 font-sans text-xs font-medium text-violet-700">
+                      %{Number(k.discountPercent).toLocaleString("tr-TR", { maximumFractionDigits: 2 })} indirim · {k.discountMonths} ay
+                    </span>
+                  )}
                 </span>
                 {k.usedAt ? (
                   <span className="text-xs text-slate-500">

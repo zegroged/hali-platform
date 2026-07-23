@@ -17,6 +17,7 @@ import { CONTRACT_VERSION } from "@/lib/legal";
 import { normalizeBusinessName } from "@/lib/text";
 import { ensureBillingCode } from "@/lib/billing";
 import { findUsableCode, claimCode, attachCodeToBusiness } from "@/lib/referralCode";
+import { discountUntilFromMonths, activeDiscountPercent } from "@/lib/discount";
 
 async function requireAdmin() {
   const u = await getSessionUser();
@@ -169,6 +170,7 @@ export async function createBusinessByAdmin(formData: FormData) {
   // (yarışı kaybeden kayıt anlaşılır hatayla durur; yanan kod geri gelmez).
   let agentId: string | null = null;
   let claimedCodeId: string | null = null;
+  let kodIndirim: { percent: number; months: number } | null = null;
   if (agentCode) {
     const bulunan = await findUsableCode(agentCode);
     if (!bulunan)
@@ -177,6 +179,8 @@ export async function createBusinessByAdmin(formData: FormData) {
       err("Komisyoncu kodu az önce kullanıldı — komisyoncudan yeni kod isteyin.");
     agentId = bulunan!.agentId;
     claimedCodeId = bulunan!.codeId;
+    if (bulunan!.discountPercent && bulunan!.discountMonths)
+      kodIndirim = { percent: bulunan!.discountPercent, months: bulunan!.discountMonths };
   }
   // İl/ilçe de boş kalabilir — sahibi sonradan panelden listeden seçer.
   // AYRICALIK (2026-07-13, kullanıcı kararı): ADMIN/SUPPORT işletme açarken
@@ -290,6 +294,14 @@ export async function createBusinessByAdmin(formData: FormData) {
         create: {
           name: finalBusinessName,
           ...(agentId ? { referredByAgent: { connect: { id: agentId } } } : {}),
+          // Koda gömülü abonelik indirimi create İÇİNDE (inceleme bulgusu:
+          // sonradan ayrı update + sessiz catch, indirimi kaybedebiliyordu).
+          ...(kodIndirim
+            ? {
+                discountPercent: kodIndirim.percent,
+                discountUntil: discountUntilFromMonths(kodIndirim.months),
+              }
+            : {}),
           address: city && district ? `${district}, ${city}` : "",
           city,
           district,
@@ -731,6 +743,8 @@ export async function createAgent(formData: FormData) {
   const usernameRaw = String(formData.get("username") || "").trim();
   const password = String(formData.get("password") || "");
   const percentRaw = String(formData.get("percent") || "").replace(",", ".");
+  // Premium yetkisi: kod üretirken istediği yüzde + sürede indirim tanımlayabilir.
+  const canDiscount = formData.get("canDiscount") === "on";
   const err = (m: string) =>
     redirect("/admin/komisyoncular?hata=" + encodeURIComponent(m));
 
@@ -767,7 +781,7 @@ export async function createAgent(formData: FormData) {
           password: await hashPassword(password),
         },
       });
-      await tx.agent.create({ data: { userId: user.id, percent } });
+      await tx.agent.create({ data: { userId: user.id, percent, canDiscount } });
     });
   } catch (e) {
     if (e && typeof e === "object" && "code" in e && (e as { code?: string }).code === "P2002") {
@@ -789,7 +803,7 @@ export async function setBusinessAgent(formData: FormData) {
 
   const biz = await prisma.cleanerBusiness.findUnique({
     where: { id: businessId },
-    select: { id: true },
+    select: { id: true, discountPercent: true, discountUntil: true },
   });
   if (!biz) redirect("/admin");
 
@@ -811,11 +825,41 @@ export async function setBusinessAgent(formData: FormData) {
       );
     if (!(await claimCode(bulunan!.codeId)))
       redirect(geri + "?hata=" + encodeURIComponent("Kod az önce kullanıldı — komisyoncudan yeni kod isteyin."));
-    await attachCodeToBusiness(bulunan!.codeId, businessId);
-    await prisma.cleanerBusiness.update({
-      where: { id: businessId },
-      data: { referredByAgentId: bulunan!.agentId },
-    });
+    // Koda gömülü indirim, işletmenin MEVCUT AKTİF indirimini EZMEZ (inceleme
+    // bulgusu: %50/12 ay verilmişken %10/1 aylık kod bağlanınca taahhüt
+    // sessizce küçülüyordu) — aktif indirim varsa korunur, admin'e söylenir.
+    const kodluIndirim = Boolean(bulunan!.discountPercent && bulunan!.discountMonths);
+    const mevcutAktif = activeDiscountPercent(biz!) != null;
+    const uygula = kodluIndirim && !mevcutAktif;
+    // Bağ + kod-iliştirme + indirim TEK transaction (yarım kalmasın).
+    await prisma.$transaction([
+      prisma.cleanerBusiness.update({
+        where: { id: businessId },
+        data: {
+          referredByAgentId: bulunan!.agentId,
+          ...(uygula
+            ? {
+                discountPercent: bulunan!.discountPercent,
+                discountUntil: discountUntilFromMonths(bulunan!.discountMonths!),
+              }
+            : {}),
+        },
+      }),
+      prisma.agentReferralCode.update({
+        where: { id: bulunan!.codeId },
+        data: { usedByBusinessId: businessId },
+      }),
+    ]);
+    if (kodluIndirim && mevcutAktif) {
+      revalidatePath(geri);
+      redirect(
+        geri +
+          "?mesaj=" +
+          encodeURIComponent(
+            "Komisyoncu bağlandı. İşletmenin mevcut aktif indirimi korundu — kodun indirimi işlenmedi.",
+          ),
+      );
+    }
   }
   revalidatePath(geri);
   redirect(geri);
@@ -849,4 +893,70 @@ export async function toggleAgentActive(formData: FormData) {
     });
   }
   revalidatePath("/admin/komisyoncular");
+}
+
+/** Premium (indirim tanımlama) yetkisini aç/kapat. Kapatınca mevcut kodlardaki
+ *  ve işletmelere işlenmiş indirimler DURMAZ (verilmiş söz tutulur) — yalnız
+ *  yeni indirimlı kod üretemez. */
+export async function toggleAgentDiscount(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("id") || "");
+  const agent = await prisma.agent.findUnique({ where: { id } });
+  if (agent) {
+    // Koşullu yaz (TOCTOU).
+    await prisma.agent.updateMany({
+      where: { id, canDiscount: agent.canDiscount },
+      data: { canDiscount: !agent.canDiscount },
+    });
+  }
+  revalidatePath("/admin/komisyoncular");
+}
+
+/** ADMIN indirim yetkisi (işletme detayından): yüzde + kaç ay — sınırsız.
+ *  Yüzde boş/0 = indirimi kaldır. Süre HER kayıtta ŞİMDİDEN itibaren yeniden
+ *  hesaplanır (uzatmak için tekrar kaydet yeter). */
+export async function setBusinessDiscount(formData: FormData) {
+  await requireAdmin();
+  const businessId = String(formData.get("businessId") || "");
+  const geri = "/admin/isletme/" + businessId;
+  if (!businessId) redirect("/admin");
+  const biz = await prisma.cleanerBusiness.findUnique({
+    where: { id: businessId },
+    select: { id: true },
+  });
+  if (!biz) redirect("/admin");
+
+  const pctRaw = String(formData.get("percent") || "").replace(",", ".").trim();
+  const ayRaw = String(formData.get("months") || "").trim();
+
+  if (!pctRaw || Number(pctRaw) === 0) {
+    await prisma.cleanerBusiness.update({
+      where: { id: businessId },
+      data: { discountPercent: null, discountUntil: null },
+    });
+    revalidatePath(geri);
+    redirect(geri + "?mesaj=" + encodeURIComponent("İndirim kaldırıldı."));
+  }
+  const pct = Number(pctRaw);
+  const ay = Number(ayRaw);
+  if (!Number.isFinite(pct) || pct <= 0 || pct > 100)
+    redirect(geri + "?hata=" + encodeURIComponent("İndirim yüzdesi 1-100 arasında olmalı."));
+  if (!Number.isInteger(ay) || ay < 1 || ay > 1200)
+    redirect(geri + "?hata=" + encodeURIComponent("İndirim süresi ay olarak girilmeli (en az 1)."));
+  const pctYuvarlak = Math.round(pct * 100) / 100;
+  await prisma.cleanerBusiness.update({
+    where: { id: businessId },
+    data: {
+      discountPercent: pctYuvarlak,
+      discountUntil: discountUntilFromMonths(ay),
+    },
+  });
+  revalidatePath(geri);
+  redirect(
+    geri +
+      "?mesaj=" +
+      encodeURIComponent(
+        `İndirim kaydedildi: %${pctYuvarlak.toLocaleString("tr-TR", { maximumFractionDigits: 2 })}, ${ay} ay.`,
+      ),
+  );
 }

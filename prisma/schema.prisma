@@ -186,6 +186,10 @@ model CleanerBusiness {
   referredByAgent   Agent?  @relation(fields: [referredByAgentId], references: [id], onDelete: SetNull)
   referredByAgentId String?
   usedReferralCodes AgentReferralCode[] @relation("CodeUsedBy")
+  // Abonelik indirimi: discountUntil geçerliyken her ödeme %discountPercent
+  // indirimli tahsil edilir (kaynak: premium komisyoncu kodu VEYA admin eli).
+  discountPercent Decimal?  @db.Decimal(5, 2)
+  discountUntil   DateTime?
 
   @@index([city, district])
 }
@@ -442,6 +446,9 @@ model Agent {
   userId    String   @unique
   percent   Decimal  @db.Decimal(5, 2) // NET (KDV hariç) tutar üzerinden yüzde
   active    Boolean  @default(true) // pasif komisyoncuya YENİ tahakkuk işlemez
+  // PREMIUM yetkisi (2026-07-23): kod üretirken abonelik fiyatına istediği
+  // yüzdede + istediği sürede indirim tanımlayabilir. Admin verir/alır.
+  canDiscount Boolean @default(false)
   createdAt DateTime @default(now())
 
   referrals CleanerBusiness[]
@@ -457,6 +464,10 @@ model AgentReferralCode {
   agent     Agent     @relation(fields: [agentId], references: [id], onDelete: Cascade)
   agentId   String
   code      String    @unique // HYK-XXXXXX
+  // Koda gömülü abonelik indirimi (yalnız canDiscount komisyoncu tanımlar):
+  // kodla kaydolan işletmenin fiyatı discountMonths boyunca %discountPercent düşer.
+  discountPercent Decimal? @db.Decimal(5, 2)
+  discountMonths  Int?
   createdAt DateTime  @default(now())
   usedAt    DateTime? // dolunca kod tükenmiştir
   usedByBusiness   CleanerBusiness? @relation("CodeUsedBy", fields: [usedByBusinessId], references: [id], onDelete: SetNull)

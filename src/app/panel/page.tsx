@@ -6,6 +6,7 @@ import {
   verificationReady,
 } from "@/lib/panel";
 import { subscriptionActive } from "@/lib/subscription";
+import { effectiveSubscriptionGross } from "@/lib/discount";
 import { paymentsLive } from "@/lib/config";
 import { submitForVerification, setPauseMode } from "./actions";
 import { startSubscriptionPayment } from "./subscription-actions";
@@ -86,6 +87,13 @@ export default async function PanelHome({
     },
   ];
   const subOk = subscriptionActive(b.subscription);
+  // İndirim (premium komisyoncu kodu / yönetim): buton indirimli tutarı
+  // gösterir; indirimliyken erken yenileme kapalı (abonelik sayfasıyla aynı kural).
+  const { gross: indirimGross, pct: indirimPct } = effectiveSubscriptionGross(b);
+  const indirimliErkenYasak =
+    indirimPct != null &&
+    (b.subscription?.currentPeriodEnd?.getTime() ?? 0) >
+      Date.now() + 3 * 24 * 60 * 60 * 1000;
   // Tatil modu durumu + tarih girişinin sınırları (TR takvim günü: bugün..+90).
   const isPaused = b.pausedUntil != null && b.pausedUntil > new Date();
   const TR_MS = 3 * 60 * 60 * 1000; // kalıcı UTC+3
@@ -320,19 +328,33 @@ export default async function PanelHome({
             olunca hesap OTOMATİK yayına girer (callback). Kart bilgisi iyzico'nun
             güvenli sayfasında. Canlı değilken havale/EFT + admin aktivasyonu. */}
         {paymentsLive ? (
+          indirimliErkenYasak ? (
+            <p className="mt-2 text-xs text-amber-700">
+              İndirimli dönemin aktif — yenileme, dönem sonuna 3 gün kala
+              /panel/abonelik&apos;ten açılır.
+            </p>
+          ) : (
           <>
             <form action={startSubscriptionPayment} className="mt-3">
               <PendingButton className="w-full rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark active:scale-[0.99]">
-                {subOk
-                  ? "Aboneliği yenile — 2.400 TL (iyzico ile güvenli ödeme)"
-                  : "Aboneliğini öde — 2.400 TL (iyzico ile güvenli ödeme)"}
+                {indirimGross <= 0
+                  ? "Dönemini ücretsiz başlat (%100 indirim)"
+                  : indirimPct != null
+                    ? `Aboneliğini öde — ${indirimGross.toLocaleString("tr-TR", { minimumFractionDigits: 2 })} TL (indirimli, iyzico ile)`
+                    : subOk
+                      ? "Aboneliği yenile — 2.400 TL (iyzico ile güvenli ödeme)"
+                      : "Aboneliğini öde — 2.400 TL (iyzico ile güvenli ödeme)"}
               </PendingButton>
             </form>
             <p className="mt-1.5 text-xs text-slate-400">
               Ödeme, iyzico&apos;nun güvenli sayfasında yapılır; kart bilgilerin
-              bize hiç ulaşmaz. 2.000 TL + %20 KDV = 2.400 TL.
+              bize hiç ulaşmaz.{" "}
+              {indirimPct != null
+                ? `İndirimli tutar KDV dahildir (normal bedel 2.400 TL).`
+                : "2.000 TL + %20 KDV = 2.400 TL."}
             </p>
           </>
+          )
         ) : (
           !subOk && (
             <p className="mt-2 text-xs text-amber-700">

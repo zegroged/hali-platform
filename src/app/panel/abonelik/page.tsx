@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentBusiness } from "@/lib/panel";
 import { subscriptionActive } from "@/lib/subscription";
 import { recurringEnabled, paymentsLive } from "@/lib/config";
+import { effectiveSubscriptionGross } from "@/lib/discount";
 import { PendingButton } from "@/components/PendingButton";
 import {
   startSubscriptionPayment,
@@ -45,6 +46,18 @@ const DURUM: Record<string, { cls: string; text: string }> = {
     cls: "border-red-300 bg-red-50 text-red-700",
     text: "Ödeme tamamlanamadı. Tekrar deneyebilirsin.",
   },
+  ucretsiz: {
+    cls: "border-green-300 bg-green-50 text-green-800",
+    text: "%100 indirimin sayesinde dönemin ÜCRETSİZ tanımlandı. 🎉 (Yayında görünmek için profil şartlarının da tamam olması gerekir.)",
+  },
+  "ucretsiz-erken": {
+    cls: "border-amber-300 bg-amber-50 text-amber-800",
+    text: "Dönemin zaten aktif — ücretsiz yenileme, dönem sonuna 3 gün kala açılabilir.",
+  },
+  "indirimli-erken": {
+    cls: "border-amber-300 bg-amber-50 text-amber-800",
+    text: "Dönemin zaten aktif — indirimli yenileme, dönem sonuna 3 gün kala açılabilir.",
+  },
 };
 
 export default async function AbonelikYonetim({
@@ -60,6 +73,13 @@ export default async function AbonelikYonetim({
   const sub = b.subscription;
   const active = subscriptionActive(sub);
   const autoRenew = Boolean(sub?.autoRenew && sub?.iyzicoSubRef);
+  // Geçerli indirim (premium komisyoncu kodu ya da yönetim): tahsilat bu
+  // tutardan yapılır; 0 = dönem ücretsiz açılır. İndirimliyken erken yenileme
+  // yasak (aksiyon reddeder) — butonu da aynı kuralla gizleriz.
+  const { gross, pct } = effectiveSubscriptionGross(b);
+  const indirimliErkenYasak =
+    pct != null &&
+    (sub?.currentPeriodEnd?.getTime() ?? 0) > Date.now() + 3 * 24 * 60 * 60 * 1000;
 
   const history = await prisma.subscriptionPayment.findMany({
     where: { businessId: b.id },
@@ -91,6 +111,13 @@ export default async function AbonelikYonetim({
                 + KDV / ay
               </span>
             </p>
+            {pct != null && b.discountUntil && (
+              <p className="mt-1 inline-flex rounded-full bg-violet-100 px-2.5 py-0.5 text-xs font-medium text-violet-700">
+                %{pct.toLocaleString("tr-TR", { maximumFractionDigits: 2 })}{" "}
+                indirim — {tr(b.discountUntil)} tarihine kadar
+                {gross > 0 ? ` (aylık ${tl(gross)})` : " (ücretsiz)"}
+              </p>
+            )}
           </div>
           <span
             className={`rounded-full px-3 py-1 text-xs font-medium ${
@@ -147,11 +174,22 @@ export default async function AbonelikYonetim({
               Aboneliği başlat — düzenli ödeme talimatı
             </Link>
           ) : paymentsLive ? (
-            <form action={startSubscriptionPayment}>
-              <PendingButton className="rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark active:scale-[0.99]">
-                Aboneliğini öde — 2.400 TL (iyzico ile)
-              </PendingButton>
-            </form>
+            indirimliErkenYasak ? (
+              <p className="text-sm text-amber-700">
+                Dönemin aktif — indirimli yenileme, dönem sonuna 3 gün kala bu
+                sayfadan açılır.
+              </p>
+            ) : (
+              <form action={startSubscriptionPayment}>
+                <PendingButton className="rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark active:scale-[0.99]">
+                  {gross <= 0
+                    ? "Dönemini ücretsiz başlat (%100 indirim)"
+                    : pct != null
+                      ? `Aboneliğini öde — ${tl(gross)} (indirimli, iyzico ile)`
+                      : "Aboneliğini öde — 2.400 TL (iyzico ile)"}
+                </PendingButton>
+              </form>
+            )
           ) : (
             <p className="text-sm text-amber-700">
               Online ödeme yakında; şu an ödeme onay sürecinde havale/EFT ile

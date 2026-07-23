@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import {
   createAgent,
   toggleAgentActive,
+  toggleAgentDiscount,
   toggleCommissionPaid,
 } from "../actions";
 import { PendingButton } from "@/components/PendingButton";
@@ -145,6 +146,14 @@ export default async function AdminAgents({
             />
           </div>
         </div>
+        <label className="flex items-start gap-2 text-sm text-slate-700">
+          <input type="checkbox" name="canDiscount" className="mt-0.5" />
+          <span>
+            <strong>Premium yetki:</strong> kod üretirken istediği yüzdede
+            indirim tanımlayıp süresini istediği kadar (ay) uzatabilir — kodla
+            kaydolan işletme o süre boyunca aboneliği indirimli öder.
+          </span>
+        </label>
         <PendingButton className="rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-dark">
           Komisyoncu Oluştur
         </PendingButton>
@@ -175,7 +184,12 @@ export default async function AdminAgents({
                     {a.user.username} · {a.user.phone}
                   </p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  {a.canDiscount && (
+                    <span className="rounded-full bg-violet-100 px-2.5 py-0.5 text-xs font-medium text-violet-700">
+                      Premium (indirim yetkili)
+                    </span>
+                  )}
                   <span
                     className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
                       a.active
@@ -185,6 +199,12 @@ export default async function AdminAgents({
                   >
                     {a.active ? "Aktif" : "Pasif"}
                   </span>
+                  <form action={toggleAgentDiscount}>
+                    <input type="hidden" name="id" value={a.id} />
+                    <PendingButton className="rounded-lg border border-violet-300 px-2.5 py-1 text-xs font-medium text-violet-700 hover:bg-violet-50">
+                      {a.canDiscount ? "Premium'u kaldır" : "Premium yap"}
+                    </PendingButton>
+                  </form>
                   <form action={toggleAgentActive}>
                     <input type="hidden" name="id" value={a.id} />
                     <PendingButton className="rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50">
