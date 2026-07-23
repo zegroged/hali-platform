@@ -4,7 +4,6 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { IconMapPin, IconFilter, IconX } from "@/components/icons";
-import { DISTRICTS } from "@/components/districts";
 import { resolveSearchLocation } from "@/lib/cities";
 
 type Props = {
@@ -20,6 +19,8 @@ type Props = {
   view?: string;
   /** Toplam işletme sayısı — 0 iken arama pasifleşir (lansman/boş DB dönemi). */
   totalCount?: number;
+  /** Hızlı butonlar: yayında işletmesi olan iller (sunucudan gelir). */
+  cities?: string[];
 };
 
 export function SearchBar(p: Props) {
@@ -199,20 +200,20 @@ export function SearchBar(p: Props) {
         </p>
       ) : (
         <div className="mt-2.5 flex flex-wrap items-center gap-2">
-          {DISTRICTS.map((d) => (
+          {(p.cities ?? []).map((d) => (
             <button
               key={d}
               onClick={() =>
                 nav({
-                  district: d,
-                  il: undefined,
+                  il: d,
+                  district: undefined,
                   lat: undefined,
                   lng: undefined,
                   q: undefined,
                 })
               }
               className={`rounded-full border px-3 py-2 text-sm ${
-                p.district === d
+                p.il === d
                   ? "border-brand bg-brand-light text-brand-dark"
                   : "border-slate-200 text-slate-600 hover:border-brand"
               }`}

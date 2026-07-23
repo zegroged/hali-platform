@@ -9,7 +9,7 @@ import Footer from "@/components/Footer";
 import TrackingBar from "@/components/TrackingBar";
 import SiteHeader from "@/components/SiteHeader";
 import HowItWorks from "@/components/HowItWorks";
-import { DISTRICTS } from "@/components/districts";
+import { getSupplyCities } from "@/lib/supplyCities";
 import { featuredCities } from "@/lib/cities";
 import {
   IconMapPin,
@@ -166,10 +166,15 @@ export default async function Home({
       (sp.sort && sp.sort !== "nearest"),
   );
 
+  // Hızlı butonlar: gerçekten yayında işletmesi olan iller (sabit semt listesi
+  // yerine — ziyaretçi arzın olduğu yere yönlenir).
+  const sehirler = await getSupplyCities();
+
   const searchProps = {
     q: sp.q,
     il: sp.il,
     district: sp.district,
+    cities: sehirler,
     lat: sp.lat,
     lng: sp.lng,
     sort: sp.sort,
@@ -247,10 +252,10 @@ export default async function Home({
                 bakabilirsin (açılınca haber verelim).
               </p>
               <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
-                {DISTRICTS.map((d) => (
+                {sehirler.map((d) => (
                   <Link
                     key={d}
-                    href={`/?district=${encodeURIComponent(d)}`}
+                    href={`/?il=${encodeURIComponent(d)}`}
                     className="rounded-full border border-slate-200 px-3 py-2 text-sm text-slate-600 hover:border-brand hover:text-brand-dark"
                   >
                     {d}
