@@ -62,6 +62,15 @@ export function getIyzicoPlanReference(): string {
 export const recurringEnabled =
   paymentsLive && (process.env.IYZICO_PLAN_REFERENCE ?? "").length > 0;
 
+/** Bağlı iyzico planının KDV DAHİL fiyatı. Normalde 2.400; CANLIYA ALMA
+ * doğrulamasında 1 TL'lik test planı bağlanır → kayıtlar/e-postalar gerçek
+ * çekilen tutarı göstersin diye .env'den okunur (IYZICO_PLAN_AMOUNT=1).
+ * Plan referansı değişince bu değeri de değiştir — ikisi ÇİFTTİR. */
+export function getIyzicoPlanAmount(): number {
+  const v = Number(process.env.IYZICO_PLAN_AMOUNT);
+  return Number.isFinite(v) && v > 0 ? v : 2400;
+}
+
 /** iyzico API tabanı; canlı modda sandbox'a düşmesini engelle. */
 export function getIyzicoBaseUrl(): string {
   const v = process.env.IYZICO_BASE_URL ?? "https://sandbox-api.iyzipay.com";

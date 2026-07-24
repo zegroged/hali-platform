@@ -6,8 +6,11 @@ import { initRecurringCheckout } from "@/lib/iyzico";
 import {
   getAppBaseUrl,
   getIyzicoPlanReference,
+  getIyzicoPlanAmount,
   recurringEnabled,
 } from "@/lib/config";
+import { activeDiscountPercent } from "@/lib/discount";
+import { pickIyzicoGsm } from "@/lib/phone";
 
 export const dynamic = "force-dynamic";
 
@@ -20,14 +23,25 @@ export default async function AbonelikOde() {
   if (!b.owner.email || !b.owner.emailVerified) redirect("/panel?odeme=eposta");
   const identity = (b.taxNumber ?? "").replace(/\D/g, "");
   if (identity.length < 10) redirect("/panel/profil?odeme=vergino");
+  // İNDİRİMLİ İŞLETME RECURRING'E GİREMEZ (4.18 kuralı): iyzico planı SABİT
+  // fiyatlıdır, indirim uygulanamaz → indirim süresi bitene kadar tek çekim.
+  if (activeDiscountPercent(b) != null) {
+    redirect("/panel/abonelik?durum=indirimli-talimat-yok");
+  }
 
   const [name, ...rest] = b.owner.name.trim().split(" ");
   const surname = rest.join(" ") || name;
-  const gsm =
-    "+90" + b.owner.phone.replace(/\D/g, "").replace(/^90/, "").replace(/^0/, "");
+  // iyzico GSM'i operatör koduyla doğrular; sahip numarası sabit hat ya da
+  // geçersizse işletmenin diğer numaraları denenir (çoklu telefon, 4.15-EK).
+  // Hiçbiri uygun değilse anlaşılır uyarı — ham iyzico hatası gösterme.
+  const gsm = pickIyzicoGsm(b.owner.phone, b.gsmPhone2, b.phone);
+  if (!gsm) redirect("/panel/profil?odeme=cep");
 
+  // Tutar bağlı planın fiyatından (1 TL doğrulama planında 1) — sabit 2400
+  // yazmak test aşamasında yanlış makbuz/fatura üretiyordu.
+  const planTutar = getIyzicoPlanAmount();
   const payment = await prisma.subscriptionPayment.create({
-    data: { businessId: b.id, status: "PENDING", amount: 2400 },
+    data: { businessId: b.id, status: "PENDING", amount: planTutar },
   });
 
   const base = getAppBaseUrl();
@@ -75,8 +89,12 @@ export default async function AbonelikOde() {
       </h1>
       <p className="text-sm text-slate-600">
         Kartın <strong>iyzico&apos;nun güvenli formunda</strong> alınır ve
-        saklanır. Onayınla birlikte <strong>iptal edene kadar her ay 2.400 TL
-        </strong> (KDV dahil) kartından otomatik çekilir.
+        saklanır. Onayınla birlikte{" "}
+        <strong>
+          iptal edene kadar her ay{" "}
+          {planTutar.toLocaleString("tr-TR", { minimumFractionDigits: 2 })} TL
+        </strong>{" "}
+        (KDV dahil) kartından otomatik çekilir.
       </p>
       {/* iyzico checkout form script'i — kart formunu bu div'e çizer */}
       <div dangerouslySetInnerHTML={{ __html: r.checkoutFormContent ?? "" }} />

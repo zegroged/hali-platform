@@ -51,7 +51,9 @@ export default async function PanelProfile({
       ? "Aboneliğe geçmeden önce Fatura Bilgileri'ni (ünvan + vergi dairesi + fatura adresi) doldurun — size bu bilgilerle fatura kesilecek."
       : odeme === "vergino"
         ? "Aboneliğe geçmeden önce vergi / T.C. kimlik numaranızı girin."
-        : null;
+        : odeme === "cep"
+          ? "Otomatik ödeme talimatı için geçerli bir CEP numarası gerekir (banka doğrulaması SMS ile gelir). Numaralar bölümüne 05xx ile başlayan cep numaranızı ekleyin."
+          : null;
 
   const hours = (b.workingHours ?? {}) as Record<
     string,

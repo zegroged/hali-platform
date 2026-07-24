@@ -9,6 +9,7 @@ import { getAppBaseUrl } from "@/lib/config";
 import { ensureBillingCode } from "@/lib/billing";
 import { effectiveSubscriptionGross } from "@/lib/discount";
 import { extendSubscription } from "@/lib/subscription";
+import { isRealMobilePhone, normalizePhone } from "@/lib/phone";
 
 // Halıcının abonelik ödemesini başlatır: SubscriptionPayment(PENDING) kaydı
 // açar, iyzico Checkout Form başlatır ve tarayıcıyı iyzico'nun GÜVENLİ kart
@@ -35,6 +36,14 @@ export async function startSubscriptionPayment() {
   ) {
     redirect("/panel/profil?odeme=fatura");
   }
+  // iyzico alıcı GSM'ini operatör koduyla doğrular (0500 gibi tahsissiz kodlar
+  // "Geçersiz telefon numarası" ile reddedilir). Sahip numarası uygun değilse
+  // işletmenin diğer numaralarını dene; hiçbiri olmazsa anlaşılır uyarı ver.
+  const gsmAday = [b.owner.phone, b.gsmPhone2, b.phone]
+    .map((x) => normalizePhone(x ?? ""))
+    .find((x) => isRealMobilePhone(x));
+  if (!gsmAday) redirect("/panel/profil?odeme=cep");
+
   // Emniyet kemeri: kodu olmayan eski hesaba ödeme öncesi cari kodu ata.
   if (!b.billingCode) await ensureBillingCode(b.id).catch(() => {});
 
@@ -116,7 +125,7 @@ export async function startSubscriptionPayment() {
     businessName: b.name,
     ownerName: b.owner.name,
     ownerEmail: b.owner.email!,
-    ownerPhone: b.owner.phone,
+    ownerPhone: gsmAday!,
     identityNumber: identity,
     address: b.address || b.district,
     city: b.city,

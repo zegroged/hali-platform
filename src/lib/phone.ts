@@ -34,3 +34,24 @@ export function isMobilePhone(p: string): boolean {
 export function isLandlinePhone(p: string): boolean {
   return TR_LANDLINE_RE.test(p);
 }
+
+// iyzico GSM doğrulaması operatör kodunu da kontrol eder: 05xx yeterli değil,
+// tahsis edilmiş bir kod olmalı (0500/0520 gibi boş kodlar REDDEDİLİR).
+// Türkiye'de tahsisli mobil kodlar: 501-509, 530-539, 541-549, 551-559, 561, 599.
+const TR_GSM_OPERATOR_RE = /^05(0[1-9]|3\d|4[1-9]|5[1-9]|61|99)\d{7}$/;
+
+/** iyzico'ya gönderilebilecek gerçek bir cep mi (operatör kodu tahsisli)? */
+export function isRealMobilePhone(p: string): boolean {
+  return TR_GSM_OPERATOR_RE.test(normalizePhone(p));
+}
+
+/** Adaylar içinden iyzico'nun kabul edeceği ilk cebi seç (+90… biçiminde).
+ *  Sahip numarası sabit hatsa işletmenin 2. GSM'i devreye girer (çoklu telefon).
+ *  Hiçbiri uygun değilse null → çağıran anlaşılır hata gösterir. */
+export function pickIyzicoGsm(...adaylar: (string | null | undefined)[]): string | null {
+  for (const a of adaylar) {
+    const n = normalizePhone(a ?? "");
+    if (isRealMobilePhone(n)) return "+90" + n.slice(1);
+  }
+  return null;
+}

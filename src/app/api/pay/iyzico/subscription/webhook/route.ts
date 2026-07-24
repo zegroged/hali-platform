@@ -4,7 +4,7 @@ import { extendSubscription } from "@/lib/subscription";
 import { notifySubscriptionPaid } from "@/lib/paymentNotify";
 import { accrueCommissionForPayment } from "@/lib/commission";
 import { syncVisibility } from "@/lib/panel";
-import { paymentsLive } from "@/lib/config";
+import { paymentsLive, getIyzicoPlanAmount } from "@/lib/config";
 
 // iyzico tekrarlayan abonelik WEBHOOK'u — her aylık otomatik çekimde iyzico
 // buraya POST eder. Başarılı çekimde dönemi 1 ay uzatır; başarısızda PAST_DUE.
@@ -72,6 +72,9 @@ export async function POST(req: NextRequest) {
     // İDEMPOTENCY: iyzico webhook'ları en-az-bir-kez teslim edilir; çift teslim
     // çift 30 gün + çift ödeme kaydı üretiyordu. iyzicoPaymentId @unique ile
     // ATOMİK claim — daha önce işlendiyse create P2002 fırlatır, no-op döner.
+    // Çekilen tutar: bağlı planın fiyatı (.env IYZICO_PLAN_AMOUNT; doğrulama
+    // döneminde 1 TL). Sabit 2400 yazmak yanlış makbuz/komisyon üretirdi.
+    const cekilen = getIyzicoPlanAmount();
     let yeniDonemSonu: Date | null = null;
     let yeniOdemeId: string | null = null;
     try {
@@ -82,7 +85,7 @@ export async function POST(req: NextRequest) {
           data: {
             businessId: sub.businessId,
             status: "PAID",
-            amount: 2400,
+            amount: cekilen,
             paidAt: new Date(),
             periodStart: new Date(),
             periodEnd: end,
@@ -100,7 +103,7 @@ export async function POST(req: NextRequest) {
       // Idempotency claim'i gectik = bu olay ILK kez islendi, cift mail gitmez.
       await notifySubscriptionPaid({
         businessId: sub.businessId,
-        amount: 2400,
+        amount: cekilen,
         periodEnd: yeniDonemSonu,
         iyzicoPaymentId: eventId,
         kind: "yenileme",

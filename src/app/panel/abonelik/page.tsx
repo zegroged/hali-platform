@@ -58,6 +58,10 @@ const DURUM: Record<string, { cls: string; text: string }> = {
     cls: "border-amber-300 bg-amber-50 text-amber-800",
     text: "Dönemin zaten aktif — indirimli yenileme, dönem sonuna 3 gün kala açılabilir.",
   },
+  "indirimli-talimat-yok": {
+    cls: "border-amber-300 bg-amber-50 text-amber-800",
+    text: "İndirimin sürerken otomatik ödeme talimatı verilemez (talimat indirimsiz tam tutardan işler). İndirimin bitince buradan açabilirsin — o zamana kadar her dönem indirimli ödersin.",
+  },
 };
 
 export default async function AbonelikYonetim({
@@ -166,7 +170,7 @@ export default async function AbonelikYonetim({
                 Otomatik yenilemeyi iptal et
               </PendingButton>
             </form>
-          ) : recurringEnabled ? (
+          ) : recurringEnabled && pct == null ? (
             <Link
               href="/panel/abonelik/ode"
               className="inline-flex rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark active:scale-[0.99]"
