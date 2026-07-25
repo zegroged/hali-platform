@@ -45,6 +45,15 @@ async function hourlyTick() {
   } catch (e) {
     console.error("[komisyon-backfill] hata:", e);
   }
+  try {
+    // Elle ödeyenlere yenileme hatırlatması / dönemi dolana bildirim.
+    const { checkSubscriptionRenewals } = await import(
+      "@/lib/subscriptionReminder"
+    );
+    await checkSubscriptionRenewals();
+  } catch (e) {
+    console.error("[abonelik-hatirlatma] hata:", e);
+  }
 }
 
 export async function register() {

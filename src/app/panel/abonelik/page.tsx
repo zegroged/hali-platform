@@ -171,14 +171,35 @@ export default async function AbonelikYonetim({
               </PendingButton>
             </form>
           ) : recurringEnabled && pct == null ? (
-            // <a> BİLEREK (Link değil): iyzico form script'i ancak TAM SAYFA
-            // yüklemesinde çalışır; client-side geçişte kart formu boş kalıyordu.
-            <a
-              href="/odeme/abonelik"
-              className="inline-flex rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark active:scale-[0.99]"
-            >
-              Aboneliği başlat — düzenli ödeme talimatı
-            </a>
+            // İKİ YOL BİRDEN (2026-07-25): talimat yalnız KREDİ kartıyla verilebiliyor
+            // (iyzico abonelik NON3D → banka kartı reddi, hata 10217). Talimat açıkken
+            // tek çekim butonu gizlenince banka kartlı halıcı bu sayfada hiçbir ödeme
+            // yolu göremiyordu — ikisi birlikte sunulur.
+            <div className="space-y-3">
+              {/* <a> BİLEREK (Link değil): iyzico form script'i ancak TAM SAYFA
+                  yüklemesinde çalışır; client-side geçişte kart formu boş kalıyordu. */}
+              <a
+                href="/odeme/abonelik"
+                className="inline-flex rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark active:scale-[0.99]"
+              >
+                Otomatik yenile — düzenli ödeme talimatı (kredi kartı)
+              </a>
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                <p className="text-xs text-slate-600">
+                  <strong>Banka (debit) kartın mı var?</strong> Düzenli ödeme
+                  talimatı kredi kartı ister — bankalar banka kartında 3D Secure
+                  şart koşuyor, abonelik çekimleri ise 3D Secure&apos;suz yapılır.
+                  Banka kartıyla aşağıdan <strong>tek seferlik</strong> ödeyip her
+                  ay bu sayfadan yenileyebilirsin (dönem sonundan 3 gün önce
+                  hatırlatma e-postası göndeririz).
+                </p>
+                <form action={startSubscriptionPayment} className="mt-2">
+                  <PendingButton className="rounded-lg border border-brand px-4 py-2 text-sm font-semibold text-brand-dark transition hover:bg-brand-light">
+                    Tek seferlik öde — {tl(gross)} (banka kartı da geçer)
+                  </PendingButton>
+                </form>
+              </div>
+            </div>
           ) : paymentsLive ? (
             indirimliErkenYasak ? (
               <p className="text-sm text-amber-700">

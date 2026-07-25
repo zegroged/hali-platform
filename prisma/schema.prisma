@@ -414,6 +414,13 @@ model Subscription {
   iyzicoCustomerRef String? // iyzico customerReferenceCode (kart saklı)
   autoRenew         Boolean   @default(false) // aktif düzenli ödeme talimatı var mı
   canceledAt        DateTime? // talimat iptal anı (dönem sonuna kadar açık kalır)
+
+  // ELLE ÖDEYENLER İÇİN YENİLEME BEKÇİSİ (2026-07-25): banka kartlı işletmeler
+  // talimat veremiyor (iyzico abonelik NON3D → debit reddi), her ay elle ödüyor.
+  // Sessizce yayından düşmesinler diye 3 gün önce hatırlatma, dolduğunda bildirim
+  // gider. Alanlar HANGİ dönem için gönderildiğini tutar → dönem başına tek mail.
+  renewalRemindedFor DateTime?
+  expiredNotifiedFor DateTime?
 }
 
 // Abonelik ödemesi kaydı — iyzico Checkout. Idempotency (çift callback/replay)
