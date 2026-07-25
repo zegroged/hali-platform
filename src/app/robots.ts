@@ -8,7 +8,17 @@ export default function robots(): MetadataRoute.Robots {
     rules: {
       userAgent: "*",
       allow: "/",
-      disallow: ["/panel", "/admin", "/sofor", "/giris", "/takip/", "/api/"],
+      disallow: [
+        "/panel",
+        "/admin",
+        "/sofor",
+        "/giris",
+        "/takip/",
+        "/api/",
+        "/odeme", // talimat ödeme sayfası (panel dışı, yetkili)
+        "/komisyoncu",
+        "/muhasebe",
+      ],
     },
     sitemap: "https://enyakinhaliyikamaservisi.com/sitemap.xml",
   };

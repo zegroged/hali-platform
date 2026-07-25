@@ -174,7 +174,7 @@ export default async function AbonelikYonetim({
             // <a> BİLEREK (Link değil): iyzico form script'i ancak TAM SAYFA
             // yüklemesinde çalışır; client-side geçişte kart formu boş kalıyordu.
             <a
-              href="/panel/abonelik/ode"
+              href="/odeme/abonelik"
               className="inline-flex rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark active:scale-[0.99]"
             >
               Aboneliği başlat — düzenli ödeme talimatı
