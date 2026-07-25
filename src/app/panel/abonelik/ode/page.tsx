@@ -11,6 +11,7 @@ import {
 } from "@/lib/config";
 import { activeDiscountPercent } from "@/lib/discount";
 import { pickIyzicoGsm } from "@/lib/phone";
+import { IyzicoFormGuard } from "@/components/IyzicoFormGuard";
 
 export const dynamic = "force-dynamic";
 
@@ -96,8 +97,16 @@ export default async function AbonelikOde() {
         </strong>{" "}
         (KDV dahil) kartından otomatik çekilir.
       </p>
-      {/* iyzico checkout form script'i — kart formunu bu div'e çizer */}
+      {/* iyzico formu bu kaba çizer (id ZORUNLU — iyzico bundle'ı bunu arar). */}
+      <div id="iyzipay-checkout-form" className="responsive" />
+      {/* Form içeriği <script> etiketleridir. React ile enjekte edilen script'ler
+          ÇALIŞMAZ; sayfa tam yüklendiğinde tarayıcı ilk HTML'i ayrıştırırken
+          çalıştırır. Bu yüzden buraya girişin TAM SAYFA olması şart (abonelik
+          sayfasındaki bağlantı <a> — Next client-side geçişi kullanılmıyor).
+          Ek güvence: aşağıdaki istemci bileşeni, script çalışmamışsa (form kabı
+          10 sn sonra hâlâ boşsa) sayfayı bir kez tam yükleyerek kendini onarır. */}
       <div dangerouslySetInnerHTML={{ __html: r.checkoutFormContent ?? "" }} />
+      <IyzicoFormGuard />
     </div>
   );
 }

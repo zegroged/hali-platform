@@ -171,12 +171,14 @@ export default async function AbonelikYonetim({
               </PendingButton>
             </form>
           ) : recurringEnabled && pct == null ? (
-            <Link
+            // <a> BİLEREK (Link değil): iyzico form script'i ancak TAM SAYFA
+            // yüklemesinde çalışır; client-side geçişte kart formu boş kalıyordu.
+            <a
               href="/panel/abonelik/ode"
               className="inline-flex rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark active:scale-[0.99]"
             >
               Aboneliği başlat — düzenli ödeme talimatı
-            </Link>
+            </a>
           ) : paymentsLive ? (
             indirimliErkenYasak ? (
               <p className="text-sm text-amber-700">
