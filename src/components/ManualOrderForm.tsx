@@ -20,12 +20,27 @@ function parseM2(v: string): number | null {
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
-export function ManualOrderForm({ drivers }: { drivers: Driver[] }) {
+export function ManualOrderForm({
+  drivers,
+  m2Fiyat = null,
+}: {
+  drivers: Driver[];
+  /** İşletmenin m² birim fiyatı — dükkânda ölçülen m²'den tutar önerilir. */
+  m2Fiyat?: number | null;
+}) {
+  // m² × birim fiyat önerisi (yalnız ikisi de varsa).
+  const oneriHesapla = (m2Metin: string): number | null => {
+    if (!m2Fiyat) return null;
+    const m2 = parseM2(m2Metin);
+    return m2 ? Math.round(m2 * m2Fiyat) : null;
+  };
+
   const [form, setForm] = useState({
     customerName: "",
     customerPhone: "",
     pickupAddress: "",
     approxM2: "",
+    quotedPrice: "",
     note: "",
     paymentMethod: "CASH" as "CASH" | "CARD",
     driverId: "",
@@ -78,6 +93,9 @@ export function ManualOrderForm({ drivers }: { drivers: Driver[] }) {
           pickupAddress: form.pickupAddress,
           pickupLat: coords?.lat,
           pickupLng: coords?.lng,
+          quotedPrice: form.quotedPrice
+            ? (parseM2(form.quotedPrice) ?? undefined)
+            : undefined,
           approxM2: form.approxM2
             ? (parseM2(form.approxM2) ?? undefined)
             : undefined,
@@ -103,6 +121,8 @@ export function ManualOrderForm({ drivers }: { drivers: Driver[] }) {
   }
 
   const inpBase = "w-full rounded-lg border px-3 py-2 text-sm focus:border-brand";
+  const oneri = oneriHesapla(form.approxM2);
+
   const inpCls = (bad?: string) =>
     `${inpBase} ${bad ? "border-red-500" : "border-slate-300"}`;
   const labelCls = "mb-1 block text-sm font-medium text-slate-700";
@@ -155,6 +175,7 @@ export function ManualOrderForm({ drivers }: { drivers: Driver[] }) {
                 customerPhone: "",
                 pickupAddress: "",
                 approxM2: "",
+                quotedPrice: "",
                 note: "",
                 paymentMethod: "CASH",
                 driverId: "",
@@ -235,6 +256,39 @@ export function ManualOrderForm({ drivers }: { drivers: Driver[] }) {
         />
       </div>
       <div className="grid grid-cols-2 gap-2">
+        <div>
+          <label htmlFor="manuel-tutar" className={labelCls}>
+            Tutar (dükkânda ölçtüysen)
+            {optionalBadge}
+          </label>
+          <div className="relative">
+            <input
+              id="manuel-tutar"
+              className={`${inpCls()} pr-10`}
+              inputMode="decimal"
+              placeholder="Ör. 1.250"
+              value={form.quotedPrice}
+              onChange={(e) => set("quotedPrice", e.target.value)}
+            />
+            <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-slate-500">
+              TL
+            </span>
+          </div>
+          {oneri != null && (
+            <button
+              type="button"
+              onClick={() => set("quotedPrice", String(oneri))}
+              className="mt-1 rounded-lg bg-brand-light px-2 py-1 text-xs font-medium text-brand-dark"
+            >
+              m²&apos;den hesapla: ≈{oneri.toLocaleString("tr-TR")} TL
+            </button>
+          )}
+          <p className="mt-1 text-xs text-slate-500">
+            Halı kapıdan alınacaksa BOŞ bırak — halıyı alıp ölçünce sipariş
+            detayından &quot;Kesin fiyat&quot; bildirirsin. Yazarsan teslim
+            ekranına hazır gelir; gelir teslimde kesinleşir.
+          </p>
+        </div>
         <div>
           <label htmlFor="manuel-m2" className={labelCls}>
             Yaklaşık m²

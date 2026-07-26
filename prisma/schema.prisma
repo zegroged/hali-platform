@@ -172,6 +172,8 @@ model CleanerBusiness {
   updatedAt DateTime @updatedAt
 
   serviceAreas ServiceArea[]
+  ledgerEntries      LedgerEntry[]
+  ledgerRecurrences  LedgerRecurrence[]
   photos       BusinessPhoto[]
   pricing      PricingItem[]
   drivers      Driver[]
@@ -192,6 +194,67 @@ model CleanerBusiness {
   discountUntil   DateTime?
 
   @@index([city, district])
+}
+
+// ---- KASA: GELİR-GİDER DEFTERİ (2026-07-26) ----
+// Halıcının kendi işletme muhasebesi (platform muhasebesi DEĞİL): giderleri elle
+// girer (personel maaşı, deterjan, kira, fatura...), GELİR teslim edilen
+// siparişlerden OTOMATİK sayılır; toplamlar/kâr-zarar sistem hesaplar.
+// Tekrarlayan kalemler (her 3 günde deterjan, aylık maaş) periyotla tanımlanır;
+// vadesi gelince kayıt kendiliğinden oluşur (lib/ledger.ts, saatlik tik).
+enum LedgerKind {
+  EXPENSE // gider
+  INCOME // elle eklenen ek gelir (siparişler dışında)
+}
+
+enum LedgerCategory {
+  PERSONEL // maaş, sigorta, yemek
+  MALZEME // deterjan, kimyasal, yedek parça
+  KIRA
+  FATURA // elektrik, su, doğalgaz, internet
+  YAKIT // araç yakıtı
+  ARAC // bakım, sigorta, lastik
+  VERGI // vergi, SGK, muhasebe
+  DIGER
+}
+
+model LedgerEntry {
+  id         String          @id @default(cuid())
+  business   CleanerBusiness @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  businessId String
+  kind       LedgerKind      @default(EXPENSE)
+  category   LedgerCategory  @default(DIGER)
+  label      String // "Ahmet maaş", "Omo 5kg x4"
+  amount     Decimal         @db.Decimal(10, 2)
+  date       DateTime // kalemin ait olduğu gün (elle seçilebilir)
+  note       String?
+  // Tekrarlayan kalemin kopyası mı (hangi kuraldan üretildi):
+  recurrence   LedgerRecurrence? @relation(fields: [recurrenceId], references: [id], onDelete: SetNull)
+  recurrenceId String?
+  createdAt  DateTime        @default(now())
+
+  @@index([businessId, date])
+}
+
+// Tekrarlayan gider/gelir kuralı: "her N günde" ya da "her ayın X'i".
+model LedgerRecurrence {
+  id         String          @id @default(cuid())
+  business   CleanerBusiness @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  businessId String
+  kind       LedgerKind      @default(EXPENSE)
+  category   LedgerCategory  @default(DIGER)
+  label      String
+  amount     Decimal         @db.Decimal(10, 2)
+  everyDays  Int? // her N günde bir (ör. 3 = deterjan)
+  monthDay   Int? // her ayın bu günü (1-28; ör. maaş)
+  active     Boolean         @default(true)
+  nextRunAt  DateTime // bir sonraki üretim zamanı (bekçi bunu okur)
+  createdAt  DateTime        @default(now())
+
+  entries LedgerEntry[]
+
+  @@index([businessId, active])
+  @@index([active, nextRunAt])
 }
 
 model ServiceArea {
@@ -326,6 +389,10 @@ model Order {
   // md.15/1-h: kesin fiyat bildirimi + müşterinin ifaya başlama ONAYI (ispatlı).
   quotedPrice     Decimal?  @db.Decimal(10, 2) // işletmenin ölçüm sonrası bildirdiği kesin fiyat
   priceApprovedAt DateTime? // müşterinin takip sayfasından onay anı
+  // TESLİM ANI (2026-07-26): Kasa'daki aylık gelir bu tarihe göre sayılır.
+  // updatedAt kullanılırsa sipariş sonradan güncellendiğinde gelir başka aya
+  // kayardı (muhasebe hatası). Eski kayıtlarda null → updatedAt'e düşülür.
+  deliveredAt     DateTime?
   estimatedDays   Int? // halıcının verdiği tahmini teslim süresi (gün)
 
   createdAt DateTime @default(now())
@@ -455,12 +522,62 @@ model Agent {
   active    Boolean  @default(true) // pasif komisyoncuya YENİ tahakkuk işlemez
   // PREMIUM yetkisi (2026-07-23): kod üretirken abonelik fiyatına istediği
   // yüzdede + istediği sürede indirim tanımlayabilir. Admin verir/alır.
+  // BAŞ komisyoncu bu yetkiyi ALTINA GEÇİREMEZ (2026-07-25 kullanıcı kararı).
   canDiscount Boolean @default(false)
+
+  // ---- BAŞ KOMİSYONCU (2 kademe; 2026-07-25) ----
+  // isHead: kendi panelinden komisyoncu hesabı açabilir, yüzdelerini belirler.
+  // poolPercent: bu ağacın HAVUZ payı (admin belirler, varsayılan 50). Baş
+  // komisyoncu alta en çok bu kadar verebilir; FARKI kendisi alır. Kendi
+  // kodundan getirdiği işletmede havuzun tamamını alır (percent = poolPercent).
+  // parentId: alt komisyoncunun baş komisyoncusu (3. kademe YOK — alt hesap açamaz).
+  isHead      Boolean  @default(false)
+  poolPercent Decimal? @db.Decimal(5, 2)
+  // ADMIN DONDURDU: baş komisyoncu bunu kendi panelinden geri AÇAMAZ (inceleme
+  // bulgusu — aynı `active` bayrağı kullanılınca admin kararı sessizce geri
+  // alınabiliyordu). Yalnız admin kaldırır.
+  suspendedByAdmin Boolean @default(false)
+  parent      Agent?   @relation("AgentTree", fields: [parentId], references: [id], onDelete: SetNull)
+  parentId    String?
+  children    Agent[]  @relation("AgentTree")
+
+  // ÖDEME (çekim) bilgileri — 2026-07-26: komisyoncu birikmiş bakiyesi için
+  // çekim talebi oluşturur; istersen her ayın belirli günü OTOMATİK talep düşer.
+  // Havale/EFT'yi admin elle yapar (iyzico dışarıya para göndermez).
+  iban      String? // TR.. (yalnız admin ve sahibi görür)
+  payoutDay Int? // 1-28: her ay bu gün otomatik çekim talebi oluşur
+
   createdAt DateTime @default(now())
 
-  referrals CleanerBusiness[]
-  entries   CommissionEntry[]
-  codes     AgentReferralCode[]
+  referrals   CleanerBusiness[]
+  entries     CommissionEntry[]
+  headEntries CommissionEntry[]   @relation("HeadCommissions")
+  codes       AgentReferralCode[]
+  payouts     PayoutRequest[]
+
+  @@index([parentId])
+}
+
+// KOMİSYON ÇEKİM TALEBİ: komisyoncunun "birikeni öde" isteği. Admin panelinde
+// listelenir, havale yapılınca "Ödendi" işaretlenir → o ana kadarki TÜM
+// ödenmemiş tahakkuklar (kendi payı + baş komisyoncuysa havuz farkı) ödenmiş
+// sayılır. Statü: PENDING | PAID | REJECTED.
+model PayoutRequest {
+  id         String    @id @default(cuid())
+  agent      Agent     @relation(fields: [agentId], references: [id], onDelete: Restrict)
+  agentId    String
+  amount     Decimal   @db.Decimal(10, 2) // talep anındaki bakiye (bilgi amaçlı)
+  paidAmount Decimal?  @db.Decimal(10, 2) // ödeme anında fiilen kapatılan tutar
+  iban       String? // talep anındaki IBAN kopyası (sonradan değişse de kayıt sabit)
+  status     String    @default("PENDING")
+  auto       Boolean   @default(false) // aylık otomatik mi, elle mi
+  note       String? // komisyoncunun notu
+  adminNote  String? // ret sebebi / havale referansı
+  createdAt  DateTime  @default(now())
+  paidAt     DateTime?
+
+  @@index([agentId, createdAt])
+  @@index([status, createdAt])
 }
 
 // TEK KULLANIMLIK referans kodu (2026-07-23 kullanıcı kararı: kalıcı kod YOK):
@@ -500,7 +617,27 @@ model CommissionEntry {
   paidAt      DateTime? // admin "ödendi" işaretleyince dolar
   createdAt   DateTime  @default(now())
 
+  // ---- BAŞ KOMİSYONCU PAYI (2026-07-25) ----
+  // Aynı ödemede iki hak sahibi olabilir: alt komisyoncu (yukarıdaki alanlar) ve
+  // onun baş komisyoncusu (havuz farkı). AYRI SATIR AÇMIYORUZ — paymentId @unique
+  // idempotency kilidi bozulmasın diye baş payı aynı satırda tutulur; ödeme
+  // durumları (paidAt / headPaidAt) bağımsız işaretlenir.
+  headAgent   Agent?    @relation("HeadCommissions", fields: [headAgentId], references: [id], onDelete: Restrict)
+  headAgentId String?
+  headPercent Decimal?  @db.Decimal(5, 2)
+  headAmount  Decimal?  @db.Decimal(10, 2)
+  headPaidAt  DateTime?
+
+  // ATLANDI İŞARETİ (inceleme bulgusu): komisyoncu PASİFken yapılan ödemeye
+  // hiç satır yazılmayınca ödeme "commission: null" kalıyor ve saatlik backfill
+  // komisyoncu sonradan aktive edilince 90 GÜNE KADAR GERİYE DÖNÜK para basıyordu.
+  // Artık pasif dönemde 0 tutarlı bu satır yazılır: paymentId kilidi dolar,
+  // backfill bir daha uğramaz, "pasif dönem = tahakkuk yok" kalıcı olur.
+  // Toplamlarda ve listelerde HARİÇ tutulur.
+  skipped     Boolean   @default(false)
+
   @@index([agentId, createdAt])
+  @@index([headAgentId, createdAt])
 }
 
 model Badge {

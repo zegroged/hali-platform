@@ -232,12 +232,17 @@ export default async function SoforPage() {
                     </p>
                   }
                 >
+                  {/* Halıcının bildirdiği/anlaştığı tutar HAZIR gelir — şoför
+                      sıfırdan yazmasın, yanlış tahsilat olmasın (2026-07-26). */}
                   <input
                     name="price"
                     type="number"
                     min="0.01"
                     step="0.01"
                     required
+                    defaultValue={
+                      o.quotedPrice != null ? Number(o.quotedPrice) : ""
+                    }
                     placeholder="Tahsil edilen tutar (TL)"
                     className={inp}
                   />

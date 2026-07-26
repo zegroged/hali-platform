@@ -21,6 +21,14 @@ const Body = z.object({
     .max(100000, "m² en fazla 100.000 olabilir.")
     .optional(),
   note: z.string().max(500, "Not en fazla 500 karakter olabilir.").optional(),
+  // Dükkânda anlaşılan tutar (2026-07-26): manuel kayıtta fiyat girecek yer
+  // yoktu; halıcı tutarı ancak teslimde yazabiliyordu. Buraya yazılan tutar
+  // teslim ekranına ÖN DOLU gelir, Kasa'daki gelir teslimde kesinleşir.
+  quotedPrice: z
+    .number()
+    .positive("Tutar sıfırdan büyük olmalı.")
+    .max(1000000, "Tutar çok büyük.")
+    .optional(),
   paymentMethod: z.enum(["CASH", "CARD"]),
   driverId: z.string().max(40).optional(),
 });
@@ -82,6 +90,7 @@ export async function POST(req: NextRequest) {
         pickupLat: d.pickupLat,
         pickupLng: d.pickupLng,
         approxM2: d.approxM2,
+        quotedPrice: d.quotedPrice,
         note: d.note,
         // Web'de şimdilik YALNIZ nakit (komisyon/kart ertelendi; app'te geri açılacak).
         paymentMethod: "CASH",

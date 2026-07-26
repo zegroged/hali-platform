@@ -7,6 +7,10 @@ import {
   toggleAgentActive,
   toggleAgentDiscount,
   toggleCommissionPaid,
+  toggleHeadCommissionPaid,
+  updateAgentPercent,
+  payoutMarkPaid,
+  payoutReject,
 } from "../actions";
 import { PendingButton } from "@/components/PendingButton";
 
@@ -33,6 +37,16 @@ export default async function AdminAgents({
     orderBy: { createdAt: "desc" },
     include: {
       user: { select: { name: true, username: true, phone: true } },
+      // BAŞ KOMİSYONCU ağacı: kimin altında / kimleri açmış.
+      parent: { select: { user: { select: { name: true } } } },
+      children: {
+        select: {
+          id: true,
+          percent: true,
+          active: true,
+          user: { select: { name: true, username: true } },
+        },
+      },
       referrals: {
         select: {
           id: true,
@@ -48,21 +62,60 @@ export default async function AdminAgents({
   // take'li listeden reduce, eski ödenmemiş borcu görünmez yapıyordu).
   const toplamGrup = await prisma.commissionEntry.groupBy({
     by: ["agentId"],
+    where: { skipped: false }, // "atlandı" (pasif dönem) satırları sayılmaz
     _sum: { amount: true },
   });
   const bekleyenGrup = await prisma.commissionEntry.groupBy({
     by: ["agentId"],
-    where: { paidAt: null },
+    where: { skipped: false, paidAt: null },
     _sum: { amount: true },
   });
   const toplamMap = new Map(toplamGrup.map((t) => [t.agentId, Number(t._sum.amount ?? 0)]));
   const bekleyenMap = new Map(bekleyenGrup.map((t) => [t.agentId, Number(t._sum.amount ?? 0)]));
 
+  // BAŞ KOMİSYONCU havuz farkı toplamları (headAgentId üzerinden — ayrı hak sahibi).
+  const headToplamGrup = await prisma.commissionEntry.groupBy({
+    by: ["headAgentId"],
+    where: { headAgentId: { not: null }, skipped: false },
+    _sum: { headAmount: true },
+  });
+  const headBekleyenGrup = await prisma.commissionEntry.groupBy({
+    by: ["headAgentId"],
+    where: { headAgentId: { not: null }, skipped: false, headPaidAt: null },
+    _sum: { headAmount: true },
+  });
+  const headToplamMap = new Map(
+    headToplamGrup.map((t) => [t.headAgentId!, Number(t._sum.headAmount ?? 0)]),
+  );
+  const headBekleyenMap = new Map(
+    headBekleyenGrup.map((t) => [t.headAgentId!, Number(t._sum.headAmount ?? 0)]),
+  );
+
+  // Baş komisyoncunun ödenecek havuz payı kayıtları (tüm ödenmemişler + son 90 gün).
+  const headKayitlar = await prisma.commissionEntry.findMany({
+    where: {
+      headAgentId: { not: null },
+      skipped: false,
+      OR: [{ headPaidAt: null }, { createdAt: { gte: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000) } }],
+    },
+    orderBy: { createdAt: "desc" },
+    include: {
+      business: { select: { name: true } },
+      agent: { select: { user: { select: { name: true } } } },
+    },
+  });
+  const headKayitMap = new Map<string, typeof headKayitlar>();
+  for (const k of headKayitlar) {
+    const d = headKayitMap.get(k.headAgentId!) ?? [];
+    d.push(k);
+    headKayitMap.set(k.headAgentId!, d);
+  }
+
   // Kayıt tablosu: TÜM ödenmemişler (borç asla pencere dışına düşmesin —
   // "Ödendi işaretle" her zaman erişilebilir) + son 90 günün ödenmişleri.
   const doksanGun = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
   const tumKayitlar = await prisma.commissionEntry.findMany({
-    where: { OR: [{ paidAt: null }, { createdAt: { gte: doksanGun } }] },
+    where: { skipped: false, OR: [{ paidAt: null }, { createdAt: { gte: doksanGun } }] },
     orderBy: { createdAt: "desc" },
     include: { business: { select: { name: true } } },
   });
@@ -72,6 +125,27 @@ export default async function AdminAgents({
     dizi.push(k);
     kayitMap.set(k.agentId, dizi);
   }
+
+  // ÖDEME TALEPLERİ: bekleyenler en üstte (havale yapılacaklar) + son kapananlar.
+  const talepler = await prisma.payoutRequest.findMany({
+    where: {
+      OR: [
+        { status: "PENDING" },
+        { createdAt: { gte: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000) } },
+      ],
+    },
+    orderBy: [{ status: "asc" }, { createdAt: "desc" }],
+    include: {
+      agent: {
+        select: {
+          isHead: true,
+          user: { select: { name: true, username: true, phone: true } },
+        },
+      },
+    },
+  });
+  const bekleyenTalepler = talepler.filter((t) => t.status === "PENDING");
+  const gecmisTalepler = talepler.filter((t) => t.status !== "PENDING");
 
   const inp =
     "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand focus:outline-none";
@@ -112,6 +186,106 @@ export default async function AdminAgents({
         </p>
       )}
 
+      {/* ÖDEME TALEPLERİ — havale yapılacaklar en üstte */}
+      <section className="rounded-2xl border border-amber-300 bg-amber-50/50 p-5">
+        <h2 className="font-semibold text-slate-900">
+          Ödeme Talepleri
+          {bekleyenTalepler.length > 0 && (
+            <span className="ml-2 rounded-full bg-amber-200 px-2 py-0.5 text-xs font-medium text-amber-900">
+              {bekleyenTalepler.length} bekliyor
+            </span>
+          )}
+        </h2>
+        <p className="mt-1 text-sm text-slate-600">
+          Komisyoncu bakiyesi için talep oluşturur (ya da seçtiği günde otomatik
+          düşer). Havaleyi <strong>sen elle</strong> yaparsın; sonra
+          &quot;Ödendi&quot; dersin — o ana kadarki tüm ödenmemiş tahakkukları
+          kapatır.
+        </p>
+
+        {bekleyenTalepler.length === 0 ? (
+          <p className="mt-3 text-sm text-slate-500">Bekleyen ödeme talebi yok.</p>
+        ) : (
+          <ul className="mt-3 space-y-3">
+            {bekleyenTalepler.map((t) => (
+              <li
+                key={t.id}
+                className="rounded-xl border border-slate-200 bg-white p-3"
+              >
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <span className="font-medium text-slate-900">
+                    {t.agent.user.name}
+                    {t.agent.isHead && (
+                      <span className="ml-1 rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-700">
+                        baş
+                      </span>
+                    )}{" "}
+                    <span className="text-sm font-normal text-slate-500">
+                      {t.agent.user.phone}
+                    </span>
+                  </span>
+                  <span className="text-lg font-bold text-slate-900">
+                    {fmtTL(Number(t.amount))} TL
+                  </span>
+                </div>
+                <p className="mt-1 font-mono text-sm text-slate-700">
+                  {t.iban ?? "IBAN YOK"}
+                </p>
+                <p className="text-xs text-slate-500">
+                  {fmtTarih(t.createdAt)}
+                  {t.auto ? " · aylık otomatik talep" : " · elle talep"}
+                </p>
+                <div className="mt-2 flex flex-wrap items-end gap-2">
+                  <form action={payoutMarkPaid} className="flex items-end gap-2">
+                    <input type="hidden" name="id" value={t.id} />
+                    <input
+                      name="adminNote"
+                      placeholder="Havale referansı (ops.)"
+                      className="w-44 rounded-lg border border-slate-300 px-2 py-1.5 text-xs"
+                    />
+                    <PendingButton className="rounded-lg bg-green-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-green-700">
+                      Havaleyi yaptım — Ödendi
+                    </PendingButton>
+                  </form>
+                  <form action={payoutReject} className="flex items-end gap-2">
+                    <input type="hidden" name="id" value={t.id} />
+                    <input
+                      name="adminNote"
+                      placeholder="Ret sebebi"
+                      className="w-36 rounded-lg border border-slate-300 px-2 py-1.5 text-xs"
+                    />
+                    <PendingButton className="rounded-lg border border-red-300 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50">
+                      Reddet
+                    </PendingButton>
+                  </form>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {gecmisTalepler.length > 0 && (
+          <ul className="mt-4 divide-y divide-amber-200/60 text-sm">
+            {gecmisTalepler.map((t) => (
+              <li key={t.id} className="flex items-center justify-between py-1.5">
+                <span className="text-slate-600">
+                  {fmtTarih(t.createdAt)} · {t.agent.user.name} ·{" "}
+                  {fmtTL(Number(t.paidAmount ?? t.amount))} TL
+                </span>
+                <span
+                  className={`text-xs font-medium ${
+                    t.status === "PAID" ? "text-green-700" : "text-red-600"
+                  }`}
+                >
+                  {t.status === "PAID" ? "Ödendi" : "Reddedildi"}
+                  {t.adminNote ? ` · ${t.adminNote}` : ""}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
       {/* Yeni komisyoncu */}
       <form
         action={createAgent}
@@ -136,14 +310,19 @@ export default async function AdminAgents({
             <input name="password" required minLength={8} className={inp} />
           </div>
           <div>
-            <label className={lbl}>Komisyon yüzdesi (KDV hariç net üzerinden)</label>
+            <label className={lbl}>
+              Komisyon yüzdesi (KDV hariç net üzerinden)
+            </label>
             <input
               name="percent"
-              required
               inputMode="decimal"
               placeholder="Örn. 50"
               className={inp}
             />
+            <p className="mt-1 text-xs text-slate-500">
+              Baş komisyoncu işaretlersen bu alan yok sayılır; aşağıdaki havuz
+              payı kullanılır.
+            </p>
           </div>
         </div>
         <label className="flex items-start gap-2 text-sm text-slate-700">
@@ -154,6 +333,29 @@ export default async function AdminAgents({
             kaydolan işletme o süre boyunca aboneliği indirimli öder.
           </span>
         </label>
+        <label className="flex items-start gap-2 text-sm text-slate-700">
+          <input type="checkbox" name="isHead" className="mt-0.5" />
+          <span>
+            <strong>Baş komisyoncu:</strong> kendi panelinden komisyoncu hesabı
+            açar, yüzdelerini kendisi belirler. Alta verdiği yüzde{" "}
+            <em>havuz payından</em> düşer, farkı baş komisyoncuya yazılır. Kendi
+            kodundan getirdiği işletmede havuzun tamamını alır. (Açtığı hesaplar
+            3. kademe açamaz ve indirim yetkisi alamaz.)
+          </span>
+        </label>
+        <div className="max-w-xs">
+          <label className={lbl}>Havuz payı % (yalnız baş komisyoncu)</label>
+          <input
+            name="poolPercent"
+            inputMode="decimal"
+            placeholder="Varsayılan 50"
+            className={inp}
+          />
+          <p className="mt-1 text-xs text-slate-500">
+            Baş komisyoncu işaretliyse üstteki &quot;Komisyon yüzdesi&quot;
+            yerine bu kullanılır.
+          </p>
+        </div>
         <PendingButton className="rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-dark">
           Komisyoncu Oluştur
         </PendingButton>
@@ -182,9 +384,22 @@ export default async function AdminAgents({
                   </p>
                   <p className="text-xs text-slate-500">
                     {a.user.username} · {a.user.phone}
+                    {a.parent && (
+                      <>
+                        {" · "}
+                        <span className="text-indigo-700">
+                          {a.parent.user.name} ekibinde
+                        </span>
+                      </>
+                    )}
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
+                  {a.isHead && (
+                    <span className="rounded-full bg-indigo-100 px-2.5 py-0.5 text-xs font-medium text-indigo-700">
+                      Baş komisyoncu · havuz %{Number(a.poolPercent ?? 0)}
+                    </span>
+                  )}
                   {a.canDiscount && (
                     <span className="rounded-full bg-violet-100 px-2.5 py-0.5 text-xs font-medium text-violet-700">
                       Premium (indirim yetkili)
@@ -197,7 +412,11 @@ export default async function AdminAgents({
                         : "bg-slate-200 text-slate-600"
                     }`}
                   >
-                    {a.active ? "Aktif" : "Pasif"}
+                    {a.active
+                      ? "Aktif"
+                      : a.suspendedByAdmin
+                        ? "Pasif (yönetim dondurdu)"
+                        : "Pasif"}
                   </span>
                   <form action={toggleAgentDiscount}>
                     <input type="hidden" name="id" value={a.id} />
@@ -209,6 +428,23 @@ export default async function AdminAgents({
                     <input type="hidden" name="id" value={a.id} />
                     <PendingButton className="rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50">
                       {a.active ? "Pasife al" : "Aktive et"}
+                    </PendingButton>
+                  </form>
+                  {/* Oran düzeltme: yanlış girilen yüzde kalıcı olmasın. Geçmiş
+                      tahakkuklar değişmez; yeni oran sonraki ödemelerde geçerli. */}
+                  <form action={updateAgentPercent} className="flex items-center gap-1">
+                    <input type="hidden" name="id" value={a.id} />
+                    <input
+                      name="percent"
+                      inputMode="decimal"
+                      defaultValue={String(
+                        a.isHead ? Number(a.poolPercent ?? 0) : Number(a.percent),
+                      )}
+                      aria-label={a.isHead ? "Havuz payı %" : "Komisyon yüzdesi %"}
+                      className="w-16 rounded-lg border border-slate-300 px-2 py-1 text-xs"
+                    />
+                    <PendingButton className="rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50">
+                      {a.isHead ? "Havuzu güncelle" : "Oranı güncelle"}
                     </PendingButton>
                   </form>
                 </div>
@@ -234,6 +470,79 @@ export default async function AdminAgents({
                   <div className="text-xs text-slate-500">Ödenmemiş</div>
                 </div>
               </div>
+
+              {a.isHead && (
+                <div className="rounded-xl border border-indigo-200 bg-indigo-50/50 p-3">
+                  <p className="text-sm text-slate-700">
+                    <strong>Ekip (havuz %{Number(a.poolPercent ?? 0)}):</strong>{" "}
+                    {a.children.length === 0
+                      ? "henüz komisyoncu açmadı."
+                      : a.children
+                          .map(
+                            (c) =>
+                              `${c.user.name} (%${Number(c.percent)}${c.active ? "" : ", pasif"})`,
+                          )
+                          .join(" · ")}
+                  </p>
+                  <p className="mt-1 text-sm text-slate-700">
+                    Havuz farkı kazancı:{" "}
+                    <strong>{fmtTL(headToplamMap.get(a.id) ?? 0)} TL</strong> ·
+                    ödenmemiş{" "}
+                    <strong className="text-amber-700">
+                      {fmtTL(headBekleyenMap.get(a.id) ?? 0)} TL
+                    </strong>
+                  </p>
+                  {(headKayitMap.get(a.id) ?? []).length > 0 && (
+                    <div className="mt-2 overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-indigo-200 text-left text-xs text-slate-500">
+                            <th className="py-1.5">Tarih</th>
+                            <th className="py-1.5">İşletme</th>
+                            <th className="py-1.5">Komisyoncu</th>
+                            <th className="py-1.5">%</th>
+                            <th className="py-1.5">Havuz payı</th>
+                            <th className="py-1.5">Durum</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-indigo-100">
+                          {(headKayitMap.get(a.id) ?? []).map((e) => (
+                            <tr key={e.id}>
+                              <td className="py-1.5">{fmtTarih(e.createdAt)}</td>
+                              <td className="py-1.5">{e.business.name}</td>
+                              <td className="py-1.5 text-slate-500">
+                                {e.agent.user.name}
+                              </td>
+                              <td className="py-1.5">
+                                %{Number(e.headPercent ?? 0)}
+                              </td>
+                              <td className="py-1.5 font-medium">
+                                {fmtTL(Number(e.headAmount ?? 0))} TL
+                              </td>
+                              <td className="py-1.5">
+                                <form action={toggleHeadCommissionPaid}>
+                                  <input type="hidden" name="id" value={e.id} />
+                                  <PendingButton
+                                    className={`rounded px-2 py-0.5 text-xs font-medium ${
+                                      e.headPaidAt
+                                        ? "bg-green-100 text-green-700 hover:bg-green-200"
+                                        : "bg-amber-100 text-amber-700 hover:bg-amber-200"
+                                    }`}
+                                  >
+                                    {e.headPaidAt
+                                      ? `Ödendi ${fmtTarih(e.headPaidAt)}`
+                                      : "Ödendi işaretle"}
+                                  </PendingButton>
+                                </form>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {a.referrals.length > 0 && (
                 <div className="text-sm text-slate-600">

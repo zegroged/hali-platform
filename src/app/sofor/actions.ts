@@ -205,6 +205,7 @@ export async function deliverOrder(formData: FormData) {
     data: {
       status: "DELIVERED",
       priceTotal: price,
+      deliveredAt: new Date(),
       deliveryPhotoUrl,
       // Komisyon yalnız tahsilat gerçekleşince yazılır: nakit→şimdi (0),
       // kart→callback'te PAID ile birlikte (B6, çift-yazım yok).

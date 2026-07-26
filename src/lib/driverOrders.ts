@@ -223,6 +223,7 @@ export async function driverDeliver(
     data: {
       status: "DELIVERED",
       priceTotal: price,
+      deliveredAt: new Date(),
       deliveryPhotoUrl,
       commission: isCash ? 0 : undefined,
       paymentStatus: isCash ? "PAID" : o.paymentStatus,

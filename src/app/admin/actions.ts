@@ -745,6 +745,11 @@ export async function createAgent(formData: FormData) {
   const percentRaw = String(formData.get("percent") || "").replace(",", ".");
   // Premium yetkisi: kod üretirken istediği yüzde + sürede indirim tanımlayabilir.
   const canDiscount = formData.get("canDiscount") === "on";
+  // BAŞ KOMİSYONCU (2026-07-25): kendi panelinden komisyoncu açar, havuz payının
+  // altına verdiği yüzdenin FARKINI kendisi alır. Kendi kodundan getirdiği
+  // işletmede havuzun tamamını alır → percent = poolPercent.
+  const isHead = formData.get("isHead") === "on";
+  const poolRaw = String(formData.get("poolPercent") || "").replace(",", ".");
   const err = (m: string) =>
     redirect("/admin/komisyoncular?hata=" + encodeURIComponent(m));
 
@@ -754,7 +759,11 @@ export async function createAgent(formData: FormData) {
   const uErr = validateUsername(username);
   if (uErr) err(uErr);
   if (password.length < 8) err("Şifre en az 8 karakter olmalı.");
-  const percent = Number(percentRaw);
+  // Baş komisyoncuda tek sayı vardır: HAVUZ payı (kendi oranı = havuz).
+  const poolPercent = isHead ? (poolRaw ? Number(poolRaw) : 50) : null;
+  if (isHead && (!Number.isFinite(poolPercent!) || poolPercent! <= 0 || poolPercent! > 100))
+    err("Havuz payı 0 ile 100 arasında olmalı (varsayılan 50).");
+  const percent = isHead ? poolPercent! : Number(percentRaw);
   if (!Number.isFinite(percent) || percent <= 0 || percent > 100)
     err("Komisyon yüzdesi 0 ile 100 arasında olmalı (örn. 50).");
   const exists = await prisma.user.findFirst({
@@ -781,7 +790,9 @@ export async function createAgent(formData: FormData) {
           password: await hashPassword(password),
         },
       });
-      await tx.agent.create({ data: { userId: user.id, percent, canDiscount } });
+      await tx.agent.create({
+        data: { userId: user.id, percent, canDiscount, isHead, poolPercent },
+      });
     });
   } catch (e) {
     if (e && typeof e === "object" && "code" in e && (e as { code?: string }).code === "P2002") {
@@ -880,7 +891,27 @@ export async function toggleCommissionPaid(formData: FormData) {
   revalidatePath("/admin/komisyoncular");
 }
 
-/** Komisyoncuyu pasife al / aktive et — pasifken YENİ tahakkuk işlemez. */
+/** BAŞ komisyoncunun havuz farkı payını ödendi/geri-al işaretle (admin). */
+export async function toggleHeadCommissionPaid(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("id") || "");
+  const entry = await prisma.commissionEntry.findUnique({
+    where: { id },
+    select: { id: true, headPaidAt: true, headAgentId: true },
+  });
+  if (entry?.headAgentId) {
+    // Koşullu yaz (TOCTOU): eşzamanlı iki tıklama niyetin tersine çevirmesin.
+    await prisma.commissionEntry.updateMany({
+      where: { id, headPaidAt: entry.headPaidAt ? { not: null } : null },
+      data: { headPaidAt: entry.headPaidAt ? null : new Date() },
+    });
+  }
+  revalidatePath("/admin/komisyoncular");
+}
+
+/** Komisyoncuyu pasife al / aktive et — pasifken YENİ tahakkuk işlemez.
+ *  ADMIN dondurması ayrı bayrakla işaretlenir: baş komisyoncu kendi panelinden
+ *  bunu geri açamaz (inceleme bulgusu — yönetici kararı geri alınabiliyordu). */
 export async function toggleAgentActive(formData: FormData) {
   await requireAdmin();
   const id = String(formData.get("id") || "");
@@ -889,10 +920,70 @@ export async function toggleAgentActive(formData: FormData) {
     // Koşullu yaz (TOCTOU).
     await prisma.agent.updateMany({
       where: { id, active: agent.active },
-      data: { active: !agent.active },
+      data: {
+        active: !agent.active,
+        // Pasife alıyorsak "admin dondurdu" işaretle; aktive ediyorsak kaldır.
+        suspendedByAdmin: agent.active,
+      },
     });
   }
   revalidatePath("/admin/komisyoncular");
+}
+
+/** Komisyon oranı düzeltme (admin): alt komisyoncunun yüzdesi ya da baş
+ *  komisyoncunun havuz payı. Yanlış girilen oran kalıcı olmasın (inceleme
+ *  bulgusu). Geçmiş tahakkuklar DEĞİŞMEZ — CommissionEntry.percent o anki
+ *  oranı saklar; yeni oran bundan sonraki ödemelerde geçerlidir. */
+export async function updateAgentPercent(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("id") || "");
+  const raw = String(formData.get("percent") || "").replace(",", ".").trim();
+  const err = (m: string) =>
+    redirect("/admin/komisyoncular?hata=" + encodeURIComponent(m));
+
+  const agent = await prisma.agent.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      isHead: true,
+      parentId: true,
+      children: { select: { percent: true } },
+      parent: { select: { poolPercent: true } },
+    },
+  });
+  if (!agent) err("Komisyoncu bulunamadı.");
+  const yeni = Number(raw);
+  if (!Number.isFinite(yeni) || yeni <= 0 || yeni > 100)
+    err("Oran 0 ile 100 arasında olmalı.");
+
+  if (agent!.isHead) {
+    // HAVUZ PAYI düşürülüyorsa altındaki en yüksek yüzdenin ALTINA inemez —
+    // yoksa o alt komisyoncu havuzdan fazla alır (kural 3 ihlali).
+    const enYuksekAlt = agent!.children.reduce(
+      (m, c) => Math.max(m, Number(c.percent)),
+      0,
+    );
+    if (yeni < enYuksekAlt)
+      err(
+        `Havuz payı, ekipteki en yüksek komisyoncu oranının (%${enYuksekAlt}) altına indirilemez — önce onun oranını düşürün.`,
+      );
+    await prisma.agent.update({
+      where: { id: agent!.id },
+      // Baş komisyoncunun kendi oranı = havuz payı (kendi kodundan tamamını alır).
+      data: { poolPercent: yeni, percent: yeni },
+    });
+  } else {
+    // ALT komisyoncu: başının havuz payını AŞAMAZ.
+    const havuz = Number(agent!.parent?.poolPercent ?? 0);
+    if (agent!.parentId && yeni > havuz)
+      err(`Bu komisyoncuya en fazla %${havuz} verilebilir (baş komisyoncunun havuz payı).`);
+    await prisma.agent.update({
+      where: { id: agent!.id },
+      data: { percent: yeni },
+    });
+  }
+  revalidatePath("/admin/komisyoncular");
+  redirect("/admin/komisyoncular?ok=" + encodeURIComponent("oran güncellendi"));
 }
 
 /** Premium (indirim tanımlama) yetkisini aç/kapat. Kapatınca mevcut kodlardaki
@@ -959,4 +1050,38 @@ export async function setBusinessDiscount(formData: FormData) {
         `İndirim kaydedildi: %${pctYuvarlak.toLocaleString("tr-TR", { maximumFractionDigits: 2 })}, ${ay} ay.`,
       ),
   );
+}
+
+// ---- KOMİSYON ÖDEME (ÇEKİM) TALEPLERİ — 2026-07-26 ----
+// Komisyoncu talep oluşturur, havaleyi ADMIN elle yapar, sonra burada işaretler.
+// "Ödendi" işareti o ana kadarki TÜM ödenmemiş tahakkukları kapatır (lib/payout).
+
+export async function payoutMarkPaid(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("id") || "");
+  const not = String(formData.get("adminNote") || "");
+  const { markPayoutPaid } = await import("@/lib/payout");
+  const r = await markPayoutPaid(id, not);
+  revalidatePath("/admin/komisyoncular");
+  if (!r.ok) {
+    redirect("/admin/komisyoncular?hata=" + encodeURIComponent(r.hata ?? "Ödeme işaretlenemedi."));
+  }
+  redirect(
+    "/admin/komisyoncular?ok=" +
+      encodeURIComponent(
+        `${(r.tutar ?? 0).toLocaleString("tr-TR", { minimumFractionDigits: 2 })} TL ödendi olarak işaretlendi`,
+      ),
+  );
+}
+
+export async function payoutReject(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("id") || "");
+  const sebep = String(formData.get("adminNote") || "").trim();
+  // Koşullu yaz: yalnız hâlâ bekleyen talep reddedilebilir (TOCTOU).
+  await prisma.payoutRequest.updateMany({
+    where: { id, status: "PENDING" },
+    data: { status: "REJECTED", adminNote: sebep || "Reddedildi" },
+  });
+  revalidatePath("/admin/komisyoncular");
 }

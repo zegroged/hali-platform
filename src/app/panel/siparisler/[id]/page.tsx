@@ -297,6 +297,9 @@ export default async function OrderManagePage({
               >
                 Tahsil edilen tutar (TL)
               </label>
+              {/* Anlaşılan/bildirilen tutar varsa HAZIR gelir (2026-07-26):
+                  halıcı manuel kayıtta ya da kesin fiyatta yazdıysa teslimde
+                  tekrar yazmasın — tek tıkla teslim etsin. */}
               <input
                 id="teslim-tutar"
                 name="price"
@@ -304,6 +307,9 @@ export default async function OrderManagePage({
                 min="1"
                 step="0.01"
                 required
+                defaultValue={
+                  o.quotedPrice != null ? Number(o.quotedPrice) : ""
+                }
                 placeholder="Ör. 850"
                 className="mt-0.5 w-36 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand"
               />

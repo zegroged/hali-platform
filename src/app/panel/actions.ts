@@ -681,6 +681,7 @@ export async function deliverOrderPanel(formData: FormData) {
     where: { id: orderId, businessId: b.id, status: "OUT_FOR_DELIVERY" },
     data: {
       status: "DELIVERED",
+      deliveredAt: new Date(),
       priceTotal: price,
       commission: isCash ? 0 : undefined,
       paymentStatus: isCash ? "PAID" : order.paymentStatus,

@@ -23,7 +23,16 @@ export async function accrueCommissionForPayment(paymentId: string): Promise<voi
           select: {
             referredByAgentId: true,
             referredByAgent: {
-              select: { id: true, active: true, percent: true },
+              select: {
+                id: true,
+                active: true,
+                percent: true,
+                // BAŞ KOMİSYONCU (2 kademe): alt komisyoncunun başı, havuz
+                // farkını alır (havuz - alt yüzdesi).
+                parent: {
+                  select: { id: true, active: true, poolPercent: true },
+                },
+              },
             },
           },
         },
@@ -31,17 +40,63 @@ export async function accrueCommissionForPayment(paymentId: string): Promise<voi
     });
     if (!payment || payment.status !== "PAID") return;
     const agent = payment.business.referredByAgent;
-    // Pasif komisyoncuya YENİ tahakkuk işlenmez (eski tahakkukları durur).
-    if (!agent || !agent.active) return;
+    if (!agent) return;
 
     const gross = Number(payment.amount);
     if (!Number.isFinite(gross) || gross <= 0) return;
+
+    // PASİF KOMİSYONCU: tahakkuk YOK — ama "atlandı" satırı yazılır. Yoksa ödeme
+    // commission:null kalıp saatlik backfill'e takılıyor ve komisyoncu sonradan
+    // aktive edildiğinde 90 güne kadar GERİYE DÖNÜK para basılıyordu (inceleme
+    // bulgusu: tetik baş komisyoncunun kendi panelindeydi). Kural: pasif geçen
+    // dönem KALICI olarak kaybedilir — hem alt hem baş payı için.
+    if (!agent.active) {
+      await prisma.commissionEntry.create({
+        data: {
+          agentId: agent.id,
+          businessId: payment.businessId,
+          paymentId: payment.id,
+          grossAmount: gross,
+          netAmount: kurus(gross / (1 + PLAN.kdvRate / 100)),
+          percent: 0,
+          amount: 0,
+          skipped: true,
+        },
+      });
+      return;
+    }
     // KDV hariç matrah: 2.400 / 1,20 = 2.000 (PLAN.kdvRate tek kaynak).
     const net = kurus(gross / (1 + PLAN.kdvRate / 100));
     const percent = Number(agent.percent);
-    if (!Number.isFinite(percent) || percent <= 0) return;
+    if (!Number.isFinite(percent) || percent < 0) return;
     const tutar = kurus((net * percent) / 100);
-    if (tutar <= 0) return;
+
+    // BAŞ KOMİSYONCU PAYI: havuz payı eksi alt komisyoncunun yüzdesi. Baş
+    // pasifse pay işlemez (mevcut "pasif komisyoncuya tahakkuk yok" kuralı).
+    // Alt komisyoncuya havuzun TAMAMI verildiyse fark 0 → baş pay almaz.
+    const head = agent.parent;
+    let headAgentId: string | null = null;
+    let headPercent: number | null = null;
+    let headAmount: number | null = null;
+    if (head && head.active) {
+      const havuz = Number(head.poolPercent ?? 0);
+      const fark = kurus(havuz - percent);
+      if (Number.isFinite(fark) && fark > 0) {
+        // KURUŞ DEĞİŞMEZİ (inceleme bulgusu): iki payı ayrı ayrı yuvarlamak
+        // toplamı havuzun 1 kuruş ÜSTÜNE çıkarabiliyordu. Baş payı, havuzun
+        // TAMAMINDAN alt payı çıkarılarak bulunur → toplam asla havuzu aşmaz.
+        const havuzToplam = kurus((net * havuz) / 100);
+        const tutarHead = kurus(havuzToplam - tutar);
+        if (tutarHead > 0) {
+          headAgentId = head.id;
+          headPercent = fark;
+          headAmount = tutarHead;
+        }
+      }
+    }
+
+    // İkisi de sıfırsa yazacak bir şey yok (ör. yüzde 0 + baş yok/pasif).
+    if (tutar <= 0 && headAmount == null) return;
 
     await prisma.commissionEntry.create({
       data: {
@@ -52,6 +107,9 @@ export async function accrueCommissionForPayment(paymentId: string): Promise<voi
         netAmount: net,
         percent,
         amount: tutar,
+        headAgentId,
+        headPercent,
+        headAmount,
       },
     });
   } catch (e) {

@@ -35,6 +35,8 @@ export type BusinessSummary = {
   distanceKm: number | null;
   isNew: boolean;
   isOpenNow: boolean;
+  /** Kapalıysa "Yarın 09:00'da açılır" gibi metin (yoksa null). */
+  opensAtLabel: string | null;
   isPaused: boolean; // tatil modu — listede kalır ama "sipariş almıyor" rozeti
   rejectRate: number;
   totalOrders: number;
@@ -74,6 +76,29 @@ function sortRating(b: BusinessSummary): number {
 }
 
 type Hours = Record<string, { open: string; close: string } | null>;
+
+// KAPALIYKEN "ne zaman açılır" (2026-07-26 tasarım düzeltmesi): kartlarda
+// yalnız "Kapalı" yazınca müşteri "burada kimse çalışmıyor" hissediyordu.
+// Örnek çıktılar: "09:00'da açılır", "Yarın 09:00'da açılır", "Pzt 09:00'da açılır".
+const GUN_KISA = ["Paz", "Pzt", "Sal", "Çar", "Per", "Cum", "Cmt"];
+function nextOpenLabel(wh: unknown): string | null {
+  if (!wh || typeof wh !== "object") return null;
+  const map = wh as Hours;
+  const keys = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
+  const { minutes: cur, day: dow } = trNowParts();
+  for (let i = 0; i < 7; i++) {
+    const gunIdx = (dow + i) % 7;
+    const d = map[keys[gunIdx]];
+    if (!d || !d.open || !d.close) continue;
+    const [oh, om] = d.open.split(":").map(Number);
+    const acilis = oh * 60 + om;
+    if (i === 0 && cur >= acilis) continue; // bugünkü açılış geçmiş
+    if (i === 0) return `${d.open}'da açılır`;
+    if (i === 1) return `Yarın ${d.open}'da açılır`;
+    return `${GUN_KISA[gunIdx]} ${d.open}'da açılır`;
+  }
+  return null;
+}
 
 function isOpenNow(wh: unknown): boolean {
   if (!wh || typeof wh !== "object") return false;
@@ -230,6 +255,7 @@ export async function getBusinesses(
       distanceKm,
       isNew: Date.now() - b.createdAt.getTime() < NEW_WINDOW_MS,
       isOpenNow: isOpenNow(b.workingHours),
+      opensAtLabel: isOpenNow(b.workingHours) ? null : nextOpenLabel(b.workingHours),
       isPaused: b.pausedUntil != null && b.pausedUntil > new Date(),
       rejectRate,
       totalOrders: s?.total ?? 0,

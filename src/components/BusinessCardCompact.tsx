@@ -48,7 +48,7 @@ export function BusinessCardCompact({ b }: { b: BusinessSummary }) {
                 : "bg-slate-100 text-slate-500"
             }`}
           >
-            {b.isOpenNow ? "Açık" : "Kapalı"}
+            {b.isOpenNow ? "Açık" : (b.opensAtLabel ?? "Kapalı")}
           </span>
         )}
       </div>

@@ -60,7 +60,7 @@ export function BusinessCard({ b }: { b: BusinessSummary }) {
             }`}
           >
             <IconClock size={12} />
-            {b.isOpenNow ? "Açık" : "Kapalı"}
+            {b.isOpenNow ? "Açık" : (b.opensAtLabel ?? "Kapalı")}
           </span>
         )}
       </div>

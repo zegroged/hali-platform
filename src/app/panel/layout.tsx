@@ -43,7 +43,10 @@ export default async function PanelLayout({
         </div>
         <PanelNav />
       </header>
-      <main className="mx-auto max-w-3xl px-4 py-6 lg:max-w-5xl">{children}</main>
+      {/* pb-24 (mobil): sabit alt çubuk son satırı kapatmasın. */}
+      <main className="mx-auto max-w-3xl px-4 pb-24 pt-6 md:pb-6 lg:max-w-5xl">
+        {children}
+      </main>
     </div>
   );
 }

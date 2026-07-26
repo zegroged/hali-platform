@@ -54,6 +54,20 @@ async function hourlyTick() {
   } catch (e) {
     console.error("[abonelik-hatirlatma] hata:", e);
   }
+  try {
+    // Komisyoncunun seçtiği günde aylık otomatik ödeme talebi oluştur.
+    const { createScheduledPayoutRequests } = await import("@/lib/payout");
+    await createScheduledPayoutRequests();
+  } catch (e) {
+    console.error("[odeme-talebi] hata:", e);
+  }
+  try {
+    // Kasa: tekrarlayan gider/gelir kalemlerini vadesinde oluştur.
+    const { runLedgerRecurrences } = await import("@/lib/ledger");
+    await runLedgerRecurrences();
+  } catch (e) {
+    console.error("[kasa-tekrar] hata:", e);
+  }
 }
 
 export async function register() {
