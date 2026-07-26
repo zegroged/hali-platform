@@ -94,8 +94,9 @@ export async function generateReferralCode(formData: FormData) {
 // ---- BAŞ KOMİSYONCU: alt komisyoncu yönetimi (2026-07-25) ----
 // Baş komisyoncu kendi panelinden komisyoncu hesabı açar ve yüzdesini belirler
 // (0 .. havuz payı). Farkı kendisi alır (bkz. lib/commission.ts). 3. KADEME YOK:
-// açılan hesap isHead=false → o da hesap açamaz. İndirim yetkisi ASLA geçmez
-// (canDiscount=false; kullanıcı kararı 2026-07-25).
+// açılan hesap isHead=false → o da hesap açamaz. İNDİRİM yetkisi, baş
+// komisyoncunun KENDİ yetkisi varsa alta verilebilir (2026-07-26 kararı;
+// önceki kural değişti) — sonradan da aç/kapat edilebilir.
 
 /** Oturumdaki BAŞ komisyoncuyu getir (değilse yetkisiz). */
 async function requireHeadAgent() {
@@ -103,7 +104,7 @@ async function requireHeadAgent() {
   if (!u || u.role !== "AGENT") redirect("/giris");
   const agent = await prisma.agent.findUnique({
     where: { userId: u!.id },
-    select: { id: true, active: true, isHead: true, poolPercent: true },
+    select: { id: true, active: true, isHead: true, poolPercent: true, canDiscount: true },
   });
   if (!agent || !agent.isHead) redirect("/komisyoncu");
   // PASİF baş komisyoncu ekibini yönetemez (inceleme bulgusu: yalnız
@@ -130,6 +131,10 @@ export async function createSubAgent(formData: FormData) {
   const password = String(formData.get("password") || "");
   const percentRaw = String(formData.get("percent") || "").replace(",", ".").trim();
   const havuz = Number(head.poolPercent ?? 0);
+  // İNDİRİM YETKİSİ DEVRİ (2026-07-26 kullanıcı kararı): baş komisyoncu, açtığı
+  // komisyoncuya indirim yetkisi verebilir — AMA yalnız KENDİSİNDE varsa.
+  // Sahip olmadığı yetkiyi dağıtamaz (yetki yükseltme deliği olmasın).
+  const altIndirim = formData.get("canDiscount") === "on" && head.canDiscount;
 
   if (name.length < 2) hata("Ad soyad girin.");
   if (!isTrPhone(phone)) hata("Geçerli bir telefon girin (11 hane).");
@@ -174,7 +179,7 @@ export async function createSubAgent(formData: FormData) {
           percent: Math.round(percent * 100) / 100,
           parentId: head.id,
           isHead: false, // 3. kademe YOK
-          canDiscount: false, // indirim yetkisi geçmez
+          canDiscount: altIndirim,
         },
       });
     });
@@ -306,4 +311,30 @@ export async function requestPayout() {
   }).catch(() => {});
   revalidatePath("/komisyoncu");
   redirect("/komisyoncu?talep=1");
+}
+
+/** Kendi komisyoncusunun İNDİRİM yetkisini aç/kapat (yalnız kendi ekibi ve
+ *  yalnız baş komisyoncunun kendi yetkisi varsa). Kapatmak geçmiş kodlardaki
+ *  indirimleri ve işletmelere işlenmiş indirimleri DURDURMAZ (verilmiş söz
+ *  tutulur) — yalnız yeni indirimli kod üretemez. */
+export async function toggleSubAgentDiscount(formData: FormData) {
+  const head = await requireHeadAgent();
+  if (!head.canDiscount) {
+    redirect(
+      "/komisyoncu?hata=" +
+        encodeURIComponent("İndirim yetkin yok — komisyoncuna da veremezsin."),
+    );
+  }
+  const id = String(formData.get("id") || "");
+  const alt = await prisma.agent.findFirst({
+    where: { id, parentId: head.id }, // SAHİPLİK: yalnız kendi ekibi
+    select: { id: true, canDiscount: true },
+  });
+  if (alt) {
+    await prisma.agent.updateMany({
+      where: { id: alt.id, canDiscount: alt.canDiscount }, // koşullu yaz (TOCTOU)
+      data: { canDiscount: !alt.canDiscount },
+    });
+  }
+  revalidatePath("/komisyoncu");
 }

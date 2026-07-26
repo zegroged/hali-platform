@@ -6,6 +6,7 @@ import {
   generateReferralCode,
   createSubAgent,
   toggleSubAgentActive,
+  toggleSubAgentDiscount,
   savePayoutInfo,
   requestPayout,
 } from "./actions";
@@ -83,6 +84,7 @@ export default async function KomisyoncuSayfasi({
           id: true,
           percent: true,
           active: true,
+          canDiscount: true,
           createdAt: true,
           user: { select: { name: true, username: true, phone: true } },
           _count: { select: { referrals: true } },
@@ -449,7 +451,12 @@ export default async function KomisyoncuSayfasi({
                       sana · {k._count.referrals} işletme getirdi
                     </span>
                   </span>
-                  <span className="flex items-center gap-2">
+                  <span className="flex flex-wrap items-center gap-2">
+                    {k.canDiscount && (
+                      <span className="rounded-full bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-700">
+                        İndirim yetkili
+                      </span>
+                    )}
                     <span
                       className={`rounded-full px-2 py-0.5 text-xs font-medium ${
                         k.active
@@ -459,6 +466,14 @@ export default async function KomisyoncuSayfasi({
                     >
                       {k.active ? "Aktif" : "Pasif"}
                     </span>
+                    {agent.canDiscount && (
+                      <form action={toggleSubAgentDiscount}>
+                        <input type="hidden" name="id" value={k.id} />
+                        <PendingButton className="rounded-lg border border-violet-300 px-2.5 py-1 text-xs font-medium text-violet-700 hover:bg-violet-50">
+                          {k.canDiscount ? "İndirimi kaldır" : "İndirim yetkisi ver"}
+                        </PendingButton>
+                      </form>
+                    )}
                     <form action={toggleSubAgentActive}>
                       <input type="hidden" name="id" value={k.id} />
                       <PendingButton className="rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50">
@@ -570,9 +585,20 @@ export default async function KomisyoncuSayfasi({
                 />
               </div>
             </div>
+            {agent.canDiscount && (
+              <label className="flex items-start gap-2 text-sm text-slate-700 sm:col-span-2">
+                <input type="checkbox" name="canDiscount" className="mt-0.5" />
+                <span>
+                  <strong>İndirim yetkisi ver:</strong> bu komisyoncu da kod
+                  üretirken abonelik fiyatına indirim tanımlayabilsin. (İndirim,
+                  hem platformun hem senin payını düşürür — komisyon her zaman
+                  fiilen tahsil edilen tutardan hesaplanır.)
+                </span>
+              </label>
+            )}
             <p className="text-xs text-slate-500">
               Verdiğin yüzde havuz payından düşer, kalanı sana yazılır. Bu hesap
-              kendi altına komisyoncu açamaz ve indirim tanımlayamaz.
+              kendi altına komisyoncu açamaz.
             </p>
             <PendingButton className="rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-dark">
               Komisyoncu Oluştur
