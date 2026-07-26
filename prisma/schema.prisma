@@ -524,6 +524,12 @@ model Agent {
   // yüzdede + istediği sürede indirim tanımlayabilir. Admin verir/alır.
   // BAŞ komisyoncu bu yetkiyi ALTINA GEÇİREMEZ (2026-07-25 kullanıcı kararı).
   canDiscount Boolean @default(false)
+  // İNDİRİM TAVANI (2026-07-26): bu komisyoncunun koda gömebileceği EN YÜKSEK
+  // indirim yüzdesi. Baş komisyoncunun açtığı hesaplarda ZORUNLU ve platform
+  // sınırı %20'dir (lib/discount.ts MAX_SUB_DISCOUNT). null = sınırsız
+  // (yalnız admin'in doğrudan verdiği yetkilerde).
+  maxDiscountPercent Decimal? @db.Decimal(5, 2)
+  maxDiscountMonths  Int? // indirimin en fazla kaç ay süreceği (null = sınırsız)
 
   // ---- BAŞ KOMİSYONCU (2 kademe; 2026-07-25) ----
   // isHead: kendi panelinden komisyoncu hesabı açabilir, yüzdelerini belirler.

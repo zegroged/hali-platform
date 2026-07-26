@@ -6,11 +6,12 @@ import {
   generateReferralCode,
   createSubAgent,
   toggleSubAgentActive,
-  toggleSubAgentDiscount,
+  setSubAgentDiscount,
   savePayoutInfo,
   requestPayout,
 } from "./actions";
 import { agentBalance } from "@/lib/payout";
+import { MAX_SUB_DISCOUNT, MAX_SUB_DISCOUNT_MONTHS } from "@/lib/discount";
 import { PendingButton } from "@/components/PendingButton";
 
 export const dynamic = "force-dynamic";
@@ -85,6 +86,8 @@ export default async function KomisyoncuSayfasi({
           percent: true,
           active: true,
           canDiscount: true,
+          maxDiscountPercent: true,
+          maxDiscountMonths: true,
           createdAt: true,
           user: { select: { name: true, username: true, phone: true } },
           _count: { select: { referrals: true } },
@@ -454,7 +457,9 @@ export default async function KomisyoncuSayfasi({
                   <span className="flex flex-wrap items-center gap-2">
                     {k.canDiscount && (
                       <span className="rounded-full bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-700">
-                        İndirim yetkili
+                        İndirim: %
+                        {Number(k.maxDiscountPercent ?? MAX_SUB_DISCOUNT)} ·{" "}
+                        {k.maxDiscountMonths ?? MAX_SUB_DISCOUNT_MONTHS} aya kadar
                       </span>
                     )}
                     <span
@@ -467,10 +472,37 @@ export default async function KomisyoncuSayfasi({
                       {k.active ? "Aktif" : "Pasif"}
                     </span>
                     {agent.canDiscount && (
-                      <form action={toggleSubAgentDiscount}>
+                      <form
+                        action={setSubAgentDiscount}
+                        className="flex items-center gap-1"
+                      >
                         <input type="hidden" name="id" value={k.id} />
+                        <input
+                          name="maxDiscount"
+                          inputMode="decimal"
+                          defaultValue={
+                            k.canDiscount
+                              ? String(Number(k.maxDiscountPercent ?? MAX_SUB_DISCOUNT))
+                              : ""
+                          }
+                          placeholder="tavan %"
+                          aria-label="İndirim tavanı yüzdesi"
+                          className="w-16 rounded-lg border border-violet-300 px-2 py-1 text-xs"
+                        />
+                        <input
+                          name="maxDiscountMonths"
+                          inputMode="numeric"
+                          defaultValue={
+                            k.canDiscount
+                              ? String(k.maxDiscountMonths ?? MAX_SUB_DISCOUNT_MONTHS)
+                              : ""
+                          }
+                          placeholder="ay"
+                          aria-label="İndirim süresi tavanı (ay)"
+                          className="w-14 rounded-lg border border-violet-300 px-2 py-1 text-xs"
+                        />
                         <PendingButton className="rounded-lg border border-violet-300 px-2.5 py-1 text-xs font-medium text-violet-700 hover:bg-violet-50">
-                          {k.canDiscount ? "İndirimi kaldır" : "İndirim yetkisi ver"}
+                          Kaydet
                         </PendingButton>
                       </form>
                     )}
@@ -586,15 +618,46 @@ export default async function KomisyoncuSayfasi({
               </div>
             </div>
             {agent.canDiscount && (
-              <label className="flex items-start gap-2 text-sm text-slate-700 sm:col-span-2">
-                <input type="checkbox" name="canDiscount" className="mt-0.5" />
-                <span>
-                  <strong>İndirim yetkisi ver:</strong> bu komisyoncu da kod
-                  üretirken abonelik fiyatına indirim tanımlayabilsin. (İndirim,
-                  hem platformun hem senin payını düşürür — komisyon her zaman
-                  fiilen tahsil edilen tutardan hesaplanır.)
-                </span>
-              </label>
+              <>
+                <label className="flex items-start gap-2 text-sm text-slate-700 sm:col-span-2">
+                  <input type="checkbox" name="canDiscount" className="mt-0.5" />
+                  <span>
+                    <strong>İndirim yetkisi ver:</strong> bu komisyoncu da kod
+                    üretirken abonelik fiyatına indirim tanımlayabilsin.
+                    (İndirim, hem platformun hem senin payını düşürür — komisyon
+                    her zaman fiilen tahsil edilen tutardan hesaplanır.)
+                  </span>
+                </label>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-slate-600">
+                    İndirim tavanı % (en fazla {MAX_SUB_DISCOUNT})
+                  </label>
+                  <input
+                    name="maxDiscount"
+                    inputMode="decimal"
+                    placeholder={`Örn. ${Math.floor(MAX_SUB_DISCOUNT / 2)}`}
+                    className={inp}
+                  />
+                  <p className="mt-1 text-xs text-slate-500">
+                    Bu komisyoncu kodlarına en fazla bu oranda indirim
+                    koyabilir. Yetki kutusunu işaretlediysen zorunludur.
+                  </p>
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-slate-600">
+                    İndirim süresi tavanı — ay (en fazla {MAX_SUB_DISCOUNT_MONTHS})
+                  </label>
+                  <input
+                    name="maxDiscountMonths"
+                    inputMode="numeric"
+                    placeholder={`Örn. ${Math.floor(MAX_SUB_DISCOUNT_MONTHS / 2)}`}
+                    className={inp}
+                  />
+                  <p className="mt-1 text-xs text-slate-500">
+                    İndirimin en fazla kaç ay süreceğini sen belirlersin.
+                  </p>
+                </div>
+              </>
             )}
             <p className="text-xs text-slate-500">
               Verdiğin yüzde havuz payından düşer, kalanı sana yazılır. Bu hesap

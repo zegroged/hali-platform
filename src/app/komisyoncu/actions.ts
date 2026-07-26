@@ -7,6 +7,7 @@ import { getSessionUser, hashPassword } from "@/lib/auth";
 import { uretKodMetni } from "@/lib/referralCode";
 import { normalizePhone, isTrPhone } from "@/lib/phone";
 import { normalizeUsername, validateUsername } from "@/lib/username";
+import { MAX_SUB_DISCOUNT, MAX_SUB_DISCOUNT_MONTHS } from "@/lib/discount";
 
 // Komisyoncunun TEK yetkili aksiyonu: kendi adına tek kullanımlık kod üretmek.
 // Her müşteri için ayrı kod üretilir; kod bir işletmeye bağlanınca yanar.
@@ -17,7 +18,13 @@ export async function generateReferralCode(formData: FormData) {
 
   const agent = await prisma.agent.findUnique({
     where: { userId: u.id },
-    select: { id: true, active: true, canDiscount: true },
+    select: {
+      id: true,
+      active: true,
+      canDiscount: true,
+      maxDiscountPercent: true,
+      maxDiscountMonths: true,
+    },
   });
   if (!agent) redirect("/giris");
   if (!agent.active) {
@@ -40,8 +47,15 @@ export async function generateReferralCode(formData: FormData) {
       hataDon("İndirim tanımlama yetkin yok — yöneticiyle görüş.");
     const pct = Number(pctRaw);
     const ay = Number(ayRaw);
+    // TAVAN: baş komisyoncunun (ya da admin'in) belirlediği üst sınır.
+    const tavan = Number(agent.maxDiscountPercent ?? 100);
     if (!Number.isFinite(pct) || pct <= 0 || pct > 100)
       hataDon("İndirim yüzdesi 1 ile 100 arasında olmalı.");
+    if (pct > tavan)
+      hataDon(`En fazla %${tavan} indirim tanımlayabilirsin.`);
+    const ayTavan = agent.maxDiscountMonths ?? 1200;
+    if (ay > ayTavan)
+      hataDon(`İndirim süresi en fazla ${ayTavan} ay olabilir.`);
     if (!Number.isInteger(ay) || ay < 1 || ay > 1200)
       hataDon("İndirim süresi ay olarak girilmeli (en az 1).");
     discountPercent = Math.round(pct * 100) / 100;
@@ -135,6 +149,9 @@ export async function createSubAgent(formData: FormData) {
   // komisyoncuya indirim yetkisi verebilir — AMA yalnız KENDİSİNDE varsa.
   // Sahip olmadığı yetkiyi dağıtamaz (yetki yükseltme deliği olmasın).
   const altIndirim = formData.get("canDiscount") === "on" && head.canDiscount;
+  // TAVAN: baş komisyoncu seçer, platform sınırı %20 (MAX_SUB_DISCOUNT).
+  const tavanRaw = String(formData.get("maxDiscount") || "").replace(",", ".").trim();
+  const ayTavanRaw = String(formData.get("maxDiscountMonths") || "").trim();
 
   if (name.length < 2) hata("Ad soyad girin.");
   if (!isTrPhone(phone)) hata("Geçerli bir telefon girin (11 hane).");
@@ -147,6 +164,19 @@ export async function createSubAgent(formData: FormData) {
   // TAVAN: havuz payını AŞAMAZ — aşarsa platform %50'den fazla öderdi.
   if (percent > havuz)
     hata(`Bu komisyoncuya en fazla %${havuz} verebilirsin (havuz payın).`);
+
+  let altTavan: number | null = null;
+  let altAyTavan: number | null = null;
+  if (altIndirim) {
+    const t = Number(tavanRaw);
+    if (!Number.isFinite(t) || t <= 0 || t > MAX_SUB_DISCOUNT)
+      hata(`İndirim tavanı 1 ile ${MAX_SUB_DISCOUNT} arasında olmalı.`);
+    altTavan = Math.round(t * 100) / 100;
+    const a = Number(ayTavanRaw);
+    if (!Number.isInteger(a) || a <= 0 || a > MAX_SUB_DISCOUNT_MONTHS)
+      hata(`İndirim süresi tavanı 1 ile ${MAX_SUB_DISCOUNT_MONTHS} ay arasında olmalı.`);
+    altAyTavan = a;
+  }
 
   // SAYI SINIRI YOK (2026-07-26 kullanıcı kararı): baş komisyoncu istediği kadar
   // komisyoncu açabilir. Kötüye kullanım freni yerine izlenebilirlik: her hesap
@@ -180,6 +210,8 @@ export async function createSubAgent(formData: FormData) {
           parentId: head.id,
           isHead: false, // 3. kademe YOK
           canDiscount: altIndirim,
+          maxDiscountPercent: altTavan,
+          maxDiscountMonths: altAyTavan,
         },
       });
     });
@@ -313,11 +345,10 @@ export async function requestPayout() {
   redirect("/komisyoncu?talep=1");
 }
 
-/** Kendi komisyoncusunun İNDİRİM yetkisini aç/kapat (yalnız kendi ekibi ve
- *  yalnız baş komisyoncunun kendi yetkisi varsa). Kapatmak geçmiş kodlardaki
- *  indirimleri ve işletmelere işlenmiş indirimleri DURDURMAZ (verilmiş söz
- *  tutulur) — yalnız yeni indirimli kod üretemez. */
-export async function toggleSubAgentDiscount(formData: FormData) {
+/** Kendi komisyoncusunun İNDİRİM yetkisini ve TAVANINI belirle (yalnız kendi
+ *  ekibi, yalnız kendi yetkisi varsa). Tavan boş/0 → yetki kapatılır. Kapatmak
+ *  daha önce verilmiş indirimleri DURDURMAZ (verilmiş söz tutulur). */
+export async function setSubAgentDiscount(formData: FormData) {
   const head = await requireHeadAgent();
   if (!head.canDiscount) {
     redirect(
@@ -326,15 +357,45 @@ export async function toggleSubAgentDiscount(formData: FormData) {
     );
   }
   const id = String(formData.get("id") || "");
+  const raw = String(formData.get("maxDiscount") || "").replace(",", ".").trim();
+  const ayRaw = String(formData.get("maxDiscountMonths") || "").trim();
   const alt = await prisma.agent.findFirst({
     where: { id, parentId: head.id }, // SAHİPLİK: yalnız kendi ekibi
-    select: { id: true, canDiscount: true },
+    select: { id: true },
   });
-  if (alt) {
-    await prisma.agent.updateMany({
-      where: { id: alt.id, canDiscount: alt.canDiscount }, // koşullu yaz (TOCTOU)
-      data: { canDiscount: !alt.canDiscount },
-    });
+  if (!alt) {
+    revalidatePath("/komisyoncu");
+    return;
   }
+  if (!raw || Number(raw) === 0) {
+    await prisma.agent.update({
+      where: { id: alt.id },
+      data: { canDiscount: false, maxDiscountPercent: null, maxDiscountMonths: null },
+    });
+    revalidatePath("/komisyoncu");
+    return;
+  }
+  const t = Number(raw);
+  if (!Number.isFinite(t) || t <= 0 || t > MAX_SUB_DISCOUNT) {
+    redirect(
+      "/komisyoncu?hata=" +
+        encodeURIComponent(`İndirim tavanı 1 ile ${MAX_SUB_DISCOUNT} arasında olmalı.`),
+    );
+  }
+  const a = ayRaw ? Number(ayRaw) : MAX_SUB_DISCOUNT_MONTHS;
+  if (!Number.isInteger(a) || a <= 0 || a > MAX_SUB_DISCOUNT_MONTHS) {
+    redirect(
+      "/komisyoncu?hata=" +
+        encodeURIComponent(`Süre tavanı 1 ile ${MAX_SUB_DISCOUNT_MONTHS} ay arasında olmalı.`),
+    );
+  }
+  await prisma.agent.update({
+    where: { id: alt.id },
+    data: {
+      canDiscount: true,
+      maxDiscountPercent: Math.round(t * 100) / 100,
+      maxDiscountMonths: a,
+    },
+  });
   revalidatePath("/komisyoncu");
 }

@@ -7,6 +7,15 @@ import { PLAN } from "@/lib/plan";
 
 const kurus = (n: number) => Math.round(n * 100) / 100;
 
+// BAŞ KOMİSYONCUNUN alt komisyoncusuna verebileceği EN YÜKSEK indirim tavanı.
+// Kullanıcı kararı 2026-07-26: baş komisyoncu bu sınırın altında istediği
+// tavanı seçebilir; üstünü yalnız admin (doğrudan yetki vererek) açabilir.
+export const MAX_SUB_DISCOUNT = 20;
+// Aynı mantıkla SÜRE tavanı: baş komisyoncu bunun altında seçer. 12 ay makul
+// bir üst sınır (kalıcı indirim taahhüdü admin kararı olmalı) — değiştirmek
+// isterseniz tek yer burası.
+export const MAX_SUB_DISCOUNT_MONTHS = 12;
+
 export type DiscountLike = {
   discountPercent: unknown; // Prisma Decimal | null
   discountUntil: Date | null;
