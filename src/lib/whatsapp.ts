@@ -1,4 +1,7 @@
 import { normalizePhone } from "@/lib/phone";
+import { prisma } from "@/lib/prisma";
+import { notify } from "@/lib/notify";
+import type { OrderStatus } from "@prisma/client";
 
 // WHATSAPP CLOUD API (2026-07-26) — sipariş bildirimlerinin ASIL kanalı.
 // SMS pahalı olduğu için ertelenmişti; WhatsApp "utility" şablonu Türkiye'de
@@ -71,6 +74,52 @@ export async function sendTemplate(
     return { ok: true, id: data.messages?.[0]?.id };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "bilinmeyen hata" };
+  }
+}
+
+/** GÖNDER + İŞLETMEYE BİLDİR (2026-07-26 kullanıcı isteği):
+ *  - Başarılı: sipariş geçmişine "WhatsApp'tan gönderildi" satırı düşer
+ *    (panelde sipariş detayında görünür; her mesaj için zil çalmak gürültü olurdu).
+ *  - Başarısız: işletme sahibine ZİL — müşteriye ulaşılamadı, telefonla arasın.
+ *  Tamamen best-effort: hiçbir hata sipariş akışını bozmaz. */
+export async function waGonderVeKaydet(opts: {
+  orderId: string;
+  status: OrderStatus;
+  ownerUserId?: string | null;
+  etiket: string; // "Takip kodu", "Fiyat onayı", "Teslimat bilgisi"
+  gonder: () => Promise<SonucKaydi>;
+}): Promise<void> {
+  if (!whatsappEnabled) return; // kapalıyken iz bırakma
+  const r = await opts.gonder();
+  try {
+    if (r.ok) {
+      await prisma.orderEvent.create({
+        data: {
+          orderId: opts.orderId,
+          status: opts.status,
+          note: `${opts.etiket} müşteriye WhatsApp'tan gönderildi`,
+        },
+      });
+      return;
+    }
+    await prisma.orderEvent.create({
+      data: {
+        orderId: opts.orderId,
+        status: opts.status,
+        note: `WhatsApp gönderilemedi (${opts.etiket}): ${r.error ?? "bilinmeyen"}`,
+      },
+    });
+    if (opts.ownerUserId) {
+      await notify({
+        userId: opts.ownerUserId,
+        type: "genel",
+        title: "WhatsApp mesajı gitmedi",
+        body: `${opts.etiket} müşteriye ulaşmadı — telefonla bilgilendirmen gerekebilir.`,
+        href: `/panel/siparisler/${opts.orderId}`,
+      });
+    }
+  } catch (e) {
+    console.error("whatsapp kayıt:", e);
   }
 }
 
