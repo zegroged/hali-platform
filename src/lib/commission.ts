@@ -22,6 +22,7 @@ export async function accrueCommissionForPayment(paymentId: string): Promise<voi
         business: {
           select: {
             referredByAgentId: true,
+            discountGrantedByAgentId: true,
             referredByAgent: {
               select: {
                 id: true,
@@ -69,7 +70,22 @@ export async function accrueCommissionForPayment(paymentId: string): Promise<voi
     const net = kurus(gross / (1 + PLAN.kdvRate / 100));
     const percent = Number(agent.percent);
     if (!Number.isFinite(percent) || percent < 0) return;
-    const tutar = kurus((net * percent) / 100);
+
+    // İNDİRİM PAYLAŞIMI (2026-07-26 kullanıcı kararı): indirimi VEREN komisyoncu
+    // indirimin YARISINI kendi komisyonundan karşılar; diğer yarısı platformdan.
+    // Örnek: 2.000 net üzerinden %20 indirim = 400 TL kayıp → 200 komisyoncudan,
+    // 200 platformdan. Komisyoncu payı bu yüzden İNDİRİMSİZ net üzerinden
+    // hesaplanıp yarım indirim düşülerek bulunur. İndirimi admin verdiyse
+    // (discountGrantedByAgentId null) komisyoncu cezalandırılmaz.
+    const netTam = kurus(PLAN.priceGrossNumber / (1 + PLAN.kdvRate / 100));
+    const indirimTutari = Math.max(0, kurus(netTam - net));
+    const indirimiVerenBen =
+      indirimTutari > 0 &&
+      payment.business.discountGrantedByAgentId === agent.id;
+
+    const tutar = indirimiVerenBen
+      ? Math.max(0, kurus((netTam * percent) / 100 - indirimTutari / 2))
+      : kurus((net * percent) / 100);
 
     // BAŞ KOMİSYONCU PAYI: havuz payı eksi alt komisyoncunun yüzdesi. Baş
     // pasifse pay işlemez (mevcut "pasif komisyoncuya tahakkuk yok" kuralı).
@@ -82,11 +98,23 @@ export async function accrueCommissionForPayment(paymentId: string): Promise<voi
       const havuz = Number(head.poolPercent ?? 0);
       const fark = kurus(havuz - percent);
       if (Number.isFinite(fark) && fark > 0) {
+        // İndirimi ALT komisyoncu verdiyse yükü o taşır; baş komisyoncunun payı
+        // indirimsiz net üzerinden hesaplanır (baş cezalandırılmaz).
+        // Baş kendi verdiyse yukarıdaki "indirimiVerenBen" dalı zaten uygulandı.
         // KURUŞ DEĞİŞMEZİ (inceleme bulgusu): iki payı ayrı ayrı yuvarlamak
         // toplamı havuzun 1 kuruş ÜSTÜNE çıkarabiliyordu. Baş payı, havuzun
         // TAMAMINDAN alt payı çıkarılarak bulunur → toplam asla havuzu aşmaz.
-        const havuzToplam = kurus((net * havuz) / 100);
-        const tutarHead = kurus(havuzToplam - tutar);
+        const esasNet = indirimiVerenBen ? netTam : net;
+        const havuzToplam = kurus((esasNet * havuz) / 100);
+        // Baş payı iki kuralın KÜÇÜĞÜ:
+        //  (a) kendi yüzdesinin karşılığı — alt komisyoncunun indirim yükünü
+        //      başa KAZANÇ olarak geçirmemek için (test bulgusu: baş 600 yerine
+        //      800 alıyordu, indirimin tamamı platformdan gidiyordu),
+        //  (b) havuz toplamı eksi alt payı — toplamın havuzu 1 kuruş bile
+        //      aşmasını engelleyen değişmez.
+        const headKendi = kurus((esasNet * fark) / 100);
+        const headKalan = kurus(havuzToplam - tutar);
+        const tutarHead = Math.min(headKendi, headKalan);
         if (tutarHead > 0) {
           headAgentId = head.id;
           headPercent = fark;

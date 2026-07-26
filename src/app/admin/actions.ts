@@ -300,6 +300,7 @@ export async function createBusinessByAdmin(formData: FormData) {
             ? {
                 discountPercent: kodIndirim.percent,
                 discountUntil: discountUntilFromMonths(kodIndirim.months),
+                discountGrantedByAgentId: agentId, // yarısı ondan düşer
               }
             : {}),
           address: city && district ? `${district}, ${city}` : "",
@@ -852,6 +853,7 @@ export async function setBusinessAgent(formData: FormData) {
             ? {
                 discountPercent: bulunan!.discountPercent,
                 discountUntil: discountUntilFromMonths(bulunan!.discountMonths!),
+                discountGrantedByAgentId: bulunan!.agentId, // yarısı ondan düşer
               }
             : {}),
         },
@@ -1023,7 +1025,11 @@ export async function setBusinessDiscount(formData: FormData) {
   if (!pctRaw || Number(pctRaw) === 0) {
     await prisma.cleanerBusiness.update({
       where: { id: businessId },
-      data: { discountPercent: null, discountUntil: null },
+      data: {
+        discountPercent: null,
+        discountUntil: null,
+        discountGrantedByAgentId: null,
+      },
     });
     revalidatePath(geri);
     redirect(geri + "?mesaj=" + encodeURIComponent("İndirim kaldırıldı."));
@@ -1040,6 +1046,8 @@ export async function setBusinessDiscount(formData: FormData) {
     data: {
       discountPercent: pctYuvarlak,
       discountUntil: discountUntilFromMonths(ay),
+      // Admin indirimi: yükü tamamen platform taşır, komisyoncu cezalanmaz.
+      discountGrantedByAgentId: null,
     },
   });
   revalidatePath(geri);

@@ -225,6 +225,8 @@ export async function POST(req: NextRequest) {
             ? {
                 discountPercent: kodIndirim.percent,
                 discountUntil: discountUntilFromMonths(kodIndirim.months),
+                // İndirimi VEREN komisyoncu: yarısı onun komisyonundan düşer.
+                discountGrantedByAgentId: agentId,
               }
             : {}),
           address: `${districtCanon}, ${cityCanon}`,

@@ -192,6 +192,11 @@ model CleanerBusiness {
   // indirimli tahsil edilir (kaynak: premium komisyoncu kodu VEYA admin eli).
   discountPercent Decimal?  @db.Decimal(5, 2)
   discountUntil   DateTime?
+  // İNDİRİMİ KİM VERDİ (2026-07-26): komisyoncu kodundan geldiyse o komisyoncunun
+  // id'si; admin elle verdiyse null. Kural: indirimin YARISI, indirimi veren
+  // komisyoncunun komisyonundan düşer (kalan yarısı platformdan). Admin verdiyse
+  // tamamı platformdan. Bkz. lib/commission.ts.
+  discountGrantedByAgentId String?
 
   @@index([city, district])
 }
