@@ -27,6 +27,36 @@ export function waNumber(raw: string): string | null {
 
 type SonucKaydi = { ok: boolean; id?: string; error?: string };
 
+// GÜNLÜK GÖNDERİM TAVANI (2026-07-26): Meta'da reklam hesabındaki gibi harcama
+// limiti YOK — kart kullandıkça çekiliyor. Kod tarafında fren koyuyoruz: bir
+// hata döngüsü (bozuk bekçi, tekrar eden iş) faturayı şişirmesin. Normal hacim
+// sipariş başına ~3 mesaj olduğundan 2.000 mesaj/gün fazlasıyla yeterli;
+// aşılırsa gönderim durur ve log'a düşer (sipariş akışı etkilenmez).
+const GUNLUK_TAVAN = Number(process.env.WHATSAPP_DAILY_CAP ?? 2000);
+
+/** Bugünün sayacını 1 artır; tavan aşıldıysa false döner (gönderme). */
+async function kotaVarMi(): Promise<boolean> {
+  const gun = new Date().toISOString().slice(0, 10); // YYYY-MM-DD (UTC yeter)
+  const key = `wa-gonderim-${gun}`;
+  // TEK atomik adım: yoksa 1 ile oluştur, varsa 1 artır ve yeni değeri döndür.
+  // (Prisma upsert'te "artır" ifadesi yok; ham SQL yarış koşulunu da kapatır.)
+  const rows = await prisma.$queryRaw<{ value: string }[]>`
+    INSERT INTO "AppState" ("key", "value", "updatedAt")
+    VALUES (${key}, '1', now())
+    ON CONFLICT ("key") DO UPDATE
+      SET "value" = (COALESCE("AppState"."value", '0')::int + 1)::text,
+          "updatedAt" = now()
+    RETURNING "value"`;
+  const sayi = Number(rows[0]?.value ?? 0);
+  if (sayi > GUNLUK_TAVAN) {
+    console.error(
+      `[whatsapp] GÜNLÜK TAVAN AŞILDI (${sayi}/${GUNLUK_TAVAN}) — gönderim durduruldu`,
+    );
+    return false;
+  }
+  return true;
+}
+
 /** Onaylı şablonu gönder. Best-effort: hata ASLA sipariş akışını bozmaz. */
 export async function sendTemplate(
   to: string,
@@ -36,6 +66,8 @@ export async function sendTemplate(
   if (!whatsappEnabled) return { ok: false, error: "whatsapp kapalı" };
   const num = waNumber(to);
   if (!num) return { ok: false, error: "geçersiz numara" };
+  if (!(await kotaVarMi()))
+    return { ok: false, error: "günlük gönderim tavanı aşıldı" };
 
   try {
     const res = await fetch(`${GRAPH}/${process.env.WHATSAPP_PHONE_ID}/messages`, {
@@ -156,6 +188,8 @@ export async function waOtp(to: string, code: string): Promise<SonucKaydi> {
   if (!whatsappEnabled) return { ok: false, error: "whatsapp kapalı" };
   const num = waNumber(to);
   if (!num) return { ok: false, error: "geçersiz numara" };
+  if (!(await kotaVarMi()))
+    return { ok: false, error: "günlük gönderim tavanı aşıldı" };
   try {
     const res = await fetch(`${GRAPH}/${process.env.WHATSAPP_PHONE_ID}/messages`, {
       method: "POST",
