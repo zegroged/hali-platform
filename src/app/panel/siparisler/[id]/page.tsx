@@ -66,6 +66,7 @@ export default async function OrderManagePage({
     where: { ownerId: u.id },
     select: {
       id: true,
+      name: true, // WhatsApp mesajında işletme adı geçsin
       drivers: {
         select: { id: true, user: { select: { name: true } } },
         orderBy: { createdAt: "asc" },
@@ -99,6 +100,22 @@ export default async function OrderManagePage({
   const trackRef = o.code ?? "";
   const trackUrl = `${getAppBaseUrl()}/takip/${trackRef}`;
 
+  // Müşterinin WhatsApp bağlantısı: TR numarası 90… biçimine çevrilir; mesaj
+  // işletme adı + takip kodu + link içerir (halıcı sadece "Gönder"e basar).
+  const waDigits = (() => {
+    const d = (o.customerPhone || "").replace(/\D/g, "");
+    if (d.startsWith("90") && d.length === 12) return d;
+    if (d.startsWith("0") && d.length === 11) return "90" + d.slice(1);
+    if (d.length === 10) return "90" + d;
+    return null;
+  })();
+  const waLink =
+    waDigits && trackRef
+      ? `https://wa.me/${waDigits}?text=${encodeURIComponent(
+          `Merhaba ${o.customerName}, ${b.name} olarak siparişinizi kaydettik. Takip kodunuz: ${trackRef}\nHalınızın durumunu buradan izleyebilirsiniz: ${trackUrl}`,
+        )}`
+      : null;
+
   return (
     <div className="space-y-4">
       <Link
@@ -121,6 +138,19 @@ export default async function OrderManagePage({
             >
               <IconPhone size={14} /> {o.customerPhone}
             </a>
+            {/* TEK TIK WHATSAPP (2026-07-26): halıcı KENDİ numarasından, hazır
+                yazılmış mesajla takip kodunu gönderir. Meta API'siz, ücretsiz;
+                otomatik gönderim (Cloud API) sonra bunun üstüne eklenecek. */}
+            {waLink && (
+              <a
+                href={waLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-1 inline-flex items-center gap-1.5 rounded-lg bg-[#25D366] px-3 py-1.5 text-xs font-semibold text-white"
+              >
+                WhatsApp&apos;tan takip kodunu gönder
+              </a>
+            )}
             <p className="mt-1 flex items-start gap-1.5 text-sm text-slate-600">
               <IconMapPin size={14} className="mt-0.5 shrink-0" />
               {o.pickupAddress}
