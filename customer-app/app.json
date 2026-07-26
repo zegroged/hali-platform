@@ -34,12 +34,16 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0d9488"
       },
-      "permissions": ["ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION"],
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION"
+      ],
       "config": {
         "googleMaps": {
           "apiKey": "ANDROID_GOOGLE_MAPS_ANAHTARI_BURAYA"
         }
       }
-    }
+    },
+    "owner": "enyakinhaliyikamaservisi"
   }
 }
