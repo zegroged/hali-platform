@@ -113,7 +113,11 @@ export function Orders({ onSessionExpired }: { onSessionExpired: () => void }) {
   }
 
   async function doDeliver(o: DriverOrder) {
-    const price = Number((prices[o.id] ?? "").replace(",", "."));
+    // Kutuda GÖRÜNEN değerle GÖNDERİLEN değer aynı olmalı: şoför ön dolu tutara
+    // dokunmadan "Teslim Et"e basarsa prices[o.id] boştur → aynı yedeğe düş.
+    const girilen =
+      prices[o.id] ?? (o.quotedPrice != null ? String(o.quotedPrice) : "");
+    const price = Number(girilen.replace(",", "."));
     if (!Number.isFinite(price) || price <= 0) {
       Alert.alert("Tutar gerekli", "Tahsil edilen tutarı gir (0'dan büyük).");
       return;
@@ -173,11 +177,17 @@ export function Orders({ onSessionExpired }: { onSessionExpired: () => void }) {
     if (o.status === "OUT_FOR_DELIVERY")
       return (
         <View style={{ gap: 8 }}>
+          {/* Halıcının bildirdiği tutar HAZIR gelir (web şoför ekranıyla İKİZ,
+              2026-07-26): şoför sıfırdan yazmasın, yanlış tahsilat olmasın.
+              Şoför yine de üzerine yazabilir (fark çıkarsa). */}
           <TextInput
             style={s.input}
             placeholder="Tahsil edilen tutar (TL)"
             keyboardType="decimal-pad"
-            value={prices[o.id] ?? ""}
+            value={
+              prices[o.id] ??
+              (o.quotedPrice != null ? String(o.quotedPrice) : "")
+            }
             onChangeText={(v) => setPrices((p) => ({ ...p, [o.id]: v }))}
           />
           <TouchableOpacity

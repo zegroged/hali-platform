@@ -2,7 +2,7 @@
   "expo": {
     "name": "Halı Şoför",
     "slug": "hali-driver",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "scheme": "halidriver",
     "userInterfaceStyle": "light",
@@ -43,7 +43,7 @@
     },
     "android": {
       "package": "com.enyakinhaliyikamaservisi.driver",
-      "versionCode": 1,
+      "versionCode": 2,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0d9488"
