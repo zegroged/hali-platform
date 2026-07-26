@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { telefonKoduDogrula } from "@/lib/phoneOtp";
+import { whatsappEnabled } from "@/lib/whatsapp";
 import { prisma } from "@/lib/prisma";
 import { hashPassword, createSession, signSession } from "@/lib/auth";
 import { rateLimit, clientIp, tooMany } from "@/lib/ratelimit";
@@ -13,6 +15,8 @@ const Body = z.object({
   phone: z.string().regex(/^05\d{9}$/, "Telefon 05xx ile 11 hane olmalı."),
   password: z.string().min(8, "Şifre en az 8 karakter olmalı.").max(72),
   emailCode: z.string().trim().length(6, "6 haneli kodu gir."),
+  // Telefon doğrulama kodu (WhatsApp). WhatsApp kapalıyken istenmez.
+  phoneCode: z.string().trim().length(6).optional(),
   // Honeypot (bot tuzağı)
   website: z.string().max(200).optional(),
 });
@@ -30,6 +34,21 @@ export async function POST(req: NextRequest) {
     );
   }
   const { name, phone, password, emailCode } = parsed.data;
+
+  // TELEFON DOĞRULAMA (2026-07-26): WhatsApp açıkken zorunlu — sahte numarayla
+  // üyelik açılmasın. Kapalıyken (jeton/numara henüz yokken) atlanır ki kayıt
+  // akışı kırılmasın.
+  if (whatsappEnabled) {
+    if (!parsed.data.phoneCode) {
+      return NextResponse.json(
+        { error: "Telefon doğrulama kodu gerekli." },
+        { status: 400 },
+      );
+    }
+    const tel = await telefonKoduDogrula(phone, parsed.data.phoneCode);
+    if (!tel.ok)
+      return NextResponse.json({ error: tel.hata }, { status: tel.durum ?? 400 });
+  }
   const email = parsed.data.email.toLowerCase();
 
   if (parsed.data.website) {
@@ -82,6 +101,7 @@ export async function POST(req: NextRequest) {
       role: "CUSTOMER",
       name,
       phone,
+      phoneVerified: whatsappEnabled, // WhatsApp kodu doğrulandıysa işaretli
       email,
       emailVerified: true, // kayıt öncesi kodla doğrulandı
       password: await hashPassword(password),

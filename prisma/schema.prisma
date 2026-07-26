@@ -136,6 +136,11 @@ model CleanerBusiness {
   // gruplu gösterir. phone birincil GSM'dir (SMS bildirimleri oraya gider).
   gsmPhone2     String? // ikinci GSM & WhatsApp numarası
   landlinePhone String? // sabit hat (0 2xx/3xx/4xx...)
+  // WHATSAPP DOĞRULAMASI (2026-07-26): işletme kaydının kapısı e-postadır
+  // (sabit hatta OTP gitmez); WhatsApp numarası AYRI doğrulanır. Doğrulanan
+  // numara burada saklanır — sonradan değişirse doğrulama düşer.
+  whatsappNumber     String?
+  whatsappVerifiedAt DateTime?
 
   workingHours            Json? // {"mon":{"open":"09:00","close":"19:00"}, ...}
   deliveryEstimateMinDays Int? // örn 2
@@ -412,6 +417,18 @@ model Order {
 }
 
 // Kayıt öncesi e-posta doğrulama kodu (hesap henüz yokken; 10 dk geçerli).
+// TELEFON DOĞRULAMA KODU (2026-07-26): kullanıcı HENÜZ YOKKEN (müşteri kaydı)
+// numaraya gönderilen kod. WhatsApp üzerinden gider (SMS pahalı). E-posta
+// tarafındaki SignupOtp ile aynı mantık.
+model PhoneOtp {
+  id        String   @id @default(cuid())
+  phone     String   @unique
+  code      String
+  expiresAt DateTime
+  attempts  Int      @default(0) // 5 yanlışta kilit
+  createdAt DateTime @default(now())
+}
+
 model SignupOtp {
   id        String   @id @default(cuid())
   email     String   @unique
