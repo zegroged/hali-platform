@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentBusiness, profileComplete, syncVisibility } from "@/lib/panel";
 import { hashPassword } from "@/lib/auth";
 import { sendSms, trackingLink } from "@/lib/sms";
+import { waSiparisYolda, waSiparisHazir, waFiyatOnayi } from "@/lib/whatsapp";
 import { sendAdminEmail } from "@/lib/email";
 import { notify, notifyAdmins } from "@/lib/notify";
 import { getAppBaseUrl } from "@/lib/config";
@@ -593,6 +594,14 @@ export async function quoteOrderPrice(formData: FormData) {
       order.customerPhone,
       `Kesin fiyat ${price} TL. Onaylamak icin: ${trackingLink(order.trackingToken)}`,
     );
+    // WhatsApp: tutar Meta şablonunda geçemiyor (pazarlama sayılıyor), müşteri
+    // takip sayfasında görüp onaylıyor.
+    void waFiyatOnayi(
+      order.customerPhone,
+      order.customerName,
+      b.name,
+      order.code ?? "",
+    );
   } catch (e) {
     console.error("quoteOrderPrice SMS hatası:", e);
   }
@@ -654,6 +663,12 @@ export async function advanceOrderPanel(formData: FormData) {
       await sendSms(
         order.customerPhone,
         `Haliniz yola cikti! Canli takip: ${trackingLink(order.trackingToken)}`,
+      );
+      void waSiparisYolda(
+        order.customerPhone,
+        order.customerName,
+        b.name,
+        order.code ?? "",
       );
     } catch (e) {
       console.error("advanceOrderPanel SMS hatası:", e);

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getAuthedUser } from "@/lib/auth";
 import { sendSms, sendTrackingSms } from "@/lib/sms";
+import { waSiparisAlindi } from "@/lib/whatsapp";
 import { createOrderWithCode } from "@/lib/ordercode";
 import { rateLimit, clientIp, tooMany } from "@/lib/ratelimit";
 import { subscriptionActive } from "@/lib/subscription";
@@ -53,6 +54,7 @@ export async function POST(req: NextRequest) {
     },
     select: {
       id: true,
+      name: true, // WhatsApp bildiriminde işletme adı geçer
       phone: true,
       ownerId: true,
       pausedUntil: true,
@@ -196,6 +198,13 @@ export async function POST(req: NextRequest) {
     // kesin-fiyat onayı/iptal yalnız bu özel linkle yapılır; kısa kod işletme+
     // şoförde görünür → onu link yapsaydık işletme müşteri onayını taklit ederdi.
     await sendTrackingSms(d.customerPhone, d.customerName, order.trackingToken);
+    // WhatsApp (SMS'in yerini alan asıl kanal; kapalıysa sessizce atlanır).
+    void waSiparisAlindi(
+      d.customerPhone,
+      d.customerName,
+      business.name,
+      order.code ?? "",
+    );
   } catch (e) {
     console.error("order tracking SMS hatası:", e);
     // 6563 Yön. md.9: teyidin "ayrıca" bacağı (SMS) düştü — işletme panelinde
