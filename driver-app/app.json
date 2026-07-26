@@ -2,7 +2,7 @@
   "expo": {
     "name": "Halı Şoför",
     "slug": "hali-driver",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "orientation": "portrait",
     "scheme": "halidriver",
     "userInterfaceStyle": "light",
@@ -28,6 +28,16 @@
         {
           "cameraPermission": "Halının alım ve teslim fotoğrafını çekmek için kamera kullanılır (hasar/kayıp kanıtı)."
         }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "compileSdkVersion": 35,
+            "targetSdkVersion": 35,
+            "buildToolsVersion": "35.0.0"
+          }
+        }
       ]
     ],
     "ios": {
@@ -43,7 +53,7 @@
     },
     "android": {
       "package": "com.enyakinhaliyikamaservisi.driver",
-      "versionCode": 2,
+      "versionCode": 3,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0d9488"

@@ -18,6 +18,16 @@
         {
           "locationWhenInUsePermission": "Yakınındaki halı yıkamacıları gösterebilmek için konumun kullanılır; konumun kaydedilmez, kimseyle paylaşılmaz."
         }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "compileSdkVersion": 35,
+            "targetSdkVersion": 35,
+            "buildToolsVersion": "35.0.0"
+          }
+        }
       ]
     ],
     "ios": {
