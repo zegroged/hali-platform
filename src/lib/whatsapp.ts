@@ -145,3 +145,52 @@ export function waSiparisHazir(to: string, ad: string, isletme: string, kod: str
 export function waSiparisYolda(to: string, ad: string, isletme: string, kod: string) {
   return sendTemplate(to, "siparis_yolda", [ad, isletme, kod]);
 }
+
+/** TELEFON DOĞRULAMA KODU (2026-07-26): SMS pahalı olduğu için OTP de
+ *  WhatsApp'tan gider. Meta'nın AUTHENTICATION şablonu özel biçimlidir: gövde
+ *  metnini Meta üretir, biz yalnız KODU veririz; kod hem gövdede hem "Kodu
+ *  kopyala" butonunda geçtiği için iki yerde de parametre olarak gönderilir.
+ *  Türkiye tarifesi: kimlik doğrulama mesajı ~0,005 $ (~25 kuruş) — SMS'in
+ *  yarısı. Şablon adı: dogrulama_kodu (kalıcı jetonla oluşturulacak). */
+export async function waOtp(to: string, code: string): Promise<SonucKaydi> {
+  if (!whatsappEnabled) return { ok: false, error: "whatsapp kapalı" };
+  const num = waNumber(to);
+  if (!num) return { ok: false, error: "geçersiz numara" };
+  try {
+    const res = await fetch(`${GRAPH}/${process.env.WHATSAPP_PHONE_ID}/messages`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${process.env.WHATSAPP_TOKEN}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        to: num,
+        type: "template",
+        template: {
+          name: "dogrulama_kodu",
+          language: { code: "tr" },
+          components: [
+            { type: "body", parameters: [{ type: "text", text: code }] },
+            {
+              type: "button",
+              sub_type: "url",
+              index: "0",
+              parameters: [{ type: "text", text: code }],
+            },
+          ],
+        },
+      }),
+      signal: AbortSignal.timeout(12000),
+    });
+    const data = (await res.json()) as {
+      messages?: { id: string }[];
+      error?: { message?: string };
+    };
+    if (!res.ok || data.error)
+      return { ok: false, error: data.error?.message ?? `HTTP ${res.status}` };
+    return { ok: true, id: data.messages?.[0]?.id };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "bilinmeyen hata" };
+  }
+}
