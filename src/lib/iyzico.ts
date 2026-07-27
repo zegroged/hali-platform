@@ -303,6 +303,7 @@ export type SubRetrieveResult = {
   subscriptionRef?: string; // iyzico subscriptionReferenceCode (iptal için saklanır)
   customerRef?: string;
   conversationId?: string; // bizim SubscriptionPayment.id — KESİN bağ için
+  error?: string; // teşhis için (canlıda sessiz düşmeyi engeller)
 };
 
 /** Checkout dönüşünde abonelik sonucunu doğrula (iyzico'ya sunucu-sunucu). */
@@ -319,18 +320,35 @@ export async function retrieveRecurringResult(
       25000,
     );
     void _to;
+    // conversationId İSTEKTE GÖNDERİLİR (2026-07-27 kritik düzeltme): iyzico
+    // yanıtta yalnız BU istekte gönderilen conversationId'yi yankılar,
+    // initialize'dakini DEĞİL. Boş gönderdiğimiz için yanıtta da boş dönüyordu;
+    // callback ödemeyi eşleştiremeyip "hata" diyordu — oysa PARA ÇEKİLMİŞTİ.
     client.subscriptionCheckoutForm.retrieve(
-      { token },
+      { locale: "tr", token },
       (err: any, result: any) => {
         const data = result?.data ?? result;
         if (err || result?.status !== "success") {
-          resolve({ ok: false, active: false });
+          // SESSİZ DÜŞME YOK: sebebi logla, yoksa canlıda teşhis imkânsız.
+          const sebep = result?.errorMessage ?? result?.errorCode ?? String(err);
+          console.error("[iyzico] abonelik sorgusu başarısız:", sebep);
+          resolve({ ok: false, active: false, error: sebep });
         } else {
           const status = data?.subscriptionStatus ?? data?.status;
+          const active =
+            status === "ACTIVE" ||
+            status === "active" ||
+            data?.parentReferenceCode != null;
+          const ref = data?.referenceCode ?? data?.subscriptionReferenceCode;
+          if (!active || !ref)
+            console.error(
+              "[iyzico] abonelik yanıtı beklenmedik:",
+              JSON.stringify({ status, ref, keys: Object.keys(data ?? {}) }),
+            );
           resolve({
             ok: true,
-            active: status === "ACTIVE" || data?.parentReferenceCode != null,
-            subscriptionRef: data?.referenceCode ?? data?.subscriptionReferenceCode,
+            active,
+            subscriptionRef: ref,
             customerRef: data?.customerReferenceCode,
             conversationId: result?.conversationId ?? data?.conversationId,
           });

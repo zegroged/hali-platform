@@ -59,7 +59,16 @@ export default async function AbonelikTalimatOde() {
     city: b.city,
   });
 
+  // TOKEN'I SAKLA (2026-07-27): callback ödemeyi bununla da bulabilsin.
+  // conversationId'ye tek başına güvenmek para kaybettirdi — iyzico yalnız
+  // sorgu isteğinde gönderilen conversationId'yi yankılıyor (bkz. lib/iyzico).
+  if (r.ok && r.token) {
+    await prisma.subscriptionPayment
+      .update({ where: { id: payment.id }, data: { iyzicoToken: r.token } })
+      .catch(() => {});
+  }
   if (!r.ok) {
+    console.error("[abonelik] talimat başlatılamadı:", r.error ?? "sebep yok");
     await prisma.subscriptionPayment.update({
       where: { id: payment.id },
       data: { status: "FAILED" },

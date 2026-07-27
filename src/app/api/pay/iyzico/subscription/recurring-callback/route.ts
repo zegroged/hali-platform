@@ -13,10 +13,18 @@ export async function POST(req: NextRequest) {
   const base = getAppBaseUrl();
   const ok = () =>
     NextResponse.redirect(new URL(`/panel/abonelik?durum=basladi`, base), 303);
-  const fail = () =>
-    NextResponse.redirect(new URL(`/panel/abonelik?durum=hata`, base), 303);
+  // SESSİZ BAŞARISIZLIK YASAK (2026-07-27): bu uç bir kez "hata" dedi ama iyzico
+  // parayı ÇEKMİŞTİ; hiçbir yere log düşmediği için sebebi ancak iyzico panelinden
+  // görülebildi. Artık her düşüş sebebiyle birlikte log'a yazılır.
+  const fail = (sebep: string) => {
+    console.error(`[abonelik-callback] BAŞARISIZ: ${sebep}`);
+    return NextResponse.redirect(
+      new URL(`/panel/abonelik?durum=hata`, base),
+      303,
+    );
+  };
 
-  if (!paymentsLive) return fail();
+  if (!paymentsLive) return fail("ödeme canlı modda değil");
 
   let token = "";
   try {
@@ -26,10 +34,12 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => ({}));
     token = String(body?.token ?? "");
   }
-  if (!token) return fail();
+  if (!token) return fail("iyzico token göndermedi");
 
   const r = await retrieveRecurringResult(token);
-  if (!r.ok || !r.active || !r.subscriptionRef || !r.conversationId) return fail();
+  if (!r.ok) return fail(`iyzico sorgusu başarısız: ${r.error ?? "sebep yok"}`);
+  if (!r.active) return fail("iyzico aboneliği ACTIVE döndürmedi");
+  if (!r.subscriptionRef) return fail("iyzico abonelik referansı vermedi");
 
   // İdempotent: bu abonelik referansı zaten bağlanmışsa tekrar işleme.
   const existing = await prisma.subscription.findFirst({
@@ -38,16 +48,29 @@ export async function POST(req: NextRequest) {
   });
   if (existing) return ok();
 
-  // KESİN BAĞ: conversationId = ode sayfasının oluşturduğu SubscriptionPayment.id.
-  // "En son PENDING" tahminine düşmüyoruz (eşzamanlı abonelerde karışırdı).
-  const marker = await prisma.subscriptionPayment.findUnique({
-    where: { id: r.conversationId },
-  });
-  if (!marker) return fail();
+  // ÖDEME KAYDINI BUL — İKİ YOL (2026-07-27, para kaybettiren hatanın düzeltmesi).
+  // Önce TOKEN: ödeme sayfası bunu kaydediyor, iyzico'nun yankısına bağlı değil.
+  // Sonra conversationId: iyzico yalnız SORGU isteğinde gönderilen değeri
+  // yankılar — eskiden sorguya conversationId koymadığımız için boş dönüyor,
+  // eşleşme tutmuyor ve para çekilmiş olmasına rağmen "hata" deniyordu.
+  // "En son PENDING" tahminine ASLA düşmüyoruz (eşzamanlı abonelerde karışır).
+  const marker =
+    (await prisma.subscriptionPayment.findFirst({
+      where: { iyzicoToken: token },
+    })) ??
+    (r.conversationId
+      ? await prisma.subscriptionPayment.findUnique({
+          where: { id: r.conversationId },
+        })
+      : null);
+  if (!marker)
+    return fail(
+      `ödeme kaydı bulunamadı (token=${token.slice(0, 12)}…, conversationId=${r.conversationId ?? "yok"}) — abonelik ${r.subscriptionRef} iyzico'da AÇIK, elle eşitle`,
+    );
   if (marker.status !== "PENDING") {
     // Replay: ödeme zaten işlenmiş — tahakkuk eksik kaldıysa tamamla (idempotent).
     if (marker.status === "PAID") await accrueCommissionForPayment(marker.id);
-    return fail();
+    return fail(`ödeme zaten işlenmiş (durum=${marker.status})`);
   }
 
   // ATOMİK CLAIM (denetim bulgusu): PENDING kontrolü transaction dışında yapılıp
