@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { telefonKoduDogrula } from "@/lib/phoneOtp";
-import { whatsappEnabled } from "@/lib/whatsapp";
+import { telefonKoduDogrula, phoneOtpRequired } from "@/lib/phoneOtp";
 import { prisma } from "@/lib/prisma";
 import { hashPassword, createSession, signSession } from "@/lib/auth";
 import { rateLimit, clientIp, tooMany } from "@/lib/ratelimit";
@@ -38,7 +37,7 @@ export async function POST(req: NextRequest) {
   // TELEFON DOĞRULAMA (2026-07-26): WhatsApp açıkken zorunlu — sahte numarayla
   // üyelik açılmasın. Kapalıyken (jeton/numara henüz yokken) atlanır ki kayıt
   // akışı kırılmasın.
-  if (whatsappEnabled) {
+  if (phoneOtpRequired) {
     if (!parsed.data.phoneCode) {
       return NextResponse.json(
         { error: "Telefon doğrulama kodu gerekli." },
@@ -101,7 +100,7 @@ export async function POST(req: NextRequest) {
       role: "CUSTOMER",
       name,
       phone,
-      phoneVerified: whatsappEnabled, // WhatsApp kodu doğrulandıysa işaretli
+      phoneVerified: phoneOtpRequired, // yalnız gerçekten doğrulandıysa
       email,
       emailVerified: true, // kayıt öncesi kodla doğrulandı
       password: await hashPassword(password),

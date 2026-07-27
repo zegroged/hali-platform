@@ -9,6 +9,14 @@ import { waOtp, whatsappEnabled } from "@/lib/whatsapp";
 // geliyor. WhatsApp KAPALIYKEN doğrulama zorunlu tutulmaz (kayıt akışları
 // kırılmasın) — açılınca kendiliğinden devreye girer.
 
+// TELEFON DOĞRULAMA ZORUNLULUĞU AYRI BAYRAKTA (2026-07-27 denetim bulgusu):
+// yalnız whatsappEnabled'a bağlamak, WhatsApp açıldığı an müşteri kaydını
+// KIRIYORDU — kodu isteyen arayüz yok ve AUTHENTICATION şablonu Meta'da henüz
+// oluşturulamıyor (işletme doğrulaması bekliyor). Bu bayrak, UI + şablon hazır
+// olunca elle açılır: PHONE_OTP_REQUIRED=1
+export const phoneOtpRequired =
+  process.env.PHONE_OTP_REQUIRED === "1" && whatsappEnabled;
+
 const KOD_SURESI_MS = 10 * 60 * 1000;
 const MAX_DENEME = 5;
 

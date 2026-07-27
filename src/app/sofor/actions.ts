@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getSessionUser } from "@/lib/auth";
 import { sendSms, trackingLink } from "@/lib/sms";
+import { waSiparisYolda, waGonderVeKaydet } from "@/lib/whatsapp";
 import { getAppBaseUrl } from "@/lib/config";
 import { DRIVER_NEXT } from "@/lib/orderStatus";
 import { saveOrderPhotoFile } from "@/lib/orderPhoto";
@@ -160,6 +161,25 @@ export async function advanceOrder(formData: FormData) {
     } catch (e) {
       console.error("advanceOrder SMS hatası:", e);
     }
+    // WhatsApp — panel/actions.ts ile İKİZ (2026-07-27 denetim bulgusu).
+    // Mesajda işletme adı geçer; gitmezse sahibine zil çalar (müşteriyi arasın).
+    const isletme = await prisma.cleanerBusiness.findUnique({
+      where: { id: o.businessId },
+      select: { name: true, ownerId: true },
+    });
+    void waGonderVeKaydet({
+      orderId: o.id,
+      status: "OUT_FOR_DELIVERY",
+      ownerUserId: isletme?.ownerId ?? null,
+      etiket: "Teslimat bilgisi",
+      gonder: () =>
+        waSiparisYolda(
+          o.customerPhone,
+          o.customerName,
+          isletme?.name ?? "",
+          o.code ?? "",
+        ),
+    });
   }
   revalidatePath("/sofor");
 }

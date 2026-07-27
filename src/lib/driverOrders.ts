@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { getAuthedUser } from "@/lib/auth";
 import { saveOrderPhotoFile } from "@/lib/orderPhoto";
 import { sendSms, trackingLink } from "@/lib/sms";
+import { waSiparisYolda, waGonderVeKaydet } from "@/lib/whatsapp";
 import { DRIVER_NEXT, ORDER_STATUS_META } from "@/lib/orderStatus";
 import { getAppBaseUrl } from "@/lib/config";
 
@@ -149,10 +150,15 @@ export async function driverAdvance(
   const o = await prisma.order.findFirst({
     where: { id: orderId, driverId, status: { in: ["PICKED_UP", "WASHING"] } },
     select: {
+      id: true,
+      code: true,
       status: true,
       priceApprovedAt: true,
       customerPhone: true,
+      customerName: true,
       trackingToken: true,
+      // WhatsApp: mesajda işletme adı geçer, gitmezse sahibine zil çalar.
+      business: { select: { name: true, ownerId: true } },
     },
   });
   if (!o) return { ok: false, error: "Bu adım şu an yapılamıyor.", code: 409 };
@@ -192,6 +198,22 @@ export async function driverAdvance(
     } catch {
       /* SMS hatası akışı bozmaz */
     }
+    // WhatsApp (2026-07-27 denetim bulgusu): bu bildirim yalnız web panelinde
+    // vardı; şoför uygulaması/şoför webinden ilerletilen siparişte müşteriye
+    // HİÇBİR ŞEY gitmiyordu (SMS mock). İKİZ kural: üç yolda da aynı.
+    void waGonderVeKaydet({
+      orderId: o.id,
+      status: "OUT_FOR_DELIVERY",
+      ownerUserId: o.business.ownerId,
+      etiket: "Teslimat bilgisi",
+      gonder: () =>
+        waSiparisYolda(
+          o.customerPhone,
+          o.customerName,
+          o.business.name,
+          o.code ?? "",
+        ),
+    });
   }
   return { ok: true };
 }
