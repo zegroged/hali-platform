@@ -17,6 +17,7 @@ import {
   IconTruck,
   IconSparkles,
   IconWallet,
+  IconShield,
 } from "@/components/icons";
 
 export const dynamic = "force-dynamic";
@@ -319,7 +320,14 @@ export default async function Home({
           <p className="mt-1.5 text-sm text-teal-50 sm:text-base">
             Halıcını seç, halın kapından alınsın, adım adım takip et.
           </p>
+          {/* GÜVEN ŞERİDİ (2026-07-28): müşterinin üç büyük tereddüdüne hero'da
+              cevap veriyor — "halım zarar görürse?", "önce para mı istiyorlar?",
+              "halım nerede?". Fotoğraflı güvence en güçlü ayırt edicimiz ama ana
+              sayfada hiç geçmiyordu. */}
           <div className="mt-3 flex flex-wrap gap-2">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-white">
+              <IconShield size={14} /> Fotoğraflı güvence
+            </span>
             <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-white">
               <IconWallet size={14} /> Ödeme teslimde · Ön ödeme yok
             </span>
