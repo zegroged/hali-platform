@@ -141,10 +141,12 @@ export default function Footer() {
               decoding="async"
               className="h-6 w-auto max-w-full opacity-90 sm:h-7"
             />
-            {/* Yanıltıcılık önlemi: kart logoları var ama tahsilat şimdilik nakit */}
+            {/* Yanıltıcılık önlemi: bantta kart logoları var ama MÜŞTERİ tahsilatı
+                nakit (iyzico yalnız işletme aboneliğinde kullanılıyor). "Çok
+                yakında" ifadesi 2026-07-27'de KALDIRILDI (kullanıcı kararı):
+                tarihi belli olmayan söz vermeyelim — durum bilgisi kalsın. */}
             <p className="text-xs text-slate-500">
-              Online kartlı ödeme çok yakında — şu an ödeme teslimde nakit
-              alınır.
+              Sipariş ödemesi teslimde nakit alınır.
             </p>
           </div>
         </div>

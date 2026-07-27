@@ -1,4 +1,5 @@
 import { jsonLdSafe } from "@/lib/htmlSafe";
+import { seoGizliMi } from "@/lib/seoCoverage";
 import type { Metadata } from "next";
 import { cache } from "react";
 import Link from "next/link";
@@ -52,6 +53,11 @@ export async function generateMetadata({
       b.description ??
       `${b.district}, ${b.city} bölgesinde kapıdan halı yıkama servisi. Halın kapından alınır, yıkanır, teslim edilir.${ratingPart}`,
     openGraph: b.photos.length > 0 ? { images: [b.photos[0].url] } : undefined,
+    // TEST/DEMO işletmesi aramaya kapalı (2026-07-27): kayıt canlıda duruyor
+    // (Play incelemesi için ŞART, kullanıcı kararı) ama sahte bir işletmenin
+    // "Kadıköy halı yıkama" aramasında çıkması gerçek müşteriyi yanıltır.
+    // Kimlikler `SEO_NOINDEX_BUSINESS_IDS` ortam değişkeninde (virgüllü).
+    ...(seoGizliMi(id) ? { robots: { index: false, follow: false } } : {}),
   };
 }
 

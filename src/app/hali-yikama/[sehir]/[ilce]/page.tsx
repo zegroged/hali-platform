@@ -2,6 +2,7 @@ import { jsonLdSafe } from "@/lib/htmlSafe";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { seoKapsam, ilceAnahtar } from "@/lib/seoCoverage";
 import { getBusinesses } from "@/lib/businesses";
 import { BusinessCard } from "@/components/BusinessCard";
 import SiteHeader from "@/components/SiteHeader";
@@ -31,10 +32,17 @@ export async function generateMetadata({
   const city = cityBySlug(sehir);
   const district = city ? districtBySlug(city.slug, ilce) : undefined;
   if (!city || !district) return {};
+  // BOŞ İLÇE SAYFASI = noindex — gerekçe şehir sayfasındakiyle aynı
+  // (lib/seoCoverage.ts). 973 ilçenin ~960'ında halıcı yok; hepsini
+  // indexlettirmeye çalışmak sitenin tamamına zarar veriyordu.
+  const kapsam = await seoKapsam().catch(() => null);
+  const bosSayfa =
+    kapsam != null && !kapsam.ilceler.has(ilceAnahtar(city.name, district));
   return {
     title: `${district} Halı Yıkama (${city.name}) — Kapıdan Alma, Teslimat`,
     description: `${locative(district)} halı yıkama servisi: yakınındaki halı yıkamacıları karşılaştır, halın kapından alınsın, adım adım takip et. Ön ödeme yok, ödeme teslimde.`,
     alternates: { canonical: `/hali-yikama/${city.slug}/${ilce}` },
+    ...(bosSayfa ? { robots: { index: false, follow: true } } : {}),
   };
 }
 

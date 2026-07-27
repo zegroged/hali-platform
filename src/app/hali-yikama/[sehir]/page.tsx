@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getBusinesses, getRecentReviews } from "@/lib/businesses";
+import { seoKapsam } from "@/lib/seoCoverage";
 import { BusinessCard } from "@/components/BusinessCard";
 import ReviewStrip from "@/components/ReviewStrip";
 import SiteHeader from "@/components/SiteHeader";
@@ -33,10 +34,18 @@ export async function generateMetadata({
   const { sehir } = await params;
   const city = cityBySlug(sehir);
   if (!city) return {};
+  // BOŞ ŞEHİR SAYFASI = noindex (2026-07-27). Halıcısı olmayan sayfa Google
+  // için ince içeriktir; 81 ilin tamamını indexlettirmeye çalışmak yeni alan
+  // adının tamamını aşağı çekiyordu (lib/seoCoverage.ts). Sayfa kullanıcıya
+  // AÇIK kalır ("açılınca haber ver" formu orada); ilk halıcı girince
+  // kendiliğinden indexlenebilir olur. `follow`: iç linkler yine gezilsin.
+  const kapsam = await seoKapsam().catch(() => null);
+  const bosSayfa = kapsam != null && !kapsam.iller.has(city.name);
   return {
     title: `${city.name} Halı Yıkama — Kapıdan Alma, Yıkama, Teslimat`,
     description: `${locative(city.name)} halı yıkama servisi: yakınındaki halı yıkamacıları karşılaştır, halın kapından alınsın, adım adım takip et. Ön ödeme yok, ödeme teslimde.`,
     alternates: { canonical: `/hali-yikama/${city.slug}` },
+    ...(bosSayfa ? { robots: { index: false, follow: true } } : {}),
   };
 }
 
