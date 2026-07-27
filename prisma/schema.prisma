@@ -234,6 +234,11 @@ model LedgerEntry {
   businessId String
   kind       LedgerKind      @default(EXPENSE)
   category   LedgerCategory  @default(DIGER)
+  // SERBEST KATEGORİ (2026-07-27): sabit 8 kalıp her işletmeye uymuyordu
+  // ("adamları neden bir kategoriye sığdırmaya çalışıyoruz"). Halıcı kendi
+  // adını yazar; enum kaba kova olarak kalır (eski kayıtlarla uyum + gruplama
+  // yedeği). Dolu olduğunda ekranda ve özet tablosunda BU gösterilir.
+  categoryLabel String?
   label      String // "Ahmet maaş", "Omo 5kg x4"
   amount     Decimal         @db.Decimal(10, 2)
   date       DateTime // kalemin ait olduğu gün (elle seçilebilir)

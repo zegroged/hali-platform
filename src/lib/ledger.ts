@@ -28,7 +28,10 @@ export type AyOzeti = {
   gider: number;
   toplamGelir: number;
   kar: number; // toplamGelir - gider
-  kategoriler: { kategori: LedgerCategory; tutar: number }[];
+  // Gider dağılımı: artık HALICININ YAZDIĞI ada göre gruplanır (2026-07-27).
+  // Sabit enum'a göre gruplayınca kendi yazdığı kategoriler tek "Diğer"
+  // kovasında eriyordu; dağılım tablosu da bilgi vermiyordu.
+  kategoriler: { kategori: string; tutar: number }[];
 };
 
 /** Ayın ilk/son anı (yerel saat — TR sunucusu). */
@@ -71,7 +74,7 @@ export async function ayOzeti(
       _sum: { amount: true },
     }),
     prisma.ledgerEntry.groupBy({
-      by: ["category"],
+      by: ["category", "categoryLabel"],
       where: { businessId, kind: "EXPENSE", date: { gte: bas, lt: son } },
       _sum: { amount: true },
     }),
@@ -90,8 +93,16 @@ export async function ayOzeti(
     gider,
     toplamGelir,
     kar: kurus(toplamGelir - gider),
-    kategoriler: kategoriGrup
-      .map((k) => ({ kategori: k.category, tutar: kurus(Number(k._sum.amount ?? 0)) }))
+    // Görünen ada göre topla: "Deterjan" hem serbest yazımdan hem hazır
+    // kalıptan gelmiş olabilir, tek satırda birleşsinler.
+    kategoriler: Object.entries(
+      kategoriGrup.reduce<Record<string, number>>((acc, k) => {
+        const ad = k.categoryLabel?.trim() || KATEGORI_ETIKET[k.category];
+        acc[ad] = (acc[ad] ?? 0) + Number(k._sum.amount ?? 0);
+        return acc;
+      }, {}),
+    )
+      .map(([kategori, tutar]) => ({ kategori, tutar: kurus(tutar) }))
       .sort((a, b) => b.tutar - a.tutar),
   };
 }

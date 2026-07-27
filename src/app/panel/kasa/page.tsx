@@ -2,6 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { getCurrentBusiness } from "@/lib/panel";
 import { ayOzeti, ayAraligi, KATEGORI_ETIKET } from "@/lib/ledger";
+import type { LedgerCategory } from "@prisma/client";
 import { PendingButton } from "@/components/PendingButton";
 import {
   addLedgerEntry,
@@ -45,7 +46,7 @@ export default async function KasaSayfasi({
   const { bas, son } = ayAraligi(yil, ay0);
   const ozet = await ayOzeti(b.id, yil, ay0);
 
-  const [kayitlar, kurallar] = await Promise.all([
+  const [kayitlar, kurallar, gecmisKategoriler] = await Promise.all([
     prisma.ledgerEntry.findMany({
       where: { businessId: b.id, date: { gte: bas, lt: son } },
       orderBy: { date: "desc" },
@@ -55,7 +56,28 @@ export default async function KasaSayfasi({
       where: { businessId: b.id },
       orderBy: { createdAt: "desc" },
     }),
+    // Bu işletmenin DAHA ÖNCE yazdığı kategori adları — forma öneri düşer ki
+    // aynı şey "Deterjan"/"deterjan" diye ikiye bölünmesin.
+    prisma.ledgerEntry.findMany({
+      where: { businessId: b.id, categoryLabel: { not: null } },
+      distinct: ["categoryLabel"],
+      select: { categoryLabel: true },
+      orderBy: { date: "desc" },
+      take: 40,
+    }),
   ]);
+
+  // Öneri listesi: önce halıcının kendi yazdıkları, sonra hazır kalıplar.
+  const kategoriOnerileri = Array.from(
+    new Set([
+      ...gecmisKategoriler.map((g) => g.categoryLabel!).filter(Boolean),
+      ...Object.values(KATEGORI_ETIKET),
+    ]),
+  );
+
+  /** Kalemin ekranda görünecek kategori adı: kendi yazdığı varsa O. */
+  const katAdi = (k: { categoryLabel: string | null; category: LedgerCategory }) =>
+    k.categoryLabel?.trim() || KATEGORI_ETIKET[k.category];
 
   const ayLink = (delta: number) => {
     const d = new Date(yil, ay0 + delta, 1);
@@ -161,9 +183,7 @@ export default async function KasaSayfasi({
               return (
                 <li key={k.kategori}>
                   <div className="flex items-baseline justify-between text-sm">
-                    <span className="text-slate-700">
-                      {KATEGORI_ETIKET[k.kategori]}
-                    </span>
+                    <span className="text-slate-700">{k.kategori}</span>
                     <span className="font-medium text-slate-900">
                       {tl(k.tutar)}{" "}
                       <span className="text-xs font-normal text-slate-400">
@@ -191,22 +211,67 @@ export default async function KasaSayfasi({
       >
         <h2 className="font-semibold text-slate-900">+ Kalem Ekle</h2>
         <div className="grid gap-3 sm:grid-cols-2">
-          <div>
-            <label className={lbl}>Tür</label>
-            <select name="kind" className={inp} defaultValue="EXPENSE">
-              <option value="EXPENSE">Gider</option>
-              <option value="INCOME">Gelir (sipariş dışı)</option>
-            </select>
+          {/* TÜR: açılır liste değil, İKİ RADYO DÜĞMESİ (2026-07-27).
+              "Gelir (sipariş dışı)" seçeneği <select> içinde saklı kaldığı için
+              halıcı ek gelir girebildiğini fark etmiyordu. Artık ikisi de
+              ekranda, işaretleriyle birlikte görünüyor. */}
+          <div className="sm:col-span-2">
+            <label className={lbl}>Bu para giriyor mu, çıkıyor mu?</label>
+            <div className="mt-1 grid grid-cols-2 gap-2">
+              <label className="cursor-pointer">
+                <input
+                  type="radio"
+                  name="kind"
+                  value="EXPENSE"
+                  defaultChecked
+                  className="peer sr-only"
+                />
+                <span className="flex items-center justify-center gap-1.5 rounded-lg border border-slate-300 px-3 py-2.5 text-sm font-medium text-slate-600 peer-checked:border-red-400 peer-checked:bg-red-50 peer-checked:text-red-700">
+                  <span aria-hidden className="text-base">
+                    −
+                  </span>
+                  Gider (para çıktı)
+                </span>
+              </label>
+              <label className="cursor-pointer">
+                <input
+                  type="radio"
+                  name="kind"
+                  value="INCOME"
+                  className="peer sr-only"
+                />
+                <span className="flex items-center justify-center gap-1.5 rounded-lg border border-slate-300 px-3 py-2.5 text-sm font-medium text-slate-600 peer-checked:border-green-500 peer-checked:bg-green-50 peer-checked:text-green-700">
+                  <span aria-hidden className="text-base">
+                    +
+                  </span>
+                  Ek gelir (para girdi)
+                </span>
+              </label>
+            </div>
+            <p className="mt-1 text-xs text-slate-500">
+              Siparişlerden gelen para zaten otomatik işleniyor. Buraya sipariş
+              dışı gelirleri yaz (kilim satışı, tamir ücreti, hurda satışı…).
+            </p>
           </div>
-          <div>
+          {/* KATEGORİ SERBEST (2026-07-27): sabit 8 kalıp yerine kendi yazdığı.
+              Daha önce yazdıkları öneri olarak düşer (datalist) — ikinci kez
+              yazmak zorunda kalmasın, aynı ad farklı yazımla bölünmesin. */}
+          <div className="sm:col-span-2">
             <label className={lbl}>Kategori</label>
-            <select name="category" className={inp} defaultValue="MALZEME">
-              {Object.entries(KATEGORI_ETIKET).map(([k, v]) => (
-                <option key={k} value={k}>
-                  {v}
-                </option>
+            <input
+              name="category"
+              list="kasa-kategoriler"
+              placeholder="Kendin yaz — ör. Deterjan, Ahmet'in maaşı, Kamyonet"
+              className={inp}
+            />
+            <datalist id="kasa-kategoriler">
+              {kategoriOnerileri.map((k) => (
+                <option key={k} value={k} />
               ))}
-            </select>
+            </datalist>
+            <p className="mt-1 text-xs text-slate-500">
+              İstediğin adı yazabilirsin; boş bırakırsan &quot;Diğer&quot; olur.
+            </p>
           </div>
           <div>
             <label className={lbl}>Ne için?</label>
@@ -357,7 +422,7 @@ export default async function KasaSayfasi({
                       )}
                     </td>
                     <td className="py-1.5 text-slate-500">
-                      {KATEGORI_ETIKET[k.category]}
+                      {katAdi(k)}
                     </td>
                     <td
                       className={`py-1.5 text-right font-medium ${

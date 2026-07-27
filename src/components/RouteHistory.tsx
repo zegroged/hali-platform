@@ -25,11 +25,51 @@ type Stop = {
   startedAt: string;
   durationMin: number;
 };
+// Boş gün TEŞHİSİ (2026-07-27): "kayıt yok" demek yetmiyordu; halıcı sebebini
+// bilmek istiyor — şoför mesaiye mi çıkmadı, uygulamayı hiç mi açmadı, yanlış
+// gün mü seçildi. Sunucu bu alanları yalnız kayıt sıfırken doldurur.
+type Tani = {
+  hicKayitYok: boolean;
+  sonKayit: string | null;
+  mesaide: boolean;
+  gelecekGun: boolean;
+};
 type RouteData = {
   points: [number, number][];
   stops: Stop[];
+  tani: Tani | null;
   summary: { pingCount: number; stopCount: number; totalStopMin: number };
 };
+
+/** Boş günün sebebini halıcının anlayacağı dilde açıkla. */
+function bosMesaji(t: Tani | null, tarih: string, bugun: string) {
+  if (t?.gelecekGun)
+    return {
+      baslik: "Bu gün henüz gelmedi",
+      aciklama: "İleri bir tarih seçtin. Geçmiş bir gün seç.",
+    };
+  if (t?.hicKayitYok)
+    return {
+      baslik: "Bu şoför hiç konum göndermemiş",
+      aciklama:
+        "Şoför uygulamaya hiç giriş yapmamış ya da konum iznini vermemiş olabilir. Şoförün telefonunda uygulamaya girip mesai düğmesini açması ve konum iznine “Her zaman izin ver” demesi gerekir.",
+    };
+  const gunAdi = tarih === bugun ? "Bugün" : "Bu gün";
+  const son = t?.sonKayit
+    ? new Date(t.sonKayit).toLocaleDateString("tr-TR", {
+        day: "numeric",
+        month: "long",
+      })
+    : null;
+  return {
+    baslik: `${gunAdi} mesaiye çıkılmamış`,
+    aciklama:
+      (son ? `Bu şoförün en son konum kaydı ${son} tarihinde. ` : "") +
+      (t?.mesaide
+        ? "Şu an mesaisi açık görünüyor; konum kaydı birkaç dakika içinde düşmeye başlar."
+        : "Şoförün mesaisi kapalı. Konum kaydı yalnız şoför uygulamadan mesaiyi açtığında tutulur."),
+  };
+}
 
 export function RouteHistory({
   drivers,
@@ -151,9 +191,17 @@ export function RouteHistory({
               </div>
             </>
           ) : (
-            <div className="rounded-xl border border-dashed border-slate-300 p-8 text-center text-slate-400">
-              Bu gün için konum kaydı yok.
-            </div>
+            (() => {
+              const m = bosMesaji(data.tani, date, today);
+              return (
+                <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center">
+                  <p className="font-medium text-slate-700">{m.baslik}</p>
+                  <p className="mx-auto mt-1 max-w-md text-sm leading-relaxed text-slate-500">
+                    {m.aciklama}
+                  </p>
+                </div>
+              );
+            })()
           )}
 
           {data.stops.length > 0 && (

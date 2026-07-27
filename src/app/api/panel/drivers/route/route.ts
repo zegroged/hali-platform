@@ -45,6 +45,36 @@ export async function GET(req: NextRequest) {
     }),
   ]);
 
+  // BOŞSA NEDENİNİ SÖYLE (2026-07-27): eskiden yalnız "konum kaydı yok" yazıyordu
+  // ve halıcı bunun sebebini (şoför mesaiye çıkmadı mı, uygulamayı hiç açmadı mı,
+  // yanlış gün mü seçildi) anlayamıyordu. Teşhis için iki ek bilgi topluyoruz:
+  // şoförün ŞU AN mesai durumu ve EN SON ne zaman konum gönderdiği.
+  let tani: {
+    hicKayitYok: boolean;
+    sonKayit: string | null;
+    mesaide: boolean;
+    gelecekGun: boolean;
+  } | null = null;
+  if (pings.length === 0) {
+    const [sonPing, sofor] = await Promise.all([
+      prisma.driverLocationPing.findFirst({
+        where: { driverId },
+        orderBy: { recordedAt: "desc" },
+        select: { recordedAt: true },
+      }),
+      prisma.driver.findUnique({
+        where: { id: driverId },
+        select: { isOnShift: true },
+      }),
+    ]);
+    tani = {
+      hicKayitYok: sonPing == null,
+      sonKayit: sonPing?.recordedAt.toISOString() ?? null,
+      mesaide: sofor?.isOnShift ?? false,
+      gelecekGun: start.getTime() > Date.now(),
+    };
+  }
+
   const points = downsample(
     pings.map((p) => [p.lat, p.lng] as [number, number]),
     500,
@@ -61,6 +91,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     points,
     stops: stopRows,
+    tani,
     summary: {
       pingCount: pings.length,
       stopCount: stopRows.length,

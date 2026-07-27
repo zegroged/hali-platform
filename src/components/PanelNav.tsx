@@ -65,12 +65,34 @@ export default function PanelNav() {
       {/* MOBİL: içeriğin altına boşluk (sabit çubuk üstünü kapatmasın) */}
       <div aria-hidden className="h-2 md:hidden" />
 
+      {/* PERDE (2026-07-27): "Daha fazla" listesi beyaz zeminde beyaz bir kutu
+          olarak açılıyordu; kullanıcı bir şeyin AÇILDIĞINI fark etmiyordu.
+          Arkayı karartmak "bir katman açıldı" sinyalinin en güçlü hâli.
+          Perdeye dokununca kapanır (mobilde beklenen davranış). */}
+      {acik && (
+        <button
+          type="button"
+          aria-label="Menüyü kapat"
+          onClick={() => setAcik(false)}
+          className="fixed inset-0 z-30 bg-slate-900/50 md:hidden"
+        />
+      )}
+
       {/* MOBİL alt sabit çubuk */}
       <div className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
-        {/* "Daha fazla" açılır listesi (çubuğun üstünde) */}
+        {/* "Daha fazla" sayfa listesi — çubuğun üstünden açılan tepsi */}
         {acik && (
-          <div className="border-b border-slate-200 bg-white px-3 py-2">
-            <div className="grid grid-cols-2 gap-1">
+          <div className="-mx-px overflow-hidden rounded-t-2xl border-x border-t border-slate-200 bg-white shadow-[0_-8px_24px_rgba(15,23,42,0.12)]">
+            {/* Tutamaç + başlık: bunun bir MENÜ olduğunu söyleyen kısım.
+                Öncesinde başlıksız bir link ızgarası vardı, sayfa içeriğinden
+                ayırt edilemiyordu. */}
+            <div className="flex items-center justify-between border-b border-slate-100 px-4 py-2.5">
+              <span className="text-sm font-semibold text-slate-900">
+                Diğer sayfalar
+              </span>
+              <span className="text-xs text-slate-400">kapatmak için dokun</span>
+            </div>
+            <div className="max-h-[55vh] overflow-y-auto">
               {digerleri.map((n) => {
                 const active = aktifMi(pathname, n.href);
                 return (
@@ -78,13 +100,18 @@ export default function PanelNav() {
                     key={n.href}
                     href={n.href}
                     onClick={() => setAcik(false)}
-                    className={`rounded-lg px-3 py-2.5 text-sm ${
+                    aria-current={active ? "page" : undefined}
+                    className={`flex items-center justify-between border-b border-slate-50 px-4 py-3.5 text-[15px] last:border-0 ${
                       active
                         ? "bg-brand-light font-semibold text-brand-dark"
-                        : "text-slate-700 hover:bg-slate-100"
+                        : "text-slate-700 active:bg-slate-100"
                     }`}
                   >
-                    {n.label}
+                    <span>{n.label}</span>
+                    {/* Ok işareti: satırın tıklanabilir olduğunu gösterir. */}
+                    <span aria-hidden className="text-slate-300">
+                      ›
+                    </span>
                   </Link>
                 );
               })}
@@ -116,7 +143,11 @@ export default function PanelNav() {
               digerAktif || acik ? "bg-brand-light text-brand-dark" : "text-slate-600"
             }`}
           >
-            {acik ? "Kapat" : "Daha fazla"}
+            {/* Üç çizgi + metin: "Daha fazla" tek başına buton gibi durmuyordu. */}
+            <span aria-hidden className="block text-base leading-none">
+              {acik ? "✕" : "☰"}
+            </span>
+            <span className="mt-0.5 block">{acik ? "Kapat" : "Daha fazla"}</span>
           </button>
         </nav>
       </div>

@@ -4,22 +4,12 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getCurrentBusiness } from "@/lib/panel";
-import { sonrakiTarih } from "@/lib/ledger";
+import { sonrakiTarih, KATEGORI_ETIKET } from "@/lib/ledger";
 import type { LedgerCategory, LedgerKind } from "@prisma/client";
 
 // KASA (gelir-gider) aksiyonları — yalnız işletmenin KENDİ kayıtları.
 // Her aksiyonda sahiplik kontrolü: businessId oturumdan gelir, formdan DEĞİL.
 
-const KATEGORILER: LedgerCategory[] = [
-  "PERSONEL",
-  "MALZEME",
-  "KIRA",
-  "FATURA",
-  "YAKIT",
-  "ARAC",
-  "VERGI",
-  "DIGER",
-];
 
 async function biz() {
   const b = await getCurrentBusiness();
@@ -42,8 +32,18 @@ export async function addLedgerEntry(formData: FormData) {
   const kind = (String(formData.get("kind") || "EXPENSE") === "INCOME"
     ? "INCOME"
     : "EXPENSE") as LedgerKind;
-  const catRaw = String(formData.get("category") || "DIGER") as LedgerCategory;
-  const category = KATEGORILER.includes(catRaw) ? catRaw : "DIGER";
+  // KATEGORİ ARTIK SERBEST METİN (2026-07-27). Halıcı ne yazarsa o görünür.
+  // Yazdığı hazır kalıplardan birine denk gelirse enum'a da oturtuyoruz ki
+  // eski kayıtlarla aynı kovada toplansın; denk gelmezse kova DIGER olur ama
+  // ekranda kendi yazdığı ad görünür.
+  const catRaw = String(formData.get("category") || "").trim();
+  const categoryLabel = catRaw.slice(0, 40);
+  const eslesen = (Object.keys(KATEGORI_ETIKET) as LedgerCategory[]).find(
+    (k) =>
+      KATEGORI_ETIKET[k].toLocaleLowerCase("tr") ===
+      categoryLabel.toLocaleLowerCase("tr"),
+  );
+  const category: LedgerCategory = eslesen ?? "DIGER";
   const label = String(formData.get("label") || "").trim();
   const amount = tutarOku(String(formData.get("amount") || ""));
   const dateRaw = String(formData.get("date") || "").trim();
