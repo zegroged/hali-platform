@@ -46,14 +46,21 @@
       },
       "permissions": [
         "ACCESS_FINE_LOCATION",
-        "ACCESS_COARSE_LOCATION"
+        "ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
       ],
       "config": {
         "googleMaps": {
-          "apiKey": "ANDROID_GOOGLE_MAPS_ANAHTARI_BURAYA"
+          "apiKey": "[MAPS_KEY]"
         }
       }
     },
-    "owner": "enyakinhaliyikamaservisi"
+    "owner": "enyakinhaliyikamaservisi",
+    "extra": {
+      "eas": {
+        "projectId": "ff48347f-9bc8-4489-b2ce-fd77f406f299"
+      }
+    }
   }
 }
