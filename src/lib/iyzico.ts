@@ -320,12 +320,19 @@ export async function retrieveRecurringResult(
       25000,
     );
     void _to;
-    // conversationId İSTEKTE GÖNDERİLİR (2026-07-27 kritik düzeltme): iyzico
-    // yanıtta yalnız BU istekte gönderilen conversationId'yi yankılar,
-    // initialize'dakini DEĞİL. Boş gönderdiğimiz için yanıtta da boş dönüyordu;
-    // callback ödemeyi eşleştiremeyip "hata" diyordu — oysa PARA ÇEKİLMİŞTİ.
+    // ⚠️ ALAN ADI `checkoutFormToken` OLMAK ZORUNDA (2026-07-27, para kaybettiren
+    // hatanın KÖK NEDENİ). SDK bu ucu YOL DEĞİŞKENİYLE çağırıyor:
+    //   GET /v2/subscription/checkoutform/{checkoutFormToken}
+    // ve `RetrieveSubscriptionCheckoutFormPathRequest` yalnız `checkoutFormToken`
+    // anahtarını okuyor. Biz `token` diye gönderdiğimiz için URL'e literal
+    // "undefined" yazılıyor, iyzico "Ödeme formu bulunamadı." diyordu — yani
+    // ödeme BAŞARIYLA çekilmiş olmasına rağmen callback abonelik açmıyordu.
+    // Sessizdi de: hata hiçbir yere yazılmıyordu, ancak iyzico panelinden görüldü.
+    // NOT: bu bir GET; gövde yok, dolayısıyla iyzico conversationId YANKILAMAZ.
+    // Ödemeyi eşleştirmek için SubscriptionPayment.iyzicoToken kullanılır
+    // (ödeme sayfası kaydediyor, callback önce ondan arıyor).
     client.subscriptionCheckoutForm.retrieve(
-      { locale: "tr", token },
+      { locale: "tr", checkoutFormToken: token },
       (err: any, result: any) => {
         const data = result?.data ?? result;
         if (err || result?.status !== "success") {
