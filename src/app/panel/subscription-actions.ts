@@ -163,6 +163,12 @@ export async function cancelRecurringSubscription() {
   }
   const r = await cancelRecurring(sub.iyzicoSubRef!);
   if (!r.ok) {
+    // SESSİZ DÜŞME YOK (2026-07-27): abonelik callback'i tam bu yüzden saatlerce
+    // teşhis edilemedi. İptal başarısızsa iyzico'da talimat AÇIK kalır ve her ay
+    // çekmeye devam eder — hangi işletme, hangi referans, ne hata, log'a yaz.
+    console.error(
+      `[abonelik-iptal] BAŞARISIZ — işletme=${b.id} ref=${sub.iyzicoSubRef} hata=${r.error ?? "sebep yok"}`,
+    );
     redirect("/panel/abonelik?durum=iptal-hata");
   }
   await prisma.subscription.update({

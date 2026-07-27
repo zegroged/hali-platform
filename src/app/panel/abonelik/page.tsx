@@ -165,11 +165,29 @@ export default async function AbonelikYonetim({
         {/* Aksiyon: aktif talimat varsa iptal; yoksa başlat/öde */}
         <div className="mt-5">
           {autoRenew ? (
-            <form action={cancelRecurringSubscription}>
-              <PendingButton className="rounded-lg border border-red-300 px-4 py-2.5 text-sm font-medium text-red-600 transition hover:bg-red-50">
-                Otomatik yenilemeyi iptal et
-              </PendingButton>
-            </form>
+            /* "Otomatik yenilemeyi iptal et" halıcıya soyut geliyordu; ama düz
+               "Aboneliği iptal et" de YANILTICI — buton dönemi bitirmiyor,
+               yalnız bir sonraki çekimi durduruyor. Sade başlık + altında ne
+               olacağı TARİHİYLE yazıldı (2026-07-27 kullanıcı geri bildirimi). */
+            <div>
+              <form action={cancelRecurringSubscription}>
+                <PendingButton className="rounded-lg border border-red-300 px-4 py-2.5 text-sm font-medium text-red-600 transition hover:bg-red-50">
+                  Aboneliği iptal et
+                </PendingButton>
+              </form>
+              <p className="mt-2 text-xs text-slate-500">
+                Paran yanmaz:{" "}
+                {sub?.currentPeriodEnd ? (
+                  <>
+                    <strong>{tr(sub.currentPeriodEnd)}</strong> tarihine kadar
+                    yayında kalırsın
+                  </>
+                ) : (
+                  <>ödediğin dönem sonuna kadar yayında kalırsın</>
+                )}
+                , o tarihten sonra yenilenmez ve kartından bir daha çekim yapılmaz.
+              </p>
+            </div>
           ) : recurringEnabled && pct == null ? (
             // İKİ YOL BİRDEN (2026-07-25): talimat yalnız KREDİ kartıyla verilebiliyor
             // (iyzico abonelik NON3D → banka kartı reddi, hata 10217). Talimat açıkken
