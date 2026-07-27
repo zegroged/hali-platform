@@ -365,6 +365,56 @@ export async function retrieveRecurringResult(
   });
 }
 
+
+/** ÇEKİM KİMLİĞİ (2026-07-28) — çift tahakkuk açığını kapatmak için.
+ *
+ *  SORUN: ilk ödeme `recurring-callback`'ten geçiyordu ve satıra iyzico'nun
+ *  ödeme kimliği YAZILMIYORDU. iyzico aynı çekim için webhook da atarsa webhook
+ *  `iyzicoPaymentId` @unique alanına yeni bir satır açabiliyor — çakışma olmadığı
+ *  için dönem İKİNCİ KEZ 30 gün uzuyor ve komisyon İKİNCİ KEZ işliyordu.
+ *
+ *  ÇÖZÜM: abonelik sorgusu (`/v2/subscription/subscriptions/{ref}`) siparişleri
+ *  ve her siparişin ödeme denemelerini döndürüyor. Başarılı denemenin
+ *  `paymentId`'sini alıp callback'te satıra yazıyoruz; böylece webhook aynı
+ *  kimlikle satır açmaya çalıştığında @unique kısıtı devreye girip no-op oluyor.
+ *  (Yanıt canlıda doğrulandı: orders[].paymentAttempts[] → {paymentId,
+ *  conversationId, paymentStatus}.) */
+export async function getRecurringPaymentId(
+  subscriptionRef: string,
+): Promise<string | null> {
+  if (!client) return null;
+  return new Promise((resolve) => {
+    const _to = setTimeout(() => resolve(null), 15000);
+    void _to;
+    client.subscription.retrieve(
+      { locale: "tr", subscriptionReferenceCode: subscriptionRef },
+      (err: any, result: any) => {
+        if (err || result?.status !== "success") {
+          console.error(
+            "[iyzico] abonelik siparişleri okunamadı:",
+            result?.errorMessage ?? String(err),
+          );
+          return resolve(null);
+        }
+        const data = result?.data ?? result;
+        const orders: any[] = Array.isArray(data?.orders) ? data.orders : [];
+        // En YENİ başarılı çekim (yenilemede birden fazla sipariş olur).
+        let enIyi: { id: string; ts: number } | null = null;
+        for (const o of orders) {
+          for (const a of o?.paymentAttempts ?? []) {
+            if (String(a?.paymentStatus).toUpperCase() !== "SUCCESS") continue;
+            const id = a?.paymentId != null ? String(a.paymentId) : null;
+            if (!id) continue;
+            const ts = Number(a?.createdDate ?? 0);
+            if (!enIyi || ts > enIyi.ts) enIyi = { id, ts };
+          }
+        }
+        resolve(enIyi?.id ?? null);
+      },
+    );
+  });
+}
+
 /** Düzenli ödeme talimatını iptal et — iyzico gelecek çekimleri durdurur. */
 export async function cancelRecurring(
   subscriptionRef: string,

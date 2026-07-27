@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { retrieveRecurringResult } from "@/lib/iyzico";
+import { retrieveRecurringResult, getRecurringPaymentId } from "@/lib/iyzico";
 import { getAppBaseUrl, paymentsLive } from "@/lib/config";
 import { extendSubscription } from "@/lib/subscription";
 import { notifySubscriptionPaid } from "@/lib/paymentNotify";
@@ -73,6 +73,33 @@ export async function POST(req: NextRequest) {
     return fail(`ödeme zaten işlenmiş (durum=${marker.status})`);
   }
 
+  // ÇİFT TAHAKKUK KORUMASI (2026-07-28): iyzico'nun bu çekime ait ödeme
+  // kimliğini al ve satıra yaz. Aynı çekim için webhook da gelirse
+  // `iyzicoPaymentId` @unique kısıtına takılıp no-op olur; yazmazsak webhook
+  // yeni satır açıp dönemi İKİNCİ KEZ uzatır ve komisyonu İKİNCİ KEZ işlerdi.
+  const cekimId = await getRecurringPaymentId(r.subscriptionRef);
+  if (cekimId) {
+    // Webhook bizden önce davrandıysa iş bitmiştir — tekrar dönem açma.
+    const zaten = await prisma.subscriptionPayment.findUnique({
+      where: { iyzicoPaymentId: cekimId },
+      select: { id: true },
+    });
+    if (zaten) {
+      // Bu istekte açılan PENDING iz satırı boşta kalmasın.
+      await prisma.subscriptionPayment
+        .updateMany({
+          where: { id: marker.id, status: "PENDING" },
+          data: { status: "FAILED" },
+        })
+        .catch(() => {});
+      return ok();
+    }
+  } else {
+    console.warn(
+      `[abonelik-callback] iyzico çekim kimliği alınamadı (ref=${r.subscriptionRef}) — webhook çift dönem açabilir, elle kontrol et`,
+    );
+  }
+
   // ATOMİK CLAIM (denetim bulgusu): PENDING kontrolü transaction dışında yapılıp
   // update koşulsuzdu — eşzamanlı iki callback ilk dönemi iki kez açabiliyordu.
   // Transaction içinde CAS: yalnız hâlâ PENDING olanı PAID'e çevir; count 0 ise
@@ -81,7 +108,13 @@ export async function POST(req: NextRequest) {
   await prisma.$transaction(async (tx) => {
     const claim = await tx.subscriptionPayment.updateMany({
       where: { id: marker.id, status: "PENDING" },
-      data: { status: "PAID", paidAt: new Date(), periodStart: new Date() },
+      data: {
+        status: "PAID",
+        paidAt: new Date(),
+        periodStart: new Date(),
+        // Idempotency anahtarı — webhook aynı çekimi tekrar işleyemesin.
+        ...(cekimId ? { iyzicoPaymentId: cekimId } : {}),
+      },
     });
     if (claim.count === 0) return; // başka istek sahiplendi
     claimed = true;
