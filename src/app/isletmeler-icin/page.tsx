@@ -40,8 +40,18 @@ const PERKS = [
   },
   {
     icon: <IconTruck size={20} />,
-    title: "Şoför uygulaması + canlı takip",
-    desc: "Şoförün mobil uygulamayla işleri görür, alım/teslimde fotoğraf çeker; sen mesai boyunca canlı konumu ve aylık durak raporunu görürsün.",
+    title: "Şoför ekranı + canlı takip",
+    desc: "Şoförün telefonundan işlerini görür, alım ve teslimde fotoğraf çeker; sen mesai boyunca canlı konumu ve aylık durak raporunu izlersin. Android uygulaması da yolda.",
+  },
+  {
+    icon: <IconWallet size={20} />,
+    title: "KASA — gelir gider defteri",
+    desc: "Maaş, deterjan, yakıt, kira… giderlerini panele gir; 3 günde bir alınan deterjan gibi tekrarlayanları bir kez tanımla, her ay kendiliğinden düşsün. Teslim ettiğin siparişlerin geliri otomatik işlenir, kâr-zararını anlık görürsün.",
+  },
+  {
+    icon: <IconBolt size={20} />,
+    title: "81 il, 973 ilçe sayfasında görünürlük",
+    desc: "Her il ve ilçe için ayrı sayfamız var; müşteri kendi ilçesini arattığında işletmen orada listelenir. Arama motoru işini biz üstleniriz, sen yıkamaya bak.",
   },
   {
     icon: <IconStar size={20} />,
@@ -66,7 +76,15 @@ const FAQS = [
   },
   {
     q: "Şoför şart mı?",
-    a: "Evet, en az 1 şoför gerekir; kapıdan alma modeli şoförle çalışır. Şoförünü panelden 2 dakikada eklersin, ücretsiz mobil uygulamayı kullanır.",
+    a: "Evet, en az 1 şoför gerekir; kapıdan alma modeli şoförle çalışır. Şoförünü panelden 2 dakikada eklersin — kendi telefonunun tarayıcısından işlerini görür, fotoğraf çeker, teslim eder. Ayrı bir program kurmasına gerek yok; Android uygulaması da yayına hazırlanıyor.",
+  },
+  {
+    q: "Aidatı hangi kartla ödeyebilirim?",
+    a: "İki yol da açık. Kredi kartın varsa düzenli ödeme talimatı verirsin, her ay kendiliğinden yenilenir. Banka (debit) kartın varsa talimat verilemiyor — bankalar banka kartında 3D Secure şart koşuyor, abonelik çekimleri ise 3D Secure'suz yapılıyor. O durumda her ay tek seferlik ödersin; dönemin bitmesine 3 gün kala hatırlatma e-postası göndeririz.",
+  },
+  {
+    q: "Muhasebemi buradan tutabilir miyim?",
+    a: "Panelde KASA bölümü var: giderlerini elle girersin (maaş, deterjan, yakıt, kira), tekrarlayanları bir kez tanımlayıp otomatiğe bağlarsın. Teslim ettiğin siparişlerin geliri kendiliğinden işlenir ve aylık kâr-zararın hesaplanır. Resmî faturalarının yerini tutmaz, işletmenin gerçek durumunu görmen içindir.",
   },
   {
     q: "Müşteri fiyatı nasıl görür?",
