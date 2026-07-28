@@ -9,7 +9,9 @@
 
 Müşteri telefonundan halısını yıkatmak istediğini söylüyor, mahallesindeki halıcı siparişi anında görüyor, halıyı kapıdan alıp yıkıyor ve teslim ediyor. Müşteri parayı teslimatta doğrudan halıcıya ödüyor; sipariş başına kimse komisyon almıyor.
 
-Halıcı için bu bir yazılım değil, **müşteri akışı**. Yazılım o akışı yönetmek için var.
+Halıcı için bu, her gün açtığı **işletme yazılımı**: siparişini, şoförünü, fotoğraflı teslim kaydını ve kâr-zararını buradan yönetiyor. Bölgesinin sayfasında listelenmesi ise üstüne geliyor — onun için ayrıca bedel alınmıyor.
+
+> **Not (2026-07-29):** burada eskiden *"Halıcı için bu bir yazılım değil, müşteri akışı"* yazıyordu. Bu cümle belgenin §7 ve §9'uyla taban tabana zıttı ve tutulmayan bir vaatti; bu yüzden değiştirildi. Aynı iddianın §9'daki hâli de ("yazılım satın almıyor, bulunabilirlik satın alıyor") aynı gün silindi.
 
 ---
 
@@ -35,7 +37,9 @@ Bu belirsizlik yüzünden çok insan halısını **hiç yıkatmıyor** — evde 
 
 ### Bizim yaptığımız
 
-Bu iki derdi birbirine bağlıyoruz. Müşteriye **güven ve takip** veriyoruz; halıcıya **düzenli sipariş akışı**. Pazarı büyütüyoruz, mevcut pastayı bölüşmüyoruz.
+Bu iki derdi birbirine bağlıyoruz. Müşteriye **güven ve takip** veriyoruz; halıcıya **işini yöneteceği yazılımı** ve bölgesinde **görünecek bir yer**. Amacımız pazarı büyütmek, mevcut pastayı bölüşmek değil.
+
+> Eski hâli halıcıya "**düzenli sipariş akışı**" vaat ediyordu. Bu ölçülebilir bir sonuç taahhüdüdür ve tutulmuyor; Ticari Reklam Yönetmeliği'nde ispat külfeti reklam verende olduğu için kaldırıldı (2026-07-29).
 
 ---
 
@@ -117,7 +121,7 @@ Aylık ciro, sipariş sayısı, şoför performansı, durak raporu.
 
 Şoförün kendi hesabı var, telefonundan giriyor. Mesaisini açıyor, üzerine atanan işleri görüyor, adım adım ilerletiyor.
 
-**Alımda ve teslimde fotoğraf zorunlu.** Bunun sebebi net: halı yıkamada en sık kavga "bu leke sizde oldu" kavgasıdır. Alım fotoğrafı bu tartışmayı bitirir. Halıcıyı haksız suçlamadan, müşteriyi de gerçekten zarar gördüğünde ispatsız kalmaktan korur.
+**Alımda ve teslimde fotoğraf.** Şoför uygulamasında teslim fotoğrafı çekilmeden sipariş teslim edilmiş sayılmaz — kural sunucuda uygulanır. Halıcı panelden fotoğrafsız teslim ederse bu da siparişin geçmişine ⚠️ notuyla yazılır (2026-07-29'da eklendi; öncesinde sessizce geçiyordu). Bunun sebebi net: halı yıkamada en sık kavga "bu leke sizde oldu" kavgasıdır. Alım fotoğrafı bu tartışmayı bitirir. Halıcıyı haksız suçlamadan, müşteriyi de gerçekten zarar gördüğünde ispatsız kalmaktan korur.
 
 Mesai açıkken şoförün konumu kaydediliyor — hem müşteri takip edebilsin, hem halıcı gün sonunda rotayı görebilsin diye. Mesai kapalıyken **hiçbir konum kaydı tutulmuyor**; şoförün özel hayatı izlenmiyor.
 

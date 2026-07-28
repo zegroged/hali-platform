@@ -47,10 +47,17 @@ export default function HakkimizdaPage() {
         <p>
           Platformda listelenmek isteyen her işletme; vergi kimlik bilgisi ve
           belge beyanı, e-posta doğrulaması ve eksiksiz profil (fiyat, hizmet
-          bölgesi, iletişim) adımlarını tamamlar. Başvurular ekibimiz
-          tarafından incelenir ve yalnızca <strong>yönetici onayından</strong>{" "}
-          geçen işletmeler müşterilere görünür hâle gelir. Bilgileri eksilen
-          veya kurallara aykırı davranan işletmeler yayından kaldırılabilir.
+          {/* KODLA ÇELİŞİYORDU (2026-07-29): "yalnızca yönetici onayından
+              geçen işletmeler görünür" deniyordu, oysa yayın 2026-07-08'den
+              beri OTOMATİK — yönetici onayı yalnız "Doğrulanmış" rozeti verir.
+              Yapılmayan bir denetimi müşteriye taahhüt etmek, hasar hâlinde
+              doğrudan sorumluluk doğurur. */}
+          bölgesi, iletişim) adımlarını tamamlar. Bu adımlar tamamlandığında
+          işletme <strong>otomatik olarak</strong> yayına girer. Belgelerini
+          ayrıca sunan ve incelemeden geçen işletmeler{" "}
+          <strong>Doğrulanmış İşletme</strong> rozeti alır — rozet yayının
+          şartı değil, ek bir güven işaretidir. Bilgileri eksilen veya
+          kurallara aykırı davranan işletmeler yayından kaldırılabilir.
         </p>
       </Section>
 

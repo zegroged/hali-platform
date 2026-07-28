@@ -376,6 +376,10 @@ export default async function OrderManagePage({
             </p>
           ) : (
             <>
+              {/* "müşteriye SMS gider" YALANDI (2026-07-29): SMS_MODE=mock,
+                  hiçbir SMS gitmiyor. Halıcı fiyatı bildirip müşterinin haber
+                  aldığını sanıyor, müşteri onaylamayınca sipariş asılı kalıyordu.
+                  ManualOrderForm'daki ikizi de aynı gün düzeltildi. */}
               {o.quotedPrice != null ? (
                 <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-sm font-medium text-amber-700">
                   Bildirilen fiyat: {Number(o.quotedPrice)} TL — müşteri onayı
@@ -383,8 +387,10 @@ export default async function OrderManagePage({
                 </p>
               ) : (
                 <p className="mt-1 text-sm text-slate-600">
-                  Ölçüm sonrası kesin fiyatı bildir — müşteriye SMS gider,
-                  takip sayfasından onaylar ve onay kayda geçer.
+                  Ölçüm sonrası kesin fiyatı bildir — müşteri takip sayfasından
+                  onaylar ve onay kayda geçer. <strong>Müşteriye haber
+                  vermeyi unutma:</strong> fiyatı bildirdiğini kendisi görmeyebilir,
+                  takip linkini yollamak en hızlısı.
                 </p>
               )}
               {o.status === "PICKED_UP" && (

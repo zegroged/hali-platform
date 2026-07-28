@@ -177,8 +177,15 @@ export function DriverShift({ initialOnShift }: { initialOnShift: boolean }) {
           md.5/2-f meşru menfaat dengesini güçlendirir). İlk gösterim anı
           sunucuda Driver.privacyNoticeAt'e kaydedilir (Tebliğ md.6). */}
       <p className="mt-3 border-t border-slate-900/10 pt-2.5 text-sm text-slate-500">
-        Mesai açıkken konumun, teslimat takibi ve güvenlik amacıyla işlenir;
-        yalnızca teslimatını beklediğin müşteri canlı konumunu görür. Ayrıntı:{" "}
+        {/* EKSİK AYDINLATMA DÜZELTİLDİ (2026-07-29 denetimi): burada yalnız
+            "müşteri görür" yazıyordu, oysa hesabını açan İŞLETME de canlı
+            konumu, geçmiş gün rotasını ve aylık durak raporunu görüyor.
+            Şoförün gerçekte kimin gördüğünü bilmesi KVKK md.10'un konusu. */}
+        Mesai açıkken konumun, teslimat takibi, operasyon yönetimi ve güvenlik
+        amacıyla işlenir. Teslimatını bekleyen müşteri canlı konumunu görür;{" "}
+        <strong>çalıştığın işletme</strong> ise mesai boyunca canlı konumunu,
+        geçmiş günlerin rota kaydını ve aylık durak özetini görebilir. Mesai
+        kapalıyken konum işlenmez. Ayrıntı:{" "}
         <a
           href="/kvkk"
           target="_blank"

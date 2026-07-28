@@ -70,10 +70,10 @@ teslim edildi. Şoför teslime çıktığında konumunu haritada gör.
 Üstelik:
 • Kesin fiyat, halın ölçüldükten sonra ONAYINA sunulur — onaylamazsan halın
   yıkanmadan ücretsiz geri getirilir.
-• Alım ve teslimde fotoğraflı kayıt: halın güvende.
+• Alım ve teslimde fotoğraflı kayıt: tartışmada elinde kanıt olur.
 • Beğenmediysen vazgeç: halı alınmadan ücretsiz iptal.
 
-Şehir şehir büyüyoruz. Bölgende henüz işletme yoksa uygulamadan haber isteyebilirsin — ilk işletme açıldığında sana bildirim gelir.
+Şehir şehir büyüyoruz. Bölgende henüz işletme yoksa listede görünmez.
 ```
 
 - Uygulama simgesi: `store-assets/play-icon-512.png`

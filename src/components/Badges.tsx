@@ -15,7 +15,10 @@ const BADGE_META: Record<
   // Gerçek sigorta poliçesi olmadan "Sigortalı" yanıltıcı ticari uygulama sayılır
   // (6502 md.61/62). Etiket, öncesi-sonrası fotoğraf + işletme sorumluluğu
   // güvencesini dürüstçe yansıtır (bkz. Kullanım Koşulları §5/C).
-  INSURED: { label: "Fotoğraflı Güvence", Icon: (p) => <IconShield {...p} /> },
+  // "Güvence" TEMİNAT çağrıştırıyordu; Kullanım Koşulları §5/C ise "sigorta
+  // poliçesi değildir" diyor. Şahıs işletmesinde bu çelişki sorumluluk riski
+  // (2026-07-29). Rozet artık ne yapıldığını söylüyor, ne vaat edildiğini değil.
+  INSURED: { label: "Fotoğraflı Kayıt", Icon: (p) => <IconShield {...p} /> },
   FAST_DELIVERY: { label: "Hızlı Teslim", Icon: (p) => <IconBolt {...p} /> },
   TOP_RATED: { label: "Çok Tercih Edilen", Icon: (p) => <IconStar {...p} filled /> },
   // Ölçtüğü şey düşük red oranı (kabul güvenilirliği) — yanıt SÜRESİ değil.

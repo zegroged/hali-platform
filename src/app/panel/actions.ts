@@ -694,15 +694,10 @@ export async function advanceOrderPanel(formData: FormData) {
       },
     });
   }
-  if (step.next === "DELIVERED" && !order.deliveryPhotoUrl) {
-    await prisma.orderEvent.create({
-      data: {
-        orderId,
-        status: "DELIVERED",
-        note: "⚠️ Teslim fotoğrafı ÇEKİLMEDEN panelden ilerletildi — teslim kanıtı yok",
-      },
-    });
-  }
+  // NOT: Buradaki "teslim fotoğrafı yok" dalı ÖLÜ KODDU (2026-07-29 denetimi).
+  // `step` PANEL_NEXT'ten geliyor, PANEL_NEXT ise yalnız ACCEPTED→PICKED_UP→
+  // WASHING→OUT_FOR_DELIVERY tanımlıyor; DELIVERED buradan hiç geçmiyor.
+  // Panelden teslim `deliverOrderPanel` ile yapılıyor — kayıt oraya taşındı.
 
   if (step.next === "OUT_FOR_DELIVERY") {
     // Şoför akışıyla aynı: önceki teslimatın konumu sızmasın + canlı takip SMS'i.
@@ -772,6 +767,32 @@ export async function deliverOrderPanel(formData: FormData) {
         : `Teslim edildi · ${price} TL (kartla ödeme bekleniyor)`,
     },
   });
+  // KANIT ZİNCİRİNİN İKİ EKSİĞİ KAPATILDI (2026-07-29 denetimi).
+  //
+  // 1) Fotoğrafsız teslim: şoför akışında teslim fotoğrafı sunucuda ZORUNLU
+  //    (sofor/actions.ts), ama panelden teslimde hiç istenmiyordu ve bunu
+  //    kayda geçiren dal ölü koddaydı. "Fotoğraflı kayıt" satılan bir özellik;
+  //    fotoğrafın YOKLUĞU da en az kendisi kadar kayda değer.
+  // 2) Onaylanan fiyattan sapma: müşterinin onayladığı tutar (quotedPrice)
+  //    kilitli ama teslimde tahsil edilen tutar serbest ve karşılaştırılmıyordu.
+  //    Sapma engellenmiyor (ek halı/hizmet meşru olabilir) ama artık GÖRÜNÜR.
+  const uyarilar: string[] = [];
+  if (!order.deliveryPhotoUrl) {
+    uyarilar.push(
+      "⚠️ Teslim fotoğrafı ÇEKİLMEDEN panelden teslim edildi — teslim kanıtı yok",
+    );
+  }
+  const onaylanan = order.priceApprovedAt ? Number(order.quotedPrice) : null;
+  if (onaylanan != null && Number.isFinite(onaylanan) && onaylanan !== price) {
+    uyarilar.push(
+      `⚠️ Tahsil edilen tutar müşterinin onayladığı tutardan farklı: onaylanan ${onaylanan} TL, tahsil edilen ${price} TL`,
+    );
+  }
+  for (const note of uyarilar) {
+    await prisma.orderEvent.create({
+      data: { orderId, status: "DELIVERED", note },
+    });
+  }
   // Müşteriye kapanış: e-posta + WhatsApp + değerlendirme daveti (2026-07-28).
   // ÜÇ AKIŞ DA bağlanır (panel / şoför web / şoför uygulaması) — DEVIR §9/7.
   await bildirTeslimEdildi(orderId);

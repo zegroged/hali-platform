@@ -166,9 +166,19 @@ export default function KvkkPage() {
           ve müşteriye süreç şeffaflığı sunulmasıdır.
         </p>
         <p>
-          Şoförün adı ve canlı konumu, <strong>yalnızca teslimata çıkılan
-          siparişin müşterisine</strong> gösterilir; başka kullanıcılarla veya
-          üçüncü kişilerle paylaşılmaz. Şoför hesaplarını platformda işletmeler
+          {/* DÜZELTİLDİ (2026-07-29): önceki metin konumun "yalnızca müşteriye
+              gösterildiğini, üçüncü kişilerle paylaşılmadığını" söylüyordu.
+              Oysa şoförü çalıştıran işletme panelden canlı konumu, geçmiş gün
+              rotasını ve aylık durak raporunu görüyor. Aydınlatmanın eksik
+              olması KVKK md.10 açısından başlı başına aykırılıktır; metin
+              gerçeğe uyduruldu. */}
+          Şoförün adı ve canlı konumu, teslimata çıkılan siparişin{" "}
+          <strong>müşterisine</strong> ve şoförün hesabını açan{" "}
+          <strong>işletmeye</strong> gösterilir. İşletme ayrıca, iş ilişkisinin
+          yürütülmesi ve operasyon yönetimi amacıyla şoförün{" "}
+          <strong>geçmiş gün rota kaydını ve aylık durak özetini</strong>{" "}
+          görüntüleyebilir. Bunun dışında başka kullanıcılarla veya üçüncü
+          kişilerle paylaşılmaz. Şoför hesaplarını platformda işletmeler
           açtığından, işletmeler çalıştırdıkları şoförleri bu işleme hakkında
           bilgilendirmekle yükümlüdür.
         </p>

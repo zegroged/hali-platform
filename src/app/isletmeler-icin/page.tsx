@@ -41,8 +41,8 @@ const PERKS = [
   },
   {
     icon: <IconTruck size={20} />,
-    title: "Şoförün mesai boyunca haritada",
-    desc: "Mesai açıkken şoförünü canlı izlersin: nerede, ne zaman durmuş, ne kadar kalmış. Geçmiş bir günün rotasını baştan oynatır, ay sonunda şoför şoför durak raporu alırsın.",
+    title: "Şoförünü haritadan izle",
+    desc: "Mesai açıkken şoförünü canlı görürsün: nerede, ne zaman durmuş, ne kadar kalmış. Geçmiş bir günün rotasını baştan oynatır, ay sonunda şoför şoför durak raporu alırsın. Kesintisiz akış için şoförün Android uygulamasını kullanması gerekir; tarayıcıdan girildiğinde telefon kilitlenince konum akışı durur.",
   },
   {
     icon: <IconShield size={20} />,
@@ -57,7 +57,7 @@ const PERKS = [
   {
     icon: <IconStar size={20} />,
     title: "Kesin fiyat, yazılı onay",
-    desc: "Halıyı ölçtükten sonra kesin fiyatı panelden bildirirsin; müşteri kendi telefonundan onaylar ve onay zaman damgasıyla kayda geçer. Onaydan sonra fiyat değiştirilemez — pazarlık kapıda değil, ekranda biter.",
+    desc: "Halıyı ölçtükten sonra kesin fiyatı panelden bildirirsin; müşteri kendi telefonundan onaylar ve onay zaman damgasıyla kayda geçer. Onaydan sonra bildirilen fiyat kilitlenir; teslimde farklı bir tutar tahsil edilirse bu da siparişin geçmişine yazılır.",
   },
   {
     icon: <IconWallet size={20} />,
@@ -142,8 +142,8 @@ export default async function ForBusinessesPage() {
             <span className="text-teal-300">tek panelden</span> yönet
           </h1>
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-300 sm:text-base">
-            Şoförün mesai boyunca haritada, halı hangi aşamada belli, teslim
-            fotoğrafla kayıtta, ay sonunda kâr mı zarar mı ettiğin tek ekranda.
+            Şoförün haritada, halı hangi aşamada belli, teslim fotoğrafla
+            kayıtta, ay sonunda kâr mı zarar mı ettiğin tek ekranda.
             Dükkânına gelen müşterini de panele yazar, takip kodunu kendin
             iletirsin. Bölgenin sayfasında da listelenirsin — oradan sipariş
             gelirse komisyon almayız.

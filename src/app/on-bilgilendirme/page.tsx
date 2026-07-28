@@ -114,8 +114,9 @@ export default function OnBilgilendirmePage() {
           kurulur: (1) size uygun işletmeyi seçersiniz; (2) sipariş formunu
           doldurursunuz — form gönderilmeden önce tüm alanları serbestçe
           düzeltebilirsiniz; (3) sipariş özetini ve onay kutusunu kontrol
-          edersiniz; (4) talebi oluşturursunuz; (5) SMS ile gelen takip
-          linkinden süreci adım adım izlersiniz. Sözleşme ve ön bilgilendirme
+          edersiniz; (4) talebi oluşturursunuz; (5) sipariş sonunda size
+          gösterilen takip linkinden (e-posta adresinizi verdiyseniz ayrıca
+          e-postayla da iletilir) süreci adım adım izlersiniz. Sözleşme ve ön bilgilendirme
           metinlerine sipariş takip sayfanızdaki bağlantılardan her zaman
           erişebilirsiniz.
         </p>
