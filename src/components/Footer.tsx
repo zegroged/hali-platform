@@ -88,6 +88,11 @@ export default function Footer() {
                   KVKK Aydınlatma Metni
                 </Link>
               </li>
+            <li>
+              <Link href="/hesap-silme" className="hover:text-white">
+                Hesap ve Veri Silme
+              </Link>
+            </li>
               <li>
                 <Link href="/gizlilik" className="hover:text-white">
                   Gizlilik Politikası

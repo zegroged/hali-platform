@@ -22,6 +22,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${BASE}/hakkimizda`, changeFrequency: "yearly", priority: 0.4 },
     { url: `${BASE}/iletisim`, changeFrequency: "yearly", priority: 0.4 },
     { url: `${BASE}/kvkk`, changeFrequency: "yearly", priority: 0.2 },
+    // Play "hesap silme URL'si" şartı — herkese açık olmalı.
+    { url: `${BASE}/hesap-silme`, changeFrequency: "yearly", priority: 0.3 },
     { url: `${BASE}/gizlilik`, changeFrequency: "yearly", priority: 0.2 },
     { url: `${BASE}/kosullar`, changeFrequency: "yearly", priority: 0.2 },
     {
