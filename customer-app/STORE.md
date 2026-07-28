@@ -73,7 +73,7 @@ teslim edildi. Şoför teslime çıktığında konumunu haritada gör.
 • Alım ve teslimde fotoğraflı kayıt: halın güvende.
 • Beğenmediysen vazgeç: halı alınmadan ücretsiz iptal.
 
-Şu anda şehir şehir açılıyoruz — bölgende işletme yoksa çok yakında!
+Şehir şehir büyüyoruz. Bölgende henüz işletme yoksa uygulamadan haber isteyebilirsin — ilk işletme açıldığında sana bildirim gelir.
 ```
 
 - Uygulama simgesi: `store-assets/play-icon-512.png`

@@ -16,9 +16,9 @@ import {
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "İşletmeler İçin — Komisyonsuz Halı Yıkama Sipariş Kanalı",
+  title: "İşletmeler İçin — Halı Yıkama İşletme Yönetim Paneli",
   description:
-    "Halı yıkama işletmeni platforma ekle: bölgendeki müşterilerden sipariş al, şoförünü canlı takip et, yorumlarla itibar kazan. Sipariş başına komisyon yok — sabit aylık abonelik.",
+    "Halı yıkama işletmeni tek panelden yönet: şoförünü haritada izle, alım-teslim fotoğrafını kayda al, kesin fiyatı yazılı onaylat, kâr-zararını gör. Ayrıca bölgenin sayfasında listelenirsin. Sabit aylık abonelik, sipariş başına komisyon yok.",
   alternates: { canonical: "/isletmeler-icin" },
 };
 
@@ -27,41 +27,52 @@ const TALEP_ESIGI = 10;
 /** Şehir rozeti bu sayının altındaki şehirler için basılmaz. */
 const SEHIR_ESIGI = 3;
 
+// SIRALAMA KASITLIDIR (2026-07-29). Eskiden liste "komisyon yok" ve "973 ilçede
+// görünürlük" ile açılıyordu — yani halıcıya ödediği paranın karşılığı olarak
+// MÜŞTERİ vaat ediliyordu. Canlıda tüm zamanlarda 3 teslim edilmiş sipariş ve
+// 0 yorum var; o vaat tutulmuyor ve 2. ay yenilememenin sebebi bu. Artık önce
+// GERÇEKTEN çalışan yazılım anlatılıyor, keşif/görünürlük listenin altında ve
+// taahhütsüz duruyor. Bu listeye bir madde eklerken tek ölçüt: kodda çalışıyor mu?
 const PERKS = [
-  {
-    icon: <IconWallet size={20} />,
-    title: "Sipariş başına komisyon yok",
-    desc: "Müşteriden aldığın ücretin tamamı senin. Platform sabit aylık abonelikle çalışır — ciro büyüdükçe kesinti artmaz.",
-  },
-  {
-    icon: <IconBolt size={20} />,
-    title: "Onay beklemeden yayın",
-    desc: "Profilin tamamlanıp ödemen alındığı an otomatik yayına girersin. Kimsenin elle onaylamasını beklemezsin.",
-  },
   {
     icon: <IconPackage size={20} />,
     title: "Sipariş yönetim paneli",
-    desc: "Gelen siparişi onayla, kesin fiyatı bildir, adım adım ilerlet. Dükkâna gelen müşterin için takip kodlu manuel kayıt da açabilirsin.",
+    desc: "Gelen siparişi onayla, halıyı ölçüp kesin fiyatı bildir, adım adım ilerlet. Dükkâna gelen müşterin için de takip kodlu kayıt açarsın — siteden hiç sipariş gelmese bile panel çalışır.",
   },
   {
     icon: <IconTruck size={20} />,
-    title: "Şoför ekranı + canlı takip",
-    desc: "Şoförün telefonundan işlerini görür, alım ve teslimde fotoğraf çeker; sen mesai boyunca canlı konumu ve aylık durak raporunu izlersin. Android uygulaması da yolda.",
+    title: "Şoförün mesai boyunca haritada",
+    desc: "Mesai açıkken şoförünü canlı izlersin: nerede, ne zaman durmuş, ne kadar kalmış. Geçmiş bir günün rotasını baştan oynatır, ay sonunda şoför şoför durak raporu alırsın.",
+  },
+  {
+    icon: <IconShield size={20} />,
+    title: "Alım ve teslim fotoğrafla kayıtta",
+    desc: "Şoför uygulamasında teslim fotoğrafı çekilmeden sipariş teslim edilmiş sayılmaz — kural sunucuda uygulanır. Panelden fotoğrafsız ilerletirsen siparişin geçmişine bu da not düşer. Bu kayıtlar tartışmada delildir; sigorta değildir.",
   },
   {
     icon: <IconWallet size={20} />,
-    title: "KASA — gelir gider defteri",
-    desc: "Maaş, deterjan, yakıt, kira… giderlerini panele gir; 3 günde bir alınan deterjan gibi tekrarlayanları bir kez tanımla, her ay kendiliğinden düşsün. Teslim ettiğin siparişlerin geliri otomatik işlenir, kâr-zararını anlık görürsün.",
+    title: "KASA — kâr mı ettin, zarar mı",
+    desc: "Maaş, deterjan, yakıt, kira gibi tekrarlayan giderleri bir kez tanımla, her ay kendiliğinden düşsün. Teslim ettiğin siparişlerin geliri deftere otomatik işlenir. Resmî muhasebe defteri değildir, kâr-zararını görmen içindir.",
+  },
+  {
+    icon: <IconStar size={20} />,
+    title: "Kesin fiyat, yazılı onay",
+    desc: "Halıyı ölçtükten sonra kesin fiyatı panelden bildirirsin; müşteri kendi telefonundan onaylar ve onay zaman damgasıyla kayda geçer. Onaydan sonra fiyat değiştirilemez — pazarlık kapıda değil, ekranda biter.",
+  },
+  {
+    icon: <IconWallet size={20} />,
+    title: "Sipariş başına komisyon yok",
+    desc: "Müşteriden aldığın ücretin tamamı senin. Platform sabit aylık abonelikle çalışır — ciron büyüdükçe kesinti artmaz.",
   },
   {
     icon: <IconBolt size={20} />,
-    title: "81 il, 973 ilçe sayfasında görünürlük",
-    desc: "Her il ve ilçe için ayrı sayfamız var; müşteri kendi ilçesini arattığında işletmen orada listelenir. Arama motoru işini biz üstleniriz, sen yıkamaya bak.",
+    title: "Bölgenin sayfasında listelenirsin",
+    desc: "Halıcısı olan il ve ilçelerin sayfaları arama motorlarına açıktır; sen girdiğinde bölgenin sayfası da açılır. Müşteri seni fotoğrafların ve fiyat listenle görür, buradan sipariş verirse panelinde çıkar. Kaç müşteri geleceğine dair söz vermiyoruz — sistem yeni, buradan gelen sipariş sayısı bugün az.",
   },
   {
     icon: <IconStar size={20} />,
     title: "Yorum ve puanla itibar",
-    desc: "Teslim edilen her sipariş yıldız ve yorum kazandırır. Google profilin de sayfana bağlanır — itibarın tek yerde birikir.",
+    desc: "Teslim edilen sipariş için müşteri yıldız ve yorum bırakabilir; yorum yazmak hesap açmayı gerektirir. Google profilin de sayfana bağlanır.",
   },
   {
     icon: <IconShield size={20} />,
@@ -120,14 +131,22 @@ export default async function ForBusinessesPage() {
           <p className="text-xs font-semibold uppercase tracking-wider text-teal-300">
             Halı yıkama işletmeleri için
           </p>
+          {/* H1 DEĞİŞTİ (2026-07-29): eski başlık "Bölgendeki müşteriler seni
+              bulsun — komisyonsuz sipariş kanalı" idi ve alt metin "müşteri
+              arar, seni görür, siparişi verir" diyerek olmamış bir şeyi geniş
+              zamanla olmuş gibi anlatıyordu. Ödenen bedelin karşılığı artık
+              çalışan yazılım olarak anlatılıyor; keşif tarafı taahhütsüz ve
+              tek cümleyle, en sonda. */}
           <h1 className="mt-2 text-2xl font-bold tracking-tight text-white sm:text-3xl">
-            Bölgendeki müşteriler seni bulsun —{" "}
-            <span className="text-teal-300">komisyonsuz</span> sipariş kanalı
+            Halı yıkama işletmeni{" "}
+            <span className="text-teal-300">tek panelden</span> yönet
           </h1>
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-300 sm:text-base">
-            Müşteri şehrini arar, seni görür, siparişi verir. Şoförün halıyı
-            kapıdan alır, sen yıkarsın, teslimatta ücretini alırsın. Sipariş
-            başına kesinti yok; yıldızlar ve yorumlarla itibarın büyür.
+            Şoförün mesai boyunca haritada, halı hangi aşamada belli, teslim
+            fotoğrafla kayıtta, ay sonunda kâr mı zarar mı ettiğin tek ekranda.
+            Dükkânına gelen müşterini de panele yazar, takip kodunu kendin
+            iletirsin. Bölgenin sayfasında da listelenirsin — oradan sipariş
+            gelirse komisyon almayız.
           </p>
           <div className="mt-4 flex flex-wrap items-center gap-3">
             <Link
@@ -206,8 +225,13 @@ export default async function ForBusinessesPage() {
             {[
               ["Kaydol ve öde", "5 dakikada hesap aç, aboneliği başlat. Kart bilgilerin iyzico güvencesinde."],
               ["Profilini doldur", "Fiyat listesi, hizmet bölgeleri, fotoğraflar ve şoförünü ekle — otomatik yayına girersin."],
-              ["Sipariş düşsün", "Bölgendeki müşteri siparişi verir; panelde ve zilde anında görürsün, şoförüne atarsın."],
-              ["Yıka, teslim et, kazan", "Kesin fiyatı bildir, onay gelince yıka. Teslimde ücretini al, yıldız ve yorum kazan."],
+              // 3. ADIM DEĞİŞTİ (2026-07-29): eskiden "Sipariş düşsün —
+              // bölgendeki müşteri siparişi verir" yazıyordu. Bu adım garanti
+              // değil, dilek; halıcı 4 adımı okuyup abone oluyor, 3. adım
+              // gerçekleşmiyordu. Yerine HER GÜN gerçekleşen adım kondu:
+              // halıcının kendi müşterisini panele yazması.
+              ["İşini panele al", "Dükkânına gelen müşteriyi panele yaz, takip kodunu ilet; siteden sipariş gelirse zilde anında görür, şoförüne atarsın."],
+              ["Yıka, teslim et, kaydet", "Kesin fiyatı bildir, onay gelince yıka. Teslimde fotoğraf çekilir, ücretini alırsın; gelir deftere kendiliğinden düşer."],
             ].map(([t, d], i) => (
               <li
                 key={t}

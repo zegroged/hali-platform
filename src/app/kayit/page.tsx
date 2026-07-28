@@ -218,8 +218,10 @@ export default function KayitPage() {
           İşletmeni Ekle
         </h1>
         <p className="mt-1 text-sm text-slate-600">
-          Müşteriler seni konumuna göre bulsun; siparişlerini ve şoförlerini
-          tek panelden yönet.
+          {/* Sıra ters çevrildi (2026-07-29): ödeme funnel'ının ilk cümlesi
+              önce tutulamayan müşteri vaadini söylüyordu. */}
+          Siparişlerini, şoförlerini ve kâr-zararını tek panelden yönet; ayrıca
+          bölgenin sayfasında listelenirsin.
         </p>
 
         {/* Funnel 1. adım: yalnız paket kartı; "Hemen Başla" formu açar */}

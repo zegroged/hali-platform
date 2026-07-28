@@ -159,21 +159,27 @@ Müşteri parayı **doğrudan halıcıya, teslimatta** ödüyor. Aramızda para 
 
 ---
 
-## 7. Aidat kendini nasıl çıkarıyor
+## 7. Aidatın karşılığı ne
 
-Basit hesap:
+Burada eskiden bir kazanç tablosu vardı: "ayda 1–2 müşteri aidatı çıkarır, gerisi kâr."
+**Kaldırıldı (2026-07-29)** — çünkü müşteri sayısı vaat ediyordu ve bu vaat tutulmuyor.
+Reklam mevzuatında ispat külfeti reklam verendedir; sistemde bugüne kadar teslim edilen
+toplam sipariş sayısı tek haneli, o tabloyu savunacak veri yok. Halıcıya söylenen her
+cümlenin ikinci ayda yüzümüze vurulabileceğini kabul ederek yazıyoruz.
 
-| | |
+Aidatın karşılığı **çalışan yazılımdır**, gelecek müşteri değil:
+
+| Aidat olmasa ne yapardı | Sistemde |
 |---|---|
-| Aylık aidat | 2.400 TL |
-| Ortalama müşteri (2–3 halı) | 1.500 – 2.500 TL |
-| **Aidatı çıkaran müşteri sayısı** | **ayda 1–2 müşteri** |
+| Sipariş defteri, WhatsApp kalabalığı | Sipariş paneli — durum, kesin fiyat, yazılı onay |
+| Şoförü telefonla arayıp "neredesin" | Mesai boyunca haritada canlı konum, rota geçmişi, aylık durak raporu |
+| "Halımda leke vardı" tartışması | Alım ve teslim fotoğrafı, zaman damgalı kayıt |
+| Ay sonunda kâr mı zarar mı bilmemek | KASA — tekrarlayan giderler, otomatik gelir, kâr-zarar özeti |
+| Kendi sitesi, alan adı, hukuki metinler | Profil sayfası ve mevzuat metinleri hazır |
 
-Yani sistemden ayda **bir tek yeni müşteri** gelse aidat çıkıyor. İkincisinden itibaren her şey kâr.
-
-Bunun üstüne şunlar da cabası: kendi sitesini yaptırmıyor, reklam vermiyor, sipariş defteri tutmuyor, muhasebe programı almıyor, şoför takip sistemi almıyor, hukuki metinler için avukata gitmiyor.
-
-**Dürüst uyarı:** bu bir garanti değil. Sistem müşteri getirir ama kaç müşteri getireceği o ilçedeki arama hacmine, halıcının fiyatına, fotoğraflarına, hizmet kalitesine ve aldığı yorumlara bağlıdır. Kötü hizmet veren halıcı burada da batar — hatta daha hızlı batar, çünkü yorumlar görünür.
+**Dürüst uyarı:** bölgenin sayfasında listelenmek aidatın karşılığı olarak sayılmıyor.
+Oradan kaç müşteri geleceğini biz de bilmiyoruz — sistem yeni, buradan gelen sipariş
+sayısı bugün az. Söz vermek yerine bu tarafı fiyatın gerekçesi olmaktan çıkardık.
 
 ---
 
@@ -181,7 +187,7 @@ Bunun üstüne şunlar da cabası: kendi sitesini yaptırmıyor, reklam vermiyor
 
 Bir pazaryerinde en kırılgan şey güvendir. Dört ayrı mekanizma var:
 
-**1. Fotoğraflı güvence.** Alımda ve teslimde zorunlu fotoğraf. Anlaşmazlıkta iki tarafı da koruyor.
+**1. Alım ve teslim fotoğrafı.** Şoför uygulamasında teslim fotoğrafı çekilmeden sipariş teslim edilmiş sayılmıyor — kural sunucuda uygulanıyor. Halıcı panelden fotoğrafsız ilerletirse siparişin geçmişine "fotoğrafsız ilerletildi" notu düşüyor. Anlaşmazlıkta iki tarafı da koruyan **delil** bu kayıt; sigorta değil ("güvence" kelimesi bu yüzden kaldırıldı — Kullanım Koşulları §5/C zaten "sigorta poliçesi değildir" diyor).
 
 **2. Gerçek yorumlar.** Sadece **teslim edilmiş siparişi olan, üye olmuş** müşteri yorum yapabiliyor. Yani sahte yorum yazılamıyor; yorum yazmak için gerçekten o halıcıya iş yaptırmış olmak gerekiyor. Yorum yapan müşteri puan kazanıyor.
 
@@ -193,15 +199,29 @@ Yani müşteri unutulmuş bir siparişle ortada bırakılmıyor. Bu, tek bir kö
 
 ---
 
-## 9. Görünürlük — halıcının asıl aldığı şey
+## 9. Bölgende görünürlük — taahhüt değil, yer
 
-Halıcı 2.400 TL'ye yazılım satın almıyor, **bulunabilirlik** satın alıyor. O yüzden arama motoru işini biz üstleniyoruz.
+Bu bölüm eskiden şöyle başlıyordu: *"Halıcı 2.400 TL'ye yazılım satın almıyor,
+bulunabilirlik satın alıyor. O yüzden arama motoru işini biz üstleniyoruz."*
+Bu cümle **silindi** — hem yeni konumlandırmanın tersi, hem de kendi kodumuzla
+çelişiyordu: halıcısı olmayan il/ilçe sayfaları `noindex` alıyor ve site
+haritasına girmiyor (Google'a bildirilen adres sayısı 1.054'ten 62'ye indirildi).
+Yani "973 ilçede görünürlük" diye satılan şeyin %98'i bilerek aramaya kapalıydı.
 
-Türkiye'nin **81 ilinin ve 973 ilçesinin** her biri için ayrı sayfamız var. Birisi "Şehitkamil halı yıkama" arattığında o ilçenin sayfası çıkıyor ve orada listelenen halıcılar görünüyor.
+Bugün doğru olan şu: **halıcısı olan** il ve ilçelerin sayfaları arama motorlarına
+açık. Bir bölgeye ilk halıcı girdiğinde o bölgenin sayfası kendiliğinden açılıyor,
+elle iş yok. Müşteri o sayfada halıcıyı fotoğrafları, m² fiyatı ve varsa yorumlarıyla
+görüyor; oradan sipariş verirse halıcının paneline düşüyor ve komisyon alınmıyor.
 
-Halıcının kendi sitesini yapmasına, alan adı almasına, SEO öğrenmesine, reklam bütçesi ayırmasına gerek yok.
+Henüz halıcısı olmayan ilçelerde sayfa yine duruyor ama müşteriye "burada henüz
+halıcımız yok, açılınca haber verelim mi?" diyor. O ilçeye ilk halıcı girdiğinde
+bekleyenlere otomatik e-posta gidiyor.
 
-Henüz halıcısı olmayan ilçelerde sayfa yine duruyor ama müşteriye "burada henüz halıcımız yok, açılınca haber verelim mi?" diyor. O ilçeye ilk halıcı girdiğinde **bekleyen herkese otomatik e-posta gidiyor.** Yani halıcı yayına girdiği gün hazır bir müşteri listesi buluyor.
+> ⚠️ Bunu **mekanizma** olarak anlatın, **sonuç** olarak değil. "Halıcı yayına
+> girdiği gün hazır bir müşteri listesi buluyor" cümlesi kaldırıldı: bugün tüm
+> Türkiye'de bekleyen kişi sayısı tek haneli. Doğrusu: *"Bölgende senden önce
+> halıcı yokken haber isteyen olduysa, ilk giren sen olduğunda onlara e-posta
+> gider."* Sayı telaffuz edilmez.
 
 Her halıcının kendi profil sayfası da ayrıca arama motorlarına açık — kendi adıyla da bulunabiliyor.
 

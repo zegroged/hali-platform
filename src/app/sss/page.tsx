@@ -76,7 +76,11 @@ const FAQS: { q: string; a: React.ReactNode }[] = [
     q: "Halıcıyım — platforma nasıl katılırım?",
     a: (
       <>
-        Kayıt ücretsizdir. <Link href="/giris" className="font-medium text-brand-dark hover:underline">İşletme girişi</Link>{" "}
+        {/* "Kayıt ücretsizdir" YANLIŞTI (2026-07-29): abonelik ödenmeden
+            işletme yayına alınmıyor (plan.ts, isletme-sozlesmesi §3). */}
+        Hesap açmak ve profilini doldurmak ücretsizdir; yayına girmek için
+        aylık abonelik gerekir (aylık 2.000 TL + KDV).{" "}
+        <Link href="/giris" className="font-medium text-brand-dark hover:underline">İşletme girişi</Link>{" "}
         sayfasından başvurabilir veya{" "}
         <Link href="/iletisim" className="font-medium text-brand-dark hover:underline">iletişim</Link>{" "}
         kanallarından bize yazabilirsiniz. İşletmeniz doğrulandıktan sonra

@@ -150,9 +150,13 @@ export function ManualOrderForm({
             {result.trackingUrl}
           </a>
         </div>
+        {/* ÜRÜNÜN İÇİNDEKİ YALAN KALDIRILDI (2026-07-29 denetim): burada
+            "SMS müşteriye gönderildi" yazıyordu, oysa canlıda SMS_MODE=mock —
+            hiçbir SMS gitmiyor. Halıcı bu yazıya güvenip müşteriye kodu
+            vermiyor, müşteri de takip edemiyordu. Doğrusu: linki SEN ver. */}
         <p className="mt-3 text-xs text-slate-500">
-          SMS müşteriye gönderildi. Bu kodu/linki müşterine verebilirsin —
-          sistemi bilmeden son durumu izler.
+          Bu kodu/linki müşterine <strong>sen ilet</strong> (WhatsApp&apos;tan
+          yollamak en pratiği) — sistemi bilmeden son durumu izler.
         </p>
         <div className="mt-4 flex gap-2">
           <button
