@@ -4,6 +4,7 @@ import { getCurrentBusiness } from "@/lib/panel";
 import { ayOzeti, ayAraligi, KATEGORI_ETIKET } from "@/lib/ledger";
 import type { LedgerCategory } from "@prisma/client";
 import { PendingButton } from "@/components/PendingButton";
+import LedgerEntryForm from "@/components/LedgerEntryForm";
 import {
   addLedgerEntry,
   deleteLedgerEntry,
@@ -84,10 +85,6 @@ export default async function KasaSayfasi({
     return `/panel/kasa?ay=${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
   };
   const bugun = `${simdi.getFullYear()}-${String(simdi.getMonth() + 1).padStart(2, "0")}-${String(simdi.getDate()).padStart(2, "0")}`;
-
-  const inp =
-    "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand focus:outline-none";
-  const lbl = "mb-1 block text-xs font-medium text-slate-600";
 
   return (
     <div className="space-y-5">
@@ -204,139 +201,14 @@ export default async function KasaSayfasi({
         </section>
       )}
 
-      {/* Yeni kalem */}
-      <form
+      {/* YENİ KALEM FORMU — istemci bileşeni (2026-07-28).
+          Sunucu bileşeninde tutulamazdı: gelir/gider seçimine göre etiketlerin
+          değişmesi ve tekrar seçeneklerinin birbirini dışlaması durum ister. */}
+      <LedgerEntryForm
         action={addLedgerEntry}
-        className="space-y-3 rounded-2xl border border-slate-200 bg-white p-5"
-      >
-        <h2 className="font-semibold text-slate-900">+ Kalem Ekle</h2>
-        <div className="grid gap-3 sm:grid-cols-2">
-          {/* TÜR: açılır liste değil, İKİ RADYO DÜĞMESİ (2026-07-27).
-              "Gelir (sipariş dışı)" seçeneği <select> içinde saklı kaldığı için
-              halıcı ek gelir girebildiğini fark etmiyordu. Artık ikisi de
-              ekranda, işaretleriyle birlikte görünüyor. */}
-          <div className="sm:col-span-2">
-            <label className={lbl}>Bu para giriyor mu, çıkıyor mu?</label>
-            <div className="mt-1 grid grid-cols-2 gap-2">
-              <label className="cursor-pointer">
-                <input
-                  type="radio"
-                  name="kind"
-                  value="EXPENSE"
-                  defaultChecked
-                  className="peer sr-only"
-                />
-                <span className="flex items-center justify-center gap-1.5 rounded-lg border border-slate-300 px-3 py-2.5 text-sm font-medium text-slate-600 peer-checked:border-red-400 peer-checked:bg-red-50 peer-checked:text-red-700">
-                  <span aria-hidden className="text-base">
-                    −
-                  </span>
-                  Gider (para çıktı)
-                </span>
-              </label>
-              <label className="cursor-pointer">
-                <input
-                  type="radio"
-                  name="kind"
-                  value="INCOME"
-                  className="peer sr-only"
-                />
-                <span className="flex items-center justify-center gap-1.5 rounded-lg border border-slate-300 px-3 py-2.5 text-sm font-medium text-slate-600 peer-checked:border-green-500 peer-checked:bg-green-50 peer-checked:text-green-700">
-                  <span aria-hidden className="text-base">
-                    +
-                  </span>
-                  Ek gelir (para girdi)
-                </span>
-              </label>
-            </div>
-            <p className="mt-1 text-xs text-slate-500">
-              Siparişlerden gelen para zaten otomatik işleniyor. Buraya sipariş
-              dışı gelirleri yaz (kilim satışı, tamir ücreti, hurda satışı…).
-            </p>
-          </div>
-          {/* KATEGORİ SERBEST (2026-07-27): sabit 8 kalıp yerine kendi yazdığı.
-              Daha önce yazdıkları öneri olarak düşer (datalist) — ikinci kez
-              yazmak zorunda kalmasın, aynı ad farklı yazımla bölünmesin. */}
-          <div className="sm:col-span-2">
-            <label className={lbl}>Kategori</label>
-            <input
-              name="category"
-              list="kasa-kategoriler"
-              placeholder="Kendin yaz — ör. Deterjan, Ahmet'in maaşı, Kamyonet"
-              className={inp}
-            />
-            <datalist id="kasa-kategoriler">
-              {kategoriOnerileri.map((k) => (
-                <option key={k} value={k} />
-              ))}
-            </datalist>
-            <p className="mt-1 text-xs text-slate-500">
-              İstediğin adı yazabilirsin; boş bırakırsan &quot;Diğer&quot; olur.
-            </p>
-          </div>
-          <div>
-            <label className={lbl}>Ne için?</label>
-            <input
-              name="label"
-              required
-              placeholder="Ör. Ahmet maaş / Omo 5kg x4"
-              className={inp}
-            />
-          </div>
-          <div>
-            <label className={lbl}>Tutar (TL)</label>
-            <input
-              name="amount"
-              required
-              inputMode="decimal"
-              placeholder="Ör. 1.250,50"
-              className={inp}
-            />
-          </div>
-          <div>
-            <label className={lbl}>Tarih</label>
-            <input type="date" name="date" defaultValue={bugun} className={inp} />
-          </div>
-          <div>
-            <label className={lbl}>Not (ops.)</label>
-            <input name="note" className={inp} />
-          </div>
-        </div>
-
-        <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-          <p className="text-xs font-medium text-slate-700">
-            Tekrar eden bir kalem mi? (ikisinden birini doldur — boş bırakırsan
-            tek seferlik olur)
-          </p>
-          <div className="mt-2 grid gap-3 sm:grid-cols-2">
-            <div>
-              <label className={lbl}>Her kaç günde bir? (ör. deterjan: 3)</label>
-              <input
-                name="everyDays"
-                inputMode="numeric"
-                placeholder="3"
-                className={inp}
-              />
-            </div>
-            <div>
-              <label className={lbl}>Her ayın kaçında? (ör. maaş: 5)</label>
-              <input
-                name="monthDay"
-                inputMode="numeric"
-                placeholder="5"
-                className={inp}
-              />
-            </div>
-          </div>
-          <p className="mt-2 text-xs text-slate-500">
-            Tekrarlayan kalem tanımlarsan sistem vadesi geldikçe kaydı otomatik
-            oluşturur — bir daha girmen gerekmez.
-          </p>
-        </div>
-
-        <PendingButton className="rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-dark">
-          Kaydet
-        </PendingButton>
-      </form>
+        kategoriOnerileri={kategoriOnerileri}
+        bugun={bugun}
+      />
 
       {/* Tekrarlayan kurallar */}
       {kurallar.length > 0 && (

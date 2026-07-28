@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 
 // Rota haritası: mobilde 360px, geniş ekranda 480px (PanelTrackingClient ile aynı desen).
@@ -61,6 +61,16 @@ function bosMesaji(t: Tani | null, tarih: string, bugun: string) {
         month: "long",
       })
     : null;
+  // Mesai AÇIKKEN "mesaiye çıkılmamış" demek kendiyle çelişiyordu (kullanıcı
+  // fark etti). Mesai açık + kayıt yok = uygulama konum göndermiyor demektir;
+  // başlığı da bunu söylesin, halıcı şoförü arayıp uygulamayı açtırabilsin.
+  if (t?.mesaide && tarih === bugun)
+    return {
+      baslik: "Mesai açık ama konum gelmiyor",
+      aciklama:
+        (son ? `Bu şoförün en son konum kaydı ${son} tarihinde. ` : "") +
+        "Şoför mesaisini açmış ama telefonundan konum düşmüyor — uygulama kapalı olabilir ya da konum izni kapatılmış olabilir. Şoförü arayıp uygulamayı açmasını ve konum iznine “Her zaman izin ver” demesini söyle.",
+    };
   return {
     baslik: `${gunAdi} mesaiye çıkılmamış`,
     aciklama:
@@ -86,7 +96,7 @@ export function RouteHistory({
 
   const stopPlaying = useCallback(() => setPlaying(false), []);
 
-  async function load() {
+  const load = useCallback(async () => {
     if (!driverId) return;
     setLoading(true);
     setPlaying(false);
@@ -95,7 +105,15 @@ export function RouteHistory({
     );
     setLoading(false);
     setData(res.ok ? await res.json() : null);
-  }
+  }, [driverId, date]);
+
+  // KENDİLİĞİNDEN YÜKLE (2026-07-28 kullanıcı isteği: "göster butonuna basmaya
+  // gerek olmasın"). Sayfa açılır açılmaz bugünün rotası gelir; şoför ya da
+  // tarih değişince de kendiliğinden yenilenir. Buton "Yenile" olarak duruyor —
+  // gün içinde tekrar bakmak isteyen için.
+  useEffect(() => {
+    void load();
+  }, [load]);
 
   const inp = "rounded-lg border border-slate-300 px-3 py-2 text-sm";
 
@@ -133,7 +151,7 @@ export function RouteHistory({
           disabled={loading}
           className="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-60"
         >
-          {loading ? "Yükleniyor…" : "Göster"}
+          {loading ? "Yükleniyor…" : "Yenile"}
         </button>
       </div>
 
