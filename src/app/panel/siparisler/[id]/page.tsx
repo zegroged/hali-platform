@@ -1,4 +1,5 @@
 import Link from "next/link";
+import MoneyInput from "@/components/MoneyInput";
 import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getSessionUser } from "@/lib/auth";
@@ -330,19 +331,18 @@ export default async function OrderManagePage({
               {/* Anlaşılan/bildirilen tutar varsa HAZIR gelir (2026-07-26):
                   halıcı manuel kayıtta ya da kesin fiyatta yazdıysa teslimde
                   tekrar yazmasın — tek tıkla teslim etsin. */}
-              <input
-                id="teslim-tutar"
-                name="price"
-                type="number"
-                min="1"
-                step="0.01"
-                required
-                defaultValue={
-                  o.quotedPrice != null ? Number(o.quotedPrice) : ""
-                }
-                placeholder="Ör. 850"
-                className="mt-0.5 w-36 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand"
-              />
+              <div className="mt-0.5 w-40">
+                <MoneyInput
+                  id="teslim-tutar"
+                  name="price"
+                  required
+                  defaultValue={
+                    o.quotedPrice != null ? String(o.quotedPrice) : ""
+                  }
+                  placeholder="Ör. 850"
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand"
+                />
+              </div>
             </div>
             <PendingButton className="rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark active:scale-[0.99] disabled:opacity-60">
               Teslim Edildi
@@ -400,19 +400,18 @@ export default async function OrderManagePage({
                     >
                       Kesin fiyat (TL)
                     </label>
-                    <input
-                      id="kesin-fiyat"
-                      name="price"
-                      type="number"
-                      min="1"
-                      step="0.01"
-                      required
-                      defaultValue={
-                        o.quotedPrice != null ? Number(o.quotedPrice) : ""
-                      }
-                      placeholder="Ör. 850"
-                      className="mt-0.5 w-36 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand"
-                    />
+                    <div className="mt-0.5 w-40">
+                      <MoneyInput
+                        id="kesin-fiyat"
+                        name="price"
+                        required
+                        defaultValue={
+                          o.quotedPrice != null ? String(o.quotedPrice) : ""
+                        }
+                        placeholder="Ör. 850"
+                        className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand"
+                      />
+                    </div>
                   </div>
                   <PendingButton className="rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark active:scale-[0.99] disabled:opacity-60">
                     {o.quotedPrice != null ? "Fiyatı güncelle" : "Fiyatı bildir"}

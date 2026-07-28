@@ -96,6 +96,12 @@ export default async function AdminHome({
           Komisyoncular
         </Link>
         <Link
+          href="/admin/bolgeler"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+        >
+          Bölge Haritası
+        </Link>
+        <Link
           href="/admin/mali-musavir"
           className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
         >

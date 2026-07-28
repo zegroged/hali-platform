@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { bolgeOku } from "@/lib/territory";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getSessionUser, hashPassword } from "@/lib/auth";
@@ -142,6 +143,14 @@ export async function createSubAgent(formData: FormData) {
   const name = String(formData.get("name") || "").trim();
   const phone = normalizePhone(String(formData.get("phone") || ""));
   const username = normalizeUsername(String(formData.get("username") || "").trim());
+  // BÖLGE (2026-07-28): baş komisyoncu açtığı kişiye il+ilçe atar. Çakışma
+  // engellenmez, form dolu ilçeleri uyarıyla gösterir (lib/territory.ts).
+  const bolge = bolgeOku(
+    String(formData.get("territoryCity") || ""),
+    formData.getAll("territoryDistrict").map((d) => String(d)),
+  );
+  // İl seçilip ilçe seçilmediyse sessizce geçme (denetim bulgusu).
+  if (!bolge.ok) hata(bolge.hata);
   const password = String(formData.get("password") || "");
   const percentRaw = String(formData.get("percent") || "").replace(",", ".").trim();
   const havuz = Number(head.poolPercent ?? 0);
@@ -203,7 +212,7 @@ export async function createSubAgent(formData: FormData) {
           password: await hashPassword(password),
         },
       });
-      await tx.agent.create({
+      const yeni = await tx.agent.create({
         data: {
           userId: user.id,
           percent: Math.round(percent * 100) / 100,
@@ -214,6 +223,16 @@ export async function createSubAgent(formData: FormData) {
           maxDiscountMonths: altAyTavan,
         },
       });
+      if (bolge.ok && bolge.city) {
+        await tx.agentTerritory.createMany({
+          data: bolge.districts.map((d: string) => ({
+            agentId: yeni.id,
+            city: bolge.city as string,
+            district: d,
+          })),
+          skipDuplicates: true,
+        });
+      }
     });
   } catch (e) {
     if (e && typeof e === "object" && "digest" in e) throw e;
@@ -398,4 +417,45 @@ export async function setSubAgentDiscount(formData: FormData) {
     },
   });
   revalidatePath("/komisyoncu");
+}
+
+
+/** Baş komisyoncu KENDİ ekibindeki bir komisyoncunun bölgesini günceller.
+ *  Yalnız kendi altındakine dokunabilir (parentId kontrolü) — 2026-07-28. */
+export async function setSubAgentTerritory(formData: FormData) {
+  const head = await requireHeadAgent();
+  const agentId = String(formData.get("agentId") || "");
+  const hata2 = (m: string) =>
+    redirect("/komisyoncu?hata=" + encodeURIComponent(m));
+  if (!agentId) hata2("Komisyoncu bulunamadı.");
+
+  const bolge = bolgeOku(
+    String(formData.get("territoryCity") || ""),
+    formData.getAll("territoryDistrict").map((d) => String(d)),
+  );
+  if (!bolge.ok) hata2(bolge.hata);
+
+  // YETKİ: yalnız kendi altındaki hesap. Başkasının ekibine dokunamaz.
+  const alt = await prisma.agent.findFirst({
+    where: { id: agentId, parentId: head.id },
+    select: { id: true },
+  });
+  if (!alt) hata2("Bu komisyoncu senin ekibinde değil.");
+
+  await prisma.$transaction(async (tx) => {
+    await tx.agentTerritory.deleteMany({ where: { agentId } });
+    if (bolge.ok && bolge.city && bolge.districts.length > 0) {
+      await tx.agentTerritory.createMany({
+        data: bolge.districts.map((d: string) => ({
+          agentId,
+          city: bolge.city as string,
+          district: d,
+        })),
+        skipDuplicates: true,
+      });
+    }
+  });
+  revalidatePath("/komisyoncu");
+  revalidatePath("/komisyoncu/bolgeler");
+  redirect("/komisyoncu?ok=" + encodeURIComponent("Bölge güncellendi"));
 }

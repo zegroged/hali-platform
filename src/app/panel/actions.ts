@@ -4,6 +4,7 @@ import crypto from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { parseTutar } from "@/lib/money";
 import { getCurrentBusiness, profileComplete, syncVisibility } from "@/lib/panel";
 import { hashPassword } from "@/lib/auth";
 import { sendSms, trackingLink } from "@/lib/sms";
@@ -167,7 +168,7 @@ export async function setWorkingHours(formData: FormData) {
 export async function addPricingItem(formData: FormData) {
   const b = await biz();
   const label = String(formData.get("label") || "").trim();
-  const price = Number(formData.get("price"));
+  const price = parseTutar(formData.get("price"));
   const unit = String(formData.get("unit") || "PER_M2") as PricingUnit;
   const isAddon = formData.get("isAddon") != null;
   // Fiyat 0'dan büyük olmalı (negatif fiyat gelir modelini tersine çevirir).
@@ -557,7 +558,7 @@ export async function acceptOrderPanel(formData: FormData) {
 export async function quoteOrderPrice(formData: FormData) {
   const b = await biz();
   const orderId = String(formData.get("orderId"));
-  const price = Number(String(formData.get("price") || "").replace(",", "."));
+  const price = parseTutar(formData.get("price"));
   if (!Number.isFinite(price) || price <= 0) {
     throw new Error("Geçerli bir kesin fiyat girin (0'dan büyük).");
   }
@@ -696,7 +697,7 @@ export async function advanceOrderPanel(formData: FormData) {
 export async function deliverOrderPanel(formData: FormData) {
   const b = await biz();
   const orderId = String(formData.get("orderId"));
-  const price = Number(String(formData.get("price") || "").replace(",", "."));
+  const price = parseTutar(formData.get("price"));
   if (!Number.isFinite(price) || price <= 0) {
     throw new Error("Geçerli bir teslim tutarı girin (0'dan büyük).");
   }

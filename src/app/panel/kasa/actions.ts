@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { parseTutar } from "@/lib/money";
 import { getCurrentBusiness } from "@/lib/panel";
 import { sonrakiTarih, KATEGORI_ETIKET } from "@/lib/ledger";
 import type { LedgerCategory, LedgerKind } from "@prisma/client";
@@ -22,9 +23,7 @@ const hata = (m: string) => {
 };
 
 function tutarOku(raw: string): number {
-  // "1.250,50" ve "1250.50" birlikte çalışsın (TR klavye alışkanlığı).
-  const t = raw.trim().replace(/\s/g, "").replace(/\.(?=\d{3}\b)/g, "").replace(",", ".");
-  return Number(t);
+  return parseTutar(raw);
 }
 
 export async function addLedgerEntry(formData: FormData) {

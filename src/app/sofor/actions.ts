@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { parseTutar } from "@/lib/money";
 import { getSessionUser } from "@/lib/auth";
 import { sendSms, trackingLink } from "@/lib/sms";
 import { waSiparisYolda, waGonderVeKaydet } from "@/lib/whatsapp";
@@ -190,7 +191,7 @@ export async function advanceOrder(formData: FormData) {
 export async function deliverOrder(formData: FormData) {
   const d = await currentDriver();
   const id = String(formData.get("orderId"));
-  const price = Number(formData.get("price"));
+  const price = parseTutar(formData.get("price"));
 
   // Geçersiz/sıfır/negatif tutar sessizce yutulmasın → şoför net hata görsün.
   if (!Number.isFinite(price) || price <= 0) {

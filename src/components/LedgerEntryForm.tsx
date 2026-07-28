@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { PendingButton } from "@/components/PendingButton";
+import MoneyInput from "@/components/MoneyInput";
 
 // KASA KALEM FORMU (2026-07-28 yeniden yazıldı — kullanıcı geri bildirimi).
 //
@@ -169,13 +170,7 @@ export default function LedgerEntryForm({
         </div>
         <div>
           <label className={lbl}>{t.tutarLabel}</label>
-          <input
-            name="amount"
-            required
-            inputMode="decimal"
-            placeholder="Ör. 1.250,50"
-            className={inp}
-          />
+          <MoneyInput name="amount" required className={inp} />
         </div>
         <div>
           <label className={lbl}>{t.tarihLabel}</label>

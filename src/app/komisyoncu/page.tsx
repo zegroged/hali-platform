@@ -1,10 +1,16 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
+import BolgeSecici from "@/components/BolgeSecici";
+import BolgeDuzenle from "@/components/BolgeDuzenle";
+import { bolgeHaritasi } from "@/lib/territory";
+import { CITIES, districtsOfCity } from "@/lib/cities";
 import { getSessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { subscriptionActive } from "@/lib/subscription";
 import {
   generateReferralCode,
   createSubAgent,
+  setSubAgentTerritory,
   toggleSubAgentActive,
   setSubAgentDiscount,
   savePayoutInfo,
@@ -90,6 +96,8 @@ export default async function KomisyoncuSayfasi({
           maxDiscountMonths: true,
           createdAt: true,
           user: { select: { name: true, username: true, phone: true } },
+          // Bölge: ekip listesinde gösterilir, oradan değiştirilir (2026-07-28).
+          territories: { select: { city: true, district: true } },
           _count: { select: { referrals: true } },
         },
       },
@@ -141,12 +149,31 @@ export default async function KomisyoncuSayfasi({
   const toplam = Number(toplamAgg._sum.amount ?? 0);
   const odenen = Number(odenenAgg._sum.amount ?? 0);
 
+  // BÖLGE SEÇİCİ VERİSİ (2026-07-28): il→ilçe listesi + hangi ilçede kaç aktif
+  // komisyoncu var. Doluluk yalnız UYARI içindir, atamayı engellemez.
+  // YALNIZ BAŞ KOMİSYONCU İÇİN (2026-07-28 denetim): bölge seçici zaten
+  // `agent.isHead` bloğunun içinde. Herkes için hesaplamak hem boşuna sorgu
+  // hem de alt komisyoncuya gereksiz veri riskiydi.
+  const ilceAdlari: Record<string, string[]> = {};
+  const doluluk: Record<string, number> = {};
+  if (agent.isHead) {
+    const { ilceler: bolgeIlce } = await bolgeHaritasi();
+    for (const c of CITIES) ilceAdlari[c.name] = [...districtsOfCity(c.name)];
+    for (const [k, v] of bolgeIlce) if (v.komisyoncu > 0) doluluk[k] = v.komisyoncu;
+  }
+
   return (
     <div className="mx-auto max-w-2xl space-y-5 px-4 py-8">
       <div>
         <h1 className="text-lg font-semibold text-slate-900">
           {agent.isHead ? "Baş Komisyoncu Paneli" : "Komisyoncu Paneli"} — {u.name}
         </h1>
+      <Link
+        href="/komisyoncu/bolgeler"
+        className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+      >
+        🗺 Bölge Haritası
+      </Link>
         <p className="mt-1 text-sm text-slate-500">
           Komisyon oranın: <strong>%{Number(agent.percent)}</strong> (KDV hariç
           net abonelik tutarı üzerinden). <strong>Her müşteri için aşağıdan
@@ -436,10 +463,8 @@ export default async function KomisyoncuSayfasi({
           ) : (
             <ul className="mt-3 divide-y divide-slate-100 text-sm">
               {agent.children.map((k) => (
-                <li
-                  key={k.id}
-                  className="flex flex-wrap items-center justify-between gap-2 py-2"
-                >
+                <li key={k.id} className="space-y-2 py-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
                   <span>
                     <span className="font-medium text-slate-800">
                       {k.user.name}
@@ -512,7 +537,17 @@ export default async function KomisyoncuSayfasi({
                         {k.active ? "Pasife al" : "Aktive et"}
                       </PendingButton>
                     </form>
-                  </span>
+                    </span>
+                  </div>
+                  {/* BÖLGE (2026-07-28 denetim): eskiden yalnız hesap açarken
+                      atanabiliyordu, sonradan değiştirilemiyordu. */}
+                  <BolgeDuzenle
+                    agentId={k.id}
+                    action={setSubAgentTerritory}
+                    mevcut={k.territories}
+                    ilceAdlari={ilceAdlari}
+                    doluluk={doluluk}
+                  />
                 </li>
               ))}
             </ul>
@@ -663,6 +698,7 @@ export default async function KomisyoncuSayfasi({
               Verdiğin yüzde havuz payından düşer, kalanı sana yazılır. Bu hesap
               kendi altına komisyoncu açamaz.
             </p>
+            <BolgeSecici ilceAdlari={ilceAdlari} doluluk={doluluk} zorunlu={false} />
             <PendingButton className="rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-dark">
               Komisyoncu Oluştur
             </PendingButton>

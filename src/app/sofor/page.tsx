@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import MoneyInput from "@/components/MoneyInput";
 import { PendingButton } from "@/components/PendingButton";
 import { PhotoForm } from "@/components/PhotoForm";
 import { prisma } from "@/lib/prisma";
@@ -234,16 +235,13 @@ export default async function SoforPage() {
                 >
                   {/* Halıcının bildirdiği/anlaştığı tutar HAZIR gelir — şoför
                       sıfırdan yazmasın, yanlış tahsilat olmasın (2026-07-26). */}
-                  <input
+                  <MoneyInput
                     name="price"
-                    type="number"
-                    min="0.01"
-                    step="0.01"
                     required
                     defaultValue={
-                      o.quotedPrice != null ? Number(o.quotedPrice) : ""
+                      o.quotedPrice != null ? String(o.quotedPrice) : ""
                     }
-                    placeholder="Tahsil edilen tutar (TL)"
+                    placeholder="Tahsil edilen tutar"
                     className={inp}
                   />
                 </PhotoForm>

@@ -582,6 +582,12 @@ model Agent {
 
   createdAt DateTime @default(now())
 
+  // BÖLGE (2026-07-28): komisyoncunun sorumlu olduğu il/ilçeler. Bir kişi
+  // birden fazla ilçe alabilir (Şehitkamil + Şahinbey gibi). Çakışma ENGEL
+  // DEĞİL — kullanıcı kararı: "10 komisyoncu atansa bir işletme bile kayıt
+  // olmasa izin verilmemesi kötü olur". Atarken UYARILIR, karar insanın.
+  territories AgentTerritory[]
+
   referrals   CleanerBusiness[]
   entries     CommissionEntry[]
   headEntries CommissionEntry[]   @relation("HeadCommissions")
@@ -589,6 +595,24 @@ model Agent {
   payouts     PayoutRequest[]
 
   @@index([parentId])
+}
+
+// KOMİSYONCU BÖLGESİ (2026-07-28): "hangi komisyoncu nereden sorumlu".
+// Amaç çakışmayı ENGELLEMEK değil GÖRÜNÜR KILMAK — kim nerede çalışıyor,
+// hangi ilçe boşta, hangi ilçede kaç işletme kayıtlı.
+// İl+ilçe `lib/cities.ts` + `lib/districts.ts` listesinden gelir (serbest metin
+// değil); böylece işletme kayıtlarıyla aynı adlarla eşleşir ve sayım tutar.
+model AgentTerritory {
+  id        String   @id @default(cuid())
+  agent     Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  agentId   String
+  city      String // kanonik il adı ("Gaziantep")
+  district  String // kanonik ilçe adı ("Şehitkamil")
+  createdAt DateTime @default(now())
+
+  // Aynı komisyoncuya aynı ilçe iki kez yazılmasın.
+  @@unique([agentId, city, district])
+  @@index([city, district])
 }
 
 // KOMİSYON ÇEKİM TALEBİ: komisyoncunun "birikeni öde" isteği. Admin panelinde

@@ -1,9 +1,12 @@
 import Link from "next/link";
+import { bolgeHaritasi } from "@/lib/territory";
+import { CITIES, districtsOfCity } from "@/lib/cities";
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import {
   createAgent,
+  setAgentTerritory,
   toggleAgentActive,
   toggleAgentDiscount,
   toggleCommissionPaid,
@@ -13,6 +16,8 @@ import {
   payoutReject,
 } from "../actions";
 import { PendingButton } from "@/components/PendingButton";
+import BolgeSecici from "@/components/BolgeSecici";
+import BolgeDuzenle from "@/components/BolgeDuzenle";
 
 export const dynamic = "force-dynamic";
 
@@ -37,6 +42,8 @@ export default async function AdminAgents({
     orderBy: { createdAt: "desc" },
     include: {
       user: { select: { name: true, username: true, phone: true } },
+      // Bölge: kartta gösterilir ve oradan değiştirilebilir (2026-07-28).
+      territories: { select: { city: true, district: true } },
       // BAŞ KOMİSYONCU ağacı: kimin altında / kimleri açmış.
       parent: { select: { user: { select: { name: true } } } },
       children: {
@@ -150,6 +157,14 @@ export default async function AdminAgents({
   const inp =
     "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand focus:outline-none";
   const lbl = "mb-1 block text-sm font-medium text-slate-700";
+
+  // BÖLGE SEÇİCİ VERİSİ (2026-07-28): il→ilçe listesi + hangi ilçede kaç aktif
+  // komisyoncu var. Doluluk yalnız UYARI içindir, atamayı engellemez.
+  const { ilceler: bolgeIlce } = await bolgeHaritasi();
+  const ilceAdlari: Record<string, string[]> = {};
+  for (const c of CITIES) ilceAdlari[c.name] = [...districtsOfCity(c.name)];
+  const doluluk: Record<string, number> = {};
+  for (const [k, v] of bolgeIlce) if (v.komisyoncu > 0) doluluk[k] = v.komisyoncu;
 
   return (
     <div className="mx-auto max-w-3xl space-y-5">
@@ -356,6 +371,7 @@ export default async function AdminAgents({
             yerine bu kullanılır.
           </p>
         </div>
+        <BolgeSecici ilceAdlari={ilceAdlari} doluluk={doluluk} zorunlu={false} />
         <PendingButton className="rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-dark">
           Komisyoncu Oluştur
         </PendingButton>
@@ -376,6 +392,13 @@ export default async function AdminAgents({
               key={a.id}
               className="space-y-3 rounded-2xl border border-slate-200 bg-white p-5"
             >
+              <BolgeDuzenle
+                agentId={a.id}
+                action={setAgentTerritory}
+                mevcut={a.territories}
+                ilceAdlari={ilceAdlari}
+                doluluk={doluluk}
+              />
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
                   <p className="font-semibold text-slate-900">

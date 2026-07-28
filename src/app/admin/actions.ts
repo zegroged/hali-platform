@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { bolgeOku } from "@/lib/territory";
 import { redirect } from "next/navigation";
 import sharp from "sharp";
 import { prisma } from "@/lib/prisma";
@@ -751,9 +752,18 @@ export async function createAgent(formData: FormData) {
   // işletmede havuzun tamamını alır → percent = poolPercent.
   const isHead = formData.get("isHead") === "on";
   const poolRaw = String(formData.get("poolPercent") || "").replace(",", ".");
+  // Bölge: il + seçilen ilçeler (çoklu). Boş bırakılabilir — eski komisyoncular
+  // bölgesiz duruyor, sonradan atanabiliyor.
+  const bolge = bolgeOku(
+    String(formData.get("territoryCity") || ""),
+    formData.getAll("territoryDistrict").map((d) => String(d)),
+  );
   const err = (m: string) =>
     redirect("/admin/komisyoncular?hata=" + encodeURIComponent(m));
 
+  // İl seçilip ilçe seçilmediyse SESSİZCE geçme (denetim bulgusu): eskiden
+  // hesap bölgesiz açılıp "oluşturuldu" deniyordu, kullanıcı fark etmiyordu.
+  if (!bolge.ok) err(bolge.hata);
   if (name.length < 2) err("Ad girin.");
   if (!isTrPhone(phone)) err("Geçerli bir telefon girin (11 hane).");
   const username = normalizeUsername(usernameRaw);
@@ -791,9 +801,21 @@ export async function createAgent(formData: FormData) {
           password: await hashPassword(password),
         },
       });
-      await tx.agent.create({
+      const agent = await tx.agent.create({
         data: { userId: user.id, percent, canDiscount, isHead, poolPercent },
       });
+      // BÖLGE (2026-07-28): hangi il/ilçelerden sorumlu. Çakışma engel değil,
+      // form zaten dolu ilçeleri uyarıyla gösteriyor (bkz. lib/territory.ts).
+      if (bolge.ok && bolge.city) {
+        await tx.agentTerritory.createMany({
+          data: bolge.districts.map((d: string) => ({
+            agentId: agent.id,
+            city: bolge.city as string,
+            district: d,
+          })),
+          skipDuplicates: true,
+        });
+      }
     });
   } catch (e) {
     if (e && typeof e === "object" && "code" in e && (e as { code?: string }).code === "P2002") {
@@ -1092,4 +1114,55 @@ export async function payoutReject(formData: FormData) {
     data: { status: "REJECTED", adminNote: sebep || "Reddedildi" },
   });
   revalidatePath("/admin/komisyoncular");
+}
+
+
+/**
+ * KOMİSYONCUNUN BÖLGESİNİ GÜNCELLE (admin) — 2026-07-28 denetim bulgusu.
+ *
+ * Bölge yalnız hesap AÇILIŞINDA yazılabiliyordu: sonradan atama, değiştirme ya
+ * da kaldırma yolu yoktu. Mevcut komisyoncular (bölge sisteminden önce açılmış
+ * olanlar) bu yüzden sonsuza dek bölgesiz kalıyordu; üstelik alt komisyoncunun
+ * bölge sayfası "atandığında burada görünecek" diye tutulamayacak bir söz
+ * veriyordu. Bu aksiyon o boşluğu kapatır.
+ *
+ * Gönderilen ilçe kümesi bölgenin TAMAMIDIR (ekle-çıkar değil, değiştir):
+ * seçilmeyenler silinir. Boş gönderim = bölgeyi kaldır.
+ */
+export async function setAgentTerritory(formData: FormData) {
+  await requireAdmin();
+  const agentId = String(formData.get("agentId") || "");
+  const err = (m: string) =>
+    redirect("/admin/komisyoncular?hata=" + encodeURIComponent(m));
+  if (!agentId) err("Komisyoncu bulunamadı.");
+
+  const bolge = bolgeOku(
+    String(formData.get("territoryCity") || ""),
+    formData.getAll("territoryDistrict").map((d) => String(d)),
+  );
+  if (!bolge.ok) err(bolge.hata);
+
+  const agent = await prisma.agent.findUnique({
+    where: { id: agentId },
+    select: { id: true },
+  });
+  if (!agent) err("Komisyoncu bulunamadı.");
+
+  // Tek transaction: eskiyi sil, yeniyi yaz. Yarım kalırsa bölge bozulmasın.
+  await prisma.$transaction(async (tx) => {
+    await tx.agentTerritory.deleteMany({ where: { agentId } });
+    if (bolge.ok && bolge.city && bolge.districts.length > 0) {
+      await tx.agentTerritory.createMany({
+        data: bolge.districts.map((d: string) => ({
+          agentId,
+          city: bolge.city as string,
+          district: d,
+        })),
+        skipDuplicates: true,
+      });
+    }
+  });
+  revalidatePath("/admin/komisyoncular");
+  revalidatePath("/admin/bolgeler");
+  redirect("/admin/komisyoncular?ok=" + encodeURIComponent("Bölge güncellendi"));
 }
