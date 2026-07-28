@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { haversineKm } from "@/lib/geo";
 import { publicTaxNumber } from "@/lib/taxId";
 import { activeSubscriptionWhere } from "@/lib/subscription";
+import { gizliFiltre } from "@/lib/seoCoverage";
 import { trNowParts } from "@/lib/time";
 import type { BadgeType, PricingUnit } from "@prisma/client";
 
@@ -161,6 +162,15 @@ export async function getBusinesses(
     verification: { not: "REJECTED" },
     // Yalnız aktif abonelikli (ödemesi alınmış) halıcılar keşifte görünür.
     subscription: activeSubscriptionWhere(),
+    // TEST/DEMO KAYDI KEŞİFTEN DE ÇIKAR (2026-07-29). 27'sinde bu işletmeler
+    // yalnız Google'a kapatılmıştı (sitemap + noindex); sitenin KENDİ
+    // listelerinde durmaya devam ediyorlardı. "Deneme Halı Yıkama (Test)"
+    // adlı kayıt canlıda Kadıköy'de herkese görünüyordu — siteye giren
+    // ziyaretçide güveni tek başına sıfırlayan bir ayrıntı. Profil adresi
+    // (/halici/<id>) hâlâ AÇIK: Play incelemesindeki demo şoför akışı ve
+    // doğrudan bağlantı çalışmaya devam etsin diye; yalnız listelerde ve
+    // aramada yoklar.
+    ...gizliFiltre(),
   };
   if (filter.city && filter.district) {
     // İlçe sayfaları: il+ilçe ÇİFTİ eşleşmeli ("Merkez" gibi ilçe adları

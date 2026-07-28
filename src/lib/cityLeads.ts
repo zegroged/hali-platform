@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { sendEmail, wrapEmail } from "@/lib/email";
 import { activeSubscriptionWhere } from "@/lib/subscription";
+import { gizliFiltre } from "@/lib/seoCoverage";
 import { CITIES, locative } from "@/lib/cities";
 import { getAppBaseUrl } from "@/lib/config";
 
@@ -18,6 +19,9 @@ export async function notifyCityLeadsIfOpen(businessId: string): Promise<void> {
       isVisible: true,
       verification: { not: "REJECTED" },
       subscription: activeSubscriptionWhere(),
+      // Test/demo kaydı "şehrinde halıcı açıldı" müjdesini TETİKLEMEZ: bekleyen
+      // müşteriye yalan haber gider, lead de notifiedAt ile yanar (2026-07-29).
+      ...gizliFiltre(),
     },
     select: { city: true },
   });

@@ -22,6 +22,11 @@ export const metadata: Metadata = {
   alternates: { canonical: "/isletmeler-icin" },
 };
 
+/** Bekleyen müşteri bölümü bu toplamın altındaysa hiç gösterilmez. */
+const TALEP_ESIGI = 10;
+/** Şehir rozeti bu sayının altındaki şehirler için basılmaz. */
+const SEHIR_ESIGI = 3;
+
 const PERKS = [
   {
     icon: <IconWallet size={20} />,
@@ -140,7 +145,15 @@ export default async function ForBusinessesPage() {
           </div>
         </section>
 
-        {totalLeads > 0 && (
+        {/* TALEP ROZETİ EŞİĞİ (2026-07-29). Eskiden koşul `totalLeads > 0`'dı;
+            canlıda toplam 1 kayıt olduğu için sayfa "Şu anda 1 müşteri,
+            şehrinde halıcı açılmasını bekliyor — İstanbul: 1 kişi" diyordu.
+            Halıcıya 2.400 TL'lik abonelik satan sayfada en büyük sayının 1
+            olması, olmamasından KÖTÜ: talebin yokluğunu ilan ediyor. Sayı
+            uydurulmuyor — anlamlı bir yığın oluşana kadar bölüm hiç
+            gösterilmiyor, oluşunca kendiliğinden geliyor. Şehir rozetleri de
+            tek kişilik şehirleri listelemesin diye ayrı eşikte. */}
+        {totalLeads >= TALEP_ESIGI && (
           <section className="mt-6 rounded-xl border border-amber-300 bg-amber-50 p-4">
             <h2 className="font-semibold text-amber-900">
               Şu anda {totalLeads} müşteri, şehrinde halıcı açılmasını bekliyor
@@ -151,14 +164,16 @@ export default async function ForBusinessesPage() {
               girdiğin an bekleyenlere otomatik e-posta gider:
             </p>
             <div className="mt-2 flex flex-wrap gap-2">
-              {leads.map((l) => (
-                <span
-                  key={l.city}
-                  className="rounded-full bg-white px-3 py-1 text-sm text-amber-900 shadow-sm"
-                >
-                  {l.city}: <strong>{l._count} kişi</strong>
-                </span>
-              ))}
+              {leads
+                .filter((l) => l._count >= SEHIR_ESIGI)
+                .map((l) => (
+                  <span
+                    key={l.city}
+                    className="rounded-full bg-white px-3 py-1 text-sm text-amber-900 shadow-sm"
+                  >
+                    {l.city}: <strong>{l._count} kişi</strong>
+                  </span>
+                ))}
             </div>
           </section>
         )}

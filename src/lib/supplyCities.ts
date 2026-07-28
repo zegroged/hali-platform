@@ -1,6 +1,7 @@
 import { unstable_cache } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { activeSubscriptionWhere } from "@/lib/subscription";
+import { gizliFiltre } from "@/lib/seoCoverage";
 
 // Ana sayfa/arama hızlı butonları: sabit semt listesi yerine GERÇEKTEN yayında
 // işletmesi olan iller, işletme sayısına göre (2026-07-23 kullanıcı kararı —
@@ -13,8 +14,10 @@ export const getSupplyCities = unstable_cache(
       where: {
         isVisible: true,
         city: { not: "" },
-        // Test kaydı bir ile buton kazandırmasın (vitrin kararı ayrı konu).
+        // Test kaydı bir ile buton kazandırmasın. Ad eşleşmesi + kimlik
+        // listesi birlikte: adı "(Test)" içermeyen demo kayıtları da elensin.
         NOT: { name: { contains: "(Test)" } },
+        ...gizliFiltre(),
         subscription: { is: activeSubscriptionWhere() },
       },
       _count: { city: true },
