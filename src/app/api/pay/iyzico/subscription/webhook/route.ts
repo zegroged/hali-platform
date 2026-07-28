@@ -127,11 +127,41 @@ export async function POST(req: NextRequest) {
       throw e;
     }
   } else if (failure) {
-    // Çekim başarısız → PAST_DUE (dönem sonunda subscriptionActive false olur).
-    await prisma.subscription.updateMany({
-      where: { businessId: sub.businessId },
-      data: { status: "PAST_DUE" },
-    });
+    // ⚠️ ÖDENMİŞ DÖNEM YAKILMAZ (2026-07-28 denetim — KRİTİK).
+    //
+    // Eskiden burada koşulsuz `status: PAST_DUE` yazılıyordu ve yorumu
+    // "dönem sonunda subscriptionActive false olur" diyordu — ama YANLIŞTI:
+    // `subscriptionActive` yalnız ACTIVE/TRIAL kabul ediyor, yani PAST_DUE
+    // AYNI SANİYEDE işletmeyi aramadan, şehir/ilçe sayfalarından ve sipariş
+    // kapısından düşürüyordu (api/orders → 410). Halıcı 2.400 TL'yi ödediği
+    // ayın kalanını kaybediyordu — üstelik /panel/abonelik ona tarihiyle
+    // "Paran yanmaz, <tarih> tarihine kadar yayında kalırsın" diye YAZILI söz
+    // veriyor. İptal butonunun kendi kodu da (subscription-actions) status'e
+    // bilerek dokunmuyor; bu satır o kararı eziyordu.
+    //
+    // Doğrusu: iptal/süre dolumu bildirimi statüyü DEĞİŞTİRMEZ — dönem zaten
+    // currentPeriodEnd geldiğinde kendiliğinden biter. Gerçek çekim
+    // başarısızlığında da PAST_DUE ancak ödenmiş dönem BİTMİŞSE yazılır.
+    const iptalBildirimi = /CANCEL|EXPIRE/.test(eventType);
+    if (iptalBildirimi) {
+      // Talimat kapandı: otomatik yenileme dursun, yayın dönem sonuna kadar sürsün.
+      await prisma.subscription.updateMany({
+        where: { businessId: sub.businessId },
+        data: { autoRenew: false, canceledAt: new Date() },
+      });
+    } else {
+      await prisma.subscription.updateMany({
+        where: {
+          businessId: sub.businessId,
+          // YALNIZ dönemi dolmuşsa düşür. Ödenmiş gün varken dokunma.
+          OR: [
+            { currentPeriodEnd: null },
+            { currentPeriodEnd: { lte: new Date() } },
+          ],
+        },
+        data: { status: "PAST_DUE" },
+      });
+    }
   }
 
   return NextResponse.json({ ok: true });

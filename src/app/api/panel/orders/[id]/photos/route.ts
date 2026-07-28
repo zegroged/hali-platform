@@ -118,6 +118,32 @@ export async function DELETE(
     return NextResponse.json({ error: "photoId gerekli" }, { status: 400 });
   }
   // Sahiplik: foto → sipariş → bu işletme zinciri doğrulanır.
+  const foto = await prisma.orderPhoto.findFirst({
+    where: { id: photoId, order: { id, businessId: b.id } },
+    select: { id: true, url: true, order: { select: { pickupPhotoUrl: true, deliveryPhotoUrl: true } } },
+  });
+  if (!foto) return NextResponse.json({ ok: false }, { status: 404 });
+
+  // ⚠️ KANIT FOTOĞRAFI SİLİNEMEZ (2026-07-28 denetim — YÜKSEK).
+  //
+  // Alım ve teslim fotoğrafı müşteriye verilmiş bir SÖZÜN dayanağı
+  // ("Fotoğraflı Güvence") ve hasar tartışmasında iki tarafı da koruyan tek
+  // kanıt. Bu uç hepsini ayrım yapmadan siliyordu: halı hasarlı geldiğinde
+  // işletme alım fotoğrafını silip "bizde böyle değildi" diyebilirdi.
+  // Fazladan çekilmiş diğer fotoğraflar silinebilir; kanıt olanlar duruyor.
+  const kanit =
+    foto.url === foto.order.pickupPhotoUrl ||
+    foto.url === foto.order.deliveryPhotoUrl;
+  if (kanit) {
+    return NextResponse.json(
+      {
+        error:
+          "Alım/teslim kanıt fotoğrafı silinemez — hasar tartışmasında hem seni hem müşteriyi koruyan kayıt budur.",
+      },
+      { status: 409 },
+    );
+  }
+
   const deleted = await prisma.orderPhoto.deleteMany({
     where: { id: photoId, order: { id, businessId: b.id } },
   });

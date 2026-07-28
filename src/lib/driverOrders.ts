@@ -4,6 +4,7 @@
 // aynı bildirim/SMS yan etkileri. Web actions.ts'e dokunmadan (risk yok) burada
 // paralel tutulur; ileride actions.ts de buraya bağlanabilir.
 import { prisma } from "@/lib/prisma";
+import { bildirTeslimEdildi, bildirMusteriyeEposta } from "@/lib/orderNotify";
 import { getAuthedUser } from "@/lib/auth";
 import { saveOrderPhotoFile } from "@/lib/orderPhoto";
 import { sendSms, trackingLink } from "@/lib/sms";
@@ -184,6 +185,7 @@ export async function driverAdvance(
           : "Dijital fiyat onayı alınmadan yıkamaya geçildi",
       },
     });
+    await bildirMusteriyeEposta(orderId, "yolda");
   }
   if (next === "OUT_FOR_DELIVERY") {
     await prisma.driver.update({
@@ -259,5 +261,6 @@ export async function driverDeliver(
   await prisma.orderEvent.create({
     data: { orderId, status: "DELIVERED", note },
   });
+  await bildirTeslimEdildi(orderId);
   return { ok: true };
 }

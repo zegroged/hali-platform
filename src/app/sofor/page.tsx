@@ -194,6 +194,25 @@ export default async function SoforPage() {
               {(o.status === "PICKED_UP" || o.status === "WASHING") && next && (
                 <form action={advanceOrder}>
                   <input type="hidden" name="orderId" value={o.id} />
+                  {/* SÖZLÜ ONAY BEYANI (2026-07-28 denetim): sunucu bu alanı
+                      okuyup sipariş geçmişine ispat kaydı yazıyordu ama ekranda
+                      KUTU YOKTU — yani şoför sözlü onay almış olsa bile
+                      belirtemiyordu, kayda hep "onay alınmadan geçildi"
+                      düşüyordu. (Mobil uygulama ise tersini yapıp onayı
+                      UYDURUYORDU; o da düzeltildi.) */}
+                  {o.status === "PICKED_UP" && !o.priceApprovedAt && (
+                    <label className="mb-2 flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                      <input
+                        type="checkbox"
+                        name="verbalConsent"
+                        className="mt-0.5 h-4 w-4 shrink-0"
+                      />
+                      <span>
+                        Müşteri kesin fiyatı <strong>sözlü olarak</strong> onayladı.
+                        Almadıysan işaretleme — bu kayıt anlaşmazlıkta delil olur.
+                      </span>
+                    </label>
+                  )}
                   <PendingButton className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-brand py-2 text-sm font-semibold text-white hover:bg-brand-dark">
                     <OrderStatusIcon status={next} size={16} />
                     {next === "OUT_FOR_DELIVERY"

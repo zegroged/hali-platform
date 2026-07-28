@@ -322,7 +322,15 @@ export async function createBusinessByAdmin(formData: FormData) {
             sat: { open: "10:00", close: "17:00" },
             sun: null,
           },
-          verification: "VERIFIED", // doğrulama kapısı yok
+          // ⚠️ ROZET OTOMATİK VERİLMEZ (2026-07-28 denetim — YÜKSEK).
+          // Eskiden burası "VERIFIED" idi ("doğrulama kapısı yok" gerekçesiyle).
+          // Ama VERIFIED yayına girme kapısı DEĞİL — müşteriye gösterilen
+          // "Doğrulanmış İşletme" ROZETİNİ sürüyor. Yani destek panelinden
+          // telefonla açılan, hiçbir belgesi görülmemiş her işletme müşteriye
+          // "doğrulanmış" diye sunuluyordu; rozet güven işareti olmaktan çıkıp
+          // yanıltıcı hale geliyordu. PENDING = yayına girer ama rozeti yoktur;
+          // admin belgeyi görünce /admin/isletme/[id]'den verir.
+          verification: "PENDING",
           isVisible: false, // syncVisibility hesaplar (profil tamamlanınca açılır)
           createdByAdmin: true, // şoför YAYIN şartından muaf (sipariş için yine gerekir)
           contractAcceptedAt: new Date(),
@@ -652,7 +660,8 @@ export async function resetOwnerPassword(formData: FormData) {
   const temp = "Gecici-" + crypto.randomBytes(4).toString("hex");
   await prisma.user.update({
     where: { id: b.ownerId },
-    data: { password: await hashPassword(temp) },
+    // sessionsValidFrom: eski mobil token'ları geçersiz kıl (2026-07-28).
+    data: { password: await hashPassword(temp), sessionsValidFrom: new Date() },
   });
   redirect(
     `/admin/isletme/${businessId}?mesaj=` +

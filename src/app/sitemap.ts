@@ -1,5 +1,6 @@
 import type { MetadataRoute } from "next";
 import { prisma } from "@/lib/prisma";
+import { activeSubscriptionWhere } from "@/lib/subscription";
 import { CITIES, districtSlug, districtsOfCity } from "@/lib/cities";
 import { seoKapsam, ilceAnahtar, gizliFiltre } from "@/lib/seoCoverage";
 
@@ -65,6 +66,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       where: {
         isVisible: true,
         verification: { not: "REJECTED" },
+        // ABONELİĞİ BİTMİŞ İŞLETMEYİ BİLDİRME (2026-07-28 denetim): dönemi
+        // dolan işletme keşiften düşüyor ve sipariş API'si 410 veriyor, ama
+        // profili sitemap'te kalıyordu. Google'dan gelen müşteri "sipariş
+        // alınmıyor" duvarına çarpıyor — hem kullanıcıyı hem sitenin kalite
+        // sinyalini yakıyordu.
+        subscription: activeSubscriptionWhere(),
         ...gizliFiltre(), // test/demo işletmesi Google'a bildirilmez
       },
       select: { id: true, updatedAt: true },

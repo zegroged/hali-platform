@@ -4,6 +4,7 @@ import crypto from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { bildirSiparisKesintisi, bildirTeslimEdildi, bildirMusteriyeEposta } from "@/lib/orderNotify";
 import { parseTutar } from "@/lib/money";
 import { getCurrentBusiness, profileComplete, syncVisibility } from "@/lib/panel";
 import { hashPassword } from "@/lib/auth";
@@ -364,7 +365,9 @@ export async function setDriverPassword(formData: FormData) {
   if (!d) return;
   await prisma.user.update({
     where: { id: d.userId },
-    data: { password: await hashPassword(pw) },
+    // sessionsValidFrom: işten çıkarılan/şifresi sıfırlanan şoförün
+    // telefonundaki 30 günlük Bearer token'ı ANINDA geçersiz kılar (2026-07-28).
+    data: { password: await hashPassword(pw), sessionsValidFrom: new Date() },
   });
   revalidatePath("/panel/soforler");
 }
@@ -494,6 +497,13 @@ export async function cancelOrder(formData: FormData) {
   } catch (e) {
     console.error("cancelOrder müşteri SMS hatası:", e);
   }
+  // SMS bu projede MOCK — asıl bildirim buradan gider (2026-07-28 denetim).
+  await bildirSiparisKesintisi({
+    orderId,
+    tur: "iptal",
+    kaynak: "isletme",
+    aliniMisti: wasPickedUp,
+  });
   revalidatePath("/panel/siparisler");
 }
 
@@ -526,6 +536,12 @@ export async function rejectOrder(formData: FormData) {
   } catch (e) {
     console.error("rejectOrder SMS hatası:", e);
   }
+  await bildirSiparisKesintisi({
+    orderId,
+    tur: "red",
+    kaynak: "isletme",
+    sebep: reason,
+  });
   revalidatePath("/panel/siparisler");
 }
 
@@ -613,6 +629,8 @@ export async function quoteOrderPrice(formData: FormData) {
   } catch (e) {
     console.error("quoteOrderPrice SMS hatası:", e);
   }
+  // E-posta da gitsin — WhatsApp kapalıyken tek kanal buydu (2026-07-28).
+  await bildirMusteriyeEposta(orderId, "fiyat-onayi");
   revalidatePath("/panel/siparisler");
   revalidatePath(`/panel/siparisler/${orderId}`);
 }
@@ -655,6 +673,33 @@ export async function advanceOrderPanel(formData: FormData) {
         orderId,
         status: step.next,
         note: "İşletme beyanı: müşteriden sözlü fiyat/ifa onayı alındı",
+      },
+    });
+  }
+
+  // ⚠️ FOTOĞRAFSIZ ALIM DÜRÜSTÇE KAYDA GEÇER (2026-07-28 denetim — YÜKSEK).
+  //
+  // Şoför akışı (lib/driverOrders.ts, app/sofor) alım/teslimde fotoğrafı ZORUNLU
+  // tutuyor; panelden ilerletme ise hiç sormuyordu. Müşteriye "Fotoğraflı
+  // Güvence" sözü verdiğimiz için bu sessiz atlama kabul edilemez: en azından
+  // kanıt OLMADIĞI zaman damgalı olarak yazılsın ki hasar tartışmasında
+  // "fotoğraf yok" gerçeği görünsün. (Tam çözüm: panel formuna da fotoğraf
+  // yükleme alanı — ayrıca yapılacak.)
+  if (step.next === "PICKED_UP" && !order.pickupPhotoUrl) {
+    await prisma.orderEvent.create({
+      data: {
+        orderId,
+        status: "PICKED_UP",
+        note: "⚠️ Alım fotoğrafı ÇEKİLMEDEN panelden ilerletildi — hasar kanıtı yok",
+      },
+    });
+  }
+  if (step.next === "DELIVERED" && !order.deliveryPhotoUrl) {
+    await prisma.orderEvent.create({
+      data: {
+        orderId,
+        status: "DELIVERED",
+        note: "⚠️ Teslim fotoğrafı ÇEKİLMEDEN panelden ilerletildi — teslim kanıtı yok",
       },
     });
   }
@@ -727,6 +772,9 @@ export async function deliverOrderPanel(formData: FormData) {
         : `Teslim edildi · ${price} TL (kartla ödeme bekleniyor)`,
     },
   });
+  // Müşteriye kapanış: e-posta + WhatsApp + değerlendirme daveti (2026-07-28).
+  // ÜÇ AKIŞ DA bağlanır (panel / şoför web / şoför uygulaması) — DEVIR §9/7.
+  await bildirTeslimEdildi(orderId);
   revalidatePath("/panel/siparisler");
   revalidatePath(`/panel/siparisler/${orderId}`);
 }

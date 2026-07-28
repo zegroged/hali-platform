@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { bildirTeslimEdildi, bildirMusteriyeEposta } from "@/lib/orderNotify";
 import { parseTutar } from "@/lib/money";
 import { getSessionUser } from "@/lib/auth";
 import { sendSms, trackingLink } from "@/lib/sms";
@@ -181,6 +182,8 @@ export async function advanceOrder(formData: FormData) {
           o.code ?? "",
         ),
     });
+    // E-posta da gitsin (2026-07-28) — üç akışta da aynı olsun.
+    await bildirMusteriyeEposta(id, "yolda");
   }
   revalidatePath("/sofor");
 }
@@ -243,5 +246,6 @@ export async function deliverOrder(formData: FormData) {
   await prisma.orderEvent.create({
     data: { orderId: id, status: "DELIVERED", note },
   });
+  await bildirTeslimEdildi(id);
   revalidatePath("/sofor");
 }

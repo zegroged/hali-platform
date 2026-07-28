@@ -35,6 +35,19 @@ export default async function AbonelikTalimatOde() {
     redirect("/panel/abonelik?durum=indirimli-talimat-yok");
   }
 
+  // ⚠️ İKİNCİ TALİMAT ENGELİ (2026-07-28 denetim — KRİTİK).
+  //
+  // Bu sayfa "zaten aktif talimatın var mı" diye HİÇ bakmıyordu. Halıcı linke
+  // ikinci kez girip kart verirse iyzico'da İKİNCİ bir abonelik açılıyor;
+  // callback `Subscription.iyzicoSubRef`i yeni referansla EZİYOR ve eskisi
+  // sistemde kayıtsız kalıyor. Sonuç: iyzico her ay İKİ KEZ 2.400 TL çekiyor,
+  // panelin iptal butonu yalnız yenisini kapatabiliyor, eskisine hiçbir
+  // arayüzden ulaşılamıyor. (Bu senaryo bu oturumda birebir yaşandı: test
+  // sırasında üç talimat birikti ve elle API'den iptal edilmek zorunda kalındı.)
+  if (b.subscription?.iyzicoSubRef && b.subscription.autoRenew) {
+    redirect("/panel/abonelik?durum=talimat-zaten-var");
+  }
+
   const [name, ...rest] = b.owner.name.trim().split(" ");
   const surname = rest.join(" ") || name;
   const gsm = pickIyzicoGsm(b.owner.phone, b.gsmPhone2, b.phone);

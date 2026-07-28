@@ -77,6 +77,12 @@ enum PricingUnit {
 
 model User {
   id                String    @id @default(cuid())
+  // OTURUM GEÇERLİLİK DAMGASI (2026-07-28 denetim — YÜKSEK).
+  // Mobil Bearer token 30 gün geçerli ve İPTAL EDİLEMİYORDU: şifresi
+  // sıfırlanan / işten çıkarılan şoför telefonundaki token'la aylarca
+  // erişmeye devam edebilirdi. Şifre değişince buraya damga atılır; bu
+  // tarihten ÖNCE üretilmiş tokenlar reddedilir (lib/auth.ts getBearerUser).
+  sessionsValidFrom DateTime?
   role              UserRole
   name              String
   phone             String    @unique

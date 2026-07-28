@@ -77,6 +77,40 @@ export function Orders({ onSessionExpired }: { onSessionExpired: () => void }) {
     return () => clearInterval(t);
   }, [fetchOrders]);
 
+  // SÖZLÜ ONAY ARTIK SORULUYOR (2026-07-28 denetim — KRİTİK).
+  //
+  // Eskiden buton koşulsuz `advanceOrder(id, true)` gönderiyordu; sunucu da bunu
+  // "İşletme beyanı: müşteriden sözlü fiyat/ifa onayı alındı" diye sipariş
+  // geçmişine YAZIYORDU. Yani kimseye sorulmadan, sözleşmede md.15/1-h ispat
+  // kaydı olarak tutulan bir beyan UYDURULUYORDU. Bir uyuşmazlıkta bu kayıt
+  // bizim aleyhimize delil olurdu.
+  //
+  // Müşteri fiyatı uygulamadan onayladıysa (priceApprovedAt dolu) soru sorulmaz
+  // — zaten dijital onay var. Yalnız onay YOKKEN şoföre sorulur ve NE DERSE O
+  // kaydedilir.
+  function yikamayaAl(o: Order) {
+    if (o.status !== "PICKED_UP" || o.priceApprovedAt) {
+      return run(o.id, () => advanceOrder(o.id, false));
+    }
+    Alert.alert(
+      "Fiyat onayı",
+      "Müşteri kesin fiyatı uygulamadan onaylamamış. Müşteri sana SÖZLÜ olarak onay verdi mi?
+
+Verdiği gibi işaretle — bu kayıt anlaşmazlıkta delil olarak kullanılır.",
+      [
+        { text: "Vazgeç", style: "cancel" },
+        {
+          text: "Hayır, onay almadım",
+          onPress: () => run(o.id, () => advanceOrder(o.id, false)),
+        },
+        {
+          text: "Evet, sözlü onay aldım",
+          onPress: () => run(o.id, () => advanceOrder(o.id, true)),
+        },
+      ],
+    );
+  }
+
   async function run(id: string, fn: () => Promise<void>) {
     setActingId(id);
     try {
@@ -169,7 +203,7 @@ export function Orders({ onSessionExpired }: { onSessionExpired: () => void }) {
         <TouchableOpacity
           style={[s.btn, busy && s.off]}
           disabled={busy}
-          onPress={() => run(o.id, () => advanceOrder(o.id, true))}
+          onPress={() => yikamayaAl(o)}
         >
           <Text style={s.btnText}>{ADVANCE_LABEL[o.status]}</Text>
         </TouchableOpacity>

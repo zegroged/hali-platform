@@ -178,6 +178,17 @@ export function waSiparisYolda(to: string, ad: string, isletme: string, kod: str
   return sendTemplate(to, "siparis_yolda", [ad, isletme, kod]);
 }
 
+/** Teslim edildi + değerlendirme daveti (2026-07-28). */
+export function waSiparisTeslim(to: string, ad: string, isletme: string, kod: string) {
+  return sendTemplate(to, "siparis_teslim_edildi", [ad, isletme, kod]);
+}
+
+/** Sipariş iptal/red edildi (2026-07-28). Sebep şablona GİRMEZ — Meta serbest
+ *  metni kategori değişikliğine sokuyor; ayrıntı takip sayfasında ve e-postada. */
+export function waSiparisIptal(to: string, ad: string, isletme: string, kod: string) {
+  return sendTemplate(to, "siparis_iptal", [ad, isletme, kod]);
+}
+
 /** TELEFON DOĞRULAMA KODU (2026-07-26): SMS pahalı olduğu için OTP de
  *  WhatsApp'tan gider. Meta'nın AUTHENTICATION şablonu özel biçimlidir: gövde
  *  metnini Meta üretir, biz yalnız KODU veririz; kod hem gövdede hem "Kodu

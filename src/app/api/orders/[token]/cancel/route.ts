@@ -4,6 +4,7 @@
 // hem ekranda hem SMS ile teyit verilir.
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { bildirSiparisKesintisi } from "@/lib/orderNotify";
 import { rateLimit, clientIp, tooMany } from "@/lib/ratelimit";
 import { sendSms } from "@/lib/sms";
 import { getAuthedUser } from "@/lib/auth";
@@ -114,6 +115,15 @@ export async function POST(
         (reason ? ` — Neden: ${reason}` : "") +
         (note ? ` — Not: ${note}` : ""),
     },
+  });
+
+  // İŞLETME + ŞOFÖR ZİLİ (2026-07-28 denetim — KRİTİK): buraya kadar yalnız
+  // SMS vardı, SMS ise MOCK. Şoför iptalden habersiz halıyı almaya gidiyordu.
+  await bildirSiparisKesintisi({
+    orderId: order.id,
+    tur: "iptal",
+    kaynak: "musteri",
+    sebep: reason || null,
   });
 
   const ref = order.code ?? order.trackingToken;

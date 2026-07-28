@@ -45,6 +45,18 @@ function makeToken(userId: string): string {
   return sign(`${userId}.${Date.now() + TOKEN_TTL_MS}`);
 }
 
+/** Token ÜRETİM anı (userId'den sonraki damga − TTL). Şifre değişiminden
+ *  önce üretilmiş token'ları elemek için kullanılır. */
+function tokenUretimAni(token: string): number | null {
+  const value = unsign(token);
+  if (!value) return null;
+  const dot = value.lastIndexOf(".");
+  if (dot < 0) return null;
+  const expiresAt = Number(value.slice(dot + 1));
+  if (!Number.isFinite(expiresAt)) return null;
+  return expiresAt - TOKEN_TTL_MS;
+}
+
 function readToken(token: string): string | null {
   const value = unsign(token);
   if (!value) return null;
@@ -123,8 +135,22 @@ async function getBearerUser(): Promise<SessionUser | null> {
   const h = await headers();
   const auth = h.get("authorization");
   if (!auth || !auth.startsWith("Bearer ")) return null;
-  const userId = readToken(auth.slice(7).trim());
+  const ham = auth.slice(7).trim();
+  const userId = readToken(ham);
   if (!userId) return null;
+  // Şifre değişiminden ÖNCE üretilmiş token geçersizdir (2026-07-28 denetim).
+  const uretim = tokenUretimAni(ham);
+  const damga = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { sessionsValidFrom: true },
+  });
+  if (
+    damga?.sessionsValidFrom &&
+    uretim != null &&
+    uretim < damga.sessionsValidFrom.getTime()
+  ) {
+    return null;
+  }
   const u = await prisma.user.findUnique({
     where: { id: userId },
     select: {

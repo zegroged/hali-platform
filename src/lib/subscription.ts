@@ -32,11 +32,18 @@ export async function extendSubscription(
     INSERT INTO "Subscription"
       (id, "businessId", status, "priceMonthly", "currentPeriodStart", "currentPeriodEnd", "createdAt", "updatedAt")
     VALUES
-      (${id}, ${businessId}, 'ACTIVE'::"SubscriptionStatus", 2000, now(), now() + interval '30 days', now(), now())
+      (${id}, ${businessId}, 'ACTIVE'::"SubscriptionStatus", 2000, now(), now() + interval '1 month' + interval '3 days', now(), now())
     ON CONFLICT ("businessId") DO UPDATE SET
       status = 'ACTIVE'::"SubscriptionStatus",
       -- Dönem hâlâ geçerliyse üstüne ekle, dolduysa şimdiden başlat (atomik birikim).
-      "currentPeriodEnd" = GREATEST(now(), "Subscription"."currentPeriodEnd") + interval '30 days',
+      -- TAKVİM AYI + 3 GÜN PAY (2026-07-28 denetim).
+      -- Eskiden sabit '30 days' eklenirdi; iyzico ise TAKVİM AYINDA çeker
+      -- (plan MONTHLY). 31 günlük aylarda dönem çekimden 1 gün ÖNCE bitiyor,
+      -- parasını düzenli ödeyen halıcı o gün keşiften düşüyor ve sipariş
+      -- API'si 410 veriyordu — yılda ~7 gün "ödedim ama yokum". Takvim ayına
+      -- geçildi; 3 gün pay ise çekimin banka/iyzico tarafında birkaç saat
+      -- gecikmesine karşı emniyet payı (fazladan gün bedava, eksik gün pahalı).
+      "currentPeriodEnd" = GREATEST(now(), "Subscription"."currentPeriodEnd") + interval '1 month' + interval '3 days',
       "updatedAt" = now()
     RETURNING "currentPeriodEnd" AS "endsAt"
   `);

@@ -34,6 +34,10 @@ const DURUM: Record<string, { cls: string; text: string }> = {
     cls: "border-red-300 bg-red-50 text-red-700",
     text: "İptal sırasında bir sorun oldu. Tekrar dene veya bize ulaş.",
   },
+  "talimat-zaten-var": {
+    cls: "border-amber-300 bg-amber-50 text-amber-800",
+    text: "Zaten aktif bir otomatik ödeme talimatın var — ikinci talimat açılmadı (açılsaydı kartından her ay İKİ KEZ çekilirdi). Değiştirmek istiyorsan önce mevcut talimatı iptal et, sonra yenisini aç.",
+  },
   "talimat-yok": {
     cls: "border-amber-300 bg-amber-50 text-amber-800",
     text: "Aktif bir otomatik ödeme talimatın yok.",

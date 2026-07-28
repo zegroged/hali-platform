@@ -1,5 +1,6 @@
 import { jsonLdSafe } from "@/lib/htmlSafe";
 import { seoGizliMi } from "@/lib/seoCoverage";
+import { subscriptionActive } from "@/lib/subscription";
 import type { Metadata } from "next";
 import { cache } from "react";
 import Link from "next/link";
@@ -47,6 +48,11 @@ export async function generateMetadata({
     b.ratingCount > 0
       ? ` ${b.ratingAvg.toFixed(1)}★ (${b.ratingCount} yorum).`
       : "";
+  // Sipariş alabiliyor mu? (getBusinessById aboneliği döndürmüyor)
+  const abonelik = await prisma.subscription.findUnique({
+    where: { businessId: id },
+    select: { status: true, currentPeriodEnd: true },
+  });
   return {
     title: `${b.name} — ${b.district} Halı Yıkama`,
     description:
@@ -57,7 +63,12 @@ export async function generateMetadata({
     // (Play incelemesi için ŞART, kullanıcı kararı) ama sahte bir işletmenin
     // "Kadıköy halı yıkama" aramasında çıkması gerçek müşteriyi yanıltır.
     // Kimlikler `SEO_NOINDEX_BUSINESS_IDS` ortam değişkeninde (virgüllü).
-    ...(seoGizliMi(id) ? { robots: { index: false, follow: false } } : {}),
+    // Aramaya kapalı: test/demo kaydı VEYA sipariş alamayan işletme
+    // (aboneliği bitmiş / duraklatılmış). Google'dan gelen müşteriyi sipariş
+    // veremeyeceği bir sayfaya düşürmek hem onu hem bizi yakıyordu (2026-07-28).
+    ...(seoGizliMi(id) || !subscriptionActive(abonelik)
+      ? { robots: { index: false, follow: false } }
+      : {}),
   };
 }
 
