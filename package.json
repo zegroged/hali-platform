@@ -10,7 +10,8 @@
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
     "db:seed": "tsx prisma/seed.ts",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "test:tahsilat": "tsc src/lib/tahsilat.ts --outDir .tmp-test --target es2022 --module esnext --moduleResolution bundler && node scripts/test-tahsilat.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1076.0",

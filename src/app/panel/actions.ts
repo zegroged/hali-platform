@@ -747,6 +747,15 @@ export async function deliverOrderPanel(formData: FormData) {
   if (!order) return;
 
   const isCash = order.paymentMethod === "CASH";
+  // Form kutusu işaretsiz gelirse tahsilat YAPILMAMIŞ sayılır.
+  const tahsilEdildi = isCash && formData.get("collected") != null;
+      // TAHSİLAT ARTIK BEYAN (2026-07-29): eskiden nakit teslimde
+      // paymentStatus KOŞULSUZ "PAID" yazılıyordu — sistem parayı almadığımız
+      // hâlde "tahsil edildi" diyordu. Bu yalan üç özelliği birden kilitliyordu
+      // (gün sonu mutabakatı, kurumsal cari, ödeme linki). Artık teslim eden
+      // kişi "tahsil ettim" der; demezse sipariş "teslim edildi, tahsil
+      // edilmedi" durumunda kalır. Varsayılan nakitte İŞARETLİ gelir, yani
+      // olağan akışta halıcı için hiçbir şey değişmez.
   const updated = await prisma.order.updateMany({
     where: { id: orderId, businessId: b.id, status: "OUT_FOR_DELIVERY" },
     data: {
@@ -754,7 +763,10 @@ export async function deliverOrderPanel(formData: FormData) {
       deliveredAt: new Date(),
       priceTotal: price,
       commission: isCash ? 0 : undefined,
-      paymentStatus: isCash ? "PAID" : order.paymentStatus,
+      paymentStatus: tahsilEdildi ? "PAID" : order.paymentStatus,
+      collectedAmount: tahsilEdildi ? price : undefined,
+      collectedAt: tahsilEdildi ? new Date() : undefined,
+      collectedById: tahsilEdildi ? b.ownerId : undefined,
     },
   });
   if (updated.count === 0) return;

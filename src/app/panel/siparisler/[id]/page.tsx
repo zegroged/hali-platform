@@ -344,6 +344,23 @@ export default async function OrderManagePage({
                 />
               </div>
             </div>
+            {/* TAHSİLAT BEYANI (2026-07-29). Eskiden nakit teslim SESSİZCE
+                "ödendi" sayılıyordu. Kutu nakitte İŞARETLİ geliyor — olağan
+                akışta halıcı için hiçbir şey değişmiyor — ama işareti
+                kaldırınca sipariş "teslim edildi, tahsil edilmedi" durumunda
+                kalıyor. Kurumsal müşteri (ay sonu fatura) ve gün sonu
+                mutabakatı bu duruma dayanıyor. */}
+            {o.paymentMethod === "CASH" && (
+              <label className="flex items-center gap-2 pb-2.5 text-sm text-slate-700">
+                <input
+                  type="checkbox"
+                  name="collected"
+                  defaultChecked
+                  className="h-4 w-4 rounded border-slate-300"
+                />
+                Ücreti tahsil ettim
+              </label>
+            )}
             <PendingButton className="rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark active:scale-[0.99] disabled:opacity-60">
               Teslim Edildi
             </PendingButton>

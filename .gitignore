@@ -10,3 +10,6 @@ next-env.d.ts
 /prisma/*.db
 /public/uploads
 reklam-varliklari/
+
+# birim testi gecici derleme ciktisi
+.tmp-test/

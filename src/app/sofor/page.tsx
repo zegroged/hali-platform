@@ -263,6 +263,22 @@ export default async function SoforPage() {
                     placeholder="Tahsil edilen tutar"
                     className={inp}
                   />
+                  {/* TAHSİLAT BEYANI (2026-07-29): nakit teslim eskiden
+                      sessizce "ödendi" sayılıyordu. Kutu işaretli geliyor —
+                      olağan akış değişmiyor — ama müşteri parayı vermediyse
+                      şoför işareti kaldırır ve sipariş "tahsil edilmedi"
+                      kalır. Gün sonu mutabakatı buna dayanıyor. */}
+                  {o.paymentMethod === "CASH" && (
+                    <label className="flex items-center gap-2 text-sm text-slate-700">
+                      <input
+                        type="checkbox"
+                        name="collected"
+                        defaultChecked
+                        className="h-4 w-4 rounded border-slate-300"
+                      />
+                      Ücreti tahsil ettim
+                    </label>
+                  )}
                 </PhotoForm>
               )}
             </div>

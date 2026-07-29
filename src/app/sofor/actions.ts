@@ -221,7 +221,15 @@ export async function deliverOrder(formData: FormData) {
 
   const isCash = o.paymentMethod === "CASH";
   // Nakitte teslimde tahsil edilir; kartta ödeme iyzico callback'ine bırakılır.
-  const paymentStatus = isCash ? "PAID" : o.paymentStatus;
+  const tahsilEdildi = isCash && formData.get("collected") != null;
+      // TAHSİLAT ARTIK BEYAN (2026-07-29): eskiden nakit teslimde
+      // paymentStatus KOŞULSUZ "PAID" yazılıyordu — sistem parayı almadığımız
+      // hâlde "tahsil edildi" diyordu. Bu yalan üç özelliği birden kilitliyordu
+      // (gün sonu mutabakatı, kurumsal cari, ödeme linki). Artık teslim eden
+      // kişi "tahsil ettim" der; demezse sipariş "teslim edildi, tahsil
+      // edilmedi" durumunda kalır. Varsayılan nakitte İŞARETLİ gelir, yani
+      // olağan akışta halıcı için hiçbir şey değişmez.
+  const paymentStatus = tahsilEdildi ? "PAID" : o.paymentStatus;
 
   // CAS: yalnız hâlâ OUT_FOR_DELIVERY ise güncelle → çift tık / çift teslim engeli.
   const updated = await prisma.order.updateMany({

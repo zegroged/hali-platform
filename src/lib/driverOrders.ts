@@ -226,14 +226,31 @@ export async function driverDeliver(
   orderId: string,
   price: number,
   photo: unknown,
+  // TAHSİLAT BEYANI (2026-07-29) — MOBİL UYGULAMAYI KIRMAMAK İÇİN OPSİYONEL.
+  //
+  // Panelde ve web şoför ekranında "Ücreti tahsil ettim" kutusu var. Play'deki
+  // uygulama (versionCode 3) bu alanı GÖNDERMİYOR ve gönderemez — mağaza
+  // güncellemesi gerekir. Bu yüzden alan gelmediğinde BUGÜNKÜ davranış korunur
+  // (nakit = tahsil edildi). Yeni uygulama sürümü alanı açıkça gönderecek;
+  // o zamana kadar mobilden teslim edilen nakit sipariş "tahsil edildi" sayılır.
+  //
+  // ⚠️ Yeni sürüm çıkınca burası `collected === true` olarak SIKILAŞTIRILMALI,
+  // yoksa eski uygulamalar sessizce eski davranışta kalır (bkz. DEVIR).
+  collected?: boolean,
 ): Promise<DriverActionResult> {
   if (!Number.isFinite(price) || price <= 0)
     return { ok: false, error: "Geçerli bir teslim tutarı gir (0'dan büyük).", code: 400 };
   const o = await prisma.order.findFirst({
     where: { id: orderId, driverId, status: "OUT_FOR_DELIVERY" },
-    select: { businessId: true, paymentMethod: true, paymentStatus: true },
+    select: {
+      businessId: true,
+      paymentMethod: true,
+      paymentStatus: true,
+      driver: { select: { userId: true } },
+    },
   });
   if (!o) return { ok: false, error: "Bu sipariş şu an teslim edilemiyor.", code: 409 };
+  const driverUserId = o.driver?.userId ?? null;
   const deliveryPhotoUrl = await saveOrderPhotoFile(photo, o.businessId, orderId);
   if (!deliveryPhotoUrl)
     return {
@@ -242,6 +259,8 @@ export async function driverDeliver(
       code: 400,
     };
   const isCash = o.paymentMethod === "CASH";
+  // collected verilmemişse (eski uygulama) nakit teslim = tahsil edildi.
+  const tahsilEdildi = isCash && collected !== false;
   const r = await prisma.order.updateMany({
     where: { id: orderId, status: "OUT_FOR_DELIVERY" },
     data: {
@@ -250,7 +269,10 @@ export async function driverDeliver(
       deliveredAt: new Date(),
       deliveryPhotoUrl,
       commission: isCash ? 0 : undefined,
-      paymentStatus: isCash ? "PAID" : o.paymentStatus,
+      paymentStatus: tahsilEdildi ? "PAID" : o.paymentStatus,
+      collectedAmount: tahsilEdildi ? price : undefined,
+      collectedAt: tahsilEdildi ? new Date() : undefined,
+      collectedById: tahsilEdildi ? driverUserId : undefined,
     },
   });
   if (r.count === 0)

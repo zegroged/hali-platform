@@ -128,6 +128,7 @@ model Notification {
 
 model CleanerBusiness {
   waMessages        WhatsAppMessage[]
+  cashHandovers     CashHandover[]
   id          String  @id @default(cuid())
   owner       User    @relation("BusinessOwner", fields: [ownerId], references: [id])
   ownerId     String  @unique
@@ -312,6 +313,7 @@ model PricingItem {
 }
 
 model Driver {
+  cashHandovers CashHandover[]
   id         String          @id @default(cuid())
   user       User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId     String          @unique
@@ -400,6 +402,24 @@ model Order {
   paymentStatus PaymentStatus @default(PENDING)
   priceTotal    Decimal?      @db.Decimal(10, 2)
   commission    Decimal?      @db.Decimal(10, 2) // kartla ödemede %3
+
+  // TAHSİLAT — TESLİMDEN AYRI BİR OLAY (2026-07-29).
+  //
+  // ÖNCESİ: nakit teslimde `paymentStatus` ÜÇ ayrı yerde koşulsuz "PAID"
+  // yazılıyordu (panel/actions.ts, sofor/actions.ts, lib/driverOrders.ts).
+  // Yani "teslim ettim ama parayı almadım" durumu TEMSİL EDİLEMİYORDU ve
+  // sistem her nakit teslimde "tahsil edildi" diye YALAN söylüyordu.
+  //
+  // Bu tek eksik üç özelliği birden kilitliyordu: gün sonu tahsilat
+  // mutabakatı, kurumsal cari (ay sonu fatura), ve ödeme linki.
+  //
+  // ARTIK: tahsilat teslim eden kişinin BEYANIDIR. İşaretlenmezse sipariş
+  // "teslim edildi, tahsil edilmedi" durumunda kalır.
+  collectedAmount Decimal?  @db.Decimal(10, 2) // fiilen tahsil edilen tutar
+  collectedAt     DateTime? // tahsilat anı
+  collectedById   String? // tahsil eden kullanıcı (şoför veya halıcı)
+
+  @@index([businessId, collectedAt])
 
   pickupPhotoUrl   String?
   deliveryPhotoUrl String? // şoförün teslimde çektiği kanıt fotoğrafı
@@ -736,6 +756,33 @@ model AppState {
   key       String   @id
   value     String
   updatedAt DateTime @updatedAt
+}
+
+// ŞOFÖRDEN HALICIYA NAKİT TESLİMİ (2026-07-29).
+//
+// NEDEN AYRI MODEL: "şoför üzerinde bekleyen nakit" bir BAYRAK değil, bir
+// BAKİYEDİR. Şoför tahsil eder → bakiyesi artar; halıcıya parayı verir →
+// bakiye kapanır. Siparişe konan tek bir "teslim ettim" işareti bunu
+// gösteremez, çünkü para siparişten bağımsız olarak toplu devrediliyor
+// ("bugünkü 8.400 lirayı akşam verdim").
+//
+// Bakiye = (tahsil edilen siparişlerin toplamı) − (devredilen tutar).
+model CashHandover {
+  id         String          @id @default(cuid())
+  business   CleanerBusiness @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  businessId String
+  // Parayı getiren şoför. Şoför kaydı silinse bile GEÇMİŞ SİLİNMEZ
+  // (muhasebe kaydı) — Kasa'daki kararın aynısı.
+  driver   Driver? @relation(fields: [driverId], references: [id], onDelete: SetNull)
+  driverId String?
+  // Kayıt anındaki şoför adı: şoför silinirse geçmiş okunabilir kalsın.
+  driverName String
+  amount     Decimal  @db.Decimal(10, 2)
+  note       String?
+  createdAt  DateTime @default(now())
+
+  @@index([businessId, createdAt])
+  @@index([driverId, createdAt])
 }
 
 // WHATSAPP MESAJ KUTUSU (2026-07-29).
