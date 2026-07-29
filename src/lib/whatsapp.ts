@@ -25,6 +25,28 @@ export function waNumber(raw: string): string | null {
   return "90" + d.slice(1);
 }
 
+/** Meta'nın verdiği numarayı (905xxxxxxxxx) veritabanında SAKLANIYOR OLABİLECEK
+ *  bütün biçimlere çevirir — gelen mesajı siparişle eşleştirmek için.
+ *
+ *  NEDEN LİSTE: `Order.customerPhone` normalize EDİLMEDEN yazılıyor
+ *  (api/orders ve api/panel/orders zod ile yalnız uzunluk bakıyor); sahadaki
+ *  değer formların ürettiği "05xxxxxxxxx" biçimidir ama "5xxxxxxxxx",
+ *  "905xxxxxxxxx", "+905xxxxxxxxx" de düşebilir. Hepsini deniyoruz.
+ *
+ *  TR DIŞI NUMARA → BOŞ LİSTE: yalnız son 10 haneye bakıp eşleşme kurmak
+ *  yabancı bir numarayı alakasız bir siparişe bağlayabilirdi. Eşleşmemek
+ *  (mesaj admin'de sahipsiz durur) YANLIŞ eşleşmekten iyidir. */
+export function waTelefonAdaylari(waPhone: string): string[] {
+  const d = (waPhone || "").replace(/\D/g, "");
+  let son10 = "";
+  if (/^90\d{10}$/.test(d)) son10 = d.slice(2); // Meta'nın normal biçimi
+  else if (/^0\d{10}$/.test(d)) son10 = d.slice(1); // 0 ile gelmişse
+  else if (/^\d{10}$/.test(d)) son10 = d; // ülke kodsuz
+  // TR abone numarası 2-5 ile başlar (cep 5, sabit hat 2/3/4).
+  if (!/^[2-5]\d{9}$/.test(son10)) return [];
+  return [`0${son10}`, son10, `90${son10}`, `+90${son10}`];
+}
+
 type SonucKaydi = { ok: boolean; id?: string; error?: string };
 
 // GÜNLÜK GÖNDERİM TAVANI (2026-07-26): Meta'da reklam hesabındaki gibi harcama
@@ -102,6 +124,61 @@ export async function sendTemplate(
     };
     if (!res.ok || data.error) {
       return { ok: false, error: data.error?.message ?? `HTTP ${res.status}` };
+    }
+    return { ok: true, id: data.messages?.[0]?.id };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "bilinmeyen hata" };
+  }
+}
+
+/** SERBEST METİN — YALNIZ 24 SAATLİK PENCERE İÇİNDE (2026-07-29).
+ *  Şablondan farkı: metni biz yazarız. Meta bunu ancak müşteri son 24 saatte
+ *  BİZE yazdıysa kabul eder; pencere kapalıysa 131047 döner. Pencereyi asıl
+ *  kontrol eden çağırandır (panel cevap ucu son gelen mesaja bakar) — burada
+ *  yine de 131047 Türkçeye çevrilir ki halıcı ekranda ham İngilizce görmesin.
+ *  sendTemplate ile aynı desen: kapalıysa gönderme, kotayı harca, hata yut. */
+export async function sendText(to: string, body: string): Promise<SonucKaydi> {
+  if (!whatsappEnabled) return { ok: false, error: "whatsapp kapalı" };
+  const num = waNumber(to);
+  if (!num) return { ok: false, error: "geçersiz numara" };
+  const metin = body.trim();
+  if (!metin) return { ok: false, error: "boş mesaj" };
+  if (!(await kotaVarMi()))
+    return { ok: false, error: "günlük gönderim tavanı aşıldı" };
+
+  try {
+    const res = await fetch(`${GRAPH}/${process.env.WHATSAPP_PHONE_ID}/messages`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${process.env.WHATSAPP_TOKEN}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        to: num,
+        type: "text",
+        // Meta'nın sınırı 4096; uç zaten 1000'de kesiyor, burada da güvence.
+        text: { body: metin.slice(0, 1000) },
+      }),
+      signal: AbortSignal.timeout(12000),
+    });
+    const data = (await res.json()) as {
+      messages?: { id: string }[];
+      error?: { message?: string; code?: number };
+    };
+    if (!res.ok || data.error) {
+      const kod = data.error?.code;
+      if (kod === 131047)
+        return {
+          ok: false,
+          error:
+            "24 saatlik yanıt penceresi kapandı — serbest metin gönderilemez (Meta 131047).",
+        };
+      const msg = data.error?.message;
+      return {
+        ok: false,
+        error: msg ? (kod ? `${msg} (kod ${kod})` : msg) : `HTTP ${res.status}`,
+      };
     }
     return { ok: true, id: data.messages?.[0]?.id };
   } catch (e) {

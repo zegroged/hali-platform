@@ -127,6 +127,7 @@ model Notification {
 }
 
 model CleanerBusiness {
+  waMessages        WhatsAppMessage[]
   id          String  @id @default(cuid())
   owner       User    @relation("BusinessOwner", fields: [ownerId], references: [id])
   ownerId     String  @unique
@@ -362,6 +363,7 @@ model DriverStop {
 }
 
 model Order {
+  waMessages    WhatsAppMessage[]
   id            String  @id @default(cuid())
   trackingToken String  @unique @default(cuid()) // SMS takip linki
   code          String? @unique // kısa, müşteri-dostu takip kodu (ör. HLK-4F2A9)
@@ -734,4 +736,39 @@ model AppState {
   key       String   @id
   value     String
   updatedAt DateTime @updatedAt
+}
+
+// WHATSAPP MESAJ KUTUSU (2026-07-29).
+//
+// NEDEN: Cloud API'de müşterinin yazdığı mesaj YALNIZ webhook'a düşer; okunacak
+// bir "gelen kutusu" yoktur. 29 Temmuz'da webhook yazıldı ve müşteri mesajlarının
+// sunucuya ulaştığı doğrulandı ("Sa" mesajı log'a düştü) — ama görüntülenecek yer
+// olmadığı için hiç kimse görmüyordu. Müşteri "halım nerede" yazsa kayboluyordu.
+//
+// İŞLETME İZOLASYONU: businessId ZORUNLU DEĞİL, çünkü tanımadığımız bir numara
+// yazabilir (hiç siparişi olmayan biri). Eşleşmeyenler businessId=null kalır ve
+// YALNIZ admin görür. Panel sorguları HER ZAMAN businessId ile daraltılmalı —
+// halıcının başka halıcının mesajını görmesi en ağır sızıntı olur.
+model WhatsAppMessage {
+  id        String   @id @default(cuid())
+  // Meta'nın mesaj kimliği (wamid). Webhook aynı olayı tekrar gönderebilir;
+  // benzersiz olması ÇİFT KAYDI engeller (Meta 200 almazsa tekrar dener).
+  waId      String   @unique
+  // IN = müşteriden geldi, OUT = biz gönderdik
+  direction String
+  phone     String // karşı taraf (E.164'süz, 905xxxxxxxxx)
+  name      String? // WhatsApp profil adı (yalnız gelen mesajlarda gelir)
+  body      String
+  // Eşleşme: gelen numara son siparişin müşteri numarasıyla tutuyorsa oraya bağlanır.
+  business   CleanerBusiness? @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  businessId String?
+  order      Order?           @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  orderId    String?
+  // Gönderim başarısızsa Meta'nın sebebi (yalnız OUT).
+  error     String?
+  readAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([businessId, createdAt])
+  @@index([phone, createdAt])
 }
