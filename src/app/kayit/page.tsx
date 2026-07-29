@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Footer from "@/components/Footer";
@@ -16,6 +16,7 @@ type Field =
   | "username"
   | "email"
   | "emailCode"
+  | "phoneCode"
   | "password"
   | "password2"
   | "district"
@@ -48,6 +49,17 @@ export default function KayitPage() {
   const [devCode, setDevCode] = useState<string | null>(null);
   const [sendingCode, setSendingCode] = useState(false);
   const [cooldown, setCooldown] = useState(0);
+  // Telefon doğrulama kodu akışı (WhatsApp OTP) — e-posta kodunun ikizi.
+  // İşletmede İKİ doğrulama da istenir; bayrağı SUNUCU söyler.
+  // BAŞLANGIÇ FALSE ve öyle kalmalı: bugün WhatsApp teslimat yapamıyor
+  // (Meta işletme doğrulaması bekliyor) ve sunucu required:false dönüyor —
+  // bayrak kapalıyken bu adım hiç görünmezse form eskisi gibi çalışır.
+  // İstek düşerse de false kalır; aksi halde canlıda kimse kayıt olamazdı.
+  const [phoneOtpRequired, setPhoneOtpRequired] = useState(false);
+  const [phoneCode, setPhoneCode] = useState("");
+  const [phoneCodeSent, setPhoneCodeSent] = useState(false);
+  const [sendingPhoneCode, setSendingPhoneCode] = useState(false);
+  const [phoneCooldown, setPhoneCooldown] = useState(0);
   // Şifre tekrarı: yanlış yazılan şifreyle boşuna uğraşılmasın (yalnız
   // istemci doğrulaması, API'ye gönderilmez).
   const [password2, setPassword2] = useState("");
@@ -56,6 +68,25 @@ export default function KayitPage() {
   // Funnel adımı: önce YALNIZ paket kartı; "Hemen Başla" formu açar.
   // (hidden ile gizlenir, unmount edilmez — geri dönüşte yazılanlar kaybolmaz)
   const [started, setStarted] = useState(false);
+
+  // Telefon adımı gösterilecek mi? Bayrak sunucuda tutuluyor (build'e gömülü
+  // değil) — .env değişince yeniden derleme gerekmesin diye uçtan sorulur.
+  // Cevap kesin "true" değilse (hata, çevrimdışı, beklenmedik gövde) adım
+  // KAPALI kalır: yanlış tarafa düşmek kayıt akışını tamamen kilitler.
+  useEffect(() => {
+    let iptal = false;
+    fetch("/api/auth/phone-otp", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!iptal) setPhoneOtpRequired(d?.required === true);
+      })
+      .catch(() => {
+        // sessiz geç — adım kapalı kalır, form eskisi gibi çalışır
+      });
+    return () => {
+      iptal = true;
+    };
+  }, []);
 
   async function sendCode() {
     setError(null);
@@ -101,6 +132,59 @@ export default function KayitPage() {
       }));
     } finally {
       setSendingCode(false);
+    }
+  }
+
+  async function sendPhoneCode() {
+    setError(null);
+    // Sunucu cep olmayan numarayı zaten reddediyor; ön kontrol boşuna istek
+    // (ve 5/saat kod hakkının boşa yanmasını) engeller.
+    if (!/^05\d{9}$/.test(form.phone)) {
+      setFieldErrors((f) => ({
+        ...f,
+        phone: "Önce geçerli bir cep numarası gir (05xx).",
+      }));
+      return;
+    }
+    setSendingPhoneCode(true);
+    try {
+      const res = await fetch("/api/auth/phone-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: form.phone }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        // Sunucunun metni AYNEN gösterilir: "doğrulama kapalı" (503), "cep
+        // değil" (400) ve "çok fazla istek" (429) birbirinden ayırt edilmeli —
+        // tek tip mesaj kullanıcıyı yanlış çözüme yönlendiriyor.
+        // Hata telefon alanının HEMEN ALTINDA duruyor (e-posta akışındaki gibi).
+        setFieldErrors((f) => ({
+          ...f,
+          phone: data?.error ?? "Kod gönderilemedi, tekrar deneyin.",
+        }));
+        return;
+      }
+      setPhoneCodeSent(true);
+      setFieldErrors((f) => ({ ...f, phone: undefined, phoneCode: undefined }));
+      // 60 sn yeniden gönderme bekleme sayacı
+      setPhoneCooldown(60);
+      const t = setInterval(() => {
+        setPhoneCooldown((c) => {
+          if (c <= 1) {
+            clearInterval(t);
+            return 0;
+          }
+          return c - 1;
+        });
+      }, 1000);
+    } catch {
+      setFieldErrors((f) => ({
+        ...f,
+        phone: "Bağlantı hatası, lütfen tekrar deneyin.",
+      }));
+    } finally {
+      setSendingPhoneCode(false);
     }
   }
   const [error, setError] = useState<string | null>(null);
@@ -149,6 +233,12 @@ export default function KayitPage() {
     if (form.name.trim().length < 2) errs.name = "Ad soyad gerekli.";
     if (!/^0[2-5]\d{9}$/.test(form.phone))
       errs.phone = "Telefon 11 hane olmalı (05xx cep veya 0xxx sabit hat).";
+    // Bayrak açıkken kod WhatsApp'tan gidiyor: sabit hatta ulaşmaz ve sunucu
+    // da reddediyor. Uyarı, kodu bekleyip çıkmaza girmesin diye TELEFON
+    // alanında verilir. Bayrak kapalıyken sabit hat serbest kalır.
+    else if (phoneOtpRequired && !/^05\d{9}$/.test(form.phone))
+      errs.phone =
+        "Kayıt için cep numarası gerekir (05xx); sabit hattını sonradan panelden ekleyebilirsin.";
     {
       // Sunucudakiyle aynı kural (src/lib/username.ts) — erken geri bildirim.
       const u = form.username.trim().toLowerCase();
@@ -168,6 +258,12 @@ export default function KayitPage() {
     if (form.district.trim().length < 2) errs.district = "İlçe gerekli.";
     if (emailCode.trim().length !== 6)
       errs.emailCode = "E-postana gönderilen 6 haneli kodu gir.";
+    // Yalnız bayrak açıkken: kapalıyken kod alanı ekranda hiç yok, zorunlu
+    // tutmak formu gönderilemez hale getirirdi.
+    if (phoneOtpRequired && phoneCode.trim().length !== 6)
+      errs.phoneCode = phoneCodeSent
+        ? "Telefonuna WhatsApp'tan gönderilen 6 haneli kodu gir."
+        : "Önce “Kod Gönder” düğmesine bas, gelen kodu gir.";
     if (!consent)
       errs.consent =
         "Devam etmek için sözleşmeyi ve kullanım koşullarını kabul etmelisin.";
@@ -179,7 +275,17 @@ export default function KayitPage() {
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...form, consent, emailCode, website }),
+        // phoneCode gövdeye YALNIZ bayrak açıkken konur: sunucu şeması alanı
+        // "ya yok ya 6 hane" kabul ediyor, kapalıyken boş string göndermek
+        // gövdeyi tümden geçersiz kılar ve kayıt "Eksik veya hatalı bilgi"
+        // ile reddedilirdi.
+        body: JSON.stringify({
+          ...form,
+          consent,
+          emailCode,
+          ...(phoneOtpRequired ? { phoneCode } : {}),
+          website,
+        }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => null);
@@ -282,18 +388,81 @@ export default function KayitPage() {
             <input
               id="kayit-telefon"
               value={form.phone}
-              onChange={(e) => set("phone", e.target.value.replace(/\D/g, ""))}
+              onChange={(e) => {
+                set("phone", e.target.value.replace(/\D/g, ""));
+                // Numara değişti → gönderilmiş kod geçersiz (2026-07-29 denetim).
+                setPhoneCodeSent(false);
+                setPhoneCode("");
+              }}
               type="tel"
               inputMode="tel"
               maxLength={11}
-              placeholder="05xx… veya sabit hat 0342…"
+              placeholder={
+                // Bayrak açıkken sabit hat örneği vermek çelişki olurdu:
+                // kod WhatsApp'tan gidiyor, sunucu sabit hattı reddediyor.
+                phoneOtpRequired ? "05xx…" : "05xx… veya sabit hat 0342…"
+              }
               className={inputCls(fieldErrors.phone)}
               autoComplete="tel"
             />
             <p className="mt-1 text-xs text-slate-500">
               Müşterilerin sana ulaşacağı numara — girişte kullanılmaz.
+              {phoneOtpRequired && (
+                <>
+                  {" "}
+                  Doğrulama kodu WhatsApp&apos;tan gönderilir, cep numarası
+                  gerekir; sabit hattını panelden ekleyebilirsin.
+                </>
+              )}
             </p>
             {err("phone")}
+            {/* Telefon doğrulama adımı — YALNIZ sunucu "required" derse.
+                Kapalıyken (bugünkü durum) bu blok hiç render edilmez, form
+                eskisi gibi çalışır. */}
+            {phoneOtpRequired && (
+              <div className="mt-2">
+                <button
+                  type="button"
+                  onClick={sendPhoneCode}
+                  disabled={sendingPhoneCode || phoneCooldown > 0}
+                  className="shrink-0 whitespace-nowrap rounded-lg border border-brand px-3 py-2 text-sm font-semibold text-brand-dark transition hover:bg-brand-light/50 disabled:opacity-50"
+                >
+                  {sendingPhoneCode
+                    ? "Gönderiliyor…"
+                    : phoneCooldown > 0
+                      ? `Tekrar (${phoneCooldown})`
+                      : phoneCodeSent
+                        ? "Tekrar Gönder"
+                        : "Kod Gönder"}
+                </button>
+                {phoneCodeSent && (
+                  <div className="mt-2">
+                    <label htmlFor="kayit-telefon-kod" className={labelCls}>
+                      Telefon doğrulama kodu
+                    </label>
+                    <input
+                      id="kayit-telefon-kod"
+                      value={phoneCode}
+                      onChange={(e) =>
+                        setPhoneCode(e.target.value.replace(/\D/g, ""))
+                      }
+                      inputMode="numeric"
+                      maxLength={6}
+                      placeholder="6 haneli kod"
+                      className={`${inputCls(fieldErrors.phoneCode)} text-center font-mono tracking-[0.3em]`}
+                      autoComplete="one-time-code"
+                    />
+                  </div>
+                )}
+                {/* HATA KUTUNUN DIŞINDA (2026-07-29 denetim bulgusu): eskiden
+                    err("phoneCode") kod kutusuyla AYNI koşulun içindeydi.
+                    "Kodu Gönder"e hiç basmadan formu gönderen kullanıcıda
+                    hata kuruluyor ama ekranda hiçbir şey görünmüyordu — buton
+                    çalışmıyormuş gibi, sessiz çıkmaz. Bayrak açıldığı gün
+                    kayıtları öldürecek bir kusurdu. */}
+                {err("phoneCode")}
+              </div>
+            )}
           </div>
           <div>
             <label htmlFor="kayit-kullanici-adi" className={labelCls}>

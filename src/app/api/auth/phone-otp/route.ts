@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { rateLimit, clientIp, tooMany } from "@/lib/ratelimit";
-import { telefonKoduGonder } from "@/lib/phoneOtp";
+import { telefonKoduGonder, phoneOtpRequired } from "@/lib/phoneOtp";
+
+// Arayüzün "telefon doğrulama adımını göstereyim mi" sorusunun cevabı.
+// Bayrak sunucuda; istemci build'e gömülmesin diye uçtan okunur — böylece
+// .env değişince YENİDEN DERLEME GEREKMEZ, konteyner yeniden başlaması yeter.
+export async function GET() {
+  return NextResponse.json({ required: phoneOtpRequired });
+}
 
 // Kayıt öncesi telefon doğrulama kodu isteme (müşteri üyeliği).
 // Kod WhatsApp'tan gider; WhatsApp kapalıysa 503 döner ve kayıt akışı

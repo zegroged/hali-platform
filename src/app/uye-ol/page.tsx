@@ -1,11 +1,17 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Footer from "@/components/Footer";
 
-type Field = "name" | "email" | "phone" | "password" | "emailCode";
+type Field =
+  | "name"
+  | "email"
+  | "phone"
+  | "password"
+  | "emailCode"
+  | "phoneCode";
 type FieldErrors = Partial<Record<Field, string>>;
 
 function UyeOlInner() {
@@ -30,10 +36,35 @@ function UyeOlInner() {
   const [codeSent, setCodeSent] = useState(false);
   const [devCode, setDevCode] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
+  // TELEFON DOĞRULAMA — adım yalnız sunucu "gerekli" derse açılır.
+  // NEDEN başlangıç FALSE: WhatsApp teslimatı kapalıyken (bugünkü durum) bu adım
+  // görünürse hiç kimse kayıt olamaz. Bu yüzden hata tarafı da "gösterme" yönüne
+  // düşmeli: istek başarısız olursa değer FALSE kalır ve form eskisi gibi çalışır.
+  const [phoneOtpRequired, setPhoneOtpRequired] = useState(false);
+  const [phoneCode, setPhoneCode] = useState("");
+  const [phoneCodeSent, setPhoneCodeSent] = useState(false);
+  const [phoneSending, setPhoneSending] = useState(false);
+  const [phoneCooldown, setPhoneCooldown] = useState(0);
   const [website, setWebsite] = useState(""); // honeypot
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    // Bayrak sunucuda tutuluyor (build'e gömülmüyor) — bu yüzden uçtan okunur.
+    let iptal = false;
+    fetch("/api/auth/phone-otp", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        // Yalnız NET "true" adımı açsın; beklenmedik gövde geldiğinde kayıt
+        // akışını kilitlememek için varsayılan kapalı kalır.
+        if (!iptal && d?.required === true) setPhoneOtpRequired(true);
+      })
+      .catch(() => {});
+    return () => {
+      iptal = true;
+    };
+  }, []);
 
   function set<K extends keyof typeof form>(k: K, v: string) {
     setForm((f) => ({ ...f, [k]: v }));
@@ -69,6 +100,51 @@ function UyeOlInner() {
     }
   }
 
+  async function sendPhoneCode() {
+    setError(null);
+    if (!/^05\d{9}$/.test(form.phone)) {
+      setFieldErrors((f) => ({ ...f, phone: "Önce geçerli bir telefon gir." }));
+      return;
+    }
+    setPhoneSending(true);
+    try {
+      const res = await fetch("/api/auth/phone-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: form.phone }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        // Sunucu metni AYNEN gösterilir: 503 "doğrulama kapalı", 400 "cep değil",
+        // 429 "çok deneme" birbirinden farklı ve kullanıcıya ne yapacağını söylüyor.
+        setFieldErrors((f) => ({
+          ...f,
+          phone: data?.error ?? "Kod gönderilemedi.",
+        }));
+        return;
+      }
+      setPhoneCodeSent(true);
+      setFieldErrors((f) => ({ ...f, phone: undefined, phoneCode: undefined }));
+      // 60 sn bekleme: her istek Meta'da ÜCRETLİ bir mesaj ve sunucudaki
+      // 5/saat/IP hakkını yakıyor — arka arkaya basılırsa kullanıcı kendi
+      // kendini bir saat kilitliyordu (2026-07-29 denetim).
+      setPhoneCooldown(60);
+      const t = setInterval(() => {
+        setPhoneCooldown((c) => {
+          if (c <= 1) {
+            clearInterval(t);
+            return 0;
+          }
+          return c - 1;
+        });
+      }, 1000);
+    } catch {
+      setFieldErrors((f) => ({ ...f, phone: "Bağlantı hatası." }));
+    } finally {
+      setPhoneSending(false);
+    }
+  }
+
   async function submitSignup(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -80,6 +156,12 @@ function UyeOlInner() {
     if (form.password.length < 8) errs.password = "Şifre en az 8 karakter olmalı.";
     if (emailCode.trim().length !== 6)
       errs.emailCode = "E-postana gelen 6 haneli kodu gir.";
+    // Kod zorunluluğu adım açıkken var; kapalıyken alan hiç görünmediği için
+    // istemci de sormamalı (yoksa kayıt tamamlanamaz).
+    if (phoneOtpRequired && phoneCode.trim().length !== 6)
+      errs.phoneCode = phoneCodeSent
+        ? "Telefonuna gelen 6 haneli kodu gir."
+        : "Önce “Kod Gönder” düğmesine bas, gelen kodu gir.";
     setFieldErrors(errs);
     if (Object.keys(errs).length) return;
 
@@ -88,7 +170,14 @@ function UyeOlInner() {
       const res = await fetch("/api/auth/customer-register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...form, emailCode, website }),
+        // phoneCode YALNIZ adım açıkken eklenir; kapalıyken gövde eskisiyle
+        // birebir aynı kalsın diye anahtar hiç konmaz.
+        body: JSON.stringify({
+          ...form,
+          emailCode,
+          ...(phoneOtpRequired ? { phoneCode } : {}),
+          website,
+        }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => null);
@@ -243,11 +332,66 @@ function UyeOlInner() {
                 placeholder="05xxxxxxxxx"
                 className={inp(fieldErrors.phone)}
                 value={form.phone}
-                onChange={(e) => set("phone", e.target.value.replace(/\D/g, ""))}
+                onChange={(e) => {
+                  set("phone", e.target.value.replace(/\D/g, ""));
+                  // NUMARA DEĞİŞTİ → gönderilmiş kod ARTIK GEÇERSİZ (2026-07-29
+                  // denetim): eskiden yeşil "kod gönderildi" yazısı ve eski
+                  // numaranın kodu ekranda kalıyordu; kullanıcı numarayı
+                  // düzeltip aynı kodu giriyor, sunucu "kod hatalı" diyordu.
+                  setPhoneCodeSent(false);
+                  setPhoneCode("");
+                }}
                 autoComplete="tel"
               />
               {errP("phone")}
             </div>
+            {/* Telefon doğrulama adımı: bayrak kapalıyken (WhatsApp teslimatı
+                yokken) HİÇ render edilmez — form o zaman eskisi gibi tek adımda
+                tamamlanır. Kod gönderilene kadar giriş kutusu da açılmaz ki
+                kullanıcı eline geçmemiş bir kodu aramasın. */}
+            {phoneOtpRequired && (
+              <div>
+                <button
+                  type="button"
+                  onClick={sendPhoneCode}
+                  disabled={phoneSending || !form.phone || phoneCooldown > 0}
+                  className="whitespace-nowrap rounded-lg border border-brand px-3 py-2 text-sm font-medium text-brand-dark disabled:opacity-60"
+                >
+                  {phoneSending
+                    ? "..."
+                    : phoneCooldown > 0
+                      ? `Tekrar (${phoneCooldown})`
+                      : phoneCodeSent
+                        ? "Tekrar"
+                        : "Kod Gönder"}
+                </button>
+                {phoneCodeSent && (
+                  <>
+                    <p className="mt-1 text-xs text-emerald-700">
+                      Doğrulama kodu WhatsApp ile telefonuna gönderildi.
+                    </p>
+                    <label
+                      htmlFor="uye-telefon-kod"
+                      className={`mt-2 ${lbl}`}
+                    >
+                      Telefon doğrulama kodu
+                    </label>
+                    <input
+                      id="uye-telefon-kod"
+                      inputMode="numeric"
+                      maxLength={6}
+                      className={inp(fieldErrors.phoneCode)}
+                      value={phoneCode}
+                      onChange={(e) =>
+                        setPhoneCode(e.target.value.replace(/\D/g, ""))
+                      }
+                      placeholder="6 haneli kod"
+                    />
+                  </>
+                )}
+                {errP("phoneCode")}
+              </div>
+            )}
             <div>
               <label htmlFor="uye-sifre" className={lbl}>
                 Şifre

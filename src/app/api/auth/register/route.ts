@@ -6,7 +6,8 @@ import { rateLimit, clientIp, tooMany } from "@/lib/ratelimit";
 import { CONTRACT_VERSION } from "@/lib/legal";
 import { normalizeUsername, validateUsername } from "@/lib/username";
 import { normalizeCityName, normalizeDistrictName } from "@/lib/cities";
-import { TR_PHONE_RE } from "@/lib/phone";
+import { TR_PHONE_RE, isMobilePhone } from "@/lib/phone";
+import { telefonKoduDogrula, phoneOtpRequired } from "@/lib/phoneOtp";
 import { normalizeBusinessName } from "@/lib/text";
 import { ensureBillingCode } from "@/lib/billing";
 import { findUsableCode, claimCode, attachCodeToBusiness } from "@/lib/referralCode";
@@ -33,6 +34,11 @@ const Body = z.object({
   consent: z.literal(true),
   // Kayıt öncesi e-postaya gönderilen 6 haneli doğrulama kodu.
   emailCode: z.string().trim().length(6),
+  // Kayıt öncesi CEP telefonuna WhatsApp'tan gönderilen 6 haneli kod.
+  // İşletmede İKİ doğrulama da şart (2026-07-29 kullanıcı kararı): işletme
+  // hem ödeme yapan hem de müşteriye karşı sorumlu taraf, kimliği iki kanaldan
+  // teyit ediliyor. Bayrak kapalıyken bu alan HİÇ istenmez (aşağıya bak).
+  phoneCode: z.string().trim().length(6).optional(),
   // Komisyoncu referans kodu (opsiyonel): doluysa geçerli olmalı.
   referralCode: z.string().trim().max(20).optional(),
   // Honeypot: gerçek kullanıcı bu gizli alanı görmez/doldurmaz; botlar doldurur.
@@ -121,6 +127,32 @@ export async function POST(req: NextRequest) {
   const usernameError = validateUsername(username);
   if (usernameError) {
     return NextResponse.json({ error: usernameError }, { status: 400 });
+  }
+
+  // TELEFON DOĞRULAMASI (bayrak açıkken zorunlu — 2026-07-29).
+  // Neden kayıt telefonu CEP olmak zorunda: OTP yalnız WhatsApp'tan gidiyor,
+  // sabit hatta kod gönderilemez. Şema zaten `phone`u "birincil GSM" sayıyor
+  // ve sabit hat için ayrı `landlinePhone` alanı var — halıcı sabit hattını
+  // panelden ekler, kimliği cebiyle doğrular.
+  if (phoneOtpRequired) {
+    if (!isMobilePhone(phone)) {
+      return NextResponse.json(
+        {
+          error:
+            "Kayıt için CEP numarası gerekir (05xx) — doğrulama kodu WhatsApp'tan gönderiliyor. Sabit hattını kayıttan sonra panelden ekleyebilirsin.",
+        },
+        { status: 400 },
+      );
+    }
+    if (!parsed.data.phoneCode) {
+      return NextResponse.json(
+        { error: "Telefon doğrulama kodu gerekli." },
+        { status: 400 },
+      );
+    }
+    const tel = await telefonKoduDogrula(phone, parsed.data.phoneCode);
+    if (!tel.ok)
+      return NextResponse.json({ error: tel.hata }, { status: tel.durum ?? 400 });
   }
 
   // E-posta doğrulama kodu (kayıt ancak posta kutusuna erişenle kurulur).
@@ -214,6 +246,9 @@ export async function POST(req: NextRequest) {
       username, // giriş kimliği (küçük harfe indirgenmiş)
       email,
       emailVerified: true, // kayıt öncesi kodla doğrulandı
+      // Telefon yalnız bayrak açıkken ve kod doğrulandıysa "doğrulanmış"
+      // sayılır — kapalıyken false kalır, sonradan panelden doğrulanabilir.
+      phoneVerified: phoneOtpRequired,
       password: hashed,
       ownedBusiness: {
         create: {
