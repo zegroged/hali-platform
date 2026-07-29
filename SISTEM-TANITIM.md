@@ -300,7 +300,9 @@ Evet. Bu bir kapalı bayilik değil, pazaryeri. Ama sıralama mesafeye ve puana 
 
 ### Çok yakında
 
-**WhatsApp bildirimleri.** Müşteriye sipariş adımları WhatsApp'tan gidecek. Türkiye'de insan e-postasını açmıyor ama WhatsApp'a bakıyor. Altyapı kuruldu, Meta'nın şablon onayı bekleniyor.
+**WhatsApp bildirimleri — KISMEN CANLI (29.07.2026).** Türkiye'de insan e-postasını açmıyor ama WhatsApp'a bakıyor; bu yüzden sipariş adımları WhatsApp'tan da gidiyor. Bugün fiilen çalışanlar: **sipariş alındı**, **kesin fiyat onayı bekleniyor**, **şoför yola çıktı**. **Teslim edildi** ve **iptal** bildirimleri kodda hazır ama Meta'nın şablon onayını bekliyor — onaylandığı an ek iş olmadan devreye girer. Bu adımlarda müşteriye e-posta zaten gidiyor.
+
+> Not: manuel (dükkândan girilen) siparişte otomatik bildirim gitmez; takip linkini halıcı kendisi iletir.
 
 **Mobil uygulamalar.** Hem müşteri hem şoför için Android uygulamaları hazır, Google Play yayın sürecinde.
 
