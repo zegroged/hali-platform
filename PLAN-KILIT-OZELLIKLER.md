@@ -50,11 +50,12 @@ sayılır. Bu, en kolay yapılacak ve en sinsi hatadır.
 | # | İş | Süre | Neden bu sırada |
 |---|---|---|---|
 | **1** | **Tahsilat gerçeği + gün sonu mutabakatı** | 2-3 gün | Diğer üç özelliğin ön şartı. Ucuz, riski düşük, halıcının en somut derdi |
-| **2** | **Tip bazlı tarife + ölçüm/fiyat akışı** | 2-3 gün | Fiyat tartışmalarını bitirir; kurumsal carinin fiyat tarafını hazırlar |
-| **3** | **Kurumsal cari + ay sonu fatura** | 8-12 gün | 1 olmadan yapılamaz. Fiyatı yükselten asıl özellik |
-| **4** | **Halı etiketleme (QR)** | 1 hafta MVP / 2.5-4 hafta tam | En güçlü kilit ama en pahalı; kararlar gerekiyor (aşağıda) |
-| **5** | **Ödeme linki (Model A)** | 1 gün "yapıştır" / 4-6 gün tam | Karar bekliyor: anahtar saklama riski |
-| **6** | **Sezon hatırlatması** | 6-8 gün kod / **4-6 hafta canlı** | 🔴 Bugün **kendi sözleşmemizle yasak** (aşağıda) |
+| **2** | **Komisyoncu demo paneli** (§3.5) | 3-4 gün | Komisyoncu ürünü GÖSTEREMİYOR. Diğer her madde "halıcı panelde kalsın" için; bu "halıcı panele GİRSİN" için. 32 işletme sıfır ödüyorken satış engeli önce gelir |
+| **3** | **Tip bazlı tarife + ölçüm/fiyat akışı** | 2-3 gün | Fiyat tartışmalarını bitirir; kurumsal carinin fiyat tarafını hazırlar |
+| **4** | **Kurumsal cari + ay sonu fatura** | 8-12 gün | 1 olmadan yapılamaz. Fiyatı yükselten asıl özellik |
+| **5** | **Halı etiketleme (QR)** | 1 hafta MVP / 2.5-4 hafta tam | En güçlü kilit ama en pahalı; kararlar gerekiyor (aşağıda) |
+| **6** | **Ödeme linki (Model A)** | 1 gün "yapıştır" / 4-6 gün tam | Karar bekliyor: anahtar saklama riski |
+| **7** | **Sezon hatırlatması** | 6-8 gün kod / **4-6 hafta canlı** | 🔴 Bugün **kendi sözleşmemizle yasak** (aşağıda) |
 
 ---
 
@@ -172,6 +173,72 @@ yazar. Hukuki sorumluluk halıcıda kalır, biz araç veririz. Bu, sözleşme
 değişikliği de İYS kaydı da gerektirmez.
 
 ---
+
+## 3.5 KOMİSYONCU DEMO PANELİ — atlanmış boşluk (2026-07-30)
+
+### Sorun
+
+Komisyoncu dükkâna gidip **ürünü gösteremiyor**. `/komisyoncu` yalnız getirdiği
+işletmeleri ve kazancını gösterir; sipariş paneli, KASA, şoför takibi, fotoğraflı
+teslim — hiçbiri gösterilemiyor. Oysa kendi satış el kitabımız diyor:
+
+> "Siteyi telefondan aç, göster. Anlatma, göster. Görmek inanmaktır."
+
+Satışın en güçlü tekniğini komisyoncuya vermemişiz. **Bu, doğrudan gelir kaybı.**
+
+Test işletmesinin girişini paylaşmak çözüm DEĞİL: bütün komisyoncular aynı
+hesaba girer, birbirinin verisini bozar, ve o hesap Play incelemesine bağlı
+(`play.demo` — silinmemesi gereken hesap, bkz. DEVIR).
+
+### Tasarım: komisyoncu başına DEMO işletme
+
+Komisyoncu panelinden **"Demo panelimi oluştur"** → kendisine ait, gerçekçi
+sahte veriyle dolu bir işletme hesabı açılır ve girişini görür. Dükkânda o
+hesapla girip paneli canlı gösterir. İstediğinde **sıfırlar** (veri bozulursa).
+
+Tohumlanacak sahte veri (gerçekçi olmalı, boş panel satmıyor):
+- 2 şoför, biri mesaide (canlı takip haritası dolu görünsün)
+- 6-8 sipariş: farklı aşamalarda (yeni gelen, yıkanıyor, yolda, teslim edilmiş)
+- Alım/teslim fotoğrafları (jenerik örnek görseller)
+- KASA: birkaç ay gelir-gider + tekrarlayan gider (kâr-zarar tablosu dolu olsun)
+- 2-3 yorum ve yıldız
+- Fiyat listesi: makine halısı, shaggy, yolluk, kilim (tarife çeşitliliği görünsün)
+
+### 🔴 TUZAKLAR — bugün test kaydında yaşadıklarımızın aynısı
+
+Demo işletme **gerçek sayılara sızmamalı**. Bugün "Deneme Halı Yıkama (Test)"
+tam bunu yaptı: Google'a kapatılmıştı ama sitenin kendi listelerinde
+duruyordu (bkz. DEVIR §4.35). Aynı hatayı N komisyoncu × 1 demo ile
+tekrarlamak, vitrini komple çöpe çevirir.
+
+Bu yüzden `SEO_NOINDEX_BUSINESS_IDS` (env, elle liste) **yetmez** — ölçeklenmez.
+Gerekli olan şema düzeyinde bir bayrak:
+
+- `CleanerBusiness.isDemo Boolean @default(false)`
+- `gizliFiltre()` bunu da elemeli → keşif, sitemap, il/ilçe sayfaları, ana
+  sayfa il butonları, "şehrinde halıcı açıldı" müjde maili
+- **Admin sayaçları**: "34 işletme" rakamı demo'ları saymamalı
+- **Komisyon**: demo işletme komisyon tahakkuku ÜRETMEMELİ (kendi demosundan
+  komisyon kazanan komisyoncu = doğrudan suistimal)
+- **Abonelik**: demo ücretlendirilmemeli, ödeme akışına girmemeli
+- **CityLead**: demo açılması bekleyen müşteriye "bölgende hizmet var" maili
+  ATMAMALI (bugün bu deliği kapattık, tekrar açılmasın)
+- **Bildirim/WhatsApp**: demo siparişlerinden gerçek müşteriye mesaj GİTMEMELİ
+  — sahte telefon numaraları kullanılmalı (WhatsApp'ta olmayan aralık)
+
+### Süre
+
+**3-4 gün.** Kırılım: bayrak + filtrelerin 6 yerde güncellenmesi (1 gün),
+tohumlama işi (1-1,5 gün — gerçekçi veri üretmek sanıldığından uzun),
+komisyoncu panelinde oluştur/sıfırla akışı (0,5 gün), demo'nun gerçek
+sayılardan çıkarıldığını kanıtlayan denetim (1 gün).
+
+### Sıradaki listede yeri
+
+**2. sıraya alınmalı** — tahsilat gerçeğinden hemen sonra, tip bazlı tariften
+önce. Gerekçe: diğer bütün özellikler "halıcı panelde kalsın" diye; bu ise
+**halıcının panele hiç girmesini** sağlıyor. Sıfır ödeyen 32 işletme varken
+satışın önündeki engeli kaldırmak, panele özellik eklemekten önce gelir.
 
 ## 4. YAPILMAYACAKLAR (işletme sahibinin kararı, katılıyorum)
 
