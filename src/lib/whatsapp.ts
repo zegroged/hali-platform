@@ -132,6 +132,27 @@ export async function waGonderVeKaydet(opts: {
           note: `${opts.etiket} müşteriye WhatsApp'tan gönderildi`,
         },
       });
+      // TESLİMAT İZİ (2026-07-29): Meta'nın `accepted` yanıtı "aldım" demek,
+      // "teslim ettim" DEMEZ — 29 Temmuz'da üç mesaj `accepted` döndü, hiçbiri
+      // ulaşmadı (işletme doğrulaması engeli) ve panelde yine "gönderildi"
+      // yazıyordu. Halıcı müşterinin haberi olduğunu sanıyordu. Gönderim
+      // kimliğini saklıyoruz ki webhook `failed` bildirdiğinde kayıt
+      // DÜZELTİLEBİLSİN (bkz. api/whatsapp/webhook).
+      if (r.id) {
+        await prisma.appState.upsert({
+          where: { key: `wa-msg-${r.id}` },
+          create: {
+            key: `wa-msg-${r.id}`,
+            value: JSON.stringify({
+              orderId: opts.orderId,
+              status: opts.status,
+              etiket: opts.etiket,
+              ownerUserId: opts.ownerUserId ?? null,
+            }),
+          },
+          update: { value: JSON.stringify({ orderId: opts.orderId, status: opts.status, etiket: opts.etiket, ownerUserId: opts.ownerUserId ?? null }) },
+        });
+      }
       return;
     }
     await prisma.orderEvent.create({

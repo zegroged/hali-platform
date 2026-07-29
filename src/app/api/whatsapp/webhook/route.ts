@@ -64,6 +64,45 @@ async function imzaGecerliMi(req: NextRequest, ham: string): Promise<boolean> {
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
+/** Teslim edilemeyen mesajı sipariş geçmişine yaz + halıcıya zil çal.
+ *  İz `lib/whatsapp.ts` içinde AppState'e `wa-msg-<id>` anahtarıyla bırakılır. */
+async function mesajDustu(
+  id: string | undefined,
+  hata: { code?: number; title?: string; error_data?: { details?: string } } | undefined,
+): Promise<void> {
+  if (!id) return;
+  const { prisma } = await import("@/lib/prisma");
+  const { notify } = await import("@/lib/notify");
+  const kayit = await prisma.appState.findUnique({ where: { key: `wa-msg-${id}` } });
+  if (!kayit) return; // bizim gönderdiğimiz bir sipariş mesajı değil
+  let iz: { orderId?: string; status?: string; etiket?: string; ownerUserId?: string | null };
+  try {
+    iz = JSON.parse(kayit.value);
+  } catch {
+    return;
+  }
+  if (!iz.orderId || !iz.status) return;
+  const sebep = hata?.error_data?.details ?? hata?.title ?? "sebep bildirilmedi";
+  await prisma.orderEvent.create({
+    data: {
+      orderId: iz.orderId,
+      status: iz.status as never,
+      note: `⚠️ ${iz.etiket ?? "WhatsApp mesajı"} MÜŞTERİYE ULAŞMADI (${sebep}) — müşteriyi telefonla bilgilendir`,
+    },
+  });
+  if (iz.ownerUserId) {
+    await notify({
+      userId: iz.ownerUserId,
+      type: "genel",
+      title: "WhatsApp mesajı müşteriye ulaşmadı",
+      body: `${iz.etiket ?? "Bildirim"} teslim edilemedi (${sebep}). Müşteriyi telefonla bilgilendirmen gerekebilir.`,
+      href: `/panel/siparisler/${iz.orderId}`,
+    });
+  }
+  // İz tek kullanımlık; birikmesin.
+  await prisma.appState.delete({ where: { key: `wa-msg-${id}` } }).catch(() => {});
+}
+
 export async function POST(req: NextRequest) {
   // Meta 200 ALMAZSA aynı olayı defalarca tekrar gönderir; bu yüzden hata
   // hâlinde bile 200 dönüyoruz, sorunu log'a yazıyoruz.
@@ -104,6 +143,10 @@ export async function POST(req: NextRequest) {
             console.error(
               `[whatsapp-webhook] BAŞARISIZ ${temel} kod=${h?.code} baslik="${h?.title}" ayrinti="${h?.error_data?.details ?? h?.message ?? ""}"`,
             );
+            // KAYDI DÜZELT: gönderim anında "gönderildi" yazılmıştı; teslim
+            // edilmediyse halıcı bunu panelde GÖRMELİ, yoksa müşterinin haberi
+            // olduğunu sanıp arayıp bilgilendirmiyor.
+            await mesajDustu(d.id, h);
           } else {
             console.log(
               `[whatsapp-webhook] ${temel} kategori=${d.pricing?.category ?? "-"} faturalanabilir=${d.pricing?.billable ?? "-"}`,
