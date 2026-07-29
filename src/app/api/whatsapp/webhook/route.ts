@@ -75,10 +75,27 @@ export async function POST(req: NextRequest) {
 
   try {
     const govde = JSON.parse(ham) as {
-      entry?: { changes?: { value?: { statuses?: Durum[]; messages?: unknown[] } }[] }[];
+      entry?: {
+        changes?: {
+          value?: {
+            statuses?: Durum[];
+            messages?: { from?: string; type?: string; text?: { body?: string } }[];
+            contacts?: { profile?: { name?: string }; wa_id?: string }[];
+          };
+        }[];
+      }[];
     };
     for (const e of govde.entry ?? []) {
       for (const c of e.changes ?? []) {
+        // GELEN MESAJ (2026-07-29): teslim edilemeyen şablonların sebebini
+        // ayırmak için eklendi. Numaradan BİZE mesaj düşüyorsa o numaranın
+        // WhatsApp'ı sağlamdır ve sorun şablon/gönderim tarafındadır.
+        for (const m of c.value?.messages ?? []) {
+          const ad = c.value?.contacts?.[0]?.profile?.name ?? "-";
+          console.log(
+            `[whatsapp-webhook] GELEN MESAJ gonderen=${m.from} ad="${ad}" tur=${m.type} metin="${m.text?.body ?? ""}"`,
+          );
+        }
         for (const d of c.value?.statuses ?? []) {
           const temel = `id=${d.id} alici=${d.recipient_id} durum=${d.status}`;
           if (d.status === "failed") {
