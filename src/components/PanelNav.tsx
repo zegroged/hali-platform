@@ -17,6 +17,7 @@ const NAV = [
   { href: "/panel/takip", label: "Canlı Takip" },
   { href: "/panel/mesajlar", label: "Mesajlar" },
   { href: "/panel/kasa", label: "Kasa" },
+  { href: "/panel/mutabakat", label: "Mutabakat" },
   { href: "/panel/profil", label: "Profil & Fiyat" },
   { href: "/panel/soforler", label: "Şoförler" },
   { href: "/panel/rota", label: "Rota Geçmişi" },
