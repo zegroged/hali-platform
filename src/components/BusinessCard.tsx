@@ -96,15 +96,38 @@ export function BusinessCard({ b }: { b: BusinessSummary }) {
         )}
 
         <div className="mt-auto flex items-center justify-between border-t border-slate-100 pt-2.5 text-sm">
-          <span className="inline-flex items-center gap-1 text-slate-600">
-            <IconTruck size={15} />
-            {b.deliveryMinDays != null && b.deliveryMaxDays != null
-              ? `${b.deliveryMinDays}-${b.deliveryMaxDays} iş günü`
-              : "Süre belirtilmedi"}
-          </span>
-          {b.minPrice != null && (
-            <span className="font-semibold text-slate-900">
-              {b.minPrice} TL/m²&apos;den
+          {/* ALT ŞERİT — BOŞLUĞU İLAN ETMEZ (2026-07-30).
+              Canlıda 34 işletmenin 13'ünde fiyat, çoğunda teslim süresi yok;
+              hepsinde yorum yok. Eski hâlde bu satır "Süre belirtilmedi" yazıp
+              yanını boş bırakıyordu — yani kart, müşteriye BİLMEDİĞİNİ
+              duyuruyordu. Telefonda ekrana 1-2 kart girdiği için bu, listeyi
+              olduğundan zayıf gösteriyor. Artık yalnız BİLİNEN bilgi yazılır;
+              hiçbiri yoksa satır hiç çizilmez. */}
+          {(b.deliveryMinDays != null && b.deliveryMaxDays != null) ||
+          b.minPrice != null ? (
+            <>
+              <span className="inline-flex items-center gap-1 text-slate-600">
+                {b.deliveryMinDays != null && b.deliveryMaxDays != null ? (
+                  <>
+                    <IconTruck size={15} />
+                    {`${b.deliveryMinDays}-${b.deliveryMaxDays} iş günü`}
+                  </>
+                ) : (
+                  <>
+                    <IconTruck size={15} />
+                    Kapıdan alım
+                  </>
+                )}
+              </span>
+              {b.minPrice != null && (
+                <span className="font-semibold text-slate-900">
+                  {b.minPrice} TL/m²&apos;den
+                </span>
+              )}
+            </>
+          ) : (
+            <span className="inline-flex items-center gap-1 text-slate-600">
+              <IconTruck size={15} /> Kapıdan alım · ödeme teslimde
             </span>
           )}
         </div>

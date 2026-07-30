@@ -19,7 +19,12 @@ export default function Loading() {
       <div className="mt-6 h-4 w-44 rounded bg-slate-200" />
 
       {/* kart ızgarası */}
-      <div className="mt-3 grid grid-cols-2 gap-3 lg:grid-cols-3">
+      {/* İSKELET GERÇEK LİSTEYLE AYNI OLMALI (2026-07-30): burada
+          `grid-cols-2` yazıyordu, gerçek liste ise `sm:grid-cols-2` —
+          yani telefonda sayfa önce İKİ DAR kolon çiziyor, veri gelince TEK
+          GENİŞ kolona zıplıyordu. Mobilde "yetersiz" hissinin görünür
+          sebeplerinden biri bu sıçramaydı. */}
+      <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {Array.from({ length: 6 }).map((_, i) => (
           <div
             key={i}
