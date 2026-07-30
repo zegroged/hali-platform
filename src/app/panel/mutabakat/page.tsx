@@ -64,6 +64,7 @@ export default async function MutabakatSayfasi({
         priceTotal: true,
         collectedAmount: true,
         collectedAt: true,
+        collectedMethod: true,
         customerName: true,
         driverId: true,
         // Şoför adı User tablosunda tutuluyor — Driver.name YOK.
@@ -89,6 +90,7 @@ export default async function MutabakatSayfasi({
       driverName: o.driver?.user.name ?? null,
       tutar: Number(o.priceTotal ?? 0),
       tahsilEdildi: o.collectedAt != null,
+      yontem: o.collectedMethod,
     })),
     devirRows.map((d) => ({ driverId: d.driverId, tutar: Number(d.amount) })),
   );
@@ -155,10 +157,11 @@ export default async function MutabakatSayfasi({
       </p>
 
       {/* Özet şeridi */}
-      <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-5">
         {[
           ["Teslimat", String(ozet.toplamTeslimat)],
           ["Tahsilat", tl(ozet.toplamTahsilat)],
+          ["Bunun IBAN'a geleni", tl(ozet.toplamIbanTahsilat)],
           ["Tahsil edilmeyen", tl(ozet.toplamTahsilEdilmeyen)],
           ["Şoförlerde bekleyen", tl(ozet.toplamBekleyen)],
         ].map(([etiket, deger], i) => (

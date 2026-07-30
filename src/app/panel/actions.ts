@@ -747,8 +747,13 @@ export async function deliverOrderPanel(formData: FormData) {
   if (!order) return;
 
   const isCash = order.paymentMethod === "CASH";
-  // Form kutusu işaretsiz gelirse tahsilat YAPILMAMIŞ sayılır.
-  const tahsilEdildi = isCash && formData.get("collected") != null;
+  // TAHSILAT SECIMI (2026-07-30): "Nakit aldim" | "IBAN'a geldi" | "Almadim".
+  // IBAN AYRI TUTULUYOR cunku o para ZATEN isletmenin hesabinda -- soforun
+  // uzerinde nakit BIRAKMAZ. Ikisi karisirsa halici soforden olmayan parayi
+  // ister. Eski istemciler alan gondermezse (mobil uygulama) nakit sayilir.
+  const secim = String(formData.get("collected") ?? "CASH");
+  const tahsilEdildi = isCash && secim !== "NO";
+  const yontem = secim === "IBAN" ? "IBAN" : "CASH";
       // TAHSİLAT ARTIK BEYAN (2026-07-29): eskiden nakit teslimde
       // paymentStatus KOŞULSUZ "PAID" yazılıyordu — sistem parayı almadığımız
       // hâlde "tahsil edildi" diyordu. Bu yalan üç özelliği birden kilitliyordu
@@ -767,6 +772,7 @@ export async function deliverOrderPanel(formData: FormData) {
       collectedAmount: tahsilEdildi ? price : undefined,
       collectedAt: tahsilEdildi ? new Date() : undefined,
       collectedById: tahsilEdildi ? b.ownerId : undefined,
+      collectedMethod: tahsilEdildi ? yontem : undefined,
     },
   });
   if (updated.count === 0) return;

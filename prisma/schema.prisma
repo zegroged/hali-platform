@@ -418,6 +418,13 @@ model Order {
   collectedAmount Decimal?  @db.Decimal(10, 2) // fiilen tahsil edilen tutar
   collectedAt     DateTime? // tahsilat anı
   collectedById   String? // tahsil eden kullanıcı (şoför veya halıcı)
+  // TAHSİLAT YÖNTEMİ: "CASH" | "IBAN" (2026-07-30 kullanıcı isteği).
+  // NEDEN AYRIM ÖNEMLİ: IBAN'a gelen para ZATEN işletmenin hesabında —
+  // şoförün üzerinde nakit BIRAKMAZ. Mutabakatta "şoförde bekleyen" hesabı
+  // yalnız NAKİT tahsilattan yürür; ikisi karışırsa halıcı şoförden olmayan
+  // parayı ister. Enum yerine String: yarın "kredi kartı" eklenirse
+  // migration gerekmesin (katmerli kalsın).
+  collectedMethod String?
 
   @@index([businessId, collectedAt])
 

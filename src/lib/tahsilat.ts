@@ -23,6 +23,8 @@ export type TeslimKaydi = {
   tutar: number;
   /** Tahsil edildi mi — teslim edenin BEYANI. */
   tahsilEdildi: boolean;
+  /** "CASH" | "IBAN" — IBAN sofurun uzerinde nakit BIRAKMAZ. */
+  yontem?: string | null;
 };
 
 /** Şoförün halıcıya elden verdiği nakit. */
@@ -35,8 +37,10 @@ export type SoforSatiri = {
   driverId: string | null;
   driverName: string;
   teslimat: number;
-  /** Tahsil edilen toplam. */
+  /** Tahsil edilen toplam (nakit + IBAN). */
   tahsilat: number;
+  /** Bunun IBAN/havale ile geleni — banka hesabinda, soforde DEGIL. */
+  ibanTahsilat: number;
   /** Teslim edilip TAHSİL EDİLMEYEN toplam (kurumsal/veresiye). */
   tahsilEdilmeyen: number;
   /** Halıcıya devredilen nakit. */
@@ -49,6 +53,7 @@ export type MutabakatOzeti = {
   satirlar: SoforSatiri[];
   toplamTeslimat: number;
   toplamTahsilat: number;
+  toplamIbanTahsilat: number;
   toplamTahsilEdilmeyen: number;
   toplamDevredilen: number;
   toplamBekleyen: number;
@@ -83,6 +88,7 @@ export function mutabakatHesapla(
         driverName: ad ?? (driverId ? "Bilinmeyen şoför" : "Panelden (halıcı)"),
         teslimat: 0,
         tahsilat: 0,
+        ibanTahsilat: 0,
         tahsilEdilmeyen: 0,
         devredilen: 0,
         bekleyen: 0,
@@ -98,8 +104,11 @@ export function mutabakatHesapla(
     const s = satirAl(t.driverId, t.driverName);
     s.teslimat += 1;
     const tutar = Number.isFinite(t.tutar) ? t.tutar : 0;
-    if (t.tahsilEdildi) s.tahsilat = kurus(s.tahsilat + tutar);
-    else s.tahsilEdilmeyen = kurus(s.tahsilEdilmeyen + tutar);
+    if (t.tahsilEdildi) {
+      s.tahsilat = kurus(s.tahsilat + tutar);
+      // IBAN ise ayri sayilir: bakiyeden dusulecek cunku banka hesabinda.
+      if (t.yontem === "IBAN") s.ibanTahsilat = kurus(s.ibanTahsilat + tutar);
+    } else s.tahsilEdilmeyen = kurus(s.tahsilEdilmeyen + tutar);
   }
 
   for (const d of devirler) {
@@ -110,7 +119,8 @@ export function mutabakatHesapla(
 
   const satirlar = [...harita.values()].map((s) => ({
     ...s,
-    bekleyen: kurus(s.tahsilat - s.devredilen),
+    // BEKLEYEN YALNIZ NAKITTEN: IBAN parasi zaten hesapta, soforde degil.
+    bekleyen: kurus(s.tahsilat - s.ibanTahsilat - s.devredilen),
   }));
 
   // Sıralama: üzerinde en çok para bekleyen üstte — halıcının bakacağı şey bu.
@@ -120,6 +130,7 @@ export function mutabakatHesapla(
     satirlar,
     toplamTeslimat: satirlar.reduce((t, s) => t + s.teslimat, 0),
     toplamTahsilat: kurus(satirlar.reduce((t, s) => t + s.tahsilat, 0)),
+    toplamIbanTahsilat: kurus(satirlar.reduce((t, s) => t + s.ibanTahsilat, 0)),
     toplamTahsilEdilmeyen: kurus(
       satirlar.reduce((t, s) => t + s.tahsilEdilmeyen, 0),
     ),

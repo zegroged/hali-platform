@@ -107,6 +107,15 @@ export default async function AdminHome({
         >
           Mali Müşavir
         </Link>
+        {/* Sahipsiz WhatsApp mesajları: hiç siparişi olmayan biri yazdığında
+            mesaj hiçbir işletmeye bağlanamıyor ve BU EKRAN OLMADAN kimse
+            görmüyordu (2026-07-30). */}
+        <Link
+          href="/admin/wa-mesajlar"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+        >
+          WhatsApp (sahipsiz)
+        </Link>
         <Link
           href="/admin/yeni"
           className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-dark"

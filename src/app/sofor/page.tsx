@@ -269,15 +269,24 @@ export default async function SoforPage() {
                       şoför işareti kaldırır ve sipariş "tahsil edilmedi"
                       kalır. Gün sonu mutabakatı buna dayanıyor. */}
                   {o.paymentMethod === "CASH" && (
-                    <label className="flex items-center gap-2 text-sm text-slate-700">
-                      <input
-                        type="checkbox"
+                    <div>
+                      <label
+                        htmlFor={`tahsilat-${o.id}`}
+                        className="mb-1 block text-xs font-medium text-slate-600"
+                      >
+                        Ücreti aldın mı?
+                      </label>
+                      <select
+                        id={`tahsilat-${o.id}`}
                         name="collected"
-                        defaultChecked
-                        className="h-4 w-4 rounded border-slate-300"
-                      />
-                      Ücreti tahsil ettim
-                    </label>
+                        defaultValue="CASH"
+                        className={inp}
+                      >
+                        <option value="CASH">Nakit aldım</option>
+                        <option value="IBAN">IBAN&apos;a geldi</option>
+                        <option value="NO">Almadım (sonra ödeyecek)</option>
+                      </select>
+                    </div>
                   )}
                 </PhotoForm>
               )}

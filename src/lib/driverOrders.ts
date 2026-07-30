@@ -237,6 +237,8 @@ export async function driverDeliver(
   // ⚠️ Yeni sürüm çıkınca burası `collected === true` olarak SIKILAŞTIRILMALI,
   // yoksa eski uygulamalar sessizce eski davranışta kalır (bkz. DEVIR).
   collected?: boolean,
+  // "IBAN" gelirse para bankaya gecmis demektir (soforde nakit birakmaz).
+  yontem?: string,
 ): Promise<DriverActionResult> {
   if (!Number.isFinite(price) || price <= 0)
     return { ok: false, error: "Geçerli bir teslim tutarı gir (0'dan büyük).", code: 400 };
@@ -273,6 +275,7 @@ export async function driverDeliver(
       collectedAmount: tahsilEdildi ? price : undefined,
       collectedAt: tahsilEdildi ? new Date() : undefined,
       collectedById: tahsilEdildi ? driverUserId : undefined,
+      collectedMethod: tahsilEdildi ? (yontem === "IBAN" ? "IBAN" : "CASH") : undefined,
     },
   });
   if (r.count === 0)

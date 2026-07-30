@@ -351,15 +351,24 @@ export default async function OrderManagePage({
                 kalıyor. Kurumsal müşteri (ay sonu fatura) ve gün sonu
                 mutabakatı bu duruma dayanıyor. */}
             {o.paymentMethod === "CASH" && (
-              <label className="flex items-center gap-2 pb-2.5 text-sm text-slate-700">
-                <input
-                  type="checkbox"
+              <div>
+                <label
+                  htmlFor="teslim-tahsilat"
+                  className="block text-xs font-medium text-slate-500"
+                >
+                  Ücreti aldın mı?
+                </label>
+                <select
+                  id="teslim-tahsilat"
                   name="collected"
-                  defaultChecked
-                  className="h-4 w-4 rounded border-slate-300"
-                />
-                Ücreti tahsil ettim
-              </label>
+                  defaultValue="CASH"
+                  className="mt-0.5 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand"
+                >
+                  <option value="CASH">Nakit aldım</option>
+                  <option value="IBAN">IBAN&apos;a geldi</option>
+                  <option value="NO">Almadım (sonra ödeyecek)</option>
+                </select>
+              </div>
             )}
             <PendingButton className="rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark active:scale-[0.99] disabled:opacity-60">
               Teslim Edildi

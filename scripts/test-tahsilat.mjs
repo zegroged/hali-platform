@@ -114,6 +114,41 @@ t("bozuk tutar (NaN) toplamı bozmaz", () => {
   assert.equal(r.satirlar[0].tahsilat, 500);
 });
 
+console.log("\nIBAN AYRIMI (2026-07-30)");
+
+t("IBAN tahsilatı şoförde nakit BIRAKMAZ", () => {
+  // Para bankaya geçtiyse şoförden istenmez. Karışırsa halıcı olmayan parayı ister.
+  const r = mutabakatHesapla(
+    [
+      { orderId: "1", driverId: "d1", driverName: "A", tutar: 1000, tahsilEdildi: true, yontem: "CASH" },
+      { orderId: "2", driverId: "d1", driverName: "A", tutar: 2500, tahsilEdildi: true, yontem: "IBAN" },
+    ],
+    [],
+  );
+  const s = r.satirlar[0];
+  assert.equal(s.tahsilat, 3500, "toplam tahsilat ikisini de sayar");
+  assert.equal(s.ibanTahsilat, 2500);
+  assert.equal(s.bekleyen, 1000, "şoförde YALNIZ nakit bekler");
+});
+
+t("yöntem verilmezse nakit sayılır (eski kayıtlar)", () => {
+  const r = mutabakatHesapla(
+    [{ orderId: "1", driverId: "d1", driverName: "A", tutar: 400, tahsilEdildi: true }],
+    [],
+  );
+  assert.equal(r.satirlar[0].ibanTahsilat, 0);
+  assert.equal(r.satirlar[0].bekleyen, 400);
+});
+
+t("tamamı IBAN ise şoför bakiyesi sıfır", () => {
+  const r = mutabakatHesapla(
+    [{ orderId: "1", driverId: "d1", driverName: "A", tutar: 5000, tahsilEdildi: true, yontem: "IBAN" }],
+    [],
+  );
+  assert.equal(r.satirlar[0].bekleyen, 0, "banka hesabına gelen para şoförde beklemez");
+  assert.equal(r.toplamIbanTahsilat, 5000);
+});
+
 console.log("\nSAAT DİLİMİ (Europe/Istanbul, sabit UTC+3)");
 
 t("gün aralığı TR 00:00'da başlar", () => {
