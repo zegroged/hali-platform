@@ -29,10 +29,10 @@ durum() { # $1=sablon adi -> APPROVED/PENDING/REJECTED/YOK
 posta() { # $1=konu, $2=govde
   SMTP_USER=$(grep "^SMTP_USER=" /opt/hali/.env | cut -d= -f2- | tr -d "\"")
   SMTP_PASS=$(grep "^SMTP_PASS=" /opt/hali/.env | cut -d= -f2- | tr -d "\"")
-  { echo "From: En Yakin Hali Yikama <$SMTP_USER>"; echo "To: [EPOSTA]";
+  { echo "From: En Yakin Hali Yikama <$SMTP_USER>"; echo "To: destek@enyakinhaliyikamaservisim.com";
     echo "Subject: $1"; echo ""; printf "%s\n" "$2"; } > /tmp/wa-mail4.txt
   curl -s --url smtp://smtp.gmail.com:587 --ssl-reqd --mail-from "$SMTP_USER" \
-    --mail-rcpt "[EPOSTA]" --upload-file /tmp/wa-mail4.txt \
+    --mail-rcpt "destek@enyakinhaliyikamaservisim.com" --upload-file /tmp/wa-mail4.txt \
     --user "$SMTP_USER:$SMTP_PASS" > /dev/null 2>&1
 }
 
