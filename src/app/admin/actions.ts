@@ -846,9 +846,19 @@ export async function setBusinessAgent(formData: FormData) {
 
   const biz = await prisma.cleanerBusiness.findUnique({
     where: { id: businessId },
-    select: { id: true, discountPercent: true, discountUntil: true },
+    select: { id: true, isDemo: true, discountPercent: true, discountUntil: true },
   });
   if (!biz) redirect("/admin");
+  // DEMO panele komisyoncu kodu bağlanamaz (2026-07-30): demo zaten sahibi
+  // olan komisyoncuya bağlıdır ve komisyon üretmez; kod bağlamak hem gerçek
+  // bir kodu yakar hem "getirdiğim işletme" raporunu yalanlar.
+  if (biz.isDemo) {
+    redirect(
+      geri +
+        "?hata=" +
+        encodeURIComponent("Bu bir DEMO panelidir — komisyoncu kodu bağlanamaz."),
+    );
+  }
 
   if (!code) {
     await prisma.cleanerBusiness.update({

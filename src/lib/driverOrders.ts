@@ -123,7 +123,8 @@ export async function driverPickup(
     select: { businessId: true },
   });
   if (!o) return { ok: false, error: "Bu sipariş şu an alınamıyor.", code: 409 };
-  const photoUrl = await saveOrderPhotoFile(photo, o.businessId, orderId);
+  // "ALIM": fotoğraf aşamaya bağlanır → müşteri takipte "Alım" etiketiyle görür.
+  const photoUrl = await saveOrderPhotoFile(photo, o.businessId, orderId, "ALIM");
   if (!photoUrl)
     return {
       ok: false,
@@ -253,7 +254,12 @@ export async function driverDeliver(
   });
   if (!o) return { ok: false, error: "Bu sipariş şu an teslim edilemiyor.", code: 409 };
   const driverUserId = o.driver?.userId ?? null;
-  const deliveryPhotoUrl = await saveOrderPhotoFile(photo, o.businessId, orderId);
+  const deliveryPhotoUrl = await saveOrderPhotoFile(
+    photo,
+    o.businessId,
+    orderId,
+    "TESLIM",
+  );
   if (!deliveryPhotoUrl)
     return {
       ok: false,

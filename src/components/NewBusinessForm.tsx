@@ -83,9 +83,15 @@ export default function NewBusinessForm() {
         gösterilir — sahibine sen iletirsin. Boş bıraktıkların otomatik üretilir.
       </p>
       <div className="grid gap-4 sm:grid-cols-2">
-        {/* Opsiyonel — boşsa sahibi panelden seçer (yayına engel değil) */}
+        {/* Zorunlu DEĞİL (bilinçli karar) ama boşsa işletme yayına alınmaz —
+            il/ilçesiz kayıt keşifte ve şehir sayfalarında zaten çıkmıyor. */}
         <CityDistrictSelect selectClass={inp} labelClass={lbl} />
       </div>
+      <p className="-mt-2 text-xs text-amber-700">
+        İl/ilçe boş bırakılabilir ama <strong>o işletme yayına alınmaz</strong> —
+        il/ilçesi olmayan kayıt aramada ve şehir sayfalarında çıkmaz. Sahibi
+        panelden seçince kendiliğinden yayına girer.
+      </p>
       <div>
         <label htmlFor="taxNumber" className={lbl}>
           Vergi / T.C. kimlik no{" "}

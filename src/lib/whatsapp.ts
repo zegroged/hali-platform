@@ -199,6 +199,19 @@ export async function waGonderVeKaydet(opts: {
   gonder: () => Promise<SonucKaydi>;
 }): Promise<void> {
   if (!whatsappEnabled) return; // kapalıyken iz bırakma
+  // DEMO PANEL MESAJ GÖNDERMEZ (2026-07-30): demo siparişlerin müşteri
+  // numaraları uydurmadır (tahsissiz 0500 aralığı — WhatsApp'ta yoklar).
+  // Gönderilseydi her satış gösterisi hem kotadan/paradan yerdi hem de
+  // panelde "WhatsApp mesajı gitmedi" zili çalıp demoyu bozardı.
+  try {
+    const o = await prisma.order.findUnique({
+      where: { id: opts.orderId },
+      select: { business: { select: { isDemo: true } } },
+    });
+    if (o?.business.isDemo) return;
+  } catch {
+    // Kontrol sorgusu patlarsa gerçek siparişin bildirimi durmasın.
+  }
   const r = await opts.gonder();
   try {
     if (r.ok) {

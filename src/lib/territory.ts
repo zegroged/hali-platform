@@ -61,16 +61,21 @@ export async function bolgeHaritasi(sadeceIl?: string): Promise<Harita> {
       },
       select: { city: true, district: true, agentId: true },
     }),
+    // DEMO işletmeler sayıma GİRMEZ (2026-07-30): bölge haritası "hangi ilçe
+    // boşta, nerede kaç halıcı var" kararını besliyor. Komisyoncunun kendi
+    // demosu ilçeyi dolu göstererek hem onu hem yönetimi yanıltırdı.
     prisma.cleanerBusiness.groupBy({
       by: ["city", "district"],
-      where: ilKisit ? { city: ilKisit } : undefined,
+      where: { isDemo: false, ...(ilKisit ? { city: ilKisit } : {}) },
       _count: true,
     }),
     // Sayımlara giremeyen kayıtlar (il/ilçesi boş — bkz. DEVIR 4.28). Sessizce
     // yutmak yerine sayısını gösteriyoruz ki "işletme sayısı eksik" sanılmasın.
     ilKisit
       ? Promise.resolve(0)
-      : prisma.cleanerBusiness.count({ where: { OR: [{ city: "" }, { district: "" }] } }),
+      : prisma.cleanerBusiness.count({
+          where: { isDemo: false, OR: [{ city: "" }, { district: "" }] },
+        }),
   ]);
 
   const ilceler = new Map<string, IlceSatiri>();

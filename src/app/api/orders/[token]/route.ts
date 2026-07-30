@@ -22,7 +22,13 @@ export async function GET(
       business: { select: { name: true, phone: true, city: true } },
       driver: { select: { lastLat: true, lastLng: true, user: { select: { name: true } } } },
       events: { orderBy: { createdAt: "asc" } },
-      photos: { orderBy: { createdAt: "asc" }, select: { id: true, url: true } },
+      // ⚠️ İZOLASYON: fotoğraflar BU siparişin ilişkisinden geliyor (ayrı bir
+      // orderPhoto sorgusu YOK) — takip token'ıyla giren biri başka siparişin
+      // karesini göremez. `stage` galeride "Alım/Yıkama/Teslim" etiketi olur.
+      photos: {
+        orderBy: { createdAt: "asc" },
+        select: { id: true, url: true, stage: true, createdAt: true },
+      },
       review: { select: { rating: true } },
     },
   });
@@ -60,12 +66,16 @@ export async function GET(
   if (needsAlternatives) {
     try {
       const { activeSubscriptionWhere } = await import("@/lib/subscription");
+      const { gizliFiltre } = await import("@/lib/seoCoverage");
       alternatives = await prisma.cleanerBusiness.findMany({
         where: {
           id: { not: order.businessId },
           isVisible: true,
           verification: { not: "REJECTED" },
           subscription: activeSubscriptionWhere(),
+          // Bekleyen gerçek müşteriye DEMO işletme önerilmesin (2026-07-30):
+          // ikinci kez çıkmaza girer ve platforma güveni biter.
+          ...gizliFiltre(),
           city: { equals: order.business.city, mode: "insensitive" },
           // Tatil modundaki işletmeyi önerme — müşteri yine çıkmaza girer.
           OR: [{ pausedUntil: null }, { pausedUntil: { lte: new Date() } }],

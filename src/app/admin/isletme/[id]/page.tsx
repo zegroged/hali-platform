@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { verifMeta } from "@/lib/verifMeta";
 import { subscriptionActive } from "@/lib/subscription";
 import { ORDER_STATUS_META } from "@/lib/orderStatus";
+import { konumEksik } from "@/lib/panel";
 import {
   activateSubscription,
   clearPauseByAdmin,
@@ -157,6 +158,13 @@ export default async function AdminBusinessDetail({
         >
           {b.isVisible && subOk ? "Müşteriye görünür" : "Yayında değil"}
         </span>
+        {/* Yayın dışı kalmanın en sık ve en görünmez sebebi: il/ilçe boş. */}
+        {konumEksik(b) && (
+          <span className="rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800">
+            İl/ilçe eksik — aramada ve şehir sayfalarında çıkmaz, yayına
+            alınmaz
+          </span>
+        )}
         {b.pausedUntil && b.pausedUntil > new Date() && (
           <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-800">
             Tatil modu: {tr(b.pausedUntil)} tarihine kadar sipariş almıyor

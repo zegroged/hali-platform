@@ -40,6 +40,10 @@ export async function checkSubscriptionRenewals(): Promise<void> {
         gt: simdi,
         lte: new Date(simdi.getTime() + HATIRLATMA_ESIGI_MS),
       },
+      // DEMO panel abonelik/ödeme akışının DIŞINDADIR (2026-07-30): dönemi
+      // uzak geleceğe kurulu ama bir gün geçse bile komisyoncuya "aboneliğin
+      // bitiyor, öde" maili gitmesin — ödeyecek bir abonelik yok.
+      business: { isDemo: false },
     },
     select: {
       businessId: true,
@@ -110,6 +114,7 @@ export async function checkSubscriptionRenewals(): Promise<void> {
     where: {
       status: { in: ["ACTIVE", "TRIAL", "PAST_DUE"] },
       currentPeriodEnd: { lt: simdi },
+      business: { isDemo: false }, // demo "yayından düştün" bildirimi almaz
     },
     select: {
       businessId: true,

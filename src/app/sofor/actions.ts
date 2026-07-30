@@ -85,10 +85,13 @@ export async function savePickup(formData: FormData) {
   // ALIM (öncesi) FOTOĞRAFI ZORUNLU: halının işletmeye teslim edildiği andaki
   // durumunun kanıtı — hasar/kayıp uyuşmazlığında "Fotoğraflı Güvence"nin
   // temeli. Arayüz required; sunucuda da zorunlu (arayüz atlatılabilir).
+  // "ALIM": fotoğraf aşamaya bağlanır (driverOrders.ts ile İKİZ) → müşteri
+  // takip sayfasındaki galeride "Alım" etiketiyle görünür.
   const photoUrl = await saveOrderPhotoFile(
     formData.get("photo"),
     o.businessId,
     o.id,
+    "ALIM",
   );
   // Arayüz (PhotoForm) fotoğrafsız göndermeyi zaten alanın altında net uyarıyla
   // engelliyor. Atlatılırsa TAM-EKRAN hata yerine sessizce /sofor'a dön —
@@ -214,6 +217,7 @@ export async function deliverOrder(formData: FormData) {
     formData.get("photo"),
     o.businessId,
     id,
+    "TESLIM",
   );
   // Arayüz zaten engelliyor; atlatılırsa tam-ekran hata yerine sessizce dön —
   // fotoğraf olmadan DELIVERED olmaz / para kaydı açılmaz.

@@ -55,6 +55,10 @@ export default async function AdminAgents({
         },
       },
       referrals: {
+        // DEMO PANEL "getirilen işletme" DEĞİLDİR (2026-07-30): komisyoncunun
+        // dükkânda gösterdiği tanıtım hesabı sahiplik için aynı bağı
+        // kullanıyor; burada sayılırsa komisyoncunun performansı şişer.
+        where: { isDemo: false },
         select: {
           id: true,
           name: true,

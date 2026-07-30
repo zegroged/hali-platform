@@ -47,6 +47,17 @@ type ProfileCheckable = {
   photos: unknown[];
 };
 
+// İL/İLÇE YOKSA İŞLETME HİÇBİR YERDE LİSTELENMEZ (2026-07-30 düzeltmesi).
+// Admin/destek yeni işletme açarken hiçbir alan zorunlu değildir (bilinçli
+// karar) — ama il/ilçesi boş kalan kayıt keşif, şehir/ilçe sayfaları ve
+// sitemap sorgularının hiçbirine düşmez. Bu kayıtlar "Görünür ✓" işaretiyle
+// duruyordu; admin işletmeyi yayında sanıyor, işletme sahibi ise hiç müşteri
+// alamıyordu. Artık yayın dışı sayılır — sahibi panel profilinden (ya da admin)
+// il/ilçe seçtiği an syncVisibility onu kendiliğinden yayına alır.
+export function konumEksik(b: { city: string; district: string }): boolean {
+  return !b.city.trim() || !b.district.trim();
+}
+
 // Görünürlüğü mevcut duruma göre senkronla — OTOMATİK YAYIN (2026-07-08):
 // profil tam + e-posta doğrulanmış + sözleşme onaylı + en az 1 şoför varsa
 // işletme admin ONAYI BEKLEMEDEN görünür olur (yayında kalmak ayrıca aktif
@@ -71,6 +82,7 @@ export async function syncVisibility(businessId: string): Promise<void> {
   // engel değil — sipariş güvenliği ayrı katmanda (şoförsüz sipariş API 409).
   // Öz-servis kayıtta tam şart seti aynen sürer.
   const ok =
+    !konumEksik(b) &&
     b.verification !== "REJECTED" &&
     (b.createdByAdmin
       ? b.photos.length > 0

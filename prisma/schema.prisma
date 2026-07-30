@@ -171,6 +171,12 @@ model CleanerBusiness {
   // Admin/destek eliyle açıldı: şoför YAYIN şartından muaf (sipariş almak
   // için yine şoför gerekir — sipariş API'si engeller).
   createdByAdmin     Boolean            @default(false)
+  // DEMO İŞLETME (2026-07-30): komisyoncunun dükkânda ürünü GÖSTEREBİLMESİ
+  // için açılan, gerçekçi sahte veriyle dolu hesap. GERÇEK SAYILARA SIZMAZ:
+  // keşif, sitemap, il/ilçe sayfaları, ana sayfa il butonları, "şehrinde
+  // halıcı açıldı" müjde maili, admin sayaçları ve KOMİSYON tahakkuku
+  // dışında tutulur. (env tabanlı SEO_NOINDEX_BUSINESS_IDS ölçeklenmiyordu.)
+  isDemo             Boolean            @default(false)
 
   ratingAvg   Float @default(0)
   ratingCount Int   @default(0)
@@ -425,6 +431,11 @@ model Order {
   // parayı ister. Enum yerine String: yarın "kredi kartı" eklenirse
   // migration gerekmesin (katmerli kalsın).
   collectedMethod String?
+  // SEZON HATIRLATMASI (2026-07-30): bu siparişin müşterisine hatırlatma
+  // gönderildiği an. Aynı kişiye tekrar tekrar gönderilmesini engeller.
+  // ⚠️ Gönderim BAYRAK ARKASINDA (SEZON_HATIRLATMA=1) — hukuki taraf
+  // (6563 + İYS + işletme sözleşmesi §) işletme sahibinde.
+  seasonRemindedAt DateTime?
 
   @@index([businessId, collectedAt])
 
@@ -505,6 +516,11 @@ model OrderPhoto {
   order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
   orderId   String
   url       String
+  // ÇEKİLDİĞİ AŞAMA (2026-07-30) — QR/barkod yerine FOTOĞRAFLA EŞLEŞTİRME
+  // kararının çekirdeği. "ALIM" | "YIKAMA" | "TESLIM". Müşteri takip
+  // sayfasında halısını aşama aşama görür; tesiste "bu kimin halısı"
+  // sorusu fotoğrafla cevaplanır. Eski kayıtlar null kalır.
+  stage     String?
   createdAt DateTime @default(now())
 
   @@index([orderId])

@@ -49,10 +49,18 @@ export async function generateMetadata({
       ? ` ${b.ratingAvg.toFixed(1)}★ (${b.ratingCount} yorum).`
       : "";
   // Sipariş alabiliyor mu? (getBusinessById aboneliği döndürmüyor)
-  const abonelik = await prisma.subscription.findUnique({
-    where: { businessId: id },
-    select: { status: true, currentPeriodEnd: true },
-  });
+  // DEMO kaydı da burada okunur: komisyoncunun dükkânda gösterdiği panelin
+  // işletmesi Google'a bildirilmez (bkz. lib/seoCoverage gizliFiltre).
+  const [abonelik, demoKaydi] = await Promise.all([
+    prisma.subscription.findUnique({
+      where: { businessId: id },
+      select: { status: true, currentPeriodEnd: true },
+    }),
+    prisma.cleanerBusiness.findUnique({
+      where: { id },
+      select: { isDemo: true },
+    }),
+  ]);
   return {
     title: `${b.name} — ${b.district} Halı Yıkama`,
     description:
@@ -66,7 +74,7 @@ export async function generateMetadata({
     // Aramaya kapalı: test/demo kaydı VEYA sipariş alamayan işletme
     // (aboneliği bitmiş / duraklatılmış). Google'dan gelen müşteriyi sipariş
     // veremeyeceği bir sayfaya düşürmek hem onu hem bizi yakıyordu (2026-07-28).
-    ...(seoGizliMi(id) || !subscriptionActive(abonelik)
+    ...(seoGizliMi(id) || demoKaydi?.isDemo || !subscriptionActive(abonelik)
       ? { robots: { index: false, follow: false } }
       : {}),
   };

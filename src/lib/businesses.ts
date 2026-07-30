@@ -350,6 +350,9 @@ export async function getRecentReviews(
         isVisible: true,
         verification: { not: "REJECTED" },
         subscription: activeSubscriptionWhere(),
+        // DEMO işletmenin uydurma yorumu ana sayfada gerçek yorum gibi
+        // görünmesin (2026-07-30) — vitrin güveni tek satırla yıkılır.
+        ...gizliFiltre(),
         ...(city ? { city: { equals: city, mode: "insensitive" } } : {}),
       },
     },

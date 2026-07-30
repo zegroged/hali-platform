@@ -452,13 +452,24 @@ export function TrackScreen({
                   <View style={{ flexDirection: "row", gap: 8 }}>
                     {data.photos.map((p) => {
                       const u = imageUrl(p.url);
+                      // Aşama etiketi (web takip sayfasıyla aynı sözlük):
+                      // müşteri hangi karenin ne zamana ait olduğunu görsün.
+                      const asama =
+                        p.stage === "ALIM"
+                          ? "Alım"
+                          : p.stage === "YIKAMA"
+                            ? "Yıkama"
+                            : p.stage === "TESLIM"
+                              ? "Teslim"
+                              : null;
                       return (
                         u && (
-                          <Image
-                            key={p.id}
-                            source={{ uri: u }}
-                            style={s.orderPhoto}
-                          />
+                          <View key={p.id}>
+                            <Image source={{ uri: u }} style={s.orderPhoto} />
+                            {asama && (
+                              <Text style={s.orderPhotoStage}>{asama}</Text>
+                            )}
+                          </View>
                         )
                       );
                     })}
@@ -693,6 +704,13 @@ const s = StyleSheet.create({
   },
   priceText: { color: C.brandDark, fontWeight: "600" },
   orderPhoto: { width: 110, height: 110, borderRadius: 10, backgroundColor: C.slateBg },
+  orderPhotoStage: {
+    marginTop: 4,
+    fontSize: 12,
+    fontWeight: "600",
+    color: C.brandDark,
+    textAlign: "center",
+  },
   altCard: {
     backgroundColor: C.card,
     borderWidth: 1,

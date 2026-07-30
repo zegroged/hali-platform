@@ -21,16 +21,28 @@ export async function maybeSendWeeklyDigest(): Promise<void> {
   const since = new Date(Date.now() - WEEK_MS);
   const [orders, delivered, newBusinesses, liveCount, reviews, leads] =
     await Promise.all([
-      prisma.order.count({ where: { createdAt: { gte: since } } }),
+      // DEMO PANELLER HAFTALIK NABIZDA SAYILMAZ (2026-07-30): bu mail
+      // "işler nasıl gidiyor" sorusunun cevabı; komisyoncuların satış için
+      // ürettiği uydurma sipariş/yorum buraya karışırsa haftalık büyüme
+      // rakamı satış demosu kadar şişer ve karar bozulur.
       prisma.order.count({
-        where: { status: "DELIVERED", updatedAt: { gte: since } },
+        where: { createdAt: { gte: since }, business: { isDemo: false } },
       }),
-      prisma.cleanerBusiness.count({ where: { createdAt: { gte: since } } }),
+      prisma.order.count({
+        where: {
+          status: "DELIVERED",
+          updatedAt: { gte: since },
+          business: { isDemo: false },
+        },
+      }),
       prisma.cleanerBusiness.count({
-        where: { isVisible: true, verification: { not: "REJECTED" } },
+        where: { createdAt: { gte: since }, isDemo: false },
+      }),
+      prisma.cleanerBusiness.count({
+        where: { isVisible: true, verification: { not: "REJECTED" }, isDemo: false },
       }),
       prisma.review.findMany({
-        where: { createdAt: { gte: since } },
+        where: { createdAt: { gte: since }, business: { isDemo: false } },
         select: { rating: true },
       }),
       prisma.cityLead.groupBy({

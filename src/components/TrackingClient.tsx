@@ -13,6 +13,7 @@ import {
   IconMapPin,
   IconX,
 } from "@/components/icons";
+import { OrderPhotoGallery } from "@/components/OrderPhotoGallery";
 import type { OrderStatus } from "@prisma/client";
 
 const LiveMap = dynamic(() => import("@/components/LiveMap"), {
@@ -41,7 +42,8 @@ type Track = {
   priceApprovedAt: string | null;
   paymentMethod: string;
   estimatedDays: number | null;
-  photos: { id: string; url: string }[];
+  // Fotoğraflar aşamaya bağlı gelir (ALIM/YIKAMA/TESLIM); eski kayıtlarda null.
+  photos: { id: string; url: string; stage: string | null; createdAt: string }[];
   business: { name: string; phone: string };
   events: { status: OrderStatus; note: string | null; at: string }[];
   driver: { name: string; lat: number; lng: number } | null;
@@ -773,26 +775,16 @@ export function TrackingClient({ token }: { token: string }) {
           <AlternativeBusinesses list={data.alternatives} />
         )}
 
-      {/* Halıcının eklediği fotoğraflar */}
+      {/* Halının yolculuğu — aşama etiketli, zaman sıralı kareler. Halıcı
+          panelindeki galerinin AYNISI (OrderPhotoGallery): müşteri ile işletme
+          aynı kanıtı aynı biçimde görür. Fotoğraflar yalnız bu siparişten
+          gelir (API'de siparişin kendi ilişkisinden seçiliyor). */}
       {data.photos.length > 0 && (
         <div>
           <h2 className="mb-2 text-sm font-semibold text-slate-700">
             Halınızdan kareler
           </h2>
-          <div className="grid grid-cols-3 gap-2">
-            {data.photos.map((p) => (
-              <a key={p.id} href={p.url} target="_blank" rel="noreferrer">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={p.url}
-                  alt="Sipariş fotoğrafı"
-                  loading="lazy"
-                  decoding="async"
-                  className="aspect-square w-full rounded-lg border border-slate-200 object-cover"
-                />
-              </a>
-            ))}
-          </div>
+          <OrderPhotoGallery photos={data.photos} />
         </div>
       )}
 

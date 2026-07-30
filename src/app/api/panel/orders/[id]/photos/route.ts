@@ -50,6 +50,10 @@ export async function POST(
   }
 
   const form = await req.formData();
+  // AŞAMA (2026-07-30): panelden YALNIZ "YIKAMA" etiketlenebilir. Alım/teslim
+  // fotoğrafı şoför akışında zorunlu çekilen KANIT'tır; panelden o etiketin
+  // uydurulabilmesi kanıt zincirini değersizleştirirdi. Tanınmayan değer → null.
+  const stage = form.get("stage") === "YIKAMA" ? "YIKAMA" : null;
   const files = form
     .getAll("files")
     .filter((f): f is File => f instanceof File)
@@ -63,7 +67,12 @@ export async function POST(
 
   // Oluşturulan fotoğrafları geri döndür ki istemci sayfayı KOMPLE yenilemeden
   // (router.refresh — ağır yeniden-render) galeriye anında ekleyebilsin.
-  const created: { id: string; url: string }[] = [];
+  const created: {
+    id: string;
+    url: string;
+    stage: string | null;
+    createdAt: Date;
+  }[] = [];
   for (const file of files) {
     const rawExt = ALLOWED[file.type];
     if (!rawExt || file.size > MAX) continue;
@@ -79,8 +88,8 @@ export async function POST(
         img.contentType,
       );
       const row = await prisma.orderPhoto.create({
-        data: { orderId: order.id, url },
-        select: { id: true, url: true },
+        data: { orderId: order.id, url, stage },
+        select: { id: true, url: true, stage: true, createdAt: true },
       });
       created.push(row);
     } catch (e) {
@@ -120,7 +129,12 @@ export async function DELETE(
   // Sahiplik: foto → sipariş → bu işletme zinciri doğrulanır.
   const foto = await prisma.orderPhoto.findFirst({
     where: { id: photoId, order: { id, businessId: b.id } },
-    select: { id: true, url: true, order: { select: { pickupPhotoUrl: true, deliveryPhotoUrl: true } } },
+    select: {
+      id: true,
+      url: true,
+      stage: true,
+      order: { select: { pickupPhotoUrl: true, deliveryPhotoUrl: true } },
+    },
   });
   if (!foto) return NextResponse.json({ ok: false }, { status: 404 });
 
@@ -131,7 +145,12 @@ export async function DELETE(
   // kanıt. Bu uç hepsini ayrım yapmadan siliyordu: halı hasarlı geldiğinde
   // işletme alım fotoğrafını silip "bizde böyle değildi" diyebilirdi.
   // Fazladan çekilmiş diğer fotoğraflar silinebilir; kanıt olanlar duruyor.
+  // Aşama etiketi de kanıt ölçütü: "ALIM"/"TESLIM" yalnız şoför akışında
+  // yazılıyor (panelden yazılamaz), dolayısıyla url eşleşmesi kaçırsa bile
+  // (ör. aynı siparişte ikinci bir alım karesi) korumaya takılır.
   const kanit =
+    foto.stage === "ALIM" ||
+    foto.stage === "TESLIM" ||
     foto.url === foto.order.pickupPhotoUrl ||
     foto.url === foto.order.deliveryPhotoUrl;
   if (kanit) {

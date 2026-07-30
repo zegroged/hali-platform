@@ -16,9 +16,12 @@ import {
   savePayoutInfo,
   requestPayout,
 } from "./actions";
+import { createDemoPanel, resetDemoPanel, deleteDemoPanel } from "./demo-actions";
+import { demoPaneliOku } from "@/lib/demoPanel";
 import { agentBalance } from "@/lib/payout";
 import { MAX_SUB_DISCOUNT, MAX_SUB_DISCOUNT_MONTHS } from "@/lib/discount";
 import { PendingButton } from "@/components/PendingButton";
+import { ConfirmButton } from "@/app/panel/ConfirmButton";
 
 export const dynamic = "force-dynamic";
 
@@ -40,9 +43,11 @@ export default async function KomisyoncuSayfasi({
     yeniKomisyoncu?: string;
     talep?: string;
     odemeBilgisi?: string;
+    demo?: string;
   }>;
 }) {
-  const { yeni, hata, yeniKomisyoncu, talep, odemeBilgisi } = await searchParams;
+  const { yeni, hata, yeniKomisyoncu, talep, odemeBilgisi, demo } =
+    await searchParams;
   // YETKİ KAPISI prisma'dan ÖNCE (app-router-auth-leak dersi).
   const u = await getSessionUser();
   if (!u || u.role !== "AGENT") redirect("/giris");
@@ -51,6 +56,10 @@ export default async function KomisyoncuSayfasi({
     where: { userId: u.id },
     include: {
       referrals: {
+        // DEMO PANEL "getirdiğin işletme" DEĞİLDİR (2026-07-30): sahiplik bağı
+        // için referredByAgentId kullanılıyor ama kazanç listesinde ve
+        // sayaçlarda görünmemeli — kendi demosunu müşteri sanmak yanıltıcı.
+        where: { isDemo: false },
         orderBy: { createdAt: "desc" },
         select: {
           id: true,
@@ -98,7 +107,8 @@ export default async function KomisyoncuSayfasi({
           user: { select: { name: true, username: true, phone: true } },
           // Bölge: ekip listesinde gösterilir, oradan değiştirilir (2026-07-28).
           territories: { select: { city: true, district: true } },
-          _count: { select: { referrals: true } },
+          // Ekip listesindeki "N işletme getirdi" sayısı da demoları saymaz.
+          _count: { select: { referrals: { where: { isDemo: false } } } },
         },
       },
     },
@@ -123,6 +133,10 @@ export default async function KomisyoncuSayfasi({
   const havuz = Number(agent.poolPercent ?? 0);
   // Panel örneği havuza göre (sabit %25 küçük havuzlarda imkânsız örnek veriyordu).
   const ornek = Math.max(1, Math.round((havuz / 2) * 100) / 100);
+
+  // DEMO PANEL (2026-07-30): dükkânda gösterilecek, gerçekçi veriyle dolu
+  // örnek işletme hesabı. Giriş bilgisi türetilir (bkz. lib/demoPanel.ts).
+  const demoBilgi = await demoPaneliOku(agent.id);
 
   // ÖDEME (çekim) durumu: bakiye + bekleyen/son talepler.
   const [bakiye, talepler] = await Promise.all([
@@ -233,6 +247,149 @@ export default async function KomisyoncuSayfasi({
           {hata}
         </p>
       )}
+
+      {demo === "kuruldu" && (
+        <p className="rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+          Demo panelin hazır — giriş bilgileri aşağıda. Telefondan aç, halıcıya
+          göster.
+        </p>
+      )}
+      {demo === "sifirlandi" && (
+        <p className="rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+          Demo panel sıfırlandı — veriler yeniden kuruldu, giriş bilgilerin
+          değişmedi.
+        </p>
+      )}
+      {demo === "silindi" && (
+        <p className="rounded-xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+          Demo panelin silindi. İstediğinde yeniden oluşturabilirsin.
+        </p>
+      )}
+      {demo === "var" && (
+        <p className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          Zaten bir demo panelin var — aşağıdaki giriş bilgilerini kullan.
+        </p>
+      )}
+
+      {/* DEMO PANEL — satışın ilk hamlesi: "görmek inanmaktır" (2026-07-30).
+          Komisyoncu dükkânda telefonundan girip ürünü canlı gösterir. Bu
+          işletme gerçek sayılara, keşfe, komisyona ve ödeme akışına GİRMEZ. */}
+      <section className="rounded-2xl border border-violet-200 bg-white p-5">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="font-semibold text-slate-900">
+            Demo Panelim{" "}
+            <span className="text-xs font-normal text-slate-400">
+              (dükkânda göstermek için)
+            </span>
+          </h2>
+          {demoBilgi && (
+            <span className="rounded-full bg-violet-100 px-2.5 py-0.5 text-xs font-medium text-violet-700">
+              {demoBilgi.siparisSayisi} örnek sipariş
+            </span>
+          )}
+        </div>
+
+        {!demoBilgi ? (
+          <>
+            <p className="mt-2 text-sm text-slate-600">
+              Halıcıya anlatmak yerine <strong>gösterin</strong>. Tek tıkla,
+              size ait örnek bir işletme hesabı açılır: iki şoför (biri
+              mesaide), farklı aşamalarda siparişler, dolu bir kasa, yorumlar ve
+              fiyat listesi. Telefondan girip ekranı çevirmeniz yeter.
+            </p>
+            <form action={createDemoPanel} className="mt-3">
+              <PendingButton className="rounded-lg bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-700">
+                Demo panelimi oluştur
+              </PendingButton>
+            </form>
+            <p className="mt-2 text-xs text-slate-500">
+              Bu hesap yalnız sizindir; müşteri aramalarında, il/ilçe
+              sayfalarında ve platform sayaçlarında görünmez. Örnek siparişlerin
+              telefon numaraları sahtedir — kimseye mesaj gitmez.
+            </p>
+          </>
+        ) : (
+          <>
+            <dl className="mt-3 grid gap-2 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm sm:grid-cols-2">
+              <div className="sm:col-span-2">
+                <dt className="text-xs text-slate-500">İşletme</dt>
+                <dd className="font-medium text-slate-900">
+                  {demoBilgi.isletmeAdi} · {demoBilgi.district}, {demoBilgi.city}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs text-slate-500">
+                  Halıcı girişi — kullanıcı adı
+                </dt>
+                <dd className="font-mono font-semibold text-slate-900">
+                  {demoBilgi.kullaniciAdi}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs text-slate-500">Şifre</dt>
+                <dd className="font-mono font-semibold text-slate-900">
+                  {demoBilgi.sifre}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs text-slate-500">
+                  Şoför girişi — kullanıcı adı
+                </dt>
+                <dd className="font-mono font-semibold text-slate-900">
+                  {demoBilgi.soforKullaniciAdi}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs text-slate-500">Şoför şifresi</dt>
+                <dd className="font-mono font-semibold text-slate-900">
+                  {demoBilgi.soforSifre}
+                </dd>
+              </div>
+            </dl>
+
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <Link
+                href="/giris"
+                className="rounded-lg bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-700"
+              >
+                Giriş sayfasını aç
+              </Link>
+              <Link
+                href={`/halici/${demoBilgi.businessId}`}
+                className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              >
+                Müşteri görünümü
+              </Link>
+              <form action={resetDemoPanel}>
+                <ConfirmButton
+                  message="Demo verileri silinip yeniden kurulacak. Giriş bilgilerin değişmez. Devam edilsin mi?"
+                  className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  Sıfırla
+                </ConfirmButton>
+              </form>
+              <form action={deleteDemoPanel}>
+                <ConfirmButton
+                  message="Demo panelin ve tüm örnek verisi silinecek. Emin misin?"
+                  className="rounded-lg border border-red-200 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-50"
+                >
+                  Sil
+                </ConfirmButton>
+              </form>
+            </div>
+            <p className="mt-2 text-xs text-slate-500">
+              Gösterim sırasında sipariş kabul edip ilerletebilirsin — panel
+              bozulmaz, <strong>Sıfırla</strong> ile her şey ilk hâline döner.
+              Bu hesap keşifte, arama motorunda ve platform sayaçlarında yer
+              almaz; komisyon da üretmez. Örnek siparişlerin telefonları
+              sahtedir, kimseye mesaj gitmez.
+              <br />
+              <strong>Not:</strong> demo hesabına girince bu paneldeki oturumun
+              kapanır — göstermek için ayrı bir tarayıcı ya da telefon kullan.
+            </p>
+          </>
+        )}
+      </section>
 
       {/* ÖDEME / ÇEKİM — bakiye, IBAN, aylık otomatik gün, talep butonu */}
       <section className="rounded-2xl border border-slate-200 bg-white p-5">

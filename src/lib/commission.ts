@@ -21,6 +21,7 @@ export async function accrueCommissionForPayment(paymentId: string): Promise<voi
         businessId: true,
         business: {
           select: {
+            isDemo: true,
             referredByAgentId: true,
             discountGrantedByAgentId: true,
             referredByAgent: {
@@ -40,6 +41,12 @@ export async function accrueCommissionForPayment(paymentId: string): Promise<voi
       },
     });
     if (!payment || payment.status !== "PAID") return;
+    // DEMO İŞLETME KOMİSYON ÜRETMEZ (2026-07-30) — DOĞRUDAN SUİSTİMAL KAPISI.
+    // Demo panel komisyoncunun KENDİ kodu/kendi hesabıyla açılıyor; oraya bir
+    // ödeme kaydı düşerse (elle, yanlışlıkla ya da kasten) komisyoncu kendi
+    // uydurma müşterisinden kendine para yazdırırdı. Ödemenin nasıl oluştuğuna
+    // bakmadan burada kesiyoruz: tahakkuk defterine demo satırı GİRMEZ.
+    if (payment.business.isDemo) return;
     const agent = payment.business.referredByAgent;
     if (!agent) return;
 
@@ -168,7 +175,9 @@ export async function backfillMissingCommissions(): Promise<void> {
         amount: { gt: 0 },
         paidAt: { gte: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000) },
         commission: null,
-        business: { referredByAgentId: { not: null } },
+        // Demo işletme tahakkuk üretmez (accrue zaten kesiyor); pencereyi de
+        // tıkamasın diye burada baştan eleniyor.
+        business: { isDemo: false, referredByAgentId: { not: null } },
       },
       select: { id: true },
       take: 50,

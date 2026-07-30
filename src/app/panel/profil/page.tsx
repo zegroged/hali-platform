@@ -3,6 +3,7 @@ import {
   updateProfileBasics,
   setWorkingHours,
   addPricingItem,
+  updatePricingItem,
   removePricingItem,
   addServiceArea,
   removeServiceArea,
@@ -14,6 +15,7 @@ import { PhotoUpload } from "@/components/PhotoUpload";
 import CityDistrictSelect from "@/components/CityDistrictSelect";
 import { districtsOfCity } from "@/lib/cities";
 import { IconX, IconCheck } from "@/components/icons";
+import { FiyatEkle } from "./FiyatEkle";
 
 const inp =
   "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand";
@@ -379,63 +381,96 @@ export default async function PanelProfile({
         <h2 className="mb-3 font-semibold text-slate-900">
           Fiyatlandırma (kategori bazlı)
         </h2>
+        {[...main, ...addons].length === 0 && (
+          <p className="mb-1 text-sm text-slate-500">
+            Henüz fiyat yok. Aşağıdaki hazır düğmelerden başlayabilirsin.
+          </p>
+        )}
+        {/* Her satır kendi düzenleme formunu açar (<details>): zam yapmak için
+            artık "sil + yeniden ekle" gerekmiyor — kalem sırası ve fiyat
+            geçmişte bir an kaybolmuyordu. */}
         <div className="space-y-1.5">
           {[...main, ...addons].map((p) => (
-            <div
+            <details
               key={p.id}
-              className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-1.5 text-sm"
+              className="group rounded-lg bg-slate-50 open:bg-white open:ring-1 open:ring-slate-200"
             >
-              <span className="text-slate-700">
-                {p.label}
-                {p.isAddon && (
-                  <span className="ml-1 text-xs text-slate-500">(ek)</span>
-                )}
-              </span>
-              <span className="flex items-center gap-2">
-                <span className="font-medium">
-                  {Number(p.price)} TL {UNIT_LABEL[p.unit]}
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2 text-sm [&::-webkit-details-marker]:hidden">
+                <span className="text-slate-700">
+                  {p.label}
+                  {p.isAddon && (
+                    <span className="ml-1 text-xs text-slate-500">(ek)</span>
+                  )}
                 </span>
-                <form action={removePricingItem}>
+                <span className="flex items-center gap-2">
+                  <span className="font-medium">
+                    {Number(p.price)} TL {UNIT_LABEL[p.unit]}
+                  </span>
+                  <span className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 group-open:border-brand group-open:text-brand">
+                    Düzenle
+                  </span>
+                </span>
+              </summary>
+              <div className="border-t border-slate-200 px-3 py-3">
+                <form
+                  action={updatePricingItem}
+                  className="grid grid-cols-2 gap-2 sm:grid-cols-12"
+                >
+                  <input type="hidden" name="id" value={p.id} />
+                  <div className="col-span-2 sm:col-span-5">
+                    <label className={lbl}>Ne yıkıyorsun?</label>
+                    <input name="label" defaultValue={p.label} className={inp} />
+                  </div>
+                  <div className="col-span-1 sm:col-span-2">
+                    <label className={lbl}>Fiyat (TL)</label>
+                    <input
+                      name="price"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      inputMode="decimal"
+                      defaultValue={Number(p.price)}
+                      className={inp}
+                    />
+                  </div>
+                  <div className="col-span-1 sm:col-span-3">
+                    <label className={lbl}>Nasıl hesaplanır?</label>
+                    <select name="unit" defaultValue={p.unit} className={inp}>
+                      <option value="PER_M2">metrekare başına</option>
+                      <option value="PER_PIECE">adet başına</option>
+                      <option value="FLAT">sabit ücret</option>
+                    </select>
+                  </div>
+                  <label className="col-span-2 flex items-center gap-1.5 self-end pb-2 text-xs text-slate-500 sm:col-span-2">
+                    <input
+                      type="checkbox"
+                      name="isAddon"
+                      defaultChecked={p.isAddon}
+                      className="h-4 w-4 accent-brand"
+                    />{" "}
+                    ek hizmet
+                  </label>
+                  <PendingButton className="col-span-2 rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark active:scale-[0.99] disabled:opacity-60 sm:col-span-12">
+                    Değişikliği kaydet
+                  </PendingButton>
+                </form>
+                <form action={removePricingItem} className="mt-2">
                   <input type="hidden" name="id" value={p.id} />
                   <ConfirmButton
                     message={`"${p.label}" fiyat kalemi silinsin mi?`}
-                    className="-my-1.5 rounded-lg px-2.5 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
+                    className="w-full rounded-lg border border-red-200 px-2.5 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
                   >
-                    Sil
+                    Bu kalemi sil
                   </ConfirmButton>
                 </form>
-              </span>
-            </div>
+              </div>
+            </details>
           ))}
         </div>
-        {/* Mobilde 2 kolonlu katman, sm+ ekranda 12 kolonlu tek satır */}
-        <form
+        <FiyatEkle
           action={addPricingItem}
-          className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-12"
-        >
-          <input
-            name="label"
-            placeholder="Etiket (ör. Makine Halısı)"
-            className={`${inp} col-span-2 sm:col-span-5`}
-          />
-          <input
-            name="price"
-            type="number"
-            placeholder="Fiyat"
-            className={`${inp} col-span-1 sm:col-span-2`}
-          />
-          <select name="unit" className={`${inp} col-span-1 sm:col-span-3`}>
-            <option value="PER_M2">/m²</option>
-            <option value="PER_PIECE">/adet</option>
-            <option value="FLAT">sabit</option>
-          </select>
-          <label className="col-span-2 flex items-center gap-1.5 text-xs text-slate-500 sm:col-span-2">
-            <input type="checkbox" name="isAddon" className="h-4 w-4 accent-brand" /> ek
-          </label>
-          <button className="col-span-2 rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark active:scale-[0.99] sm:col-span-12">
-            Fiyat ekle
-          </button>
-        </form>
+          mevcutEtiketler={b.pricing.map((p) => p.label)}
+        />
       </section>
 
       {/* Hizmet bölgeleri */}

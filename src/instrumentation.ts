@@ -1,29 +1,15 @@
 // Sunucu açılışında bir kez çalışır (Next.js instrumentation hook).
 // KVKK saklama süresi temizliği: gizlilik politikası ve şoför aydınlatması
-// 12 ayı aşan konum kayıtlarının silineceğini taahhüt eder — burada uygulanır.
+// 12 ayı aşan konum/durak kayıtlarının silineceğini taahhüt eder — zamanlaması
+// burada, gövdesi lib/retention.ts'te.
 
-const RETENTION_DAYS = 365;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 async function purgeOldLocationData() {
-  // prisma'yı burada import et: instrumentation edge bundle'ına sızmasın.
-  const { prisma } = await import("@/lib/prisma");
-  const cutoff = new Date(Date.now() - RETENTION_DAYS * DAY_MS);
-  try {
-    const pings = await prisma.driverLocationPing.deleteMany({
-      where: { recordedAt: { lt: cutoff } },
-    });
-    const stops = await prisma.driverStop.deleteMany({
-      where: { startedAt: { lt: cutoff } },
-    });
-    if (pings.count > 0 || stops.count > 0) {
-      console.log(
-        `[saklama-temizligi] ${pings.count} konum izi + ${stops.count} durak silindi (>${RETENTION_DAYS} gün)`,
-      );
-    }
-  } catch (e) {
-    console.error("[saklama-temizligi] hata:", e);
-  }
+  // Gövde lib/retention.ts'te (parçalı silme + durak kayıtları). Buradan yalnız
+  // çağrılır: bu dosya zamanlayıcı kalsın, iş mantığı kütüphanede dursun.
+  // Dinamik import: prisma instrumentation edge bundle'ına sızmasın.
+  await (await import("@/lib/retention")).purgeExpiredLocationData();
 }
 
 async function hourlyTick() {
@@ -68,6 +54,51 @@ async function hourlyTick() {
   } catch (e) {
     console.error("[kasa-tekrar] hata:", e);
   }
+  try {
+    await dailyTick();
+  } catch (e) {
+    console.error("[gunluk-tik] hata:", e);
+  }
+}
+
+const DAILY_STATE_KEY = "dailyTickDay";
+
+/**
+ * GÜNLÜK tik — saatlik tikin içinden çağrılır, TR takvim günü değiştiyse çalışır.
+ *
+ * NEDEN AppState işareti: konteyner gün içinde birkaç kez yeniden başlıyor
+ * (deploy, OOM). "Açılışta bir kez + 24 saatlik interval" deseni kullanılsaydı
+ * aynı gün İKİ KEZ çalışır, müşteriye iki kez yazardı.
+ *
+ * NEDEN upsert DEĞİL: açılışta hourlyTick İKİ KEZ tetikleniyor (hemen + 30 sn),
+ * "önce oku, yoksa yaz" arasında ikisi de boş okuyup ikisi de çalışabilirdi.
+ * Tek UPDATE ... WHERE value <> bugün atomiktir: yarışı yalnız biri kazanır.
+ */
+async function dailyTick() {
+  const { prisma } = await import("@/lib/prisma");
+  const { bugunISO } = await import("@/lib/tahsilat");
+  const bugun = bugunISO(new Date());
+
+  const guncellenen = await prisma.appState.updateMany({
+    where: { key: DAILY_STATE_KEY, value: { not: bugun } },
+    data: { value: bugun },
+  });
+  if (guncellenen.count === 0) {
+    // Ya kayıt hiç yok (ilk çalışma) ya da bugün zaten çalıştı. Anahtar birincil
+    // anahtar olduğundan create çakışırsa ikincisidir → sessizce çık.
+    const olusturuldu = await prisma.appState
+      .create({ data: { key: DAILY_STATE_KEY, value: bugun } })
+      .catch(() => null);
+    if (!olusturuldu) return;
+  }
+
+  try {
+    // Sezon hatırlatması — SEZON_HATIRLATMA=1 değilse fonksiyon hemen döner.
+    const { sendSeasonReminders } = await import("@/lib/seasonReminder");
+    await sendSeasonReminders();
+  } catch (e) {
+    console.error("[sezon-hatirlatma] hata:", e);
+  }
 }
 
 export async function register() {
@@ -78,7 +109,8 @@ export async function register() {
   const timer = setInterval(purgeOldLocationData, DAY_MS);
   if (typeof timer.unref === "function") timer.unref();
   // Saatlik tik: haftalık özet (yalnız TR pazartesi, AppState işaretli) +
-  // sipariş SLA bekçisi (2s hatırlatma / 24s eskalasyon; sipariş başına bir kez).
+  // sipariş SLA bekçisi (2s hatırlatma / 24s eskalasyon; sipariş başına bir kez)
+  // + GÜNLÜK tik (sezon hatırlatması; TR günü başına bir kez, AppState işaretli).
   // await ETME: birikmiş iş (e-posta döngüsü) açılışı bloklamasın — kesinti
   // sonrası site bir an önce ayağa kalkmalı.
   void hourlyTick();

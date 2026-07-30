@@ -42,6 +42,12 @@ const DURUM: Record<string, { cls: string; text: string }> = {
     cls: "border-amber-300 bg-amber-50 text-amber-800",
     text: "Aktif bir otomatik ödeme talimatın yok.",
   },
+  // Komisyoncunun tanıtım hesabı: aboneliği ücretsiz ve süresizdir, ödeme
+  // akışına hiç girmez (bkz. lib/demoPanel.ts).
+  demo: {
+    cls: "border-violet-300 bg-violet-50 text-violet-800",
+    text: "Bu bir DEMO panelidir — aboneliği ücretsiz ve süresizdir, ödeme alınmaz.",
+  },
   "hazir-degil": {
     cls: "border-amber-300 bg-amber-50 text-amber-800",
     text: "Otomatik ödeme henüz aktif değil; şimdilik ödeme onay sürecinde alınır.",

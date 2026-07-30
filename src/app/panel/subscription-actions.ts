@@ -18,6 +18,12 @@ export async function startSubscriptionPayment() {
   const b = await getCurrentBusiness();
   if (!b) redirect("/giris");
 
+  // DEMO PANEL ÖDEME AKIŞINA GİRMEZ (2026-07-30). Komisyoncunun dükkânda
+  // gösterdiği hesabın aboneliği sonsuz ve ücretsizdir; buradan iyzico'ya
+  // gerçek bir tahsilat isteği çıkması (yanlış tıklama, meraklı müşteri)
+  // gerçek para hareketi + gerçek fatura kaydı doğururdu.
+  if (b.isDemo) redirect("/panel/abonelik?durum=demo");
+
   // iyzico canlıda alıcı için geçerli e-posta + kimlik no ister.
   if (!b.owner.email || !b.owner.emailVerified) {
     redirect("/panel?odeme=eposta"); // önce e-posta doğrula

@@ -27,6 +27,11 @@ export default async function AbonelikTalimatOde() {
   if (!recurringEnabled) redirect("/panel/abonelik?durum=hazir-degil");
   const b = await getCurrentBusiness();
   if (!b) redirect("/giris");
+  // DEMO İŞLETME ÖDEME AKIŞINA GİRMEZ (2026-07-30 denetim — KRİTİK).
+  // Tek seferlik ödeme yolu isDemo ile kapatılmıştı ama KARDEŞ YOL olan
+  // düzenli ödeme talimatı açık kalmıştı: demo hesap iyzico'ya GERÇEK
+  // talimat isteği atabiliyordu (kart saklama + her ay çekim).
+  if (b.isDemo) redirect("/panel/abonelik?durum=demo-odeme-yok");
   if (!b.owner.email || !b.owner.emailVerified) redirect("/panel?odeme=eposta");
   const identity = (b.taxNumber ?? "").replace(/\D/g, "");
   if (identity.length < 10) redirect("/panel/profil?odeme=vergino");

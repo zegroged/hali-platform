@@ -106,7 +106,9 @@ export type Tracking = {
   quotedPrice: number | null;
   priceApprovedAt: string | null;
   estimatedDays: number | null;
-  photos: { id: string; url: string }[];
+  // stage: fotoğrafın çekildiği aşama ("ALIM"/"YIKAMA"/"TESLIM"). Eski
+  // kayıtlarda ve eski sunucuda yok → opsiyonel (etiketsiz gösterilir).
+  photos: { id: string; url: string; stage?: string | null }[];
   // Teslim sonrası değerlendirme: yorumlandıysa yıldızı, yoksa (üye+sahipse)
   // yorum formunu göster (web TrackingClient ile aynı).
   review: { rating: number } | null;

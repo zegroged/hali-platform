@@ -45,11 +45,20 @@ export async function claimCode(codeId: string): Promise<boolean> {
 }
 
 /** Tüketilen kodu oluşturulan işletmeye iliştir (raporlamada "hangi kod
- *  hangi işletmeye" görünür). Best-effort. */
+ *  hangi işletmeye" görünür). Best-effort.
+ *
+ *  DEMO İŞLETMEYE KOD BAĞLANMAZ (2026-07-30): komisyoncunun dükkânda
+ *  gösterdiği demo panel referans zincirine girmemeli — girerse "kodumla
+ *  işletme getirdim" raporunda uydurma bir satır olur ve komisyon
+ *  tahakkukunun (lib/commission.ts) ikinci savunma hattı delinmiş sayılır. */
 export async function attachCodeToBusiness(
   codeId: string,
   businessId: string,
 ): Promise<void> {
+  const b = await prisma.cleanerBusiness
+    .findUnique({ where: { id: businessId }, select: { isDemo: true } })
+    .catch(() => null);
+  if (b?.isDemo) return;
   await prisma.agentReferralCode
     .update({ where: { id: codeId }, data: { usedByBusinessId: businessId } })
     .catch(() => {});

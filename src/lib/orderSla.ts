@@ -38,6 +38,9 @@ export async function checkStaleOrders(): Promise<void> {
       isManual: false,
       createdAt: { lt: new Date(now - REMIND_AFTER_MS) },
       staleRemindedAt: null,
+      // DEMO panelde "bekleyen talep" bilerek duruyor (satışta gösterilecek).
+      // Bekçi onu gerçek sanıp uydurma numaraya SMS atmasın (2026-07-30).
+      business: { isDemo: false },
     },
     select: {
       id: true,
@@ -81,6 +84,8 @@ export async function checkStaleOrders(): Promise<void> {
       isManual: false,
       createdAt: { lt: new Date(now - ESCALATE_AFTER_MS) },
       staleEscalatedAt: null,
+      // Demo siparişi adminlere "işletme siparişi bekletiyor" diye zil çaldırmasın.
+      business: { isDemo: false },
     },
     select: {
       id: true,

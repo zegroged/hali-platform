@@ -51,6 +51,12 @@ export async function POST(req: NextRequest) {
       id: d.businessId,
       isVisible: true,
       verification: { not: "REJECTED" },
+      // DEMO İŞLETME GERÇEK SİPARİŞ ALMAZ (2026-07-30 denetim).
+      // Demo, komisyoncunun dükkânda ürünü göstermesi için var; profili
+      // doğrudan bağlantıyla açılabildiği için sipariş formu da erişilebilir
+      // kalıyordu. Gerçek bir müşteri oraya sipariş verirse hem müşteri
+      // mağdur olur (kimse hizmet vermez) hem demo verisi kirlenir.
+      isDemo: false,
     },
     select: {
       id: true,

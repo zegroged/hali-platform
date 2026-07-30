@@ -519,15 +519,31 @@ export default async function OrderManagePage({
         </div>
       )}
 
-      {/* Fotoğraflar */}
+      {/* Fotoğraflar — FOTOĞRAFLA EŞLEŞTİRME (QR/barkod yerine seçilen çözüm).
+          Yıkama sırasında çekilen kareler "YIKAMA" aşamasına bağlanır; müşteri
+          takip sayfasında aynı galeriyi aynı etiketlerle görür. */}
       <div className={card}>
         {/* Sayaç yok: galeri yerel state ile anında güncelleniyor; sunucudan
             gelen sabit sayı yükleme sonrası yanıltıcı kalırdı. */}
-        <h2 className="font-semibold text-slate-900">Fotoğraflar</h2>
+        <h2 className="font-semibold text-slate-900">
+          {o.status === "WASHING" ? "Fotoğraflar · Yıkama" : "Fotoğraflar"}
+        </h2>
+        {o.status === "WASHING" && (
+          <p className="mt-1 text-sm text-slate-600">
+            Halı yıkanırken fotoğraf çek — müşteri işin yapıldığını görür,
+            tesiste “bu kimin halısı” sorusu fotoğrafla cevaplanır.
+          </p>
+        )}
         <div className="mt-3">
           <OrderPhotoManager
             orderId={o.id}
-            photos={o.photos.map((p) => ({ id: p.id, url: p.url }))}
+            photos={o.photos.map((p) => ({
+              id: p.id,
+              url: p.url,
+              stage: p.stage,
+              createdAt: p.createdAt.toISOString(),
+            }))}
+            uploadStage={o.status === "WASHING" ? "YIKAMA" : undefined}
           />
         </div>
       </div>

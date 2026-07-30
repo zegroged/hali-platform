@@ -66,10 +66,34 @@ export function seoGizliIdler(): string[] {
     .filter(Boolean);
 }
 
-/** Prisma `where` eki: gizli işletmeleri dışarıda bırakır. */
+/**
+ * Prisma `where` eki: gizli işletmeleri dışarıda bırakır.
+ *
+ * İKİ KAYNAK:
+ *  1) env'deki kimlik listesi (elle kapatılan tek tük test kaydı),
+ *  2) `isDemo` — komisyoncunun dükkânda gösterdiği DEMO paneli (2026-07-30).
+ *
+ * NEDEN isDemo BURADA: bu fonksiyon keşif (lib/businesses.ts), sitemap,
+ * il/ilçe kapsamı (seoKapsam), ana sayfa il butonları (lib/supplyCities.ts) ve
+ * "şehrinde halıcı açıldı" müjde maili (lib/cityLeads.ts) tarafından ORTAK
+ * kullanılıyor. Tek yere yazılınca beşi birden korunur; ayrı ayrı yazılsaydı
+ * biri unutulur ve uydurma bir işletme gerçek müşteriye çıkardı.
+ */
 export function gizliFiltre() {
   const idler = seoGizliIdler();
-  return idler.length ? { id: { notIn: idler } } : {};
+  return {
+    isDemo: false,
+    // 🔴 `id` DEĞİL `AND` (2026-07-30 denetim bulgusu — KRİTİK).
+    // Eskiden `{ id: { notIn: [...] } }` dönüyordu ve bu nesne yayıldığında
+    // ÇAĞIRANIN KENDİ `id` FİLTRESİNİ EZİYORDU. Somut hasar: cityLeads.ts'te
+    // `{ id: businessId, ...gizliFiltre() }` yazılmıştı → businessId filtresi
+    // yok oluyor, "şehrinde halıcı açıldı" müjde maili YANLIŞ işletme için
+    // tetiklenebiliyordu. Aynı tuzak api/orders/[token] alternatif önerisinde
+    // de vardı (`id: { not: ... }` eziliyordu).
+    // `AND` ayrı bir anahtar olduğu için hiçbir çağıranın filtresini bozmaz;
+    // üst seviyede AND kullanan çağıran yok (kontrol edildi).
+    ...(idler.length ? { AND: [{ id: { notIn: idler } }] } : {}),
+  };
 }
 
 /** Bu işletme aramaya kapalı mı? (profil sayfasında noindex için) */

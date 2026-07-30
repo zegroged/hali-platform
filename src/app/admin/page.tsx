@@ -4,6 +4,7 @@ import { getSessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { verifMeta, subscriptionLabel } from "@/lib/verifMeta";
 import { subscriptionActive } from "@/lib/subscription";
+import { konumEksik } from "@/lib/panel";
 import { approveBusiness } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -29,8 +30,13 @@ export default async function AdminHome({
         _count: { select: { drivers: true, orders: true } },
       },
     }),
-    prisma.driver.count(),
-    prisma.order.count(),
+    // DEMO SAYILMAZ (2026-07-30): komisyoncuların dükkânda gösterdiği demo
+    // panellerin şoförü/siparişi platformun gerçek hacmi değildir. Liste
+    // aşağıda demo kayıtları GÖSTERİR (denetlenebilirlik) ama sayaçlar
+    // yalnız gerçeği sayar — yoksa "kaç işletmemiz var" sorusunun cevabı
+    // sattığımız demoların sayısına göre şişerdi.
+    prisma.driver.count({ where: { business: { isDemo: false } } }),
+    prisma.order.count({ where: { business: { isDemo: false } } }),
     // "Açılınca haber ver" kayıtları — hangi şehirde müşteri talebi birikiyor
     // (işletme kazanım görüşmelerinde koz: "X şehrinde N kişi bekliyor").
     prisma.cityLead.groupBy({
@@ -44,6 +50,9 @@ export default async function AdminHome({
       where: {
         status: "CREATED",
         createdAt: { lt: new Date(Date.now() - 2 * 60 * 60 * 1000) },
+        // Demo panelde bilerek "bekleyen talep" duruyor — gerçek bir müşteri
+        // beklemiyor; admin'in acil listesini kirletmesin.
+        business: { isDemo: false },
       },
       orderBy: { createdAt: "asc" },
       take: 20,
@@ -58,8 +67,17 @@ export default async function AdminHome({
     }),
   ]);
 
-  const pending = businesses.filter((b) => b.verification === "PENDING");
-  const live = businesses.filter(
+  // SAYAÇLAR VE UYARILAR YALNIZ GERÇEK İŞLETMEYİ SAYAR (2026-07-30).
+  // Komisyoncuların dükkânda gösterdiği DEMO paneller listede durur
+  // (denetlenebilir olmalı, aşağıda rozetle işaretli) ama "kaç işletmemiz
+  // var" rakamını şişirmez; rozet/konum uyarıları da onlar için anlamsızdır.
+  const gercekler = businesses.filter((b) => !b.isDemo);
+  const demoSayisi = businesses.length - gercekler.length;
+  const pending = gercekler.filter((b) => b.verification === "PENDING");
+  // İl/ilçesi boş kayıtlar: keşifte, şehir sayfalarında ve sitemap'te ÇIKMAZ.
+  // Bunlar sessizce ölü kayıt olduğundan admin'e listenin başında söylenir.
+  const konumsuz = gercekler.filter(konumEksik);
+  const live = gercekler.filter(
     (b) =>
       b.verification === "VERIFIED" &&
       b.isVisible &&
@@ -68,7 +86,7 @@ export default async function AdminHome({
 
   // Gözetim sayaçları — platformun bir bakışta durumu
   const stats = [
-    { label: "İşletme", value: businesses.length },
+    { label: "İşletme", value: gercekler.length },
     { label: "Onay bekleyen", value: pending.length },
     { label: "Yayında", value: live },
     { label: "Şoför", value: driverCount },
@@ -265,7 +283,36 @@ export default async function AdminHome({
 
       {/* Tüm işletmeler — satıra tıkla → tam denetim sayfası */}
       <section>
-        <h2 className="mb-3 font-semibold text-slate-900">Tüm İşletmeler</h2>
+        <h2 className="mb-3 font-semibold text-slate-900">
+          Tüm İşletmeler
+          {demoSayisi > 0 && (
+            <span className="ml-2 text-sm font-normal text-slate-500">
+              ({demoSayisi} demo panel sayaçlara dahil değil)
+            </span>
+          )}
+        </h2>
+        {konumsuz.length > 0 && (
+          <p
+            role="alert"
+            className="mb-3 rounded-xl border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800"
+          >
+            <strong>{konumsuz.length} işletmenin il/ilçesi eksik</strong> —
+            keşifte, şehir sayfalarında ve sitemap&apos;te listelenmiyorlar, bu
+            yüzden yayına da alınmıyorlar. İl/ilçe girilince kendiliğinden
+            yayına girerler:{" "}
+            {konumsuz.map((b, i) => (
+              <span key={b.id}>
+                {i > 0 && ", "}
+                <Link
+                  href={`/admin/isletme/${b.id}`}
+                  className="font-medium underline"
+                >
+                  {b.name}
+                </Link>
+              </span>
+            ))}
+          </p>
+        )}
         <div className="no-scrollbar overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
           <table className="w-full min-w-[560px] text-sm">
             <thead className="bg-slate-50 text-left text-xs text-slate-500">
@@ -290,7 +337,20 @@ export default async function AdminHome({
                       >
                         {b.name}
                       </Link>
-                      <div className="text-xs text-slate-500">{b.district}</div>
+                      {b.isDemo && (
+                        <span className="ml-2 rounded-full bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-700">
+                          DEMO
+                        </span>
+                      )}
+                      {konumEksik(b) ? (
+                        <div className="text-xs font-medium text-red-700">
+                          il/ilçe eksik — listelenmiyor
+                        </div>
+                      ) : (
+                        <div className="text-xs text-slate-500">
+                          {b.district}
+                        </div>
+                      )}
                     </td>
                     <td className="px-4 py-2.5">
                       <span

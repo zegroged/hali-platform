@@ -1,6 +1,7 @@
 import sharp from "sharp";
 import { prisma } from "@/lib/prisma";
 import { saveObject } from "@/lib/storage";
+import type { PhotoStage } from "@/lib/photoStage";
 
 const MAX = 8 * 1024 * 1024; // 8 MB (server action gövde limitiyle uyumlu)
 const MAX_EDGE = 2560;
@@ -11,11 +12,16 @@ const ALLOWED = new Set(["image/jpeg", "image/png", "image/webp"]);
  * Şoför aksiyonlarından gelen sipariş fotoğrafı: doğrula → küçült/WebP →
  * kaydet → OrderPhoto satırı aç (müşteri takip sayfasında görür).
  * Geçersiz/boş dosyada null döner — fotoğraf opsiyonel, akışı bloklamaz.
+ *
+ * `stage` (2026-07-30): fotoğraf artık AŞAMAYA bağlanıyor ("ALIM"/"TESLIM").
+ * Order.pickupPhotoUrl/deliveryPhotoUrl geri uyumluluk için duruyor; galeri ve
+ * müşteri takibi bu alandan besleniyor. Aşamasız çağrı eski davranışı korur.
  */
 export async function saveOrderPhotoFile(
   file: unknown,
   businessId: string,
   orderId: string,
+  stage?: PhotoStage,
 ): Promise<string | null> {
   if (!(file instanceof File) || file.size === 0) return null;
   if (!ALLOWED.has(file.type) || file.size > MAX) return null;
@@ -43,6 +49,6 @@ export async function saveOrderPhotoFile(
     buf,
     contentType,
   );
-  await prisma.orderPhoto.create({ data: { orderId, url } });
+  await prisma.orderPhoto.create({ data: { orderId, url, stage: stage ?? null } });
   return url;
 }

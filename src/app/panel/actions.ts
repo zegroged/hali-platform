@@ -166,17 +166,50 @@ export async function setWorkingHours(formData: FormData) {
   redirect("/panel/profil?kaydedildi=Çalışma+saatleri");
 }
 
+// Birim istemciden gelir; tanımsız bir değer Prisma'da enum hatası (500) verirdi.
+// Bilinmeyeni sessizce /m²'ye düşürüyoruz — halıcı satırdan düzeltebilir.
+const BIRIMLER: PricingUnit[] = ["PER_M2", "PER_PIECE", "FLAT"];
+function birimOku(raw: FormDataEntryValue | null): PricingUnit {
+  const v = String(raw || "") as PricingUnit;
+  return BIRIMLER.includes(v) ? v : "PER_M2";
+}
+
 export async function addPricingItem(formData: FormData) {
   const b = await biz();
   const label = String(formData.get("label") || "").trim();
   const price = parseTutar(formData.get("price"));
-  const unit = String(formData.get("unit") || "PER_M2") as PricingUnit;
+  const unit = birimOku(formData.get("unit"));
   const isAddon = formData.get("isAddon") != null;
   // Fiyat 0'dan büyük olmalı (negatif fiyat gelir modelini tersine çevirir).
   if (!label || !Number.isFinite(price) || price <= 0) return;
   await prisma.pricingItem.create({
     data: { businessId: b.id, label, price, unit, isAddon },
   });
+  await syncVisibility(b.id);
+  revalidatePath("/panel/profil");
+  revalidatePath("/panel");
+}
+
+/**
+ * Fiyat kalemini yerinde günceller. Öncesinde zam yapmak "sil + yeniden ekle"
+ * demekti; kalem listenin sonuna düşüyor ve bir an fiyatsız kalıyordu.
+ *
+ * İZOLASYON: updateMany + businessId koşulu — başka işletmenin kalemi where'e
+ * takılmaz, 0 satır güncellenir (findUnique + kontrol yerine tek sorgu).
+ */
+export async function updatePricingItem(formData: FormData) {
+  const b = await biz();
+  const id = String(formData.get("id") || "");
+  const label = String(formData.get("label") || "").trim();
+  const price = parseTutar(formData.get("price"));
+  const unit = birimOku(formData.get("unit"));
+  const isAddon = formData.get("isAddon") != null;
+  if (!id || !label || !Number.isFinite(price) || price <= 0) return;
+  await prisma.pricingItem.updateMany({
+    where: { id, businessId: b.id },
+    data: { label, price, unit, isAddon },
+  });
+  // Tek ana kalem "ek hizmet"e çevrilirse işletme yayın şartını kaybeder.
   await syncVisibility(b.id);
   revalidatePath("/panel/profil");
   revalidatePath("/panel");
