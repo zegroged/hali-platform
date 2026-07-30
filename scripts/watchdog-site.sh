@@ -44,7 +44,11 @@ Bu uyarı, sunucudaki site bekçisi tarafından otomatik gönderildi.</td></tr>
   rm -f /tmp/hali-watchdog-mail.txt
 }
 
-code=$(curl -s -o /dev/null -m 20 -w '%{http_code}' "$URL" 2>/dev/null || echo 000)
+# 2026-07-30 düzeltme: `|| echo 000` curl'un YAZDIĞI koda EKLENIYORDU —
+# başlıklar gelip (200) gövde aktarımı koptuğunda log "HTTP 200000" oluyordu
+# ve ayakta olan site başarısız sayılıyordu. Kod boşsa 000 say, doluysa güven.
+code=$(curl -s -o /dev/null -m 20 -w '%{http_code}' "$URL" 2>/dev/null)
+[ -z "$code" ] && code=000
 
 if [ "$code" = "200" ]; then
   rm -f "$FAILCNT"
