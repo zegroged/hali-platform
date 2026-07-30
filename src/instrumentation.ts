@@ -98,7 +98,8 @@ async function dailyTick() {
   }
 
   try {
-    // Sezon hatırlatması — SEZON_HATIRLATMA=1 değilse fonksiyon hemen döner.
+    // Sezon hatırlatması — ayar VERİTABANINDA (AppState, /admin/hatirlatma).
+    // Admin açmadıysa fonksiyon hemen döner; elle tetikleme admin ekranından.
     const { sendSeasonReminders } = await import("@/lib/seasonReminder");
     await sendSeasonReminders();
   } catch (e) {
@@ -110,8 +111,21 @@ export async function register() {
   // Yalnız Node.js runtime'ında (edge/middleware derlemesinde prisma yok).
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
   // Açılışta bir kez + günde bir. unref: interval, kapanışı bloklamasın.
-  await purgeOldLocationData();
-  const timer = setInterval(purgeOldLocationData, DAY_MS);
+  // await ETME (2026-07-30, 4.43 bulgusu): birikmiş KVKK temizliği (365 günü
+  // aşan konum kayıtları) açılışı dakikalarca bloklayabilir — kesinti sonrası
+  // site önce ayağa kalkmalı. purge kendi hatasını içerde yutuyor.
+  void purgeOldLocationData().catch((e) =>
+    console.error("[kvkk-temizlik] açılış hatası:", e),
+  );
+  // setInterval'a async fonksiyonu CIPLAK verme: reddedilen soz unhandled
+  // rejection olur (acilis cagrisi .catch'liydi, periyodik olan degildi).
+  const timer = setInterval(
+    () =>
+      void purgeOldLocationData().catch((e) =>
+        console.error("[kvkk-temizlik] periyodik hata:", e),
+      ),
+    DAY_MS,
+  );
   if (typeof timer.unref === "function") timer.unref();
   // Saatlik tik: haftalık özet (yalnız TR pazartesi, AppState işaretli) +
   // sipariş SLA bekçisi (2s hatırlatma / 24s eskalasyon; sipariş başına bir kez)

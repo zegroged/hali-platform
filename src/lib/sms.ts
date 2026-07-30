@@ -58,6 +58,17 @@ async function logSms(to: string, body: string, ok: boolean, error?: string) {
 }
 
 export async function sendSms(to: string, body: string): Promise<void> {
+  // DEMO KALKANI (2026-07-30, 4.43 bulgusu): komisyoncu demo işletmelerinin
+  // müşteri numaraları TAHSİSSİZ 0500 aralığından üretilir (lib/demoPanel.ts
+  // DEMO_TEL_ONEK) — gerçek bir abonede bu önek olamaz. WhatsApp yolunda bu
+  // kalkan vardı (waGonderVeKaydet isDemo bakar), SMS yolunda YOKTU; SMS canlıya
+  // alındığı gün her satış gösterisi gerçek SMS faturası üretirdi. Numara
+  // bazında kesmek, çağıran 20+ noktaya tek tek işletme sorgusu eklemekten
+  // hem ucuz hem delik bırakmaz.
+  if (to.replace(/\D/g, "").replace(/^90/, "0").startsWith("0500")) {
+    console.log(`[SMS demo-kalkan] ${to} tahsissiz demo aralığı — gönderilmedi`);
+    return;
+  }
   if (process.env.SMS_MODE !== "live") {
     console.log(`\n[MOCK SMS] -> ${to}\n${body}\n`);
     // Mock modda da ok=true loglanır: geliştirme/test dönemindeki teyitlerin

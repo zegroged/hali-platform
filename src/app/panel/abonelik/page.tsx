@@ -101,6 +101,30 @@ export default async function AbonelikYonetim({
     take: 24,
   });
 
+  // DEMO PANELİ (2026-07-30, 4.43 bulgusu): ödeme düğmeleri görünüyor,
+  // "demo, ödeme alınmaz" uyarısı ancak BASILDIKTAN sonra çıkıyordu —
+  // komisyoncu dükkânda gösterirken kötü görünüyordu. Demo hesapta bu sayfa
+  // yalnız bilgi kartı gösterir; ödeme akışına giden hiçbir düğme çizilmez
+  // (sunucu aksiyonları zaten ayrıca reddediyor — bu görsel katman).
+  if (b.isDemo) {
+    return (
+      <div className="space-y-6">
+        <Link
+          href="/panel"
+          className="text-sm font-medium text-brand-dark hover:underline"
+        >
+          ← Panele dön
+        </Link>
+        <h1 className="text-lg font-semibold text-slate-900">Abonelik</h1>
+        <p className="rounded-xl border border-violet-300 bg-violet-50 px-4 py-3 text-sm text-violet-800">
+          Bu bir <strong>DEMO panelidir</strong> — aboneliği ücretsiz ve
+          süresizdir, ödeme alınmaz. Gerçek işletmede burada abonelik durumu,
+          ödeme geçmişi ve otomatik yenileme yönetimi görünür.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <Link href="/panel" className="text-sm font-medium text-brand-dark hover:underline">

@@ -134,6 +134,14 @@ export default async function AdminHome({
         >
           WhatsApp (sahipsiz)
         </Link>
+        {/* Sezon hatırlatması YALNIZ buradan yönetilir (2026-07-30 kararı) —
+            halıcı panelindeki sayfa silindi. */}
+        <Link
+          href="/admin/hatirlatma"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+        >
+          Sezon Hatırlatması
+        </Link>
         <Link
           href="/admin/yeni"
           className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-dark"

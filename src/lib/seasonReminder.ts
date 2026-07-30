@@ -1,42 +1,82 @@
 import { prisma } from "@/lib/prisma";
 import { sendEmail, wrapEmail } from "@/lib/email";
 import { escapeHtml } from "@/lib/htmlSafe";
-import { normalizePhone } from "@/lib/phone";
+import { normalizePhone, isMobilePhone } from "@/lib/phone";
 import { getAppBaseUrl } from "@/lib/config";
+import { sendTemplate, whatsappEnabled } from "@/lib/whatsapp";
 
-// SEZON HATIRLATMASI (2026-07-30).
+// SEZON HATIRLATMASI (2026-07-30, işletme sahibinin İKİ kararıyla YENİDEN yazıldı).
 //
 // NEDEN OTOMATİK: halı yıkatmak yılda bir-iki kez hatırlanan bir iştir; müşteri
-// unutunca iş geri gelmiyor. "Halıcı kendi arasın" denendiğinde YAPILMIYOR —
-// işletme sahibinin kararı bu yüzden "kesinlikle otomatik, 6 ayda bir gibi".
+// unutunca iş geri gelmiyor. "Halıcı kendi arasın" denendiğinde YAPILMIYOR.
 //
-// 🔴 BAYRAK ARKASINDA: SEZON_HATIRLATMA=1 değilse iş HİÇ ÇALIŞMAZ — ne gönderim
-// ne işaretleme. Sebep teknik değil HUKUKİ: bu bir TİCARİ İLETİDİR (6563 sayılı
-// kanun + İYS kaydı + işletme sözleşmesinde onay maddesi). O taraf işletme
-// sahibinde; kod hazır bekler, açma kararı onundur. Bayrak kapalıyken
-// seasonRemindedAt'e hiçbir şey yazılmaz ki açıldığı gün geçmiş "gönderilmiş"
-// gibi görünmesin.
+// KARAR 1 — YALNIZ ADMİN YÖNETİR: ayar .env bayrağı DEĞİL, VERİTABANINDA
+// (AppState "sezon-ayarlar"). Admin /admin/hatirlatma ekranından açar/kapar,
+// aralığı değiştirir, elle tetikler — deploy gerekmez. Halıcı paneli bu işe
+// HİÇ dokunmaz (o sayfa silindi). Gerekçe: "halıcılara bırakırsak yapılmaz."
 //
-// KANAL — E-POSTA: WhatsApp'ta bu mesajın şablonu YOK ve MARKETING kategorisine
-// girer (Meta onayı zor, mesaj başına ücretli, opt-out zorunlu). Birinci sürüm
-// bedava kanaldan gider; halıcı ayrıca /panel/hatirlatma listesinden kimin
-// arandığını görür ve telefonla da dönebilir.
+// KARAR 2 — KANAL WHATSAPP, E-POSTA YEDEK: "e-postayı 60 yaşındaki teyze
+// açmıyor". Şablon `sezon_hatirlatma` (MARKETING, URL butonu → işletme sayfası).
+// Şablon Meta onayından geçene kadar gönderim kendiliğinden e-postaya düşer.
+//
+// HUKUK: ticari ileti (6563 + İYS). İşletme sahibi avukat/İYS tarafını
+// HALLETTİĞİNİ söyledi (2026-07-30) — açma kararı yine de admin ekranında,
+// koddan otomatik AÇILMAZ.
 
 const VARSAYILAN_AY = 6;
+const AYAR_KEY = "sezon-ayarlar";
+const SON_CALISMA_KEY = "sezon-son-calisma";
 
-/** 🔴 Ana bayrak — kapalıyken iş hiç çalışmaz (bkz. lib/phoneOtp.ts deseni). */
-export const seasonReminderEnabled = process.env.SEZON_HATIRLATMA === "1";
-
-/** Kaç ay sonra hatırlatılsın (env SEZON_AY, varsayılan 6). */
-export const sezonAy = (() => {
-  const v = Number(process.env.SEZON_AY);
-  return Number.isFinite(v) && v >= 1 && v <= 60 ? Math.floor(v) : VARSAYILAN_AY;
-})();
-
-/** Tek turda en fazla kaç müşteriye yazılır (SMTP'yi boğmamak için). */
+/** Tek turda en fazla kaç müşteriye yazılır (kanalları boğmamak için). */
 const TUR_LIMITI = 100;
 /** Tek turda taranacak aday sipariş sayısı. */
 const TARAMA_LIMITI = 800;
+
+export type SezonAyar = { acik: boolean; ay: number };
+export type SonCalisma = {
+  at: string; // ISO
+  gonderilen: number;
+  kanal: { whatsapp: number; eposta: number };
+  atlanan: number;
+  elle: boolean;
+};
+
+/** Ayarlar VERİTABANINDAN okunur (admin panelden değiştirir, deploy gerekmez). */
+export async function getSezonAyar(): Promise<SezonAyar> {
+  try {
+    const s = await prisma.appState.findUnique({ where: { key: AYAR_KEY } });
+    if (!s) return { acik: false, ay: VARSAYILAN_AY };
+    const v = JSON.parse(s.value) as Partial<SezonAyar>;
+    const ay = Number(v.ay);
+    return {
+      acik: v.acik === true,
+      ay: Number.isFinite(ay) && ay >= 1 && ay <= 24 ? Math.floor(ay) : VARSAYILAN_AY,
+    };
+  } catch {
+    // Okunamıyorsa GÜVENLİ taraf: kapalı say (ticari ileti yanlışlıkla gitmesin).
+    return { acik: false, ay: VARSAYILAN_AY };
+  }
+}
+
+export async function setSezonAyar(v: SezonAyar): Promise<void> {
+  const value = JSON.stringify({ acik: v.acik === true, ay: v.ay });
+  await prisma.appState.upsert({
+    where: { key: AYAR_KEY },
+    create: { key: AYAR_KEY, value },
+    update: { value },
+  });
+}
+
+export async function getSonCalisma(): Promise<SonCalisma | null> {
+  try {
+    const s = await prisma.appState.findUnique({
+      where: { key: SON_CALISMA_KEY },
+    });
+    return s ? (JSON.parse(s.value) as SonCalisma) : null;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * `d`den `n` ay öncesi. Gün taşması KIRPILIR: 31 Ağustos − 6 ay "3 Mart" değil
@@ -57,11 +97,6 @@ export function aylarOnce(d: Date, n: number): Date {
   );
 }
 
-/** Hatırlatma eşiği: bu andan ÖNCE teslim edilenler "sezonu gelmiş" sayılır. */
-export function sezonEsigi(simdi: Date = new Date()): Date {
-  return aylarOnce(simdi, sezonAy);
-}
-
 /** Gruplamaya giren tek sipariş (saf tip — Prisma'ya bağlı değil). */
 export type SezonKaydi = {
   orderId: string;
@@ -69,42 +104,37 @@ export type SezonKaydi = {
   name: string;
   email: string | null;
   deliveredAt: Date;
-  tutar: number;
   businessId: string;
   businessName: string;
-  remindedAt: Date | null;
+  /** Mesajın adına gidebileceği işletme mi (görünür + demo değil)? */
+  businessUygun: boolean;
 };
 
 /** Bir müşteri (telefon) için toparlanmış hatırlatma satırı. */
 export type SezonSatiri = {
-  /** Normalize edilmiş numara — gruplama anahtarı. */
-  phone: string;
+  phone: string; // normalize — gruplama anahtarı
   name: string;
   email: string | null;
-  /** En son ne zaman hizmet aldı. */
   sonTeslim: Date;
   siparisSayisi: number;
-  toplamTutar: number;
-  /** En SON hizmeti veren işletme — mesaj onun adıyla gider. */
+  /**
+   * Müşterinin GERÇEKTEN en son hizmet aldığı işletme — mesaj onun adıyla gider.
+   * 🔴 İŞLETME SINIRI DERSİ (4.43 bulgusu): görünürlük süzgeci SORGUDA
+   * uygulanırsa "en son" iddiası çarpılır — müşteri en son B'den aldıysa ama B
+   * süzgece takıldıysa mesaj "en son A yıkamıştı" diye YALAN söylerdi. Süzgeç
+   * artık gruplamadan SONRA: gerçek son işletme uygun değilse müşteri ATLANIR.
+   */
   businessId: string;
   businessName: string;
-  /** Bu numaraya daha önce hatırlatma gittiyse tarihi. */
-  remindedAt: Date | null;
-  /** Bu numaranın gruba giren tüm siparişleri (hepsi birlikte işaretlenir). */
+  businessUygun: boolean;
+  /** Bu numaranın gruba giren tüm siparişleri (birlikte işaretlenir). */
   orderIds: string[];
 };
 
-/**
- * Telefona göre grupla. AYNI MÜŞTERİYE TEK MESAJ kuralının kalbi burası:
- * numara normalize edilir ("+90555…", "0555…", "555…" hepsi aynı kişidir —
- * sipariş formuna nasıl yazıldığı müşteriden müşteriye değişiyor).
- *
- * Grubun kimliği (ad, e-posta, işletme) EN SON siparişten alınır: müşteri
- * en son kimden hizmet aldıysa onu hatırlar, mesaj o isimle gitmeli.
- */
+/** Telefona göre grupla. AYNI MÜŞTERİYE TEK MESAJ kuralının kalbi. */
 export function telefonaGoreGrupla(kayitlar: SezonKaydi[]): SezonSatiri[] {
   const harita = new Map<string, SezonSatiri>();
-  // Önce eskiden yeniye sırala; böylece son yazan (en yeni) kimliği belirler.
+  // Eskiden yeniye: son yazan (en yeni sipariş) kimliği belirler.
   const sirali = [...kayitlar].sort(
     (a, b) => a.deliveredAt.getTime() - b.deliveredAt.getTime(),
   );
@@ -119,31 +149,121 @@ export function telefonaGoreGrupla(kayitlar: SezonKaydi[]): SezonSatiri[] {
         email: k.email,
         sonTeslim: k.deliveredAt,
         siparisSayisi: 1,
-        toplamTutar: k.tutar,
         businessId: k.businessId,
         businessName: k.businessName,
-        remindedAt: k.remindedAt,
+        businessUygun: k.businessUygun,
         orderIds: [k.orderId],
       });
       continue;
     }
     mevcut.siparisSayisi += 1;
-    mevcut.toplamTutar = Math.round((mevcut.toplamTutar + k.tutar) * 100) / 100;
     mevcut.orderIds.push(k.orderId);
     mevcut.sonTeslim = k.deliveredAt;
     mevcut.name = k.name;
     mevcut.businessId = k.businessId;
     mevcut.businessName = k.businessName;
-    // E-posta: en yeni DOLU değer kazansın (son siparişte boş bırakılmışsa
-    // eski siparişteki adres kaybolmasın).
+    mevcut.businessUygun = k.businessUygun;
     if (k.email) mevcut.email = k.email;
-    // İşaretlerden en YENİSİ: "bu numaraya en son ne zaman yazdık".
-    if (k.remindedAt && (!mevcut.remindedAt || k.remindedAt > mevcut.remindedAt))
-      mevcut.remindedAt = k.remindedAt;
   }
   return [...harita.values()].sort(
     (a, b) => b.sonTeslim.getTime() - a.sonTeslim.getTime(),
   );
+}
+
+export type SezonOnizleme = {
+  /** Gönderime girecek satırlar (uygun işletme + aktif olmayan müşteri). */
+  satirlar: SezonSatiri[];
+  /** İşletmesi uygun olmadığı için atlananlar (gizli/demo). */
+  atlanan: number;
+  /** Tarama penceresi doldu mu (dolduysa sayılar alt sınırdır). */
+  pencereDoldu: boolean;
+};
+
+/**
+ * Adayları tara + grupla + süz. GÖNDERMEZ, İŞARETLEMEZ — hem gerçek gönderim
+ * hem /admin/hatirlatma önizlemesi AYNI fonksiyonu kullanır ki ekranda görünen
+ * ile fiilen gönderilen asla ayrışmasın.
+ */
+export async function sezonOnizleme(ay: number): Promise<SezonOnizleme> {
+  const esik = aylarOnce(new Date(), ay);
+
+  // 🔴 İşletme süzgeci SORGUDA YOK (bkz. SezonSatiri.businessId notu) — yalnız
+  // kanal önkoşulu var: WhatsApp kapalıysa e-postasız müşteriye ulaşamayız,
+  // onları taramaya hiç sokmamak pencereyi korur.
+  const adaylar = await prisma.order.findMany({
+    where: {
+      status: "DELIVERED",
+      seasonRemindedAt: null,
+      deliveredAt: { lte: esik },
+      ...(whatsappEnabled
+        ? {}
+        : {
+            OR: [
+              { customerEmail: { not: null } },
+              { customer: { email: { not: null } } },
+            ],
+          }),
+    },
+    select: {
+      id: true,
+      customerName: true,
+      customerPhone: true,
+      customerEmail: true,
+      deliveredAt: true,
+      customer: { select: { email: true } },
+      business: { select: { id: true, name: true, isDemo: true, isVisible: true } },
+    },
+    orderBy: { deliveredAt: "desc" },
+    take: TARAMA_LIMITI,
+  });
+  if (adaylar.length === 0)
+    return { satirlar: [], atlanan: 0, pencereDoldu: false };
+
+  // AKTİF MÜŞTERİYİ RAHATSIZ ETME: eşikten SONRA teslimat almış YA DA şu an
+  // SÜREN siparişi olan numaralara "uzun zamandır görüşmedik" denmez.
+  // İkinci koşul denetim bulgusu (2026-07-30): yalnız DELIVERED'a bakılınca,
+  // halısı O SIRADA yıkamada olan müşteriye "yeniden yıkatın" mesajı gidiyordu.
+  // orderBy ŞART: sırasız take hangi 5000 satırın geleceğini garanti etmiyordu.
+  const yakinlar = await prisma.order.findMany({
+    where: {
+      OR: [
+        { status: "DELIVERED", deliveredAt: { gt: esik } },
+        {
+          status: {
+            in: ["CREATED", "ACCEPTED", "PICKED_UP", "WASHING", "OUT_FOR_DELIVERY"],
+          },
+        },
+      ],
+    },
+    select: { customerPhone: true },
+    orderBy: { createdAt: "desc" },
+    take: 5000,
+  });
+  const yakinSet = new Set(
+    yakinlar.map((o) => normalizePhone(o.customerPhone)).filter(Boolean),
+  );
+
+  const gruplar = telefonaGoreGrupla(
+    adaylar
+      .filter((o) => o.deliveredAt != null)
+      .map((o) => ({
+        orderId: o.id,
+        phone: o.customerPhone,
+        name: o.customerName,
+        email: o.customerEmail ?? o.customer?.email ?? null,
+        deliveredAt: o.deliveredAt!,
+        businessId: o.business.id,
+        businessName: o.business.name,
+        businessUygun: o.business.isVisible && !o.business.isDemo,
+      })),
+  ).filter((s) => !yakinSet.has(s.phone));
+
+  const satirlar = gruplar.filter((s) => s.businessUygun);
+  return {
+    satirlar,
+    atlanan: gruplar.length - satirlar.length,
+    pencereDoldu: adaylar.length >= TARAMA_LIMITI,
+  };
 }
 
 const gunTR = (d: Date) =>
@@ -156,126 +276,201 @@ const gunTR = (d: Date) =>
     timeZone: "Europe/Istanbul",
   });
 
-/** Hatırlatma e-postasının gövdesi — hizmeti veren işletmenin adıyla. */
-function mesajHtml(s: SezonSatiri, base: string): string {
+/** E-posta gövdesi (WhatsApp gidemezse yedek kanal). */
+function mesajHtml(s: SezonSatiri, ay: number, base: string): string {
   const isletme = escapeHtml(s.businessName);
   const url = `${base}/halici/${s.businessId}`;
   return wrapEmail(
     `<p style="margin:0 0 12px;">Merhaba ${escapeHtml(s.name)},</p>
      <p style="margin:0 0 12px;">Halılarınızı en son <strong>${gunTR(
        s.sonTeslim,
-     )}</strong> tarihinde <strong>${isletme}</strong> yıkamıştı. Üzerinden ${sezonAy} aydan fazla geçti — mevsim değişimi halıların bakım zamanıdır.</p>
+     )}</strong> tarihinde <strong>${isletme}</strong> yıkamıştı. Üzerinden ${ay} aydan fazla geçti — mevsim değişimi halıların bakım zamanıdır.</p>
      <p style="margin:0 0 16px;">Yeniden yıkatmak isterseniz aşağıdaki bağlantıdan aynı işletmeye sipariş verebilirsiniz; halınızı adresinizden alır, yıkar ve teslim ederler.</p>
      <p style="margin:0 0 16px;"><a href="${url}" style="display:inline-block;background-color:#0f766e;color:#ffffff;text-decoration:none;font-weight:bold;padding:12px 24px;border-radius:8px;">${isletme} — sipariş ver</a></p>
      <p style="margin:0;color:#64748b;font-size:13px;">Bu hatırlatmayı almak istemiyorsanız bu e-postaya &quot;çıkar&quot; yazıp yanıtlamanız yeterlidir.</p>`,
   );
 }
 
+/** Normalize edilmiş 0XXXXXXXXXX numaranın DB'de bulunabilecek biçimleri —
+ *  `Order.customerPhone` normalize EDİLMEDEN yazılıyor (bkz. whatsapp.ts
+ *  waTelefonAdaylari ile aynı gerekçe). Telefon-bazlı claim bunlarla yapılır. */
+function telefonBicimleri(normal: string): string[] {
+  const on = normal.slice(1); // baştaki 0'sız
+  return [normal, on, `90${on}`, `+90${on}`];
+}
+
 /**
- * SEZON HATIRLATMASI — günde bir çalışır (instrumentation günlük tik).
+ * SEZON HATIRLATMASI.
+ *  - Günlük tik: yalnız admin AÇTIYSA çalışır (AppState).
+ *  - `elle: true` (admin ekranındaki düğme): anahtar kapalıyken de çalışır —
+ *    elle tetikleme zaten adminin açık iradesidir.
+ * Kanal sırası: WhatsApp şablonu (onaylıysa + numara CEP ise) → e-posta.
  *
- * Kimi bulur: N aydan önce teslim edilmiş, hatırlatılmamış ve e-posta adresi
- * olan siparişler. Numara bazında gruplanır → AYNI MÜŞTERİYE TEK MESAJ,
- * o numaranın gruba giren tüm siparişleri birlikte işaretlenir.
- *
- * Best-effort: hata saatlik/günlük tiki bozmamalı (çağıran yakalar).
+ * 🔴 YARIŞ GÜVENLİĞİ (2026-07-30 düşman denetimi — kritik bulgu): PendingButton
+ * 10 sn'de sayfayı otomatik yenilediği için "elle tetik sürerken ikinci tetik"
+ * bu projede GERÇEKÇİ bir senaryo; günlük tik de aynı ana denk gelebilir.
+ * Üç katman:
+ *  1. KOŞU KİLİDİ (AppState createMany — atomik): ikinci koşu hiç başlamaz.
+ *  2. TELEFON-BAZLI CLAIM CAS: müşterinin eşikten eski TÜM teslimatları tek
+ *     updateMany ile damgalanır; count=0 → başkası almış → GÖNDERME. Telefon
+ *     bazlı olması 800'lük tarama penceresi kaymasını da çözer: pencere
+ *     DIŞINDA kalan eski sipariş de işaretlenir, müşteri bir daha gruplanamaz
+ *     (aksi halde pencere derinleştikçe aynı müşteriye daha eski siparişin
+ *     işletme adıyla İKİNCİ mesaj gidiyordu).
+ *  3. Geri alma yalnız KENDİ damgasıyla ve yalnız "Meta şablonu tanımadı"
+ *     kesinliğinde: zaman aşımı gibi belirsiz durumlarda işaret KALIR —
+ *     ticari ileti için at-most-once, at-least-once'tan iyidir (mükerrer
+ *     pazarlama mesajı İYS şikâyeti doğurur; kaçan hatırlatma yalnız fırsattır).
  */
-export async function sendSeasonReminders(): Promise<void> {
-  // 🔴 BAYRAK — kapalıyken tek satır veri bile okunmaz/yazılmaz.
-  if (!seasonReminderEnabled) return;
+export async function sendSeasonReminders(opts?: { elle?: boolean }): Promise<{
+  gonderilen: number;
+  atlanan: number;
+  ulasilamayan: number;
+  kilitli?: boolean;
+}> {
+  const ayar = await getSezonAyar();
+  if (!ayar.acik && !opts?.elle)
+    return { gonderilen: 0, atlanan: 0, ulasilamayan: 0 };
 
-  const simdi = new Date();
-  const esik = sezonEsigi(simdi);
-
-  const adaylar = await prisma.order.findMany({
-    where: {
-      status: "DELIVERED",
-      seasonRemindedAt: null,
-      deliveredAt: { lte: esik },
-      // E-POSTASI OLMAYAN ADAY DEĞİL: kanal e-posta olduğu için gönderilemez.
-      // Sorgudan dışlanmazsa her gün tarama penceresini boşuna doldururlar
-      // (halıcı onları /panel/hatirlatma listesinde görüp telefonla arar).
-      OR: [
-        { customerEmail: { not: null } },
-        { customer: { email: { not: null } } },
-      ],
-      business: {
-        // Demo işletme GERÇEK müşteriye yazmaz.
-        isDemo: false,
-        // Yayında olmayan işletmeye müşteri yönlendirmek kötü deneyim:
-        // tıklayınca sipariş veremeyeceği bir sayfaya düşer.
-        isVisible: true,
-      },
-    },
-    select: {
-      id: true,
-      customerName: true,
-      customerPhone: true,
-      customerEmail: true,
-      deliveredAt: true,
-      priceTotal: true,
-      seasonRemindedAt: true,
-      customer: { select: { email: true } },
-      business: { select: { id: true, name: true } },
-    },
-    orderBy: { deliveredAt: "desc" },
-    take: TARAMA_LIMITI,
+  // 1) KOŞU KİLİDİ. 15 dk'dan eski kilit devralınır (ölmüş koşu).
+  const KILIT = "sezon-kosu-kilidi";
+  const damgaStr = `${Date.now()}:${Math.random().toString(36).slice(2)}`;
+  const kilitAl = await prisma.appState.createMany({
+    data: [{ key: KILIT, value: damgaStr }],
+    skipDuplicates: true,
   });
-  if (adaylar.length === 0) return;
-
-  // AKTİF MÜŞTERİYİ RAHATSIZ ETME: 8 ay önceki siparişi eşiği geçse de aynı
-  // numaradan geçen ay yeni teslimat varsa "uzun zamandır görüşmedik" demek
-  // yanlış olur (ve müşteriyi kaçırır). Yakın dönemde hizmet alan numaralar
-  // elenir. Numara biçimleri veritabanında tek tip DEĞİL, bu yüzden eşleşme
-  // SQL'de değil normalize edilmiş küme üzerinde yapılır.
-  const yakinlar = await prisma.order.findMany({
-    where: { status: "DELIVERED", deliveredAt: { gt: esik } },
-    select: { customerPhone: true },
-    take: 5000,
-  });
-  const yakinSet = new Set(
-    yakinlar.map((o) => normalizePhone(o.customerPhone)).filter(Boolean),
-  );
-
-  const satirlar = telefonaGoreGrupla(
-    adaylar
-      .filter((o) => o.deliveredAt != null)
-      .map((o) => ({
-        orderId: o.id,
-        phone: o.customerPhone,
-        name: o.customerName,
-        email: o.customerEmail ?? o.customer?.email ?? null,
-        deliveredAt: o.deliveredAt!,
-        tutar: Number(o.priceTotal ?? 0),
-        businessId: o.business.id,
-        businessName: o.business.name,
-        remindedAt: o.seasonRemindedAt,
-      })),
-  ).filter((s) => !yakinSet.has(s.phone) && s.email);
-
-  const base = getAppBaseUrl();
-  let gonderilen = 0;
-  for (const s of satirlar.slice(0, TUR_LIMITI)) {
-    // ÖNCE İŞARETLE: SMTP yavaş/hatalıysa bir sonraki tur aynı kişiye ikinci
-    // kez yazmasın (orderSla'daki aynı karar — mükerrer mesaj güven yakar).
-    await prisma.order.updateMany({
-      where: { id: { in: s.orderIds }, seasonRemindedAt: null },
-      data: { seasonRemindedAt: new Date() },
+  if (kilitAl.count === 0) {
+    const eski = await prisma.appState.findUnique({ where: { key: KILIT } });
+    const yas = eski ? Date.now() - Number(eski.value.split(":")[0]) : Infinity;
+    if (eski && yas < 15 * 60 * 1000) {
+      return { gonderilen: 0, atlanan: 0, ulasilamayan: 0, kilitli: true };
+    }
+    // CAS devralma: eski değere eşitlik şartı — iki istek aynı anda devralamaz.
+    const devral = await prisma.appState.updateMany({
+      where: { key: KILIT, value: eski?.value ?? "" },
+      data: { value: damgaStr },
     });
-    try {
-      await sendEmail(
-        s.email!,
-        `${s.businessName} — halılarınızın bakım zamanı geldi`,
-        `Halılarınızı en son ${gunTR(s.sonTeslim)} tarihinde ${s.businessName} yıkamıştı. Yeniden sipariş vermek için: ${base}/halici/${s.businessId}`,
-        mesajHtml(s, base),
-      );
-      gonderilen++;
-    } catch (e) {
-      console.error("[sezon-hatirlatma] e-posta hatasi:", e);
+    if (devral.count === 0) {
+      return { gonderilen: 0, atlanan: 0, ulasilamayan: 0, kilitli: true };
     }
   }
-  if (gonderilen > 0)
-    console.log(
-      `[sezon-hatirlatma] ${gonderilen} müşteriye gönderildi (${sezonAy} ay eşiği)`,
-    );
+
+  try {
+    const { satirlar, atlanan } = await sezonOnizleme(ayar.ay);
+    const base = getAppBaseUrl();
+    const esik = aylarOnce(new Date(), ayar.ay);
+    let wa = 0;
+    let ep = 0;
+    let ulasilamayan = 0;
+
+    for (const s of satirlar) {
+      // Limit GÖNDERİLEN üzerinden — kanalsız müşteriler tepe-100'ü tıkayıp
+      // arkadaki ulaşılabilir müşterileri aç bırakmasın (denetim bulgusu).
+      if (wa + ep >= TUR_LIMITI) break;
+
+      // Kanal önkoşulu — CLAIM'DEN ÖNCE: hiçbir kanala ulaşamayacaksak
+      // müşteriyi işaretlemeyiz (kanal açılınca sırası gelir). WhatsApp yalnız
+      // CEP numarasına denenir (waNumber sabit hattı da kabul ediyor — sabit
+      // hatta şablon göndermek kotayı boşa yakar).
+      const waOlur = whatsappEnabled && isMobilePhone(s.phone);
+      if (!waOlur && !s.email) {
+        ulasilamayan++;
+        continue;
+      }
+
+      // 2) TELEFON-BAZLI CLAIM (CAS): count=0 → eşzamanlı koşu kazandı, atla.
+      const damga = new Date();
+      const claim = await prisma.order.updateMany({
+        where: {
+          customerPhone: { in: telefonBicimleri(s.phone) },
+          status: "DELIVERED",
+          deliveredAt: { lte: esik },
+          seasonRemindedAt: null,
+        },
+        data: { seasonRemindedAt: damga },
+      });
+      if (claim.count === 0) continue;
+
+      let gitti = false;
+      let sablonYok = false;
+      // 1) WhatsApp — MARKETING şablonu, buton işletme sayfasına gider.
+      if (waOlur) {
+        const r = await sendTemplate(
+          s.phone,
+          "sezon_hatirlatma",
+          [s.name, s.businessName],
+          { butonUrlParam: s.businessId },
+        );
+        if (r.ok) {
+          wa++;
+          gitti = true;
+        } else {
+          const e = (r.error ?? "").toLowerCase();
+          // Yalnız "şablon yok/onaysız" KESİN gitmedi demektir; zaman aşımı
+          // vb. belirsizdir — belirsizde işaret kalır (at-most-once).
+          sablonYok =
+            e.includes("template") || e.includes("132001") || e.includes("132000");
+        }
+      }
+      // 2) E-posta yedek.
+      if (!gitti && s.email) {
+        try {
+          await sendEmail(
+            s.email,
+            `${s.businessName} — halılarınızın bakım zamanı geldi`,
+            `Halılarınızı en son ${gunTR(s.sonTeslim)} tarihinde ${s.businessName} yıkamıştı. Yeniden sipariş vermek için: ${base}/halici/${s.businessId}`,
+            mesajHtml(s, ayar.ay, base),
+          );
+          ep++;
+          gitti = true;
+        } catch (e) {
+          console.error("[sezon-hatirlatma] e-posta hatasi:", e);
+        }
+      }
+      // 3) Geri alma: yalnız KENDİ damgamız + yalnız kesin-gitmedi durumu —
+      //    böylece eşzamanlı koşunun BAŞARILI işaretini silemeyiz (denetim:
+      //    koşulsuz geri alma üçüncü mesaja yol açıyordu). Şablon onaylanınca
+      //    bu müşterilerin sırası kendiliğinden gelir.
+      if (!gitti) {
+        ulasilamayan++;
+        if (sablonYok && !s.email) {
+          await prisma.order.updateMany({
+            where: {
+              customerPhone: { in: telefonBicimleri(s.phone) },
+              seasonRemindedAt: damga,
+            },
+            data: { seasonRemindedAt: null },
+          });
+        }
+      }
+    }
+
+    const gonderilen = wa + ep;
+    const kayit: SonCalisma = {
+      at: new Date().toISOString(),
+      gonderilen,
+      kanal: { whatsapp: wa, eposta: ep },
+      atlanan,
+      elle: opts?.elle === true,
+    };
+    try {
+      await prisma.appState.upsert({
+        where: { key: SON_CALISMA_KEY },
+        create: { key: SON_CALISMA_KEY, value: JSON.stringify(kayit) },
+        update: { value: JSON.stringify(kayit) },
+      });
+    } catch {
+      // kayıt düşmezse gönderim yine geçerli
+    }
+    if (gonderilen > 0 || ulasilamayan > 0)
+      console.log(
+        `[sezon-hatirlatma] gönderilen:${gonderilen} (wa:${wa} eposta:${ep}) ulaşılamayan:${ulasilamayan} — ${ayar.ay} ay eşiği, elle:${opts?.elle === true}`,
+      );
+    return { gonderilen, atlanan, ulasilamayan };
+  } finally {
+    // Kilidi yalnız KENDİ damgamızla bırak — devralınmış kilidi silmeyelim.
+    await prisma.appState
+      .deleteMany({ where: { key: KILIT, value: damgaStr } })
+      .catch(() => {});
+  }
 }

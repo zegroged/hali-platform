@@ -232,13 +232,27 @@ async function artiklariTemizle(agentId: string): Promise<void> {
       role: { in: ["CLEANER", "DRIVER"] },
       phone: { startsWith: DEMO_TEL_ONEK },
     },
-    select: { id: true, ownedBusiness: { select: { id: true, isDemo: true } } },
+    select: {
+      id: true,
+      ownedBusiness: {
+        select: { id: true, isDemo: true, referredByAgentId: true },
+      },
+    },
   });
   for (const u of artiklar) {
     const biz = u.ownedBusiness;
     // Sahip olduğu işletme DEMO değilse dokunma (olmaması gereken durum —
     // sessiz veri kaybı yerine hesabı olduğu gibi bırak).
     if (biz && !biz.isDemo) continue;
+    // 🔴 SAHİPLİK KONTROLÜ (2026-07-30, 4.43 bulgusu): kullanıcı adı eki
+    // sha256'nın İLK 6 HANESİ — iki komisyoncunun eki çakışırsa buradaki
+    // silme BAŞKA komisyoncunun CANLI demosunu yok ederdi. İşletmesi olan
+    // artık ancak BU komisyoncuya bağlıysa silinir (işletmesiz yarım hesap
+    // için sahiplik bilgisi yok — o eski davranışla temizlenir).
+    // null = sahipsiz artik (yarim kurulum) — temizlenebilir; yoksa P2002
+    // kilidi sonsuza kalirdi. Dolu ve BASKASINA aitse dokunulmaz.
+    if (biz && biz.referredByAgentId != null && biz.referredByAgentId !== agentId)
+      continue;
     if (biz) {
       await prisma.order.deleteMany({ where: { businessId: biz.id } });
       await prisma.cleanerBusiness.delete({ where: { id: biz.id } });

@@ -14,9 +14,13 @@
 LOG=/var/log/hali-wa-sablon.log
 FLAG_ESKI=/opt/hali-probe/wa-onaylandi-3-alti-sablon.flag
 FLAG_LINK=/opt/hali-probe/wa-onaylandi-4-linkli.flag
+FLAG_SEZON=/opt/hali-probe/wa-onaylandi-5-sezon.flag
 FLAG_RED=/opt/hali-probe/wa-red-uyarisi-4.flag
 GRUP_ESKI="siparis_alindi fiyat_onayi_bekleniyor siparis_hazir siparis_yolda siparis_teslim_edildi siparis_iptal"
 GRUP_LINK="siparis_alindi_link fiyat_onayi_link siparis_yolda_link siparis_teslim_link siparis_iptal_link"
+# Sezon hatirlatmasi (MARKETING, /admin/hatirlatma yonetir). Onaylanmasa da
+# sistem calisir: kod e-postaya duser.
+GRUP_SEZON="sezon_hatirlatma"
 TOKEN=$(grep "^WHATSAPP_TOKEN=" /opt/hali/.env | cut -d= -f2-)
 OUT=$(curl -s -m 25 "https://graph.facebook.com/v21.0/1355565982729678/message_templates?fields=name,status&limit=100" -H "Authorization: Bearer $TOKEN")
 
@@ -47,9 +51,18 @@ for S in $GRUP_LINK; do
   [ "$D" = "APPROVED" ] || LINK_OK=0
   [ "$D" = "REJECTED" ] && REDLER="$REDLER $S"
 done
+SEZON_OK=1
+for S in $GRUP_SEZON; do
+  D=$(durum "$S"); SATIR="$SATIR $S=$D"
+  [ "$D" = "APPROVED" ] || SEZON_OK=0
+  [ "$D" = "REJECTED" ] && REDLER="$REDLER $S"
+done
 echo "$(date "+%F %T")$SATIR" >> $LOG
 
-if [ -n "$REDLER" ] && [ ! -f "$FLAG_RED" ]; then
+# Ret bayragi ICERIK karsilastirmali (dusman denetimi bulgusu): duz "dosya var
+# mi" kontrolu ilk retten sonra susuyordu — IKINCI bir sablon reddedilse haber
+# gelmiyordu. Simdi reddedilen kume degistiginde yeniden mail atilir.
+if [ -n "$REDLER" ] && [ "$(cat $FLAG_RED 2>/dev/null)" != "$REDLER" ]; then
   posta "WhatsApp: sablon REDDEDILDI:$REDLER" \
 "Su sablonlar Meta tarafindan reddedildi:$REDLER
 
@@ -57,7 +70,7 @@ Eski onayli sablonlar calismaya devam ediyor, musteri bildirimi KESILMEDI.
 Ama linkli mesaj / duzeltilmis Turkce o sablonda devreye giremez.
 Yapilacak: ret sebebini API'den oku, metni duzelt, YENI ADLA tekrar gonder
 (ayni ad hemen yeniden kullanilamaz)."
-  touch $FLAG_RED
+  printf "%s" "$REDLER" > $FLAG_RED
 fi
 
 if [ "$ESKI_OK" = "1" ] && [ ! -f "$FLAG_ESKI" ]; then
@@ -65,6 +78,14 @@ if [ "$ESKI_OK" = "1" ] && [ ! -f "$FLAG_ESKI" ]; then
 "Turkce metni duzeltilen alti sablonun tamami APPROVED.
 Kod tarafinda is YOK; sistem zaten acik, mesajlar duzgun Turkce gidiyor."
   touch $FLAG_ESKI
+fi
+
+if [ "$SEZON_OK" = "1" ] && [ ! -f "$FLAG_SEZON" ]; then
+  posta "WhatsApp: sezon_hatirlatma sablonu ONAYLANDI" \
+"Sezon hatirlatmasi sablonu (MARKETING) APPROVED. Kod tarafinda is YOK:
+/admin/hatirlatma gonderimlerinde artik WhatsApp kullanilir (e-posta yedege
+duser). MARKETING mesaji utility'den pahalidir (~acik kurus mertebesi)."
+  touch $FLAG_SEZON
 fi
 
 if [ "$LINK_OK" = "1" ] && [ ! -f "$FLAG_LINK" ]; then
