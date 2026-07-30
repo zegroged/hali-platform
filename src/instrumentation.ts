@@ -84,12 +84,17 @@ async function dailyTick() {
     data: { value: bugun },
   });
   if (guncellenen.count === 0) {
-    // Ya kayıt hiç yok (ilk çalışma) ya da bugün zaten çalıştı. Anahtar birincil
-    // anahtar olduğundan create çakışırsa ikincisidir → sessizce çık.
-    const olusturuldu = await prisma.appState
-      .create({ data: { key: DAILY_STATE_KEY, value: bugun } })
-      .catch(() => null);
-    if (!olusturuldu) return;
+    // Ya kayıt hiç yok (ilk çalışma) ya da bugün zaten çalıştı.
+    // createMany + skipDuplicates: create/catch ile aynı yarış güvenliği ama
+    // ÇAKIŞMADA İSTİSNA FIRLATMIYOR. Öncekinde Prisma her açılışta konteyner
+    // loguna "prisma:error ... Unique constraint failed on the fields: (key)"
+    // basıyordu; akış doğruydu ama log gürültüsü gerçek hataları maskeliyordu
+    // (2026-07-30 deploy doğrulamasında görüldü).
+    const { count } = await prisma.appState.createMany({
+      data: [{ key: DAILY_STATE_KEY, value: bugun }],
+      skipDuplicates: true,
+    });
+    if (count === 0) return; // kayıt zaten vardı → bugün çalışmış
   }
 
   try {

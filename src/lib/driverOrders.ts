@@ -209,12 +209,14 @@ export async function driverAdvance(
       status: "OUT_FOR_DELIVERY",
       ownerUserId: o.business.ownerId,
       etiket: "Teslimat bilgisi",
+      metin: "Halınız teslimata çıktı, şoförümüz yolda.",
       gonder: () =>
         waSiparisYolda(
           o.customerPhone,
           o.customerName,
           o.business.name,
           o.code ?? "",
+          o.trackingToken,
         ),
     });
   }

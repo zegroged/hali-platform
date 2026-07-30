@@ -210,12 +210,14 @@ export async function POST(req: NextRequest) {
       status: "CREATED",
       ownerUserId: business.ownerId,
       etiket: "Takip kodu",
+      metin: "Siparişiniz alındı — takip kodunuzla durumu izleyebilirsiniz.",
       gonder: () =>
         waSiparisAlindi(
           d.customerPhone,
           d.customerName,
           business.name,
           order.code ?? "",
+          order.trackingToken,
         ),
     });
   } catch (e) {

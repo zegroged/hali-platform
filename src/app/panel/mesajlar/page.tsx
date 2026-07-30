@@ -72,12 +72,32 @@ export default async function MesajlarSayfasi({
 
   // Sohbet listesi son 500 mesajdan kurulur; daha eskisi listede görünmez
   // ama sohbeti açınca (aşağıdaki sorgu) tam geçmiş gelir.
-  const sonMesajlar = await prisma.whatsAppMessage.findMany({
-    where: { businessId: b.id },
-    orderBy: { createdAt: "desc" },
-    take: 500,
-    include: { order: { select: { id: true, code: true } } },
-  });
+  //
+  // ⚠️ 2026-07-30: giden sipariş bildirimleri de bu tabloya yazılmaya başlandı
+  // (öncesinde yalnız gelenler + panelden verilen cevaplar vardı). Yoğun bir
+  // işletmede trafiği artık OTOMATİK bildirimler domine ediyor; 500'lük pencere
+  // günler içinde dolabilir ve CEVAPLANMAMIŞ eski bir müşteri mesajı listeden
+  // düşebilirdi — gelen kutusunun tek işi buysa bu sessiz bir kayıptır.
+  // Bu yüzden okunmamış GELEN mesajlar ayrıca çekilip listeye zorla ekleniyor.
+  const [sonMesajlar, okunmamisGelen] = await Promise.all([
+    prisma.whatsAppMessage.findMany({
+      where: { businessId: b.id },
+      orderBy: { createdAt: "desc" },
+      take: 500,
+      include: { order: { select: { id: true, code: true } } },
+    }),
+    prisma.whatsAppMessage.findMany({
+      where: { businessId: b.id, direction: "IN", readAt: null },
+      orderBy: { createdAt: "desc" },
+      take: 200,
+      include: { order: { select: { id: true, code: true } } },
+    }),
+  ]);
+  // Birleştir + kimliğe göre tekille + yeniden eskiye sırala (haritayı kuran
+  // döngü "ilk gördüğüm EN YENİ" varsayımına dayanıyor).
+  const tumu = [...sonMesajlar, ...okunmamisGelen]
+    .filter((m, i, a) => a.findIndex((x) => x.id === m.id) === i)
+    .sort((a, b2) => b2.createdAt.getTime() - a.createdAt.getTime());
 
   type Kayit = (typeof sonMesajlar)[number];
   type Sohbet = {
@@ -91,7 +111,7 @@ export default async function MesajlarSayfasi({
   // Numara = sohbet. Liste yeniden eskiye sıralı geldiği için her numarada ilk
   // gördüğümüz kayıt EN YENİ olanıdır.
   const harita = new Map<string, Sohbet>();
-  for (const m of sonMesajlar) {
+  for (const m of tumu) {
     let s = harita.get(m.phone);
     if (!s) {
       s = { phone: m.phone, ad: null, son: m, okunmamis: 0, siparis: null };

@@ -651,12 +651,14 @@ export async function quoteOrderPrice(formData: FormData) {
       status: "PICKED_UP",
       ownerUserId: b.ownerId,
       etiket: "Fiyat onayı",
+      metin: "Halınızın ölçümü tamamlandı, kesin fiyat onayınız bekleniyor.",
       gonder: () =>
         waFiyatOnayi(
           order.customerPhone,
           order.customerName,
           b.name,
           order.code ?? "",
+          order.trackingToken,
         ),
     });
   } catch (e) {
@@ -750,12 +752,14 @@ export async function advanceOrderPanel(formData: FormData) {
         status: "OUT_FOR_DELIVERY",
         ownerUserId: b.ownerId,
         etiket: "Teslimat bilgisi",
+        metin: "Halınız teslimata çıktı, şoförümüz yolda.",
         gonder: () =>
           waSiparisYolda(
             order.customerPhone,
             order.customerName,
             b.name,
             order.code ?? "",
+            order.trackingToken,
           ),
       });
     } catch (e) {

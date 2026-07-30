@@ -99,12 +99,17 @@ export async function bildirSiparisKesintisi(o: Kesinti): Promise<void> {
         status: o.tur === "red" ? "REJECTED" : "CANCELED",
         ownerUserId: null,
         etiket: o.tur === "red" ? "Red bildirimi" : "İptal bildirimi",
+        metin:
+          o.tur === "red"
+            ? "Siparişiniz işletme tarafından alınamadı. Ayrıntı takip sayfasında."
+            : "Siparişiniz iptal edildi. Ayrıntı takip sayfasında.",
         gonder: () =>
           waSiparisIptal(
             order.customerPhone,
             order.customerName,
             order.business.name,
             kod,
+            order.trackingToken,
           ),
       });
       return;
@@ -186,12 +191,14 @@ export async function bildirTeslimEdildi(orderId: string): Promise<void> {
       status: "DELIVERED",
       ownerUserId: order.business.ownerId ?? null,
       etiket: "Teslim bildirimi",
+      metin: "Halınız teslim edildi. Değerlendirmenizi bekliyoruz.",
       gonder: () =>
         waSiparisTeslim(
           order.customerPhone,
           order.customerName,
           order.business.name,
           kod,
+          order.trackingToken,
         ),
     });
   } catch (e) {

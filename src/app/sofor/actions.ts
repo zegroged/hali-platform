@@ -177,12 +177,14 @@ export async function advanceOrder(formData: FormData) {
       status: "OUT_FOR_DELIVERY",
       ownerUserId: isletme?.ownerId ?? null,
       etiket: "Teslimat bilgisi",
+      metin: "Halınız teslimata çıktı, şoförümüz yolda.",
       gonder: () =>
         waSiparisYolda(
           o.customerPhone,
           o.customerName,
           isletme?.name ?? "",
           o.code ?? "",
+          o.trackingToken,
         ),
     });
     // E-posta da gitsin (2026-07-28) — üç akışta da aynı olsun.

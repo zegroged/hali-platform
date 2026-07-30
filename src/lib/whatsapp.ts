@@ -84,6 +84,10 @@ export async function sendTemplate(
   to: string,
   template: string,
   params: string[],
+  opts?: {
+    /** Şablonun URL butonuna eklenecek dinamik son ek (takip token'ı). */
+    butonUrlParam?: string;
+  },
 ): Promise<SonucKaydi> {
   if (!whatsappEnabled) return { ok: false, error: "whatsapp kapalı" };
   const num = waNumber(to);
@@ -92,6 +96,23 @@ export async function sendTemplate(
     return { ok: false, error: "günlük gönderim tavanı aşıldı" };
 
   try {
+    const components: unknown[] = params.length
+      ? [
+          {
+            type: "body",
+            parameters: params.map((p) => ({ type: "text", text: p })),
+          },
+        ]
+      : [];
+    // Dinamik URL butonu: şablonda `.../takip/{{1}}` tanımlı, son ek buradan.
+    if (opts?.butonUrlParam) {
+      components.push({
+        type: "button",
+        sub_type: "url",
+        index: "0",
+        parameters: [{ type: "text", text: opts.butonUrlParam }],
+      });
+    }
     const res = await fetch(`${GRAPH}/${process.env.WHATSAPP_PHONE_ID}/messages`, {
       method: "POST",
       headers: {
@@ -105,14 +126,7 @@ export async function sendTemplate(
         template: {
           name: template,
           language: { code: "tr" },
-          components: params.length
-            ? [
-                {
-                  type: "body",
-                  parameters: params.map((p) => ({ type: "text", text: p })),
-                },
-              ]
-            : [],
+          components,
         },
       }),
       // Ağ takılırsa sipariş akışı beklemesin.
@@ -129,6 +143,38 @@ export async function sendTemplate(
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "bilinmeyen hata" };
   }
+}
+
+/** LİNKLİ ŞABLONU DENE, OLMAZSA ESKİSİNE DÜŞ (2026-07-30).
+ *
+ *  Kullanıcı kararı: müşteriye giden her bildirimde TIKLANABİLİR takip linki
+ *  olmalı — 24 saatlik pencere bir haftalık yıkama süresinde çoktan kapandığı
+ *  için bu ancak URL butonlu şablonla olur. Butonlu `_link` şablonları Meta
+ *  incelemesinde (PENDING); onaylanana kadar gönderim "şablon bulunamadı /
+ *  onaysız" hatası verir. Bu sarmalayıcı sayesinde:
+ *    - onay GELMEDEN: eski onaylı şablon çalışmaya devam eder (kesinti yok),
+ *    - onay GELİNCE: ek deploy olmadan kendiliğinden linkli şablona geçilir.
+ *  Başarısız ilk deneme kota sayacını 1 harcar — onay bekleme penceresiyle
+ *  sınırlı, kabul edilir maliyet. */
+async function sendTemplateLinkli(
+  to: string,
+  linkliSablon: string,
+  linkliParams: string[], // yeni şablonlar 2 değişkenli: [ad, işletme]
+  eskiSablon: string,
+  eskiParams: string[], // eskiler 3 değişkenli: [ad, işletme, kod]
+  trackingToken: string,
+): Promise<SonucKaydi> {
+  const r = await sendTemplate(to, linkliSablon, linkliParams, {
+    butonUrlParam: trackingToken,
+  });
+  if (r.ok) return r;
+  // Yalnız "şablon yok/onaysız" hatasında düş; kota/numara hatasında düşme —
+  // aynı hatayı ikinci kez almak kotayı boşa harcar.
+  const e = (r.error ?? "").toLowerCase();
+  const sablonSorunu =
+    e.includes("template") || e.includes("132001") || e.includes("132000");
+  if (!sablonSorunu) return r;
+  return sendTemplate(to, eskiSablon, eskiParams);
 }
 
 /** SERBEST METİN — YALNIZ 24 SAATLİK PENCERE İÇİNDE (2026-07-29).
@@ -196,6 +242,8 @@ export async function waGonderVeKaydet(opts: {
   status: OrderStatus;
   ownerUserId?: string | null;
   etiket: string; // "Takip kodu", "Fiyat onayı", "Teslimat bilgisi"
+  /** Sohbet ekranında görünecek okunur özet. Verilmezse `etiket` kullanılır. */
+  metin?: string;
   gonder: () => Promise<SonucKaydi>;
 }): Promise<void> {
   if (!whatsappEnabled) return; // kapalıyken iz bırakma
@@ -203,12 +251,21 @@ export async function waGonderVeKaydet(opts: {
   // numaraları uydurmadır (tahsissiz 0500 aralığı — WhatsApp'ta yoklar).
   // Gönderilseydi her satış gösterisi hem kotadan/paradan yerdi hem de
   // panelde "WhatsApp mesajı gitmedi" zili çalıp demoyu bozardı.
+  let siparis: {
+    businessId: string;
+    customerPhone: string;
+    business: { isDemo: boolean };
+  } | null = null;
   try {
-    const o = await prisma.order.findUnique({
+    siparis = await prisma.order.findUnique({
       where: { id: opts.orderId },
-      select: { business: { select: { isDemo: true } } },
+      select: {
+        businessId: true,
+        customerPhone: true,
+        business: { select: { isDemo: true } },
+      },
     });
-    if (o?.business.isDemo) return;
+    if (siparis?.business.isDemo) return;
   } catch {
     // Kontrol sorgusu patlarsa gerçek siparişin bildirimi durmasın.
   }
@@ -228,6 +285,32 @@ export async function waGonderVeKaydet(opts: {
       // yazıyordu. Halıcı müşterinin haberi olduğunu sanıyordu. Gönderim
       // kimliğini saklıyoruz ki webhook `failed` bildirdiğinde kayıt
       // DÜZELTİLEBİLSİN (bkz. api/whatsapp/webhook).
+      // SOHBETE DE YAZ (2026-07-30). Öncesinde giden bildirimler YALNIZ sipariş
+      // geçmişine "gönderildi" satırı olarak düşüyordu; /panel/mesajlar ekranına
+      // ise sadece (a) müşteriden GELEN ve (b) halıcının panelden yazdığı cevap
+      // yazılıyordu. Sonuç: müşteri bildirime cevap verdiğinde halıcı neye cevap
+      // verildiğini göremiyordu — konuşmanın yarısı eksikti.
+      // `waId` benzersiz + createMany/skipDuplicates → tekrar denemede çift kayıt yok.
+      // ⚠️ Bu kayıt YALNIZ sipariş bildirimleri için: OTP (`waOtp`) buradan
+      // geçmez, doğrulama kodu halıcının gelen kutusuna DÜŞMEMELİ.
+      if (r.id && siparis) {
+        const num = waNumber(siparis.customerPhone);
+        if (num) {
+          await prisma.whatsAppMessage.createMany({
+            data: [
+              {
+                waId: r.id,
+                direction: "OUT",
+                phone: num,
+                body: opts.metin ?? opts.etiket,
+                businessId: siparis.businessId,
+                orderId: opts.orderId,
+              },
+            ],
+            skipDuplicates: true,
+          });
+        }
+      }
       if (r.id) {
         await prisma.appState.upsert({
           where: { key: `wa-msg-${r.id}` },
@@ -270,34 +353,62 @@ export async function waGonderVeKaydet(opts: {
 // Şablon adları Meta'da onaylıdır; değişken SIRASI şablonla birebir aynı olmalı.
 
 /** Sipariş oluşturuldu: müşteri adı, işletme adı, takip kodu. */
-export function waSiparisAlindi(to: string, ad: string, isletme: string, kod: string) {
-  return sendTemplate(to, "siparis_alindi", [ad, isletme, kod]);
+// 2026-07-30 KULLANICI KARARI: her bildirimde TIKLANABİLİR takip linki.
+// `token` = uzun trackingToken (kısa kod DEĞİL — approve-price kısa kodu 403'ler,
+// bkz. 2026-07-14 taklit açığı). Linkli şablon onaylanana dek eskisine düşer.
+export function waSiparisAlindi(
+  to: string, ad: string, isletme: string, kod: string, token: string,
+) {
+  return sendTemplateLinkli(
+    to, "siparis_alindi_link", [ad, isletme],
+    "siparis_alindi", [ad, isletme, kod], token,
+  );
 }
 
 /** Kesin fiyat girildi, müşteri onayı bekleniyor (tutar takip sayfasında). */
-export function waFiyatOnayi(to: string, ad: string, isletme: string, kod: string) {
-  return sendTemplate(to, "fiyat_onayi_bekleniyor", [ad, isletme, kod]);
+export function waFiyatOnayi(
+  to: string, ad: string, isletme: string, kod: string, token: string,
+) {
+  return sendTemplateLinkli(
+    to, "fiyat_onayi_link", [ad, isletme],
+    "fiyat_onayi_bekleniyor", [ad, isletme, kod], token,
+  );
 }
 
-/** Yıkama bitti, teslime hazır. */
+/** Yıkama bitti, teslime hazır. (Henüz hiçbir olaya bağlı değil.) */
 export function waSiparisHazir(to: string, ad: string, isletme: string, kod: string) {
   return sendTemplate(to, "siparis_hazir", [ad, isletme, kod]);
 }
 
 /** Teslimata çıktı. */
-export function waSiparisYolda(to: string, ad: string, isletme: string, kod: string) {
-  return sendTemplate(to, "siparis_yolda", [ad, isletme, kod]);
+export function waSiparisYolda(
+  to: string, ad: string, isletme: string, kod: string, token: string,
+) {
+  return sendTemplateLinkli(
+    to, "siparis_yolda_link", [ad, isletme],
+    "siparis_yolda", [ad, isletme, kod], token,
+  );
 }
 
 /** Teslim edildi + değerlendirme daveti (2026-07-28). */
-export function waSiparisTeslim(to: string, ad: string, isletme: string, kod: string) {
-  return sendTemplate(to, "siparis_teslim_edildi", [ad, isletme, kod]);
+export function waSiparisTeslim(
+  to: string, ad: string, isletme: string, kod: string, token: string,
+) {
+  return sendTemplateLinkli(
+    to, "siparis_teslim_link", [ad, isletme],
+    "siparis_teslim_edildi", [ad, isletme, kod], token,
+  );
 }
 
 /** Sipariş iptal/red edildi (2026-07-28). Sebep şablona GİRMEZ — Meta serbest
  *  metni kategori değişikliğine sokuyor; ayrıntı takip sayfasında ve e-postada. */
-export function waSiparisIptal(to: string, ad: string, isletme: string, kod: string) {
-  return sendTemplate(to, "siparis_iptal", [ad, isletme, kod]);
+export function waSiparisIptal(
+  to: string, ad: string, isletme: string, kod: string, token: string,
+) {
+  return sendTemplateLinkli(
+    to, "siparis_iptal_link", [ad, isletme],
+    "siparis_iptal", [ad, isletme, kod], token,
+  );
 }
 
 /** TELEFON DOĞRULAMA KODU (2026-07-26): SMS pahalı olduğu için OTP de
