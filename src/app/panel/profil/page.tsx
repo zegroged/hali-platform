@@ -150,7 +150,9 @@ export default async function PanelProfile({
               className={inp}
             />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          {/* 2026-07-30: 360px'te iki açılır liste yan yana sığmıyor —
+              "Afyonkarahisar"/"Şehitkamil" gibi adlar kırpılıyordu. */}
+          <div className="grid gap-3 sm:grid-cols-2">
             <CityDistrictSelect
               defaultCity={b.city}
               defaultDistrict={b.district}
@@ -211,22 +213,23 @@ export default async function PanelProfile({
               </div>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className={lbl}>
-                Vergi / T.C. kimlik no{taxMissing && reqBadge}
-              </label>
-              <input
-                name="taxNumber"
-                defaultValue={b.taxNumber ?? ""}
-                placeholder="11 hane T.C. veya 10 hane vergi no"
-                className={taxMissing ? inpMissing : inp}
-              />
-              <p className="mt-1 text-xs text-slate-500">
-                Şahıs işletmesi 11 haneli T.C. kimlik, şirket 10 haneli vergi
-                numarası girer. Müşteriye yalnız şirket vergi numarası gösterilir.
-              </p>
-            </div>
+          {/* 2026-07-30: bu alan İKİ KOLONLUK ızgaranın içinde TEK ÇOCUKTU —
+              alan yarım genişlikte kalıyor, yanı boş duruyor ve "11 hane T.C.
+              veya 10 hane vergi no" ipucu kırpılıyordu. Izgara kaldırıldı. */}
+          <div>
+            <label className={lbl}>
+              Vergi / T.C. kimlik no{taxMissing && reqBadge}
+            </label>
+            <input
+              name="taxNumber"
+              defaultValue={b.taxNumber ?? ""}
+              placeholder="11 hane T.C. veya 10 hane vergi no"
+              className={taxMissing ? inpMissing : inp}
+            />
+            <p className="mt-1 text-xs text-slate-500">
+              Şahıs işletmesi 11 haneli T.C. kimlik, şirket 10 haneli vergi
+              numarası girer. Müşteriye yalnız şirket vergi numarası gösterilir.
+            </p>
           </div>
 
           {/* FATURA BİLGİLERİ — abonelik ödemesi öncesi zorunlu (platform sana
@@ -250,7 +253,10 @@ export default async function PanelProfile({
                   className={billingMissing && !b.billingTitle ? inpMissing : inp}
                 />
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              {/* 2026-07-30: fatura adresi uzun bir metin; yarım genişlikte
+                  ipucu ("Örn. Fevzi Çakmak Mah. No:12, Selçuklu/Konya")
+                  tamamen kırpılıyordu. Telefonda alt alta. */}
+              <div className="grid gap-3 sm:grid-cols-2">
                 <div>
                   <label className={lbl}>Vergi dairesi</label>
                   <input

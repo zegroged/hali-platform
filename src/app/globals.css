@@ -29,11 +29,22 @@ body {
     border-radius: 6px;
   }
 
-  /* iOS Safari 16px altındaki input'a odaklanınca sayfayı zorla yakınlaştırır. */
+  /* iOS Safari 16px altındaki input'a odaklanınca sayfayı zorla yakınlaştırır.
+     2026-07-30: taban 17px'e çekildi (yaşlı kullanıcı) — halıcı adres, tutar ve
+     telefon yazarken en çok bu alanlara bakıyor. `1rem` kök yazı boyuna bağlı
+     olduğu ve kök 16px kaldığı için piksel değeri ayrıca yazılıyor. */
   input,
   textarea,
   select {
-    font-size: max(1rem, 16px);
+    font-size: max(1.0625rem, 17px);
+  }
+
+  /* DOKUNMA HEDEFİ: açılır listeler her yerde aynı biçimde kullanılıyor ve
+     hepsi tek satırlık; 44px alt sınır (erişilebilirlik eşiği) burada güvenli.
+     Buton/link hedefleri yerleşime göre değiştiği için tek tek ölçülüyor —
+     genel bir kural küçük ikon butonlarını da şişirirdi. */
+  select {
+    min-height: 44px;
   }
 }
 

@@ -102,7 +102,7 @@ export default function BolgeSecici({
                     key={d}
                     type="button"
                     onClick={() => degistir(d)}
-                    className={`flex items-center justify-between gap-2 rounded-lg border px-2.5 py-1.5 text-left text-sm transition ${
+                    className={`flex items-center justify-between gap-2 rounded-lg border px-3 py-2.5 text-left text-sm transition ${
                       sec
                         ? "border-brand bg-brand-light font-medium text-brand-dark"
                         : "border-slate-200 text-slate-700 hover:bg-slate-50"

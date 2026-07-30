@@ -259,7 +259,37 @@ export function ManualOrderForm({
           addressHint={form.pickupAddress}
         />
       </div>
-      <div className="grid grid-cols-2 gap-2">
+      {/* 2026-07-30 (telefon turu): burası `grid-cols-2` idi — 360px ekranda
+          "Tutar (dükkânda ölçtüysen)" etiketi iki satıra kırılıp kendi input'unu
+          aşağı itiyor, yanındaki m² alanıyla HİZASI kayıyordu; altındaki
+          açıklama da yarım genişlikte 6 satıra çıkıyordu (kullanıcının ekran
+          görüntüsüyle tespit edildi). Telefonda tek kolon, sm'den itibaren iki.
+          AYRICA SIRA DEĞİŞTİ: önce m², sonra tutar. Tek kolonda doğal akış
+          "ölç → m² gir → öneriyi gör → tutarı yaz"; eskisinde "m²'den hesapla"
+          önerisi, m² alanı daha ekrana gelmeden görünüyordu. */}
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div>
+          <label htmlFor="manuel-m2" className={labelCls}>
+            Yaklaşık m²
+            {optionalBadge}
+          </label>
+          <div className="relative">
+            <input
+              id="manuel-m2"
+              className={`${inpCls(fieldErrors.approxM2)} pr-10`}
+              inputMode="decimal"
+              placeholder="Ör. 12,5"
+              value={form.approxM2}
+              onChange={(e) => set("approxM2", e.target.value)}
+            />
+            <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-slate-500">
+              m²
+            </span>
+          </div>
+          {fieldErrors.approxM2 && (
+            <p className={fieldErrCls}>{fieldErrors.approxM2}</p>
+          )}
+        </div>
         <div>
           <label htmlFor="manuel-tutar" className={labelCls}>
             Tutar (dükkânda ölçtüysen)
@@ -282,7 +312,9 @@ export function ManualOrderForm({
             <button
               type="button"
               onClick={() => set("quotedPrice", String(oneri))}
-              className="mt-1 rounded-lg bg-brand-light px-2 py-1 text-xs font-medium text-brand-dark"
+              // Dokunma hedefi büyütüldü (px-2 py-1 → px-3 py-2): eldiven/
+              // titreyen elle isabet ettirilemeyecek kadar küçüktü.
+              className="mt-1.5 w-full rounded-lg bg-brand-light px-3 py-2 text-sm font-medium text-brand-dark sm:w-auto"
             >
               m²&apos;den hesapla: ≈{oneri.toLocaleString("tr-TR")} TL
             </button>
@@ -292,28 +324,6 @@ export function ManualOrderForm({
             detayından &quot;Kesin fiyat&quot; bildirirsin. Yazarsan teslim
             ekranına hazır gelir; gelir teslimde kesinleşir.
           </p>
-        </div>
-        <div>
-          <label htmlFor="manuel-m2" className={labelCls}>
-            Yaklaşık m²
-            {optionalBadge}
-          </label>
-          <div className="relative">
-            <input
-              id="manuel-m2"
-              className={`${inpCls(fieldErrors.approxM2)} pr-10`}
-              inputMode="decimal"
-              placeholder="Ör. 12,5"
-              value={form.approxM2}
-              onChange={(e) => set("approxM2", e.target.value)}
-            />
-            <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-slate-500">
-              m²
-            </span>
-          </div>
-          {fieldErrors.approxM2 && (
-            <p className={fieldErrCls}>{fieldErrors.approxM2}</p>
-          )}
         </div>
         {drivers.length > 0 && (
           <div>

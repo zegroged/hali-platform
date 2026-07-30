@@ -122,28 +122,35 @@ export default async function MutabakatSayfasi({
         </p>
       )}
 
-      {/* Gün gezinme */}
-      <div className="mt-4 flex items-center justify-between gap-2">
-        <Link
-          href={`/panel/mutabakat?gun=${oncekiGun}`}
-          className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50"
-        >
-          ← Önceki gün
-        </Link>
-        <span className="text-sm font-semibold text-slate-800">
+      {/* Gün gezinme — 2026-07-30: üçü tek satırdaydı ve 360px ekranda ortadaki
+          tarih ("30 Temmuz 2026 (bugün)") iki butonu sıkıştırıp "← Önceki gün"ü
+          iki satıra kırıyordu. Tarih kendi satırına alındı; butonlar satır
+          kırmıyor ve dokunma hedefi büyüdü. */}
+      <div className="mt-4 space-y-2">
+        <p className="text-center text-sm font-semibold text-slate-800">
           {gunAdi(gunISO)}
           {gunISO === bugun && " (bugün)"}
-        </span>
-        {gunISO < bugun ? (
+        </p>
+        <div className="flex items-center justify-between gap-2">
           <Link
-            href={`/panel/mutabakat?gun=${sonrakiGun}`}
-            className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50"
+            href={`/panel/mutabakat?gun=${oncekiGun}`}
+            className="whitespace-nowrap rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-700 hover:bg-slate-50"
           >
-            Sonraki gün →
+            ← Önceki gün
           </Link>
-        ) : (
-          <span className="px-3 py-1.5 text-sm text-slate-300">Sonraki gün →</span>
-        )}
+          {gunISO < bugun ? (
+            <Link
+              href={`/panel/mutabakat?gun=${sonrakiGun}`}
+              className="whitespace-nowrap rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-700 hover:bg-slate-50"
+            >
+              Sonraki gün →
+            </Link>
+          ) : (
+            <span className="whitespace-nowrap px-3 py-2.5 text-sm text-slate-300">
+              Sonraki gün →
+            </span>
+          )}
+        </div>
       </div>
 
       {/* KASA İLE FARKI — bu uyarı bilerek duruyor: iki farklı "bu ay ne
@@ -167,12 +174,19 @@ export default async function MutabakatSayfasi({
         ].map(([etiket, deger], i) => (
           <div key={etiket} className={`${kutu} p-3`}>
             <p className="text-xs text-slate-500">{etiket}</p>
+            {/* 2026-07-30 DÜZELTME: indisler kaymıştı. Dizi sırası
+                0 Teslimat · 1 Tahsilat · 2 IBAN'a gelen · 3 Tahsil edilmeyen ·
+                4 Şoförlerde bekleyen. Kod `i === 3` iken `toplamBekleyen`e
+                bakıyordu, yani "Şoförlerde bekleyen" para varken "Tahsil
+                edilmeyen" kartı sarıya dönüyordu — para ekranında yanlış kart
+                işaretleniyordu. `i === 2` dalının iki ucu da aynı renkti,
+                yani hiçbir işe yaramıyordu. */}
             <p
               className={`mt-1 text-lg font-bold ${
-                i === 3 && ozet.toplamBekleyen > 0
+                i === 4 && ozet.toplamBekleyen > 0
                   ? "text-amber-700"
-                  : i === 2 && ozet.toplamTahsilEdilmeyen > 0
-                    ? "text-slate-900"
+                  : i === 3 && ozet.toplamTahsilEdilmeyen > 0
+                    ? "text-amber-700"
                     : "text-slate-900"
               }`}
             >
@@ -302,7 +316,7 @@ export default async function MutabakatSayfasi({
               </span>
               <form action={nakitTeslimSil}>
                 <input type="hidden" name="id" value={d.id} />
-                <PendingButton className="rounded-lg border border-slate-300 px-2.5 py-1 text-xs text-slate-600 transition hover:bg-slate-50">
+                <PendingButton className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-600 transition hover:bg-slate-50">
                   Sil
                 </PendingButton>
               </form>

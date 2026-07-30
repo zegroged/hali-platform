@@ -62,7 +62,7 @@ export function EmailVerify({ initialEmail }: { initialEmail?: string | null }) 
           <button
             onClick={request}
             disabled={loading || !email.includes("@")}
-            className="rounded-lg border border-brand px-3 py-1.5 text-sm font-medium text-brand-dark disabled:opacity-60"
+            className="rounded-lg border border-brand px-3 py-2.5 text-sm font-medium text-brand-dark disabled:opacity-60"
           >
             {loading ? "Gönderiliyor…" : "✉️ Kod gönder"}
           </button>

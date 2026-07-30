@@ -53,7 +53,7 @@ export default function BolgeDuzenle({
         <button
           type="button"
           onClick={() => setAcik((v) => !v)}
-          className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
+          className="rounded-lg border border-slate-300 px-3 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
         >
           {acik ? "Vazgeç" : ozet ? "Değiştir" : "Bölge ata"}
         </button>

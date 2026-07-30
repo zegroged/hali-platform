@@ -200,6 +200,49 @@ export function IconReceipt(p: IconProps) {
   );
 }
 
+// Panel ana ekranı ızgarası için eklendi (2026-07-30). Yaşlı kullanıcı metni
+// taramak yerine şekli tanıyor; her sayfanın ayırt edici bir ikonu olmalı.
+export function IconPlus(p: IconProps) {
+  return (
+    <svg {...base(p)}>
+      <path d="M5 12h14" />
+      <path d="M12 5v14" />
+    </svg>
+  );
+}
+
+export function IconStore(p: IconProps) {
+  return (
+    <svg {...base(p)}>
+      <path d="m2 7 4.41-4.41A2 2 0 0 1 7.83 2h8.34a2 2 0 0 1 1.42.59L22 7" />
+      <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+      <path d="M2 7h20" />
+      <path d="M15 22v-4a2 2 0 0 0-2-2h-2a2 2 0 0 0-2 2v4" />
+    </svg>
+  );
+}
+
+export function IconRoute(p: IconProps) {
+  return (
+    <svg {...base(p)}>
+      <circle cx="6" cy="19" r="3" />
+      <path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15" />
+      <circle cx="18" cy="5" r="3" />
+    </svg>
+  );
+}
+
+export function IconChart(p: IconProps) {
+  return (
+    <svg {...base(p)}>
+      <path d="M3 3v18h18" />
+      <path d="M8 17v-3" />
+      <path d="M13 17V5" />
+      <path d="M18 17V9" />
+    </svg>
+  );
+}
+
 /** Sipariş durumuna göre SVG ikon (emoji yerine). */
 export function OrderStatusIcon({
   status,

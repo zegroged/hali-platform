@@ -92,10 +92,14 @@ export default async function KasaSayfasi({
         <h1 className="text-lg font-semibold text-slate-900">
           Kasa — Gelir / Gider
         </h1>
+        {/* 2026-07-30: ok butonları ~26×30px idi — erişilebilirlik eşiği 44px
+            ve kullanıcı kitlesi 50-65 yaş; ay değiştirmek için nişan almak
+            gerekiyordu. 44×44'e çıkarıldı, ekran okuyucu için ad verildi. */}
         <div className="flex items-center gap-1 text-sm">
           <Link
             href={ayLink(-1)}
-            className="rounded-lg border border-slate-300 px-2.5 py-1.5 text-slate-600 hover:bg-slate-50"
+            aria-label="Önceki ay"
+            className="flex h-11 w-11 items-center justify-center rounded-lg border border-slate-300 text-lg text-slate-600 hover:bg-slate-50"
           >
             ‹
           </Link>
@@ -104,7 +108,8 @@ export default async function KasaSayfasi({
           </span>
           <Link
             href={ayLink(1)}
-            className="rounded-lg border border-slate-300 px-2.5 py-1.5 text-slate-600 hover:bg-slate-50"
+            aria-label="Sonraki ay"
+            className="flex h-11 w-11 items-center justify-center rounded-lg border border-slate-300 text-lg text-slate-600 hover:bg-slate-50"
           >
             ›
           </Link>
@@ -235,13 +240,13 @@ export default async function KasaSayfasi({
                 <span className="flex items-center gap-2">
                   <form action={toggleRecurrence}>
                     <input type="hidden" name="id" value={k.id} />
-                    <PendingButton className="rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50">
+                    <PendingButton className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">
                       {k.active ? "Duraklat" : "Devam ettir"}
                     </PendingButton>
                   </form>
                   <form action={deleteRecurrence}>
                     <input type="hidden" name="id" value={k.id} />
-                    <PendingButton className="rounded-lg border border-red-300 px-2.5 py-1 text-xs font-medium text-red-600 hover:bg-red-50">
+                    <PendingButton className="rounded-lg border border-red-300 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50">
                       Sil
                     </PendingButton>
                   </form>

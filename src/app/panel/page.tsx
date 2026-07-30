@@ -14,6 +14,7 @@ import { acceptContractVersioned } from "./contract-actions";
 import { CONTRACT_VERSION } from "@/lib/legal";
 import { PendingButton } from "@/components/PendingButton";
 import { EmailVerify } from "@/components/EmailVerify";
+import PanelAnaEkran from "@/components/PanelAnaEkran";
 import {
   IconCheck,
   IconChevronRight,
@@ -220,6 +221,10 @@ export default async function PanelHome({
         </Link>
       </div>
 
+      {/* MOBİL ana-ekran ızgarası: panelin 7 sayfası "Daha fazla" menüsünde
+          gizliydi ve kullanıcı onları hiç açmıyordu (bkz. PanelAnaEkran). */}
+      <PanelAnaEkran />
+
       {/* Son teslimatlar — tutar + adres + teslim fotoğrafı (şoför çeker) */}
       {delivered.length > 0 && (
         <div className="rounded-xl border border-slate-200 bg-white p-4">
@@ -399,19 +404,26 @@ export default async function PanelHome({
               Profilin yayında ve aramalarda kalır; seçtiğin günün sonunda
               siparişler otomatik açılır.
             </p>
-            <form
-              action={setPauseMode}
-              className="mt-3 flex flex-wrap items-center gap-2"
-            >
-              <input
-                type="date"
-                name="pausedUntil"
-                required
-                min={pauseMin}
-                max={pauseMax}
-                className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand"
-              />
-              <PendingButton className="rounded-lg border border-amber-400 bg-white px-4 py-2 text-sm font-semibold text-amber-700 transition hover:bg-amber-50 active:scale-[0.99] disabled:opacity-60">
+            {/* 2026-07-30: tarih alanı ETİKETSİZDİ. Android Chrome boş bir
+                `type="date"` alanını yazısız gri kutu + ok olarak çiziyor;
+                telefondan bakan halıcı orada ne istendiğini anlamıyordu
+                (kullanıcının ekran görüntüsüyle tespit edildi). Etiket eklendi
+                ve alan telefonda tam genişliğe alındı. */}
+            <form action={setPauseMode} className="mt-3 space-y-2">
+              <label className="block">
+                <span className="block text-sm font-medium text-slate-700">
+                  Hangi tarihe kadar kapalı kalsın?
+                </span>
+                <input
+                  type="date"
+                  name="pausedUntil"
+                  required
+                  min={pauseMin}
+                  max={pauseMax}
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:border-brand sm:w-auto"
+                />
+              </label>
+              <PendingButton className="w-full rounded-lg border border-amber-400 bg-white px-4 py-2.5 text-sm font-semibold text-amber-700 transition hover:bg-amber-50 active:scale-[0.99] disabled:opacity-60 sm:w-auto">
                 Bu tarihe kadar duraklat
               </PendingButton>
             </form>
@@ -523,10 +535,13 @@ export default async function PanelHome({
             )}
           </div>
 
-          <div className="mt-4 flex items-center gap-3 border-t border-slate-100 pt-3">
+          {/* 2026-07-30: `flex` + uzun yan metin, "Profili düzenle" butonunu
+              360px'te iki satıra kırıyordu. Telefonda alt alta, sm'den itibaren
+              yan yana. */}
+          <div className="mt-4 flex flex-col items-start gap-3 border-t border-slate-100 pt-3 sm:flex-row sm:items-center">
             <Link
               href="/panel/profil"
-              className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              className="whitespace-nowrap rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
             >
               Profili düzenle
             </Link>

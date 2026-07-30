@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import type { MapMarker } from "@/components/LiveMap";
+import EmptyState from "@/components/EmptyState";
+import { IconMapPin } from "@/components/icons";
 
 // Panel haritası: mobilde 360px, geniş ekranda 480px. Placeholder aynı
 // sınıfları kullanır ki yükleme geçişinde zıplama olmasın.
@@ -78,9 +80,24 @@ export function PanelTrackingClient() {
           <LiveMap markers={markers} paths={paths} />
         </div>
       ) : (
-        <div className="flex h-[200px] items-center justify-center rounded-xl bg-slate-100 text-center text-sm text-slate-500">
-          Şu an mesaide konum gönderen şoför yok.
-        </div>
+        // 2026-07-30: burası tek satır "şoför yok" yazıyordu ve halıcı NEDEN
+        // boş olduğunu anlamıyordu (kullanıcının ekran görüntüsü). Rota
+        // Geçmişi'nde 2026-07-27'de yapılan "boş ekran sebebini söylesin"
+        // düzeltmesinin buraya uygulanmamış hâliydi. Ortak EmptyState kutusu
+        // kullanılıyor — panelin diğer boş ekranlarıyla aynı görünsün.
+        <EmptyState
+          icon={<IconMapPin size={22} />}
+          title="Haritada gösterilecek konum yok"
+          description={
+            drivers.length === 0
+              ? "Henüz şoför eklemedin. Şoför ekleyip mesaisini açtırınca konumunu burada canlı görürsün."
+              : !drivers.some((d) => d.isOnShift)
+                ? "Şoförlerinin hiçbiri şu an mesaide değil. Şoför kendi telefonundan giriş yapıp “Mesaiyi başlat” demeli."
+                : "Şoför mesaide ama konum gelmiyor. Telefonu kilitli olabilir, tarayıcı kapanmış olabilir ya da konum izni verilmemiş olabilir."
+          }
+          actionHref={drivers.length === 0 ? "/panel/soforler" : undefined}
+          actionLabel={drivers.length === 0 ? "Şoför ekle" : undefined}
+        />
       )}
 
       <div className="space-y-2">
@@ -92,7 +109,9 @@ export function PanelTrackingClient() {
           return (
           <div
             key={d.id}
-            className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+            // Telefonda alt alta: 360px'te "ad + ● Çevrimdışı (bağlantı yok)
+            // + son: 13:29" tek satıra sığmıyordu (yazı 13px'e çıkınca hiç).
+            className="flex flex-col gap-0.5 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm sm:flex-row sm:items-center sm:justify-between sm:gap-2"
           >
             <span className="font-medium text-slate-800">{d.name}</span>
             <span className="text-slate-500">

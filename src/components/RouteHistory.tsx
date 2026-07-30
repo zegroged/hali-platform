@@ -194,14 +194,14 @@ export function RouteHistory({
                   <button
                     onClick={() => setPlaying(true)}
                     disabled={data.points.length < 2}
-                    className="rounded-lg border border-brand px-4 py-1.5 text-sm font-medium text-brand-dark disabled:opacity-50"
+                    className="rounded-lg border border-brand px-4 py-2.5 text-sm font-medium text-brand-dark disabled:opacity-50"
                   >
                     ▶ Rotayı oynat
                   </button>
                 ) : (
                   <button
                     onClick={() => setPlaying(false)}
-                    className="rounded-lg border border-red-300 px-4 py-1.5 text-sm font-medium text-red-600"
+                    className="rounded-lg border border-red-300 px-4 py-2.5 text-sm font-medium text-red-600"
                   >
                     ■ Durdur
                   </button>
