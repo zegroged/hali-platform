@@ -30,11 +30,18 @@ durum() { # $1=sablon adi -> APPROVED/PENDING/REJECTED/YOK
   echo "$D"
 }
 
+# 2026-07-31: Turkce destegi. Onceden mailler BILEREK ASCII idi (sablon
+# felaketinin dersi: Turkce, kabuktan gecerken kirilirsa "hal?n?z" olur).
+# Dogru cozum kacmak degil MIME: govde utf-8 charset basligiyla, konu RFC 2047
+# base64 ile tasinir — kabuk baytlara dokunmaz, Gmail dogru cizer.
 posta() { # $1=konu, $2=govde
   SMTP_USER=$(grep "^SMTP_USER=" /opt/hali/.env | cut -d= -f2- | tr -d "\"")
   SMTP_PASS=$(grep "^SMTP_PASS=" /opt/hali/.env | cut -d= -f2- | tr -d "\"")
+  KONU_B64=$(printf "%s" "$1" | base64 | tr -d "\n")
   { echo "From: En Yakin Hali Yikama <$SMTP_USER>"; echo "To: destek@enyakinhaliyikamaservisim.com";
-    echo "Subject: $1"; echo ""; printf "%s\n" "$2"; } > /tmp/wa-mail4.txt
+    echo "Subject: =?utf-8?B?${KONU_B64}?="; echo "MIME-Version: 1.0";
+    echo "Content-Type: text/plain; charset=utf-8"; echo "Content-Transfer-Encoding: 8bit";
+    echo ""; printf "%s\n" "$2"; } > /tmp/wa-mail4.txt
   curl -s --url smtp://smtp.gmail.com:587 --ssl-reqd --mail-from "$SMTP_USER" \
     --mail-rcpt "destek@enyakinhaliyikamaservisim.com" --upload-file /tmp/wa-mail4.txt \
     --user "$SMTP_USER:$SMTP_PASS" > /dev/null 2>&1
