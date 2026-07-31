@@ -90,7 +90,11 @@ async function geocodeDistrict(
 export async function POST(req: NextRequest) {
   const ip = clientIp(req);
   // Kötüye kullanım koruması: IP başına saatte 3 kayıt denemesi.
-  const rl = rateLimit(`register:${ip}`, 3, 60 * 60 * 1000);
+  // 2026-07-31: 3/saat → 10/saat. Sayaç BAŞARISIZ denemeleri de sayıyor
+  // (yanlış e-posta kodu, alınmış kullanıcı adı...); gerçek kullanıcı formu
+  // üç kez beceremeyince BİR SAAT kilitleniyordu — canlıda yaşandı, kullanıcı
+  // yarım saat bekledi. 10/saat hâlâ toplu hesap açmayı engeller.
+  const rl = rateLimit(`register:${ip}`, 10, 60 * 60 * 1000);
   if (!rl.ok) return tooMany(rl.retryAfterSec);
 
   const parsed = Body.safeParse(await req.json().catch(() => null));
