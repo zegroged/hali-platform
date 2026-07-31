@@ -9,8 +9,8 @@ import { parseTutar } from "@/lib/money";
 import { getCurrentBusiness, profileComplete, syncVisibility } from "@/lib/panel";
 import { hashPassword } from "@/lib/auth";
 import { sendSms, trackingLink } from "@/lib/sms";
-import { waSiparisYolda, waFiyatOnayi, waGonderVeKaydet } from "@/lib/whatsapp";
-import { sendAdminEmail } from "@/lib/email";
+import { waSiparisYolda, waFiyatOnayi, waSiparisHazir, waGonderVeKaydet } from "@/lib/whatsapp";
+import { sendAdminEmail, sendEmail } from "@/lib/email";
 import { notify, notifyAdmins } from "@/lib/notify";
 import { getAppBaseUrl } from "@/lib/config";
 import { ORDER_STATUS_META, PANEL_NEXT } from "@/lib/orderStatus";
@@ -932,4 +932,67 @@ export async function setPauseMode(formData: FormData) {
   });
   revalidatePath("/panel");
   redirect("/panel?kaydedildi=Siparişler+duraklatıldı");
+}
+
+/**
+ * "MÜŞTERİYE HAZIR HABERİ" (2026-07-31): siparis_hazir şablonu Meta'da onaylı
+ * ama hiçbir olaya bağlı değildi — akışta WASHING → OUT_FOR_DELIVERY doğrudan
+ * geçiyor, "yıkandı, hazır" ayrı bir durum yok. Yeni durum eklemek yerine
+ * İSTEĞE BAĞLI düğme: halıcı yıkama bitince basar, müşteri "halın hazır,
+ * teslimatı bekle" bilgisini alır. SİPARİŞ BAŞINA BİR KEZ (OrderEvent kaydı
+ * hem işaret hem geçmiş satırı).
+ */
+export async function notifyOrderReady(formData: FormData) {
+  const b = await getCurrentBusiness();
+  if (!b) return;
+  const orderId = String(formData.get("orderId") ?? "");
+  const order = await prisma.order.findFirst({
+    where: { id: orderId, businessId: b.id, status: "WASHING" },
+    select: {
+      id: true,
+      code: true,
+      trackingToken: true,
+      customerName: true,
+      customerPhone: true,
+      customerEmail: true,
+    },
+  });
+  if (!order) return;
+  // Bir kez: daha önce gönderildiyse sessizce çık (çift tık / yenileme).
+  const onceki = await prisma.orderEvent.findFirst({
+    where: { orderId, note: { startsWith: "Hazır haberi" } },
+    select: { id: true },
+  });
+  if (onceki) {
+    revalidatePath(`/panel/siparisler/${orderId}`);
+    return;
+  }
+  await prisma.orderEvent.create({
+    data: {
+      orderId,
+      status: "WASHING",
+      note: "Hazır haberi müşteriye gönderildi (yıkama tamamlandı)",
+    },
+  });
+  void waGonderVeKaydet({
+    orderId,
+    status: "WASHING",
+    ownerUserId: b.ownerId,
+    etiket: "Hazır haberi",
+    metin: "Halınız yıkandı ve teslime hazır.",
+    gonder: () =>
+      waSiparisHazir(order.customerPhone, order.customerName, b.name, order.code ?? ""),
+  });
+  if (order.customerEmail) {
+    try {
+      await sendEmail(
+        order.customerEmail,
+        `Halın yıkandı, teslime hazır (${order.code ?? ""})`,
+        `Halın yıkandı ve teslime hazır. Teslimata çıktığında ayrıca haber vereceğiz. Takip: ${trackingLink(order.trackingToken)}`,
+      );
+    } catch (e) {
+      console.error("[hazir-haberi] e-posta hatası:", e);
+    }
+  }
+  revalidatePath(`/panel/siparisler/${orderId}`);
 }

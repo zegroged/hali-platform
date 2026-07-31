@@ -25,6 +25,7 @@ import {
   deliverOrderPanel,
   setOrderEta,
   quoteOrderPrice,
+  notifyOrderReady,
   rejectOrder,
   cancelOrder,
   reassignOrder,
@@ -546,6 +547,27 @@ export default async function OrderManagePage({
             uploadStage={o.status === "WASHING" ? "YIKAMA" : undefined}
           />
         </div>
+        {/* "Hazır" haberi (2026-07-31): siparis_hazir şablonu onaylıydı ama
+            hiçbir olaya bağlı değildi. İsteğe bağlı, sipariş başına BİR KEZ —
+            gönderilmişse geçmiş satırından anlaşılır ve düğme kaybolur. */}
+        {o.status === "WASHING" &&
+          (o.events.some((e) => e.note?.startsWith("Hazır haberi")) ? (
+            <p className="mt-3 rounded-lg bg-green-50 px-3 py-2 text-sm text-green-800">
+              ✓ Müşteriye &quot;halın yıkandı, teslime hazır&quot; haberi
+              gönderildi.
+            </p>
+          ) : (
+            <form action={notifyOrderReady} className="mt-3">
+              <input type="hidden" name="orderId" value={o.id} />
+              <PendingButton className="w-full rounded-lg border border-brand bg-white px-4 py-2.5 text-sm font-semibold text-brand-dark transition hover:bg-brand-light active:scale-[0.99] disabled:opacity-60 sm:w-auto">
+                Müşteriye haber ver — halın yıkandı, teslime hazır
+              </PendingButton>
+              <p className="mt-1 text-xs text-slate-500">
+                WhatsApp + e-posta gider; bir kez gönderilir. Teslimata
+                çıkardığında ayrıca &quot;yolda&quot; bildirimi gidecek.
+              </p>
+            </form>
+          ))}
       </div>
 
       {/* İşlem geçmişi */}

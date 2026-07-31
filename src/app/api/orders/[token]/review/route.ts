@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getAuthedUser } from "@/lib/auth";
 import { rateLimit, clientIp, tooMany } from "@/lib/ratelimit";
+import { normalizePhone } from "@/lib/phone";
 
 // Müşteri yorumu + yıldız. ARTIK ÜYELİK ZORUNLU: yalnız giriş yapmış müşteri
 // (CUSTOMER) yorum yapabilir — takip linki o siparişe erişim kanıtı, üyelik ise
@@ -47,10 +48,22 @@ export async function POST(
     where: { OR: [{ trackingToken: token }, { code: token.toUpperCase() }] },
     select: {
       id: true,
+      code: true,
       status: true,
       businessId: true,
       customerId: true,
-      business: { select: { ownerId: true } },
+      isManual: true,
+      business: {
+        select: {
+          ownerId: true,
+          name: true,
+          phone: true,
+          gsmPhone2: true,
+          landlinePhone: true,
+          whatsappNumber: true,
+          owner: { select: { email: true, phone: true } },
+        },
+      },
       review: { select: { id: true } },
     },
   });
@@ -73,6 +86,38 @@ export async function POST(
   }
   // Öz-yorum koruması: işletme sahibi kendi işletmesini puanlayamaz.
   if (order.business?.ownerId === viewer.id) {
+    return NextResponse.json(
+      { error: "Kendi işletmenizi değerlendiremezsiniz." },
+      { status: 403 },
+    );
+  }
+  // ÖZ-YORUM 2. KATMAN (2026-07-31, 4.30'un açık maddesi): sahibin İKİNCİ bir
+  // müşteri hesabıyla kendine yıldız basması. Kullanıcı kimliği farklı olsa da
+  // TELEFON/E-POSTA işletmeninkiyle eşleşiyorsa reddedilir. Kalan boşluk
+  // (üçüncü kişiye ait numarayla hesap) aşağıdaki şüpheli-örüntü zili ile
+  // admin'e düşer — engellemek yerine görünür kılınır (yanlış pozitif riskine
+  // karşı gerçek müşteri mağdur edilmez).
+  const viewerKimlik = await prisma.user.findUnique({
+    where: { id: viewer.id },
+    select: { email: true, phone: true, createdAt: true },
+  });
+  const tel = (v: string | null | undefined) => normalizePhone(v ?? "") || null;
+  const viewerTel = tel(viewerKimlik?.phone);
+  const isletmeTelleri = [
+    order.business?.phone,
+    order.business?.gsmPhone2,
+    order.business?.landlinePhone,
+    order.business?.whatsappNumber,
+    order.business?.owner?.phone,
+  ]
+    .map(tel)
+    .filter(Boolean);
+  const viewerEposta = viewerKimlik?.email?.toLowerCase() ?? null;
+  const sahipEposta = order.business?.owner?.email?.toLowerCase() ?? null;
+  if (
+    (viewerTel && isletmeTelleri.includes(viewerTel)) ||
+    (viewerEposta && sahipEposta && viewerEposta === sahipEposta)
+  ) {
     return NextResponse.json(
       { error: "Kendi işletmenizi değerlendiremezsiniz." },
       { status: 403 },
@@ -137,6 +182,34 @@ export async function POST(
       );
     }
     throw e;
+  }
+
+  // ŞÜPHELİ ÖRÜNTÜ ZİLİ (engel değil, görünürlük): iki işaret —
+  //  (a) MANUEL kayda yüksek puan: manuel siparişi halıcı kendisi açar,
+  //      müşteri telefonu serbest metindir; kendi kontrolündeki numarayla
+  //      sahte akış kurmanın en kolay yolu budur.
+  //  (b) Yorumdan < 48 saat önce açılmış hesaptan 5 yıldız: gerçek müşteri de
+  //      olabilir (teslimden sonra üye olan) — o yüzden yalnız bildirim.
+  // Best-effort: zil hatası yorumu bozmaz.
+  try {
+    const hesapYasiMs = viewerKimlik
+      ? Date.now() - viewerKimlik.createdAt.getTime()
+      : Infinity;
+    const isaretler: string[] = [];
+    if (order.isManual && rating >= 4) isaretler.push("manuel kayda yüksek puan");
+    if (hesapYasiMs < 48 * 60 * 60 * 1000 && rating === 5)
+      isaretler.push("48 saatten yeni hesaptan 5 yıldız");
+    if (isaretler.length > 0) {
+      const { notifyAdmins } = await import("@/lib/notify");
+      await notifyAdmins({
+        type: "genel",
+        title: "Şüpheli yorum örüntüsü",
+        body: `${order.business?.name ?? "İşletme"} — ${order.code ?? order.id}: ${rating}★ (${isaretler.join(" + ")}). Gerekirse admin panelden yorumu sil.`,
+        href: `/admin/isletme/${order.businessId}`,
+      });
+    }
+  } catch (e) {
+    console.error("[yorum-suphe] zil hatası:", e);
   }
 
   return NextResponse.json({ ok: true, pointsAwarded: awarded });
