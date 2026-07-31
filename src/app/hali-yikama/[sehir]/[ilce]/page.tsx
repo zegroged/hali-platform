@@ -254,6 +254,22 @@ export default async function DistrictPage({ params }: { params: Params }) {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: jsonLdSafe(faqJsonLd) }}
       />
+      {/* BreadcrumbList (2026-07-30, SEO B/9) — şehir sayfasıyla aynı desen. */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: jsonLdSafe({
+            "@context": "https://schema.org",
+            "@type": "BreadcrumbList",
+            itemListElement: [
+              { "@type": "ListItem", position: 1, name: "Ana Sayfa", item: "https://enyakinhaliyikamaservisi.com" },
+              { "@type": "ListItem", position: 2, name: "Şehirler", item: "https://enyakinhaliyikamaservisi.com/sehirler" },
+              { "@type": "ListItem", position: 3, name: `${city.name} Halı Yıkama`, item: `https://enyakinhaliyikamaservisi.com/hali-yikama/${city.slug}` },
+              { "@type": "ListItem", position: 4, name: `${district} Halı Yıkama` },
+            ],
+          }),
+        }}
+      />
     </>
   );
 }

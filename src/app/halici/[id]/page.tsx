@@ -171,6 +171,22 @@ export default async function HaliciProfile({
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: jsonLdSafe(ld) }}
         />
+        {/* BreadcrumbList (2026-07-30): işletme adı KULLANICI VERİSİ —
+            jsonLdSafe şart (4.5 stored-XSS dersi). */}
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: jsonLdSafe({
+              "@context": "https://schema.org",
+              "@type": "BreadcrumbList",
+              itemListElement: [
+                { "@type": "ListItem", position: 1, name: "Ana Sayfa", item: base },
+                { "@type": "ListItem", position: 2, name: "Halıcılar", item: `${base}/halicilar` },
+                { "@type": "ListItem", position: 3, name: b.name },
+              ],
+            }),
+          }}
+        />
         <Link href="/" className="text-sm text-brand-dark hover:underline">
           ← Halıcılar
         </Link>

@@ -286,6 +286,23 @@ export default async function CityPage({ params }: { params: Params }) {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: jsonLdSafe(faqJsonLd) }}
       />
+      {/* BreadcrumbList (2026-07-30, SEO B/9): arama sonucunda "Ana Sayfa ›
+          Şehirler › X" kırıntısı çıkar. Şehir adı statik listeden (cities.ts)
+          ama alışkanlık bozulmasın diye yine jsonLdSafe. */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: jsonLdSafe({
+            "@context": "https://schema.org",
+            "@type": "BreadcrumbList",
+            itemListElement: [
+              { "@type": "ListItem", position: 1, name: "Ana Sayfa", item: "https://enyakinhaliyikamaservisi.com" },
+              { "@type": "ListItem", position: 2, name: "Şehirler", item: "https://enyakinhaliyikamaservisi.com/sehirler" },
+              { "@type": "ListItem", position: 3, name: `${city.name} Halı Yıkama` },
+            ],
+          }),
+        }}
+      />
     </>
   );
 }

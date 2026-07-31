@@ -734,6 +734,13 @@ export async function advanceOrderPanel(formData: FormData) {
   // WASHING→OUT_FOR_DELIVERY tanımlıyor; DELIVERED buradan hiç geçmiyor.
   // Panelden teslim `deliverOrderPanel` ile yapılıyor — kayıt oraya taşındı.
 
+  // "Yıkanmaya başladı" e-postası (2026-07-30, bildirim paketinin son parçası).
+  // ⚠️ İKİZ KURAL: aynı çağrı şoför web (sofor/actions) ve şoför uygulaması
+  // (lib/driverOrders) yollarında da var — üçü birlikte değişir.
+  if (step.next === "WASHING") {
+    await bildirMusteriyeEposta(orderId, "yikama");
+  }
+
   if (step.next === "OUT_FOR_DELIVERY") {
     // Şoför akışıyla aynı: önceki teslimatın konumu sızmasın + canlı takip SMS'i.
     if (order.driverId) {

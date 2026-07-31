@@ -53,6 +53,26 @@ export const viewport = {
   themeColor: "#0f766e",
 };
 
+// Organization JSON-LD (2026-07-30, SEO paketi B/9): Google'ın markayı tek
+// varlık olarak tanıması için — logo, iletişim ve sosyal kanıt buradan okunur.
+// Statik veri: kullanıcı girdisi İÇERMEZ (kaçış gerekmez; dinamik veri
+// gömülecekse jsonLdSafe ŞART — 4.5'teki stored-XSS dersi).
+const ORG_JSONLD = {
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  name: SITE_NAME,
+  url: "https://enyakinhaliyikamaservisi.com",
+  logo: "https://enyakinhaliyikamaservisi.com/icon-512.png",
+  description: SITE_DESCRIPTION,
+  contactPoint: {
+    "@type": "ContactPoint",
+    contactType: "customer service",
+    email: "info@enyakinhaliyikamaservisi.com",
+    telephone: "+90-501-609-03-73",
+    availableLanguage: "Turkish",
+  },
+};
+
 export default function RootLayout({
   children,
 }: {
@@ -61,6 +81,10 @@ export default function RootLayout({
   return (
     <html lang="tr" className={inter.variable}>
       <body className="font-sans">
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(ORG_JSONLD) }}
+        />
         <VersionSkewGuard />
         {children}
       </body>

@@ -163,6 +163,7 @@ export async function bildirTeslimEdildi(orderId: string): Promise<void> {
         customerName: true,
         customerEmail: true,
         customerPhone: true,
+        customerId: true, // misafir mi uye mi — davet paragrafi buna bakar
         business: { select: { name: true, ownerId: true } },
       },
     });
@@ -181,6 +182,11 @@ export async function bildirTeslimEdildi(orderId: string): Promise<void> {
            <p style="margin:0 0 12px;">Sipariş kodun: <strong>${esc(kod)}</strong></p>
            <p style="margin:0 0 16px;">Memnun kaldıysan birkaç saniyeni ayırıp değerlendirme bırakır mısın? Yorumun, senden sonra gelen müşterilere yol gösteriyor.</p>
            <p style="margin:0 0 16px;"><a href="${url}" style="display:inline-block;background-color:#0f766e;color:#ffffff;text-decoration:none;font-weight:bold;padding:12px 24px;border-radius:8px;">Değerlendirme bırak</a></p>
+           ${
+             order.customerId
+               ? ""
+               : `<p style="margin:0 0 16px;padding:12px;background-color:#f0fdfa;border-radius:8px;color:#134e4a;font-size:14px;">Bu siparişi misafir olarak verdin. <a href="${getAppBaseUrl()}/uye-ol" style="color:#0f766e;font-weight:bold;">Ücretsiz üye olursan</a> siparişlerini tek yerden takip eder, yorum yapabilir ve puan biriktirirsin — yorum başına 50 puan.</p>`
+           }
            <p style="margin:0;color:#64748b;font-size:13px;">Bir sorun olduysa doğrudan halıcıya ulaşabilir ya da bize yazabilirsin.</p>`,
         ),
       );
@@ -217,7 +223,7 @@ export async function bildirTeslimEdildi(orderId: string): Promise<void> {
  */
 export async function bildirMusteriyeEposta(
   orderId: string,
-  olay: "fiyat-onayi" | "yolda",
+  olay: "fiyat-onayi" | "yolda" | "yikama",
 ): Promise<void> {
   try {
     const order = await prisma.order.findUnique({
@@ -235,7 +241,20 @@ export async function bildirMusteriyeEposta(
     const url = `${getAppBaseUrl()}/takip/${order.trackingToken}`;
 
     const icerik =
-      olay === "fiyat-onayi"
+      olay === "yikama"
+        ? {
+            // "Yıkanmaya başladı" (2026-07-30, bildirim paketinin son parçası).
+            // WhatsApp şablonu YOK (siparis_hazir farklı bir adımı anlatıyor,
+            // bağlanmadı) — yalnız e-posta; takip sayfası zaten canlı gösteriyor.
+            konu: `Halın yıkanmaya başladı (${kod})`,
+            duz: `${order.business.name} halını yıkamaya aldı. Durumu takip sayfasından izleyebilirsin: ${url}`,
+            html: `<p style="margin:0 0 12px;">Merhaba ${esc(order.customerName)},</p>
+              <p style="margin:0 0 12px;"><strong>${esc(order.business.name)}</strong> onayladığın fiyatla halını yıkamaya aldı.</p>
+              <p style="margin:0 0 16px;">Yıkama bitip teslimata çıktığında yine haber vereceğiz.</p>
+              <p style="margin:0 0 16px;"><a href="${url}" style="display:inline-block;background-color:#0f766e;color:#ffffff;text-decoration:none;font-weight:bold;padding:12px 24px;border-radius:8px;">Siparişimi takip et</a></p>`,
+            etiket: "Yıkama bilgisi",
+          }
+        : olay === "fiyat-onayi"
         ? {
             konu: `Kesin fiyatın hazır — onayını bekliyoruz (${kod})`,
             duz: `${order.business.name} halını ölçtü ve kesin fiyatı bildirdi. Onaylamadan yıkama başlamaz. Tutarı görmek ve onaylamak için: ${url}`,

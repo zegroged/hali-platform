@@ -186,9 +186,19 @@ export async function driverAdvance(
           : "Dijital fiyat onayı alınmadan yıkamaya geçildi",
       },
     });
-    await bildirMusteriyeEposta(orderId, "yolda");
+    // 🐛 BURADA `bildirMusteriyeEposta(orderId, "yolda")` VARDI (2026-07-30'da
+    // yakalandı): halı daha yıkamaya girerken müşteriye "halın YOLA ÇIKTI"
+    // maili gidiyordu — üstelik yalnız dijital onayı OLMAYAN müşterilere.
+    // "Yolda" maili aşağıdaki OUT_FOR_DELIVERY bloğuna taşındı (orada SMS ve
+    // WhatsApp vardı ama e-posta HİÇ yoktu — uygulamadan ilerletilen sipariş
+    // yola çıktığında müşteriye e-posta gitmiyordu).
+  }
+  // "Yıkanmaya başladı" e-postası — panel ve şoför web ile İKİZ.
+  if (next === "WASHING") {
+    await bildirMusteriyeEposta(orderId, "yikama");
   }
   if (next === "OUT_FOR_DELIVERY") {
+    await bildirMusteriyeEposta(orderId, "yolda");
     await prisma.driver.update({
       where: { id: driverId },
       data: { lastLat: null, lastLng: null },

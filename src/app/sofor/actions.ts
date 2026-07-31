@@ -151,6 +151,11 @@ export async function advanceOrder(formData: FormData) {
     });
   }
 
+  // "Yıkanmaya başladı" e-postası — panel ve şoför uygulamasıyla İKİZ.
+  if (next === "WASHING") {
+    await bildirMusteriyeEposta(id, "yikama");
+  }
+
   if (next === "OUT_FOR_DELIVERY") {
     // B9: önceki teslimatın konumu sızmasın — sonraki ping'e kadar konumu temizle.
     await prisma.driver.update({
