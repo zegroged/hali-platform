@@ -49,16 +49,25 @@ export async function generateReferralCode(formData: FormData) {
       hataDon("İndirim tanımlama yetkin yok — yöneticiyle görüş.");
     const pct = Number(pctRaw);
     const ay = Number(ayRaw);
-    // TAVAN: baş komisyoncunun (ya da admin'in) belirlediği üst sınır.
-    const tavan = Number(agent.maxDiscountPercent ?? 100);
-    if (!Number.isFinite(pct) || pct <= 0 || pct > 100)
-      hataDon("İndirim yüzdesi 1 ile 100 arasında olmalı.");
+    // 🔴 MUTLAK PLATFORM TAVANI (2026-08-02, kullanıcı kararı — 4.21'deki
+    // "admin'in premium yaptığı sınırsız olsun" tasarımı GERİ ALINDI):
+    // HİÇBİR komisyoncu %20'den fazla ya da 12 aydan uzun indirim basamaz.
+    // Kişiye özel tavan (maxDiscountPercent/Months) yalnız DAHA SIKI olabilir.
+    const tavan = Math.min(
+      Number(agent.maxDiscountPercent ?? MAX_SUB_DISCOUNT),
+      MAX_SUB_DISCOUNT,
+    );
+    const ayTavan = Math.min(
+      agent.maxDiscountMonths ?? MAX_SUB_DISCOUNT_MONTHS,
+      MAX_SUB_DISCOUNT_MONTHS,
+    );
+    if (!Number.isFinite(pct) || pct <= 0)
+      hataDon("İndirim yüzdesi 1 ile " + tavan + " arasında olmalı.");
     if (pct > tavan)
-      hataDon(`En fazla %${tavan} indirim tanımlayabilirsin.`);
-    const ayTavan = agent.maxDiscountMonths ?? 1200;
+      hataDon(`En fazla %${tavan} indirim tanımlayabilirsin (platform tavanı).`);
     if (ay > ayTavan)
-      hataDon(`İndirim süresi en fazla ${ayTavan} ay olabilir.`);
-    if (!Number.isInteger(ay) || ay < 1 || ay > 1200)
+      hataDon(`İndirim süresi en fazla ${ayTavan} ay olabilir (platform tavanı).`);
+    if (!Number.isInteger(ay) || ay < 1)
       hataDon("İndirim süresi ay olarak girilmeli (en az 1).");
     discountPercent = Math.round(pct * 100) / 100;
     discountMonths = ay;

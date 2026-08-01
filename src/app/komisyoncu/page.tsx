@@ -564,7 +564,7 @@ export default async function KomisyoncuSayfasi({
                   <input
                     name="discountPercent"
                     inputMode="decimal"
-                    placeholder="Örn. 25"
+                    placeholder="Örn. 10"
                     className="w-24 rounded-lg border border-slate-300 px-2.5 py-2 text-sm focus:border-brand focus:outline-none"
                   />
                 </div>
@@ -591,7 +591,17 @@ export default async function KomisyoncuSayfasi({
             <strong>Premium yetkin var:</strong> istersen koda indirim göm —
             kodla kaydolan işletme, seçtiğin süre boyunca aboneliği o yüzde
             indirimli öder (komisyonun da indirimli tutar üzerinden hesaplanır).
-            Boş bırakırsan kod indirimsiz olur.
+            Boş bırakırsan kod indirimsiz olur. Tavan: en fazla %
+            {Math.min(
+              Number(agent.maxDiscountPercent ?? MAX_SUB_DISCOUNT),
+              MAX_SUB_DISCOUNT,
+            )}{" "}
+            indirim,{" "}
+            {Math.min(
+              agent.maxDiscountMonths ?? MAX_SUB_DISCOUNT_MONTHS,
+              MAX_SUB_DISCOUNT_MONTHS,
+            )}{" "}
+            ay süre.
           </p>
         )}
         {agent.codes.length > 0 && (
