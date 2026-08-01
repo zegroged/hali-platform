@@ -154,6 +154,7 @@ export default async function AdminAgents({
           id: true,
           isHead: true,
           taxId: true,
+          address: true,
           faturaMukellefi: true,
           user: { select: { name: true, username: true, phone: true } },
         },
@@ -296,6 +297,14 @@ export default async function AdminAgents({
                         Gider pusulası yazdır
                       </a>
                     </p>
+                    {(!t.agent.taxId || !t.agent.address) && (
+                      <p className="mt-0.5 font-semibold text-red-700">
+                        ⚠️ Pusula için eksik: {!t.agent.taxId && "T.C./VKN"}
+                        {!t.agent.taxId && !t.agent.address && " + "}
+                        {!t.agent.address && "adres"} — komisyoncudan iste
+                        (panelindeki Ödemem bölümünden ekler).
+                      </p>
+                    )}
                     <p className="mt-0.5 text-amber-700">
                       &quot;Ödendi işaretle&quot;de stopaj OTOMATİK hesaplanıp
                       kaydedilir — havaleyi NET tutardan yap. Fatura

@@ -38,6 +38,7 @@ export default async function GiderPusulasi({
           taxId: true,
           iban: true,
           ibanName: true,
+          address: true,
           user: { select: { name: true, phone: true } },
         },
       },
@@ -100,6 +101,8 @@ export default async function GiderPusulasi({
             <p className="mt-1 text-slate-700">
               {t.ibanName ?? t.agent.ibanName ?? t.agent.user.name}
               <br />
+              Adres: {t.agent.address ?? "____________________"}
+              <br />
               Tel: {t.agent.user.phone}
               <br />
               T.C./VKN: {t.agent.taxId ?? "____________________"}
@@ -153,12 +156,17 @@ export default async function GiderPusulasi({
         </div>
 
         <p className="mt-6 text-xs leading-relaxed text-slate-500">
-          Not: Bu belge, vergi mükellefi olmayan kişiye yapılan komisyon ödemesi
-          için düzenlenir; kesilen stopaj platform tarafından muhtasar
-          beyannameyle beyan edilir. Komisyoncu vergi mükellefiyse bu belge
-          KULLANILMAZ — fatura alınır ve brüt ödenir. Oran ve eşik uygulaması
-          mali müşavir teyidine tabidir; belgeyi işleme koymadan önce mali
-          müşavirinize danışın.
+          <strong>Belge niteliği (VUK md. 234, 7338 değişikliği):</strong>{" "}
+          Ödeme banka aracılığıyla yapıldığından <strong>banka dekontu gider
+          pusulası yerine geçer</strong>; bu çıktı, dekontun stopaj dökümünü
+          gösteren iç ekidir — dekontla birlikte saklayın (5 yıl). Matbaa
+          basımlı pusula kullanılacaksa bu döküm oradaki alanlara aynen
+          geçirilir. Belge, hizmet/ödeme tarihinden itibaren en geç{" "}
+          <strong>7 gün içinde</strong> düzenlenmiş olmalıdır; iki nüsha
+          hazırlanır, biri işi yapanda kalır. Kesilen stopaj platformca
+          muhtasar beyannameyle beyan edilir. Komisyoncu vergi mükellefiyse bu
+          belge KULLANILMAZ — fatura alınır, brüt ödenir. Oran/eşik ve dekont
+          ikamesi yorumu mali müşavir teyidine tabidir.
         </p>
       </div>
     </div>

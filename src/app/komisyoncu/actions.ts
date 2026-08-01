@@ -313,6 +313,11 @@ export async function savePayoutInfo(formData: FormData) {
   const taxIdRaw = String(formData.get("taxId") || "").replace(/\D/g, "");
   if (taxIdRaw && !isValidTaxOrTckn(taxIdRaw))
     hata(taxIdError(taxIdRaw) ?? "Vergi/T.C. kimlik numarası doğrulanamadı.");
+  // ADRES (2026-08-01, VUK 234 araştırması): gider pusulasının zorunlu şekil
+  // şartı — işi yapanın adresi. IBAN kaydıyla birlikte istenir.
+  const address = String(formData.get("address") || "").trim();
+  if (ibanRaw && address.length < 10)
+    hata("Adres zorunlu (gider pusulası/vergi belgesi için) — mahalle, ilçe ve il ile yaz.");
   // payoutDay KALDIRILDI (2026-07-31): ödemeler herkese ayın son günü.
   await prisma.agent.update({
     where: { id: agent!.id },
@@ -320,6 +325,7 @@ export async function savePayoutInfo(formData: FormData) {
       iban: ibanRaw || null,
       ibanName: ibanRaw ? ibanName : null,
       taxId: taxIdRaw || null,
+      address: address || null,
     },
   });
   revalidatePath("/komisyoncu");

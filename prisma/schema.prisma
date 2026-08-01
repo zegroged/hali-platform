@@ -634,6 +634,9 @@ model Agent {
   ibanName  String?
   // Gider pusulası için TCKN/VKN (opsiyonel; stopajlı ödemede belgeye yazılır).
   taxId     String?
+  // Gider pusulası zorunlu alanı (VUK 234): işi yapanın ADRESİ. IBAN ile
+  // birlikte istenir — pusula/dekont dökümü adressiz şeklen eksik kalır.
+  address   String?
   // FATURA MÜKELLEFİ (2026-07-31): true = komisyoncu vergi mükellefi, ödemeye
   // FATURA keser → stopaj UYGULANMAZ (brüt ödenir). false = mükellef değil →
   // aylık eşik aşıldığında ödeme anında stopaj OTOMATİK hesaplanıp kaydedilir.

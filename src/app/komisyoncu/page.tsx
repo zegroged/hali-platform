@@ -474,6 +474,17 @@ export default async function KomisyoncuSayfasi({
           </div>
           <div>
             <label className="mb-1 block text-xs font-medium text-slate-600">
+              Adres (IBAN ile zorunlu — vergi belgesi için)
+            </label>
+            <input
+              name="address"
+              defaultValue={agent.address ?? ""}
+              placeholder="Mahalle, ilçe, il"
+              className={inp}
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-slate-600">
               T.C. kimlik / Vergi no (opsiyonel)
             </label>
             <input
