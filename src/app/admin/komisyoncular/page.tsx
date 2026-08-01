@@ -166,9 +166,29 @@ export default async function AdminAgents({
   // STOPAJ GÖSTERGESİ (2026-07-31): bu ay ESIK'i asan komisyoncunun bekleyen
   // talebinde brüt/stopaj/net dökümü + gider pusulası bağlantısı gösterilir.
   // Yalnız GÖSTERİM — tutarlar brüt kalır, karar ve belge admindedir.
-  const ayToplamlari = await ayTahakkuklari(
-    [...new Set(bekleyenTalepler.map((t) => t.agent.id))],
-  );
+  // Eşik TALEBİN AÇILDIĞI AYA göre ölçülür (denetim: "bugün"e göre ölçülünce
+  // 31'inde açılan talebin uyarısı 1'inde kayboluyor, stopaj da atlanıyordu —
+  // markPayoutPaid ile aynı çapa). Talepler ay gruplarına ayrılır (tipik: tek
+  // grup, ay-sonu toplu açılış), ay başına tek toplu sorgu.
+  const ayAnahtari = (d: Date) =>
+    new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Istanbul" })
+      .format(d)
+      .slice(0, 7);
+  const ayGruplari = new Map<string, { ornekTarih: Date; agentIds: Set<string> }>();
+  for (const t of bekleyenTalepler) {
+    const k = ayAnahtari(t.createdAt);
+    const g = ayGruplari.get(k) ?? { ornekTarih: t.createdAt, agentIds: new Set<string>() };
+    g.agentIds.add(t.agent.id);
+    ayGruplari.set(k, g);
+  }
+  // Anahtar: `${ayKey}:${agentId}` → o AYDAKİ tahakkuk toplamı.
+  const ayToplamlari = new Map<string, number>();
+  for (const [k, g] of ayGruplari) {
+    const toplamlar = await ayTahakkuklari([...g.agentIds], g.ornekTarih);
+    for (const [aid, tutar] of toplamlar) ayToplamlari.set(`${k}:${aid}`, tutar);
+  }
+  const talepAyToplami = (t: { createdAt: Date; agent: { id: string } }) =>
+    ayToplamlari.get(`${ayAnahtari(t.createdAt)}:${t.agent.id}`) ?? 0;
 
   const inp =
     "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand focus:outline-none";
@@ -228,10 +248,12 @@ export default async function AdminAgents({
           )}
         </h2>
         <p className="mt-1 text-sm text-slate-600">
-          Komisyoncu bakiyesi için talep oluşturur (ya da seçtiği günde otomatik
-          düşer). Havaleyi <strong>sen elle</strong> yaparsın; sonra
-          &quot;Ödendi&quot; dersin — o ana kadarki tüm ödenmemiş tahakkukları
-          kapatır.
+          Talepler <strong>her ayın son günü otomatik</strong> açılır (bakiyesi
+          olan herkese; IBAN/ad eksikse o ay bekletilir ve komisyoncuya zil
+          çalar). Havaleyi <strong>sen elle</strong> yaparsın — stopaj
+          gerekiyorsa kutudaki <strong>NET</strong> tutarı gönder; sonra
+          &quot;Ödendi&quot; dersin: talep tarihine kadarki tahakkuklar kapanır,
+          stopaj kaydı otomatik yazılır.
         </p>
 
         {bekleyenTalepler.length === 0 ? (
@@ -275,13 +297,12 @@ export default async function AdminAgents({
                   {fmtTarih(t.createdAt)}
                   {t.auto ? " · aylık otomatik talep" : " · elle talep"}
                 </p>
-                {!t.agent.faturaMukellefi &&
-                  (ayToplamlari.get(t.agent.id) ?? 0) >= STOPAJ_ESIK && (
+                {!t.agent.faturaMukellefi && talepAyToplami(t) >= STOPAJ_ESIK && (
                   <div className="mt-2 rounded-lg border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900">
                     <p className="font-semibold">
-                      ⚠️ Stopaj eşiği aşıldı — bu ay tahakkuk:{" "}
-                      {fmtTL(ayToplamlari.get(t.agent.id) ?? 0)} TL (eşik{" "}
-                      {fmtTL(STOPAJ_ESIK)} TL)
+                      ⚠️ Stopaj eşiğine ulaşıldı — talep ayı tahakkuku:{" "}
+                      {fmtTL(talepAyToplami(t))} TL (eşik {fmtTL(STOPAJ_ESIK)} TL,
+                      dahil)
                     </p>
                     <p className="mt-0.5">
                       Komisyoncu FATURA kesemiyorsa: brüt {fmtTL(Number(t.amount))}{" "}
@@ -290,7 +311,7 @@ export default async function AdminAgents({
                       <strong>net {fmtTL(stopajHesapla(Number(t.amount)).net)} TL öde</strong>{" "}
                       ·{" "}
                       <a
-                        href={`/admin/pusula/${t.id}`}
+                        href={`/pusula/${t.id}`}
                         target="_blank"
                         className="font-semibold underline"
                       >

@@ -696,6 +696,9 @@ model PayoutRequest {
   stopajOran  Decimal? @db.Decimal(5, 2)
   stopajTutar Decimal? @db.Decimal(10, 2)
   netTutar    Decimal? @db.Decimal(10, 2)
+  // Ödeme ANINDAKİ mükelleflik kopyası (denetim: canlı bayrak okununca admin
+  // sonradan değiştirdiğinde geçmiş dökümün "Fatura/—" etiketi değişiyordu).
+  mukellefti  Boolean?
   status     String    @default("PENDING")
   auto       Boolean   @default(false) // aylık otomatik mi, elle mi
   note       String? // komisyoncunun notu

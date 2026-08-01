@@ -401,7 +401,7 @@ export default async function KomisyoncuSayfasi({
         )}
       </section>
 
-      {/* ÖDEME / ÇEKİM — bakiye, IBAN, aylık otomatik gün, talep butonu */}
+      {/* ÖDEMEM — bakiye + ay sonu bilgisi + havale/vergi bilgileri formu */}
       <section className="rounded-2xl border border-slate-200 bg-white p-5">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h2 className="font-semibold text-slate-900">Ödemem</h2>
@@ -505,9 +505,8 @@ export default async function KomisyoncuSayfasi({
               Ödeme bilgilerini kaydet
             </PendingButton>
             <p className="mt-2 text-xs text-slate-500">
-              Otomatik gün seçersen o gün bakiyen varsa talep kendiliğinden
-              oluşur — her ay hatırlatmaya gerek kalmaz. Havaleyi yönetim elle
-              yapar.
+              Ödemeler her ayın son günü otomatik yapılır; buradaki bilgiler
+              havale (IBAN + ad) ve vergi belgesi (T.C. no + adres) içindir.
             </p>
           </div>
         </form>

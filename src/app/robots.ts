@@ -18,6 +18,7 @@ export default function robots(): MetadataRoute.Robots {
         "/odeme", // talimat ödeme sayfası (panel dışı, yetkili)
         "/komisyoncu",
         "/muhasebe",
+        "/pusula", // gider pusulası (yetkili; /admin dışına taşındı 2026-08-01)
       ],
     },
     sitemap: "https://enyakinhaliyikamaservisi.com/sitemap.xml",

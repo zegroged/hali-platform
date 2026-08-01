@@ -925,6 +925,23 @@ export async function toggleCommissionPaid(formData: FormData) {
   const id = String(formData.get("id") || "");
   const entry = await prisma.commissionEntry.findUnique({ where: { id } });
   if (entry) {
+    // 🔒 ÇİFTE ÖDEME KORUMASI (2026-08-01 denetim): ödeme TALEBİYLE kapanmış
+    // satır tek tıkla geri açılamaz — açılsaydı bir sonraki ay-sonu otomatik
+    // talebi aynı komisyonu İKİNCİ kez ödetirdi. Eşleşme birebir: markPayoutPaid
+    // talebe ve satırlara AYNI `simdi` damgasını yazar.
+    if (entry.paidAt) {
+      const talepleKapandi = await prisma.payoutRequest.count({
+        where: { agentId: entry.agentId, status: "PAID", paidAt: entry.paidAt },
+      });
+      if (talepleKapandi > 0) {
+        redirect(
+          "/admin/komisyoncular?hata=" +
+            encodeURIComponent(
+              "Bu satır bir ödeme talebiyle kapatılmış — tek tık ile geri açılamaz (aynı komisyon ikinci kez ödenirdi). Gerçekten düzeltme gerekiyorsa ödeme kaydını yönet.",
+            ),
+        );
+      }
+    }
     // Koşullu yaz (TOCTOU): eşzamanlı iki tıklama niyetin tersine çevirmesin.
     await prisma.commissionEntry.updateMany({
       where: { id, paidAt: entry.paidAt ? { not: null } : null },
@@ -1158,10 +1175,31 @@ export async function payoutReject(formData: FormData) {
   const id = String(formData.get("id") || "");
   const sebep = String(formData.get("adminNote") || "").trim();
   // Koşullu yaz: yalnız hâlâ bekleyen talep reddedilebilir (TOCTOU).
+  const talep = await prisma.payoutRequest.findUnique({
+    where: { id },
+    select: { amount: true, agent: { select: { userId: true } } },
+  });
   await prisma.payoutRequest.updateMany({
     where: { id, status: "PENDING" },
     data: { status: "REJECTED", adminNote: sebep || "Reddedildi" },
   });
+  // Komisyoncuya zil (2026-08-01 denetim): elle talep yolu kaldırıldığı için
+  // ret sessiz kalırsa komisyoncu bir ay boyunca parayı bekler; sebepli haber
+  // gitsin — bakiye durur, sonraki ay sonunda talep yeniden açılır.
+  if (talep?.agent.userId) {
+    try {
+      const { notify } = await import("@/lib/notify");
+      await notify({
+        userId: talep.agent.userId,
+        type: "genel",
+        title: "Ödeme talebin reddedildi",
+        body: `${Number(talep.amount).toLocaleString("tr-TR", { minimumFractionDigits: 2 })} TL'lik talep reddedildi${sebep ? ` — sebep: ${sebep}` : ""}. Bakiyen durmaya devam ediyor; sorun giderilince bir sonraki ay sonunda otomatik yeniden açılır.`,
+        href: "/komisyoncu",
+      });
+    } catch (e) {
+      console.error("[odeme-ret] zil hatası:", e);
+    }
+  }
   revalidatePath("/admin/komisyoncular");
 }
 

@@ -4,7 +4,9 @@ import { prisma } from "@/lib/prisma";
 import { stopajHesapla, STOPAJ_ORAN } from "@/lib/stopaj";
 import PrintButton from "@/components/PrintButton";
 
-// GİDER PUSULASI (2026-07-31, işletme sahibi isteği: "stopaj belgelerini ayarla").
+// GİDER PUSULASI — /pusula/[id] (2026-08-01 denetim bulgusuyla /admin DIŞINA
+// taşındı: /admin layout'u ACCOUNTANT'ı /giris'e atıyordu, sayfanın kendi izni
+// hiç devreye giremiyordu; mali müşavir muhasebe dökümünden buraya tıklar).
 //
 // NE ZAMAN KULLANILIR: komisyoncu VERGİ MÜKELLEFİ DEĞİLSE (fatura kesemiyorsa)
 // platform ödemeyi gider pusulasıyla belgeler ve stopajı keserek NET öder.
@@ -12,6 +14,9 @@ import PrintButton from "@/components/PrintButton";
 //
 // ⚠️ Bu şablon MALİ MÜŞAVİR TEYİDİNE tabidir (oran, eşik, GİB e-belge
 // yükümlülükleri). Sistem tutarlara DOKUNMAZ; bu sayfa yalnız belgeyi üretir.
+
+// /admin dışına taşınınca admin layout'unun noindex'i kayboldu — kendi başlığı:
+export const metadata = { robots: { index: false, follow: false } };
 
 export const dynamic = "force-dynamic";
 
@@ -46,7 +51,24 @@ export default async function GiderPusulasi({
   });
   if (!t) notFound();
 
-  const brut = Number(t.paidAmount ?? t.amount);
+  // ÖDENMİŞ ama STOPAJSIZ kapanmış talep için pusula YOK (denetim): mükellef/
+  // eşik-altı ödemeye "stopaj kesildi" görünümlü belge üretmek yanlış kayıttır.
+  if (t!.status === "PAID" && t!.stopajTutar == null) {
+    return (
+      <div className="mx-auto max-w-xl px-6 py-12 text-center">
+        <p className="text-lg font-semibold text-slate-900">
+          Bu ödemede stopaj kesilmedi
+        </p>
+        <p className="mt-2 text-sm text-slate-600">
+          Talep brüt ödenerek kapatılmış (fatura mükellefi ya da eşik altı) —
+          gider pusulası düzenlenmez. Mükellef ödemesiyse karşılığında FATURA
+          alınmış olmalı.
+        </p>
+      </div>
+    );
+  }
+
+  const brut = Number(t!.paidAmount ?? t!.amount);
   // ÖDENMİŞ talepte KAYITLI stopaj kullanılır (ödeme anında otomatik yazıldı) —
   // oran sonradan değişse de belge tarihî gerçeği gösterir. Bekleyen talepte
   // güncel oranla önizleme hesaplanır.

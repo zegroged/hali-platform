@@ -215,7 +215,7 @@ export default async function MuhasebePage() {
                     <td className="px-3 py-2 text-right text-amber-700">
                       {t.stopajTutar != null
                         ? `${fmtTL(Number(t.stopajTutar))} (%${Number(t.stopajOran ?? 0)})`
-                        : t.agent.faturaMukellefi
+                        : (t.mukellefti ?? t.agent.faturaMukellefi)
                           ? "Fatura"
                           : "—"}
                     </td>
@@ -225,7 +225,7 @@ export default async function MuhasebePage() {
                     <td className="px-3 py-2">
                       {t.stopajTutar != null ? (
                         <a
-                          href={`/admin/pusula/${t.id}`}
+                          href={`/pusula/${t.id}`}
                           target="_blank"
                           className="text-brand-dark underline"
                         >

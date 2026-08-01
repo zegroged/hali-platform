@@ -47,7 +47,18 @@ export async function ayTahakkuklari(
   simdi: Date = new Date(),
 ): Promise<Map<string, number>> {
   if (agentIds.length === 0) return new Map();
-  const ayBasi = new Date(simdi.getFullYear(), simdi.getMonth(), 1);
+  // AY BAŞI TR TAKVİMİNE GÖRE (denetim bulgusu): konteyner UTC'de —
+  // getFullYear/getMonth yerel(UTC) ayı verir; TR gece 00:00-03:00 arası
+  // oluşan tahakkuklar yanlış ayın penceresine düşüyordu. TR = UTC+3 sabit.
+  const [y, m] = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Istanbul" })
+    .format(simdi)
+    .split("-")
+    .map(Number);
+  const ayBasi = new Date(Date.UTC(y, m - 1, 1) - 3 * 60 * 60 * 1000);
+  // ÜST SINIR ŞART: `simdi` GEÇMİŞ bir ay olabilir (stopaj eşiği TALEBİN
+  // AÇILDIĞI aya göre ölçülür — ödeme ertesi ayda yapılsa bile). Üst sınırsız
+  // sorgu yeni ayın tahakkuklarını da katardı.
+  const sonrakiAyBasi = new Date(Date.UTC(y, m, 1) - 3 * 60 * 60 * 1000);
   // ⚠️ İKİ KAYNAK: alt payı `amount` (agentId) + baş komisyoncunun havuz farkı
   // AYNI satırın `headAmount` alanında (headAgentId). Yalnız amount toplansaydı
   // baş komisyoncunun aylık geliri eksik ölçülür, stopaj eşiği yanlış atlanırdı.
@@ -57,7 +68,7 @@ export async function ayTahakkuklari(
       where: {
         agentId: { in: agentIds },
         skipped: false,
-        createdAt: { gte: ayBasi },
+        createdAt: { gte: ayBasi, lt: sonrakiAyBasi },
       },
       _sum: { amount: true },
     }),
@@ -66,7 +77,7 @@ export async function ayTahakkuklari(
       where: {
         headAgentId: { in: agentIds },
         skipped: false,
-        createdAt: { gte: ayBasi },
+        createdAt: { gte: ayBasi, lt: sonrakiAyBasi },
       },
       _sum: { headAmount: true },
     }),

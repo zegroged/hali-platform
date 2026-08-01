@@ -26,9 +26,9 @@ export async function agentBalance(agentId: string): Promise<{
   return { kendi, havuz, toplam: kurus(kendi + havuz) };
 }
 
-/** Ödeme yapıldı: o ana kadarki TÜM ödenmemiş tahakkukları kapat ve talebi
- *  PAID işaretle. Tutar ödeme ANINDA yeniden hesaplanır (talepten sonra yeni
- *  tahakkuk geldiyse o da kapanır — kullanıcı toplam bakiyeyi havale ediyor).
+/** Ödeme yapıldı: TALEP TARİHİNE KADARKİ ödenmemiş tahakkukları kapat ve
+ *  talebi PAID işaretle. Talepten SONRA gelen tahakkuk kapanmaz — bir sonraki
+ *  ay-sonu talebine kalır (ekranda görünen = havale edilen = kayda yazılan).
  *  Tek transaction: yarım kapanma olmaz. */
 export async function markPayoutPaid(
   requestId: string,
@@ -46,21 +46,49 @@ export async function markPayoutPaid(
       id: true,
       agentId: true,
       status: true,
-      agent: { select: { faturaMukellefi: true } },
+      createdAt: true,
+      agent: { select: { faturaMukellefi: true, taxId: true, address: true } },
     },
   });
   if (!istek) return { ok: false, hata: "Talep bulunamadı." };
   if (istek.status !== "PENDING")
     return { ok: false, hata: "Bu talep zaten kapatılmış." };
 
-  const bakiye = await agentBalance(istek.agentId);
   const simdi = new Date();
 
-  // STOPAJ — OTOMATİK (2026-07-31 kullanıcı kararı): komisyoncu fatura
-  // mükellefi DEĞİLSE ve bu ayki brüt tahakkuku eşiği aştıysa, kesinti ödeme
-  // ANINDA hesaplanır ve talebe KALICI yazılır (oran sonradan değişse de
-  // tarihi kayıt sabit kalır — mali müşavir dökümü buradan okur). Mükellefe
-  // stopaj uygulanmaz: o fatura keser, brüt ödenir.
+  // 🔴 KAPATMA TALEP ANINA SABİTLENİR (2026-08-01 düşman denetimi, KRİTİK):
+  // önceden "o ana kadarki TÜM ödenmemişler" kapanıyordu — talep açıldıktan
+  // SONRA gelen tahakkuk da sessizce kapanıyor, admin ekranda t.amount görüp
+  // ona göre havale ederken kayıt bakiye.toplam ile yazılıyordu: komisyoncuya
+  // eksik havale + yanlış muhtasar. Artık yalnız talep tarihinden ÖNCE oluşmuş
+  // satırlar kapanır; sonra gelenler bir SONRAKİ ay-sonu talebine kalır.
+  const kapatmaFiltre = {
+    skipped: false,
+    createdAt: { lte: istek.createdAt },
+  } as const;
+  const [altAgg, headAgg] = await Promise.all([
+    prisma.commissionEntry.aggregate({
+      where: { ...kapatmaFiltre, agentId: istek.agentId, paidAt: null },
+      _sum: { amount: true },
+    }),
+    prisma.commissionEntry.aggregate({
+      where: { ...kapatmaFiltre, headAgentId: istek.agentId, headPaidAt: null },
+      _sum: { headAmount: true },
+    }),
+  ]);
+  const odenecek =
+    Math.round(
+      (Number(altAgg._sum.amount ?? 0) + Number(headAgg._sum.headAmount ?? 0)) *
+        100,
+    ) / 100;
+  if (odenecek <= 0)
+    return { ok: false, hata: "Bu talebin kapsamında ödenmemiş tahakkuk kalmamış." };
+
+  // STOPAJ — OTOMATİK (2026-07-31 kullanıcı kararı). Eşik, TALEBİN AÇILDIĞI
+  // AYIN tahakkukuna göre ölçülür (denetim, KRİTİK): 31 Temmuz'da açılan talep
+  // 2 Ağustos'ta ödendiğinde önceki kod YENİ ayın (~0) toplamına bakıp stopajı
+  // tamamen atlıyordu. Kesinti kaydı talebe KALICI yazılır; mükellefe stopaj
+  // uygulanmaz (fatura keser, brüt ödenir).
   let stopajOran: number | null = null;
   let stopajTutar: number | null = null;
   let netTutar: number | null = null;
@@ -68,9 +96,11 @@ export async function markPayoutPaid(
     const { ayTahakkuklari, stopajHesapla, STOPAJ_ESIK, STOPAJ_ORAN } =
       await import("@/lib/stopaj");
     const ayToplam =
-      (await ayTahakkuklari([istek.agentId], simdi)).get(istek.agentId) ?? 0;
+      (await ayTahakkuklari([istek.agentId], istek.createdAt)).get(
+        istek.agentId,
+      ) ?? 0;
     if (ayToplam >= STOPAJ_ESIK) {
-      const d = stopajHesapla(bakiye.toplam);
+      const d = stopajHesapla(odenecek);
       stopajOran = STOPAJ_ORAN * 100;
       stopajTutar = d.stopaj;
       netTutar = d.net;
@@ -85,20 +115,35 @@ export async function markPayoutPaid(
         data: {
           status: "PAID",
           paidAt: simdi,
-          paidAmount: bakiye.toplam,
+          paidAmount: odenecek,
+          mukellefti: istek.agent.faturaMukellefi,
           stopajOran,
           stopajTutar,
           netTutar,
-          adminNote: adminNote?.trim() || null,
+          // Stopajlı ödemede kimlik/adres eksikse iz düşür (denetim: eksik
+          // belgeli pusula sessizce akıyordu) — ödeme ENGELLENMEZ (para
+          // bekletmek daha kötü) ama eksik, kayıtta ve dökümde görünür olur.
+          adminNote:
+            [
+              adminNote?.trim() || null,
+              stopajTutar != null && (!istek.agent.taxId || !istek.agent.address)
+                ? "⚠️ pusula eksik: " +
+                  [!istek.agent.taxId && "TCKN", !istek.agent.address && "adres"]
+                    .filter(Boolean)
+                    .join("+")
+                : null,
+            ]
+              .filter(Boolean)
+              .join(" · ") || null,
         },
       });
       if (claim.count === 0) throw new Error("zaten-kapali");
       await tx.commissionEntry.updateMany({
-        where: { agentId: istek.agentId, skipped: false, paidAt: null },
+        where: { ...kapatmaFiltre, agentId: istek.agentId, paidAt: null },
         data: { paidAt: simdi },
       });
       await tx.commissionEntry.updateMany({
-        where: { headAgentId: istek.agentId, skipped: false, headPaidAt: null },
+        where: { ...kapatmaFiltre, headAgentId: istek.agentId, headPaidAt: null },
         data: { headPaidAt: simdi },
       });
     });
@@ -109,7 +154,7 @@ export async function markPayoutPaid(
   }
   return {
     ok: true,
-    tutar: bakiye.toplam,
+    tutar: odenecek,
     stopaj: stopajTutar ?? undefined,
     net: netTutar ?? undefined,
   };
@@ -138,13 +183,30 @@ export async function createScheduledPayoutRequests(): Promise<void> {
   const sonGun = new Date(y, m, 0).getDate(); // m: 1-12 → o ayın son günü
   if (d !== sonGun) return;
 
-  // Ay başına TEK koşu (saatlik tik her saat çağırır; marker atomik).
+  // Ay başına TEK koşu — DEVRALINABİLİR marker (denetim bulgusu: marker işten
+  // ÖNCE yazılıp koşu ortasında konteyner ölürse kalan komisyoncular o ay
+  // atlanıyordu; yeniden koşmak zaten güvenli — tek-bekleyen kontrolü açılmış
+  // talebi atlar). Değer "basladi:<ts>" ile başlar, iş bitince "bitti:<ts>"
+  // olur; "basladi" hâlinde 1 saatten eski marker CAS ile devralınır.
   const anahtar = `payout-ay-${y}-${String(m).padStart(2, "0")}`;
+  const damga = `basladi:${Date.now()}`;
   const kilit = await prisma.appState.createMany({
-    data: [{ key: anahtar, value: new Date().toISOString() }],
+    data: [{ key: anahtar, value: damga }],
     skipDuplicates: true,
   });
-  if (kilit.count === 0) return; // bu ay koşuldu
+  let benimDamgam = damga;
+  if (kilit.count === 0) {
+    const eski = await prisma.appState.findUnique({ where: { key: anahtar } });
+    if (!eski || eski.value.startsWith("bitti:")) return; // bu ay tamamlandı
+    const yas = Date.now() - Number(eski.value.split(":")[1] || 0);
+    if (yas < 60 * 60 * 1000) return; // koşu sürüyor (ya da az önce başladı)
+    // Yarım kalmış koşu: CAS ile devral (iki tik aynı anda devralamaz).
+    const devral = await prisma.appState.updateMany({
+      where: { key: anahtar, value: eski.value },
+      data: { value: damga },
+    });
+    if (devral.count === 0) return;
+  }
 
   const agents = await prisma.agent.findMany({
     where: { active: true },
@@ -185,4 +247,9 @@ export async function createScheduledPayoutRequests(): Promise<void> {
       },
     });
   }
+  // İş bitti: marker'ı kalıcıla — yalnız kendi damgamızla (devralma yarışı).
+  await prisma.appState.updateMany({
+    where: { key: anahtar, value: benimDamgam },
+    data: { value: `bitti:${Date.now()}` },
+  });
 }
