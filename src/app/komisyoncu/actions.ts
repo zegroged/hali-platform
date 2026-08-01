@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { bolgeOku } from "@/lib/territory";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { isValidTaxOrTckn, taxIdError } from "@/lib/taxId";
 import { getSessionUser, hashPassword } from "@/lib/auth";
 import { uretKodMetni } from "@/lib/referralCode";
 import { normalizePhone, isTrPhone } from "@/lib/phone";
@@ -301,6 +302,17 @@ export async function savePayoutInfo(formData: FormData) {
   const ibanRaw = String(formData.get("iban") || "").replace(/\s+/g, "").toUpperCase();
   if (ibanRaw && !/^TR\d{24}$/.test(ibanRaw))
     hata("IBAN 'TR' ile başlayıp 26 karakter olmalı (TR + 24 hane).");
+  // AD SOYAD (2026-07-31, kullanıcı isteği): IBAN kaydediliyorsa hesap sahibinin
+  // adı ZORUNLU — bankalar isim uyuşmazlığında havaleyi geri çeviriyor; admin de
+  // havaleyi isimsiz yapamıyordu.
+  const ibanName = String(formData.get("ibanName") || "").trim();
+  if (ibanRaw && ibanName.length < 5)
+    hata("IBAN ile birlikte hesap sahibinin adı soyadı zorunlu (banka kaydındaki haliyle).");
+  // TCKN/VKN (opsiyonel): stopajlı ödemede gider pusulasına yazılır. Girildiyse
+  // resmî algoritmayla doğrulanır (uydurma numara belgeye girmesin).
+  const taxIdRaw = String(formData.get("taxId") || "").replace(/\D/g, "");
+  if (taxIdRaw && !isValidTaxOrTckn(taxIdRaw))
+    hata(taxIdError(taxIdRaw) ?? "Vergi/T.C. kimlik numarası doğrulanamadı.");
   const gunRaw = String(formData.get("payoutDay") || "").trim();
   let payoutDay: number | null = null;
   if (gunRaw) {
@@ -311,7 +323,12 @@ export async function savePayoutInfo(formData: FormData) {
   }
   await prisma.agent.update({
     where: { id: agent!.id },
-    data: { iban: ibanRaw || null, payoutDay },
+    data: {
+      iban: ibanRaw || null,
+      ibanName: ibanRaw ? ibanName : null,
+      taxId: taxIdRaw || null,
+      payoutDay,
+    },
   });
   revalidatePath("/komisyoncu");
   redirect("/komisyoncu?odemeBilgisi=1");
@@ -323,7 +340,7 @@ export async function requestPayout() {
   if (!u || u.role !== "AGENT") redirect("/giris");
   const agent = await prisma.agent.findUnique({
     where: { userId: u!.id },
-    select: { id: true, active: true, iban: true },
+    select: { id: true, active: true, iban: true, ibanName: true },
   });
   if (!agent) redirect("/giris");
 
@@ -333,6 +350,8 @@ export async function requestPayout() {
   if (!agent.active) hata("Hesabın pasif — ödeme talebi oluşturamazsın.");
   if (!agent.iban)
     hata("Önce IBAN'ını kaydet — havale oraya yapılacak.");
+  if (!agent.ibanName)
+    hata("Ödeme bilgilerine hesap sahibinin adını soyadını ekle — bankalar isim uyuşmazlığında havaleyi geri çeviriyor.");
 
   const bekleyen = await prisma.payoutRequest.count({
     where: { agentId: agent!.id, status: "PENDING" },
@@ -350,6 +369,7 @@ export async function requestPayout() {
       agentId: agent!.id,
       amount: bakiye.toplam,
       iban: agent!.iban,
+      ibanName: agent!.ibanName,
     },
   });
   // Yöneticiye zil: talep beklemede kalmasın.

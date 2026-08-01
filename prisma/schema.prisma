@@ -629,6 +629,11 @@ model Agent {
   // çekim talebi oluşturur; istersen her ayın belirli günü OTOMATİK talep düşer.
   // Havale/EFT'yi admin elle yapar (iyzico dışarıya para göndermez).
   iban      String? // TR.. (yalnız admin ve sahibi görür)
+  // 2026-07-31 (kullanıcı isteği): havale için hesap sahibinin AD SOYADI şart —
+  // bankalar isim uyuşmazlığında havaleyi geri çevirebiliyor.
+  ibanName  String?
+  // Gider pusulası için TCKN/VKN (opsiyonel; stopajlı ödemede belgeye yazılır).
+  taxId     String?
   payoutDay Int? // 1-28: her ay bu gün otomatik çekim talebi oluşur
 
   createdAt DateTime @default(now())
@@ -677,6 +682,7 @@ model PayoutRequest {
   amount     Decimal   @db.Decimal(10, 2) // talep anındaki bakiye (bilgi amaçlı)
   paidAmount Decimal?  @db.Decimal(10, 2) // ödeme anında fiilen kapatılan tutar
   iban       String? // talep anındaki IBAN kopyası (sonradan değişse de kayıt sabit)
+  ibanName   String? // talep anındaki hesap sahibi adı (havale isim uyuşması için)
   status     String    @default("PENDING")
   auto       Boolean   @default(false) // aylık otomatik mi, elle mi
   note       String? // komisyoncunun notu

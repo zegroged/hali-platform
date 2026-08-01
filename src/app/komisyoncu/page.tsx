@@ -446,6 +446,36 @@ export default async function KomisyoncuSayfasi({
           </div>
           <div>
             <label className="mb-1 block text-xs font-medium text-slate-600">
+              Hesap sahibi ad soyad (IBAN ile zorunlu)
+            </label>
+            <input
+              name="ibanName"
+              defaultValue={agent.ibanName ?? ""}
+              placeholder="Banka kaydındaki haliyle"
+              className={inp}
+            />
+            <p className="mt-1 text-xs text-slate-500">
+              Bankalar isim uyuşmazlığında havaleyi geri çevirebiliyor.
+            </p>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-slate-600">
+              T.C. kimlik / Vergi no (opsiyonel)
+            </label>
+            <input
+              name="taxId"
+              defaultValue={agent.taxId ?? ""}
+              placeholder="Gider pusulası için"
+              inputMode="numeric"
+              className={inp}
+            />
+            <p className="mt-1 text-xs text-slate-500">
+              Stopajlı ödemelerde belgeye yazılır; girildiyse resmî algoritmayla
+              doğrulanır.
+            </p>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-slate-600">
               Her ayın kaçında otomatik talep? (1-28, boş = kapalı)
             </label>
             <input

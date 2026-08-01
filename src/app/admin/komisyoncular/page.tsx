@@ -4,6 +4,7 @@ import { CITIES, districtsOfCity } from "@/lib/cities";
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { ayTahakkuklari, stopajHesapla, STOPAJ_ESIK, STOPAJ_ORAN } from "@/lib/stopaj";
 import {
   createAgent,
   setAgentTerritory,
@@ -149,7 +150,9 @@ export default async function AdminAgents({
     include: {
       agent: {
         select: {
+          id: true,
           isHead: true,
+          taxId: true,
           user: { select: { name: true, username: true, phone: true } },
         },
       },
@@ -157,6 +160,12 @@ export default async function AdminAgents({
   });
   const bekleyenTalepler = talepler.filter((t) => t.status === "PENDING");
   const gecmisTalepler = talepler.filter((t) => t.status !== "PENDING");
+  // STOPAJ GÖSTERGESİ (2026-07-31): bu ay ESIK'i asan komisyoncunun bekleyen
+  // talebinde brüt/stopaj/net dökümü + gider pusulası bağlantısı gösterilir.
+  // Yalnız GÖSTERİM — tutarlar brüt kalır, karar ve belge admindedir.
+  const ayToplamlari = await ayTahakkuklari(
+    [...new Set(bekleyenTalepler.map((t) => t.agent.id))],
+  );
 
   const inp =
     "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand focus:outline-none";
@@ -249,11 +258,42 @@ export default async function AdminAgents({
                 </div>
                 <p className="mt-1 font-mono text-sm text-slate-700">
                   {t.iban ?? "IBAN YOK"}
+                  {"  "}
+                  <span className="font-sans font-medium text-slate-900">
+                    {t.ibanName ?? "— hesap sahibi adı YOK"}
+                  </span>
                 </p>
                 <p className="text-xs text-slate-500">
                   {fmtTarih(t.createdAt)}
                   {t.auto ? " · aylık otomatik talep" : " · elle talep"}
                 </p>
+                {(ayToplamlari.get(t.agent.id) ?? 0) >= STOPAJ_ESIK && (
+                  <div className="mt-2 rounded-lg border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900">
+                    <p className="font-semibold">
+                      ⚠️ Stopaj eşiği aşıldı — bu ay tahakkuk:{" "}
+                      {fmtTL(ayToplamlari.get(t.agent.id) ?? 0)} TL (eşik{" "}
+                      {fmtTL(STOPAJ_ESIK)} TL)
+                    </p>
+                    <p className="mt-0.5">
+                      Komisyoncu FATURA kesemiyorsa: brüt {fmtTL(Number(t.amount))}{" "}
+                      − %{Math.round(STOPAJ_ORAN * 100)} stopaj{" "}
+                      {fmtTL(stopajHesapla(Number(t.amount)).stopaj)} ={" "}
+                      <strong>net {fmtTL(stopajHesapla(Number(t.amount)).net)} TL öde</strong>{" "}
+                      ·{" "}
+                      <a
+                        href={`/admin/pusula/${t.id}`}
+                        target="_blank"
+                        className="font-semibold underline"
+                      >
+                        Gider pusulası yazdır
+                      </a>
+                    </p>
+                    <p className="mt-0.5 text-amber-700">
+                      Fatura kesebiliyorsa stopaj bize düşmez — faturayı iste,
+                      brütü öde. Oran/eşik mali müşavir teyidine tabidir.
+                    </p>
+                  </div>
+                )}
                 <div className="mt-2 flex flex-wrap items-end gap-2">
                   <form action={payoutMarkPaid} className="flex items-end gap-2">
                     <input type="hidden" name="id" value={t.id} />
