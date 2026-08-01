@@ -118,32 +118,70 @@ export async function markPayoutPaid(
 /** AYLIK OTOMATİK TALEP: komisyoncu "her ayın X'i" seçtiyse o gün bakiyesi
  *  varsa talep kendiliğinden oluşur (admin panelinde görünür). Ay başına TEK
  *  kez: aynı ay içinde talep varsa atlanır. Saatlik tik'ten çağrılır. */
+// AY SONU TOPLU ÖDEME (2026-07-31, kullanıcı kararı: "ödemeleri her ayın
+// sonuna indirgeyelim, herkes her ay düzenli alsın").
+// Eski model: her komisyoncu kendi gününü seçer + istediği an elle talep açar
+// → admin'e dağınık, öngörüsüz iş. Yeni model: ayın SON GÜNÜ (TR takvimi)
+// bakiyesi olan HERKESE otomatik talep açılır; admin ay sonunda TEK toplu
+// listeyle havaleleri yapar (stopaj zaten otomatik hesaplanıp yazılıyor).
+// Elle talep butonu ve kişisel gün seçimi KALDIRILDI (Agent.payoutDay artık
+// okunmuyor — kolon eski kayıtlar için duruyor).
 export async function createScheduledPayoutRequests(): Promise<void> {
   const simdi = new Date();
-  const gun = simdi.getDate();
-  const ayBasi = new Date(simdi.getFullYear(), simdi.getMonth(), 1);
+  // TR takvim günü — konteyner UTC'de; gece yarısı sınırında yanlış gün olmasın.
+  const [y, m, d] = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Istanbul",
+  })
+    .format(simdi)
+    .split("-")
+    .map(Number);
+  const sonGun = new Date(y, m, 0).getDate(); // m: 1-12 → o ayın son günü
+  if (d !== sonGun) return;
+
+  // Ay başına TEK koşu (saatlik tik her saat çağırır; marker atomik).
+  const anahtar = `payout-ay-${y}-${String(m).padStart(2, "0")}`;
+  const kilit = await prisma.appState.createMany({
+    data: [{ key: anahtar, value: new Date().toISOString() }],
+    skipDuplicates: true,
+  });
+  if (kilit.count === 0) return; // bu ay koşuldu
 
   const agents = await prisma.agent.findMany({
-    where: { active: true, payoutDay: gun },
-    select: { id: true, iban: true },
+    where: { active: true },
+    select: { id: true, userId: true, iban: true, ibanName: true },
   });
   for (const a of agents) {
-    const [bekleyen, buAy] = await Promise.all([
-      prisma.payoutRequest.count({ where: { agentId: a.id, status: "PENDING" } }),
-      prisma.payoutRequest.count({
-        where: { agentId: a.id, createdAt: { gte: ayBasi } },
-      }),
-    ]);
-    if (bekleyen > 0 || buAy > 0) continue; // zaten talep var
+    const bekleyen = await prisma.payoutRequest.count({
+      where: { agentId: a.id, status: "PENDING" },
+    });
+    if (bekleyen > 0) continue; // zaten açık talep var (tek-bekleyen kuralı)
     const bakiye = await agentBalance(a.id);
     if (bakiye.toplam <= 0) continue;
+    if (!a.iban || !a.ibanName) {
+      // Bakiye var ama havale bilgisi eksik: talep AÇILMAZ (admin IBAN'sız
+      // havale yapamaz), komisyoncuya zil çalar — ekleyince gelecek ay girer.
+      try {
+        const { notify } = await import("@/lib/notify");
+        await notify({
+          userId: a.userId,
+          type: "genel",
+          title: "Ay sonu ödemen bekletildi",
+          body: `${bakiye.toplam.toLocaleString("tr-TR", { minimumFractionDigits: 2 })} TL bakiyen var ama IBAN/hesap sahibi adı eksik. Panelindeki "Ödemem" bölümünden ekle — bir sonraki ay sonunda otomatik ödenir.`,
+          href: "/komisyoncu",
+        });
+      } catch (e) {
+        console.error("[ay-sonu-odeme] zil hatası:", e);
+      }
+      continue;
+    }
     await prisma.payoutRequest.create({
       data: {
         agentId: a.id,
         amount: bakiye.toplam,
         iban: a.iban,
+        ibanName: a.ibanName,
         auto: true,
-        note: "Aylık otomatik talep",
+        note: "Ay sonu otomatik ödeme",
       },
     });
   }

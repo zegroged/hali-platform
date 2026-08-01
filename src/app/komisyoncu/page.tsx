@@ -14,7 +14,6 @@ import {
   toggleSubAgentActive,
   setSubAgentDiscount,
   savePayoutInfo,
-  requestPayout,
 } from "./actions";
 import { createDemoPanel, resetDemoPanel, deleteDemoPanel } from "./demo-actions";
 import { demoPaneliOku } from "@/lib/demoPanel";
@@ -22,6 +21,17 @@ import { agentBalance } from "@/lib/payout";
 import { MAX_SUB_DISCOUNT, MAX_SUB_DISCOUNT_MONTHS } from "@/lib/discount";
 import { PendingButton } from "@/components/PendingButton";
 import { ConfirmButton } from "@/app/panel/ConfirmButton";
+
+/** Bir sonraki ay-sonu ödeme gününün TR etiketi (bugün son günse bugün). */
+function aySonuEtiketi(): string {
+  const [y, m, d] = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Istanbul" })
+    .format(new Date())
+    .split("-")
+    .map(Number);
+  const sonGun = new Date(y, m, 0).getDate();
+  const hedef = d <= sonGun ? new Date(y, m - 1, sonGun) : new Date(y, m, 0);
+  return hedef.toLocaleDateString("tr-TR", { day: "numeric", month: "long", timeZone: "Europe/Istanbul" });
+}
 
 export const dynamic = "force-dynamic";
 
@@ -414,19 +424,23 @@ export default async function KomisyoncuSayfasi({
             yönetimde bekliyor{bekleyenTalep.auto ? " (aylık otomatik)" : ""}.
           </p>
         ) : (
-          <form action={requestPayout} className="mt-3">
-            <PendingButton
-              className="rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-50"
-              disabled={bakiye.toplam <= 0 || !agent.iban}
-            >
-              Ödememi talep et ({fmtTL(bakiye.toplam)} TL)
-            </PendingButton>
-            {!agent.iban && (
-              <span className="ml-2 text-xs text-amber-700">
-                Önce IBAN kaydet.
+          /* AY SONU MODELİ (2026-07-31): elle talep kaldırıldı — bakiyesi olan
+             herkese ayın son günü otomatik talep açılır, tek düzende ödenir. */
+          <p className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+            Ödemeler <strong>her ayın son günü</strong> otomatik yapılır:
+            bakiyen o gün talebe dönüşür, yönetim havale eder.
+            {bakiye.toplam > 0 && (
+              <>
+                {" "}Sıradaki ödeme günü: <strong>{aySonuEtiketi()}</strong>.
+              </>
+            )}
+            {(!agent.iban || !agent.ibanName) && (
+              <span className="mt-1 block font-medium text-amber-700">
+                ⚠️ IBAN ve hesap sahibi adı eksikse ödeme o ay BEKLETİLİR —
+                aşağıdan ekle.
               </span>
             )}
-          </form>
+          </p>
         )}
 
         <form
@@ -474,18 +488,7 @@ export default async function KomisyoncuSayfasi({
               doğrulanır.
             </p>
           </div>
-          <div>
-            <label className="mb-1 block text-xs font-medium text-slate-600">
-              Her ayın kaçında otomatik talep? (1-28, boş = kapalı)
-            </label>
-            <input
-              name="payoutDay"
-              inputMode="numeric"
-              defaultValue={agent.payoutDay ?? ""}
-              placeholder="Örn. 5"
-              className={inp}
-            />
-          </div>
+
           <div className="sm:col-span-2">
             <PendingButton className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-white">
               Ödeme bilgilerini kaydet

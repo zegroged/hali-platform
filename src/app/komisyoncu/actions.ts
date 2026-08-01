@@ -313,76 +313,21 @@ export async function savePayoutInfo(formData: FormData) {
   const taxIdRaw = String(formData.get("taxId") || "").replace(/\D/g, "");
   if (taxIdRaw && !isValidTaxOrTckn(taxIdRaw))
     hata(taxIdError(taxIdRaw) ?? "Vergi/T.C. kimlik numarası doğrulanamadı.");
-  const gunRaw = String(formData.get("payoutDay") || "").trim();
-  let payoutDay: number | null = null;
-  if (gunRaw) {
-    const g = Number(gunRaw);
-    if (!Number.isInteger(g) || g < 1 || g > 28)
-      hata("Ödeme günü 1 ile 28 arasında olmalı (ay sonu kaymalarını önlemek için).");
-    payoutDay = g;
-  }
+  // payoutDay KALDIRILDI (2026-07-31): ödemeler herkese ayın son günü.
   await prisma.agent.update({
     where: { id: agent!.id },
     data: {
       iban: ibanRaw || null,
       ibanName: ibanRaw ? ibanName : null,
       taxId: taxIdRaw || null,
-      payoutDay,
     },
   });
   revalidatePath("/komisyoncu");
   redirect("/komisyoncu?odemeBilgisi=1");
 }
 
-/** Bakiyesi için çekim talebi oluştur (aynı anda tek bekleyen talep). */
-export async function requestPayout() {
-  const u = await getSessionUser();
-  if (!u || u.role !== "AGENT") redirect("/giris");
-  const agent = await prisma.agent.findUnique({
-    where: { userId: u!.id },
-    select: { id: true, active: true, iban: true, ibanName: true },
-  });
-  if (!agent) redirect("/giris");
-
-  const hata = (m: string) => {
-    redirect("/komisyoncu?hata=" + encodeURIComponent(m));
-  };
-  if (!agent.active) hata("Hesabın pasif — ödeme talebi oluşturamazsın.");
-  if (!agent.iban)
-    hata("Önce IBAN'ını kaydet — havale oraya yapılacak.");
-  if (!agent.ibanName)
-    hata("Ödeme bilgilerine hesap sahibinin adını soyadını ekle — bankalar isim uyuşmazlığında havaleyi geri çeviriyor.");
-
-  const bekleyen = await prisma.payoutRequest.count({
-    where: { agentId: agent!.id, status: "PENDING" },
-  });
-  if (bekleyen > 0)
-    hata("Zaten bekleyen bir ödeme talebin var — o sonuçlanınca yenisini oluşturabilirsin.");
-
-  const { agentBalance } = await import("@/lib/payout");
-  const bakiye = await agentBalance(agent!.id);
-  if (bakiye.toplam <= 0)
-    hata("Ödenecek bakiyen yok — tahakkuk oluştukça burada görünür.");
-
-  await prisma.payoutRequest.create({
-    data: {
-      agentId: agent!.id,
-      amount: bakiye.toplam,
-      iban: agent!.iban,
-      ibanName: agent!.ibanName,
-    },
-  });
-  // Yöneticiye zil: talep beklemede kalmasın.
-  const { notifyAdmins } = await import("@/lib/notify");
-  await notifyAdmins({
-    type: "genel",
-    title: "Komisyon ödeme talebi",
-    body: `${u!.name} ${bakiye.toplam.toLocaleString("tr-TR", { minimumFractionDigits: 2 })} TL çekim talebi oluşturdu.`,
-    href: "/admin/komisyoncular",
-  }).catch(() => {});
-  revalidatePath("/komisyoncu");
-  redirect("/komisyoncu?talep=1");
-}
+// requestPayout KALDIRILDI (2026-07-31): elle talep yok — ay sonu otomatik
+// toplu ödeme (lib/payout.ts createScheduledPayoutRequests).
 
 /** Kendi komisyoncusunun İNDİRİM yetkisini ve TAVANINI belirle (yalnız kendi
  *  ekibi, yalnız kendi yetkisi varsa). Tavan boş/0 → yetki kapatılır. Kapatmak
