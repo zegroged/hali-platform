@@ -33,10 +33,21 @@ export async function agentBalance(agentId: string): Promise<{
 export async function markPayoutPaid(
   requestId: string,
   adminNote?: string,
-): Promise<{ ok: boolean; tutar?: number; hata?: string }> {
+): Promise<{
+  ok: boolean;
+  tutar?: number;
+  stopaj?: number;
+  net?: number;
+  hata?: string;
+}> {
   const istek = await prisma.payoutRequest.findUnique({
     where: { id: requestId },
-    select: { id: true, agentId: true, status: true },
+    select: {
+      id: true,
+      agentId: true,
+      status: true,
+      agent: { select: { faturaMukellefi: true } },
+    },
   });
   if (!istek) return { ok: false, hata: "Talep bulunamadı." };
   if (istek.status !== "PENDING")
@@ -44,6 +55,28 @@ export async function markPayoutPaid(
 
   const bakiye = await agentBalance(istek.agentId);
   const simdi = new Date();
+
+  // STOPAJ — OTOMATİK (2026-07-31 kullanıcı kararı): komisyoncu fatura
+  // mükellefi DEĞİLSE ve bu ayki brüt tahakkuku eşiği aştıysa, kesinti ödeme
+  // ANINDA hesaplanır ve talebe KALICI yazılır (oran sonradan değişse de
+  // tarihi kayıt sabit kalır — mali müşavir dökümü buradan okur). Mükellefe
+  // stopaj uygulanmaz: o fatura keser, brüt ödenir.
+  let stopajOran: number | null = null;
+  let stopajTutar: number | null = null;
+  let netTutar: number | null = null;
+  if (!istek.agent.faturaMukellefi) {
+    const { ayTahakkuklari, stopajHesapla, STOPAJ_ESIK, STOPAJ_ORAN } =
+      await import("@/lib/stopaj");
+    const ayToplam =
+      (await ayTahakkuklari([istek.agentId], simdi)).get(istek.agentId) ?? 0;
+    if (ayToplam >= STOPAJ_ESIK) {
+      const d = stopajHesapla(bakiye.toplam);
+      stopajOran = STOPAJ_ORAN * 100;
+      stopajTutar = d.stopaj;
+      netTutar = d.net;
+    }
+  }
+
   try {
     await prisma.$transaction(async (tx) => {
       // KOŞULLU claim (TOCTOU): yalnız hâlâ PENDING olan talebi kapat.
@@ -53,6 +86,9 @@ export async function markPayoutPaid(
           status: "PAID",
           paidAt: simdi,
           paidAmount: bakiye.toplam,
+          stopajOran,
+          stopajTutar,
+          netTutar,
           adminNote: adminNote?.trim() || null,
         },
       });
@@ -71,7 +107,12 @@ export async function markPayoutPaid(
       return { ok: false, hata: "Bu talep az önce kapatıldı." };
     throw e;
   }
-  return { ok: true, tutar: bakiye.toplam };
+  return {
+    ok: true,
+    tutar: bakiye.toplam,
+    stopaj: stopajTutar ?? undefined,
+    net: netTutar ?? undefined,
+  };
 }
 
 /** AYLIK OTOMATİK TALEP: komisyoncu "her ayın X'i" seçtiyse o gün bakiyesi

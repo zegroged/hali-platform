@@ -14,6 +14,7 @@ import {
   toggleHeadCommissionPaid,
   updateAgentPercent,
   payoutMarkPaid,
+  toggleFaturaMukellefi,
   payoutReject,
 } from "../actions";
 import { PendingButton } from "@/components/PendingButton";
@@ -153,6 +154,7 @@ export default async function AdminAgents({
           id: true,
           isHead: true,
           taxId: true,
+          faturaMukellefi: true,
           user: { select: { name: true, username: true, phone: true } },
         },
       },
@@ -256,6 +258,11 @@ export default async function AdminAgents({
                     {fmtTL(Number(t.amount))} TL
                   </span>
                 </div>
+                {t.agent.faturaMukellefi && (
+                  <p className="mt-1 inline-flex rounded-full bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-700">
+                    Fatura mükellefi — stopaj yok, FATURA iste, brüt öde
+                  </p>
+                )}
                 <p className="mt-1 font-mono text-sm text-slate-700">
                   {t.iban ?? "IBAN YOK"}
                   {"  "}
@@ -267,7 +274,8 @@ export default async function AdminAgents({
                   {fmtTarih(t.createdAt)}
                   {t.auto ? " · aylık otomatik talep" : " · elle talep"}
                 </p>
-                {(ayToplamlari.get(t.agent.id) ?? 0) >= STOPAJ_ESIK && (
+                {!t.agent.faturaMukellefi &&
+                  (ayToplamlari.get(t.agent.id) ?? 0) >= STOPAJ_ESIK && (
                   <div className="mt-2 rounded-lg border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900">
                     <p className="font-semibold">
                       ⚠️ Stopaj eşiği aşıldı — bu ay tahakkuk:{" "}
@@ -289,8 +297,11 @@ export default async function AdminAgents({
                       </a>
                     </p>
                     <p className="mt-0.5 text-amber-700">
-                      Fatura kesebiliyorsa stopaj bize düşmez — faturayı iste,
-                      brütü öde. Oran/eşik mali müşavir teyidine tabidir.
+                      &quot;Ödendi işaretle&quot;de stopaj OTOMATİK hesaplanıp
+                      kaydedilir — havaleyi NET tutardan yap. Fatura
+                      kesebiliyorsa önce &quot;Fatura mükellefi yap&quot;
+                      düğmesini kullan (stopaj uygulanmaz, brüt ödenir).
+                      Oran/eşik mali müşavir teyidine tabidir.
                     </p>
                   </div>
                 )}
@@ -330,6 +341,13 @@ export default async function AdminAgents({
                 <span className="text-slate-600">
                   {fmtTarih(t.createdAt)} · {t.agent.user.name} ·{" "}
                   {fmtTL(Number(t.paidAmount ?? t.amount))} TL
+                  {t.stopajTutar != null && (
+                    <span className="text-amber-700">
+                      {" "}
+                      (stopaj {fmtTL(Number(t.stopajTutar))} → net{" "}
+                      {fmtTL(Number(t.netTutar ?? 0))})
+                    </span>
+                  )}
                 </span>
                 <span
                   className={`text-xs font-medium ${
@@ -472,6 +490,11 @@ export default async function AdminAgents({
                       Premium (indirim yetkili)
                     </span>
                   )}
+                  {a.faturaMukellefi && (
+                    <span className="rounded-full bg-sky-100 px-2.5 py-0.5 text-xs font-medium text-sky-700">
+                      Fatura mükellefi (stopaj yok)
+                    </span>
+                  )}
                   <span
                     className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
                       a.active
@@ -489,6 +512,14 @@ export default async function AdminAgents({
                     <input type="hidden" name="id" value={a.id} />
                     <PendingButton className="rounded-lg border border-violet-300 px-2.5 py-1 text-xs font-medium text-violet-700 hover:bg-violet-50">
                       {a.canDiscount ? "Premium'u kaldır" : "Premium yap"}
+                    </PendingButton>
+                  </form>
+                  <form action={toggleFaturaMukellefi}>
+                    <input type="hidden" name="agentId" value={a.id} />
+                    <PendingButton className="rounded-lg border border-sky-300 px-2.5 py-1 text-xs font-medium text-sky-700 hover:bg-sky-50">
+                      {a.faturaMukellefi
+                        ? "Mükellefliği kaldır (stopaj kesilsin)"
+                        : "Fatura mükellefi yap"}
                     </PendingButton>
                   </form>
                   <form action={toggleAgentActive}>

@@ -31,6 +31,25 @@ export default async function MuhasebePage() {
   const u = await getSessionUser();
   if (!u || (u.role !== "ACCOUNTANT" && u.role !== "ADMIN")) redirect("/giris");
 
+  // KOMİSYON ÖDEMELERİ + STOPAJ DÖKÜMÜ (2026-07-31, kullanıcı kararı:
+  // "mali müşavire para durumunu, stopaj durumunu vereceğiz"). Stopaj ödeme
+  // anında OTOMATİK hesaplanıp talebe yazılıyor (lib/payout.ts) — muhtasar
+  // beyanname bu dökümden hazırlanır.
+  const komisyonOdemeleri = await prisma.payoutRequest.findMany({
+    where: { status: "PAID" },
+    orderBy: { paidAt: "desc" },
+    take: 200,
+    include: {
+      agent: {
+        select: {
+          taxId: true,
+          faturaMukellefi: true,
+          user: { select: { name: true } },
+        },
+      },
+    },
+  });
+
   const payments = await prisma.subscriptionPayment.findMany({
     // 0 TL = %100 indirimli ücretsiz dönem — fatura kesilecek işlem değildir.
     where: { status: "PAID", amount: { gt: 0 } },
@@ -149,6 +168,80 @@ export default async function MuhasebePage() {
           </table>
         </div>
       )}
+
+      {/* Komisyon ödemeleri — stopaj dökümü */}
+      <div className="mt-8">
+        <h2 className="font-semibold text-slate-900">
+          Komisyon Ödemeleri ve Stopaj Dökümü
+        </h2>
+        <p className="mt-1 text-sm text-slate-500">
+          Stopaj, ödeme anında sistemce otomatik hesaplanır (aylık 10.000 TL
+          eşiği, %15 — teyide açıktır). &quot;Fatura&quot; yazan satırlarda
+          komisyoncu mükelleftir: stopaj kesilmez, karşılığında fatura alınır.
+        </p>
+        {komisyonOdemeleri.length === 0 ? (
+          <p className="mt-3 rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-500">
+            Henüz ödenmiş komisyon yok.
+          </p>
+        ) : (
+          <div className="mt-3 overflow-x-auto rounded-xl border border-slate-200 bg-white">
+            <table className="w-full min-w-[640px] text-sm">
+              <thead>
+                <tr className="border-b border-slate-200 text-left text-xs text-slate-500">
+                  <th className="px-3 py-2">Tarih</th>
+                  <th className="px-3 py-2">Komisyoncu</th>
+                  <th className="px-3 py-2">T.C./VKN</th>
+                  <th className="px-3 py-2 text-right">Brüt</th>
+                  <th className="px-3 py-2 text-right">Stopaj</th>
+                  <th className="px-3 py-2 text-right">Net Ödenen</th>
+                  <th className="px-3 py-2">Belge</th>
+                </tr>
+              </thead>
+              <tbody>
+                {komisyonOdemeleri.map((t) => (
+                  <tr key={t.id} className="border-b border-slate-100">
+                    <td className="px-3 py-2 whitespace-nowrap">
+                      {t.paidAt ? fmtDate(t.paidAt) : "—"}
+                    </td>
+                    <td className="px-3 py-2">
+                      {t.ibanName ?? t.agent.user.name}
+                    </td>
+                    <td className="px-3 py-2 font-mono text-xs">
+                      {t.agent.taxId ?? "—"}
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      {fmtTL(Number(t.paidAmount ?? t.amount))}
+                    </td>
+                    <td className="px-3 py-2 text-right text-amber-700">
+                      {t.stopajTutar != null
+                        ? `${fmtTL(Number(t.stopajTutar))} (%${Number(t.stopajOran ?? 0)})`
+                        : t.agent.faturaMukellefi
+                          ? "Fatura"
+                          : "—"}
+                    </td>
+                    <td className="px-3 py-2 text-right font-semibold">
+                      {fmtTL(Number(t.netTutar ?? t.paidAmount ?? t.amount))}
+                    </td>
+                    <td className="px-3 py-2">
+                      {t.stopajTutar != null ? (
+                        <a
+                          href={`/admin/pusula/${t.id}`}
+                          target="_blank"
+                          className="text-brand-dark underline"
+                        >
+                          Gider pusulası
+                        </a>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

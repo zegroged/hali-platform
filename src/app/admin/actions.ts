@@ -1115,10 +1115,40 @@ export async function payoutMarkPaid(formData: FormData) {
   if (!r.ok) {
     redirect("/admin/komisyoncular?hata=" + encodeURIComponent(r.hata ?? "Ödeme işaretlenemedi."));
   }
+  const tl = (n: number) =>
+    n.toLocaleString("tr-TR", { minimumFractionDigits: 2 });
   redirect(
     "/admin/komisyoncular?ok=" +
       encodeURIComponent(
-        `${(r.tutar ?? 0).toLocaleString("tr-TR", { minimumFractionDigits: 2 })} TL ödendi olarak işaretlendi`,
+        r.stopaj != null
+          ? `${tl(r.tutar ?? 0)} TL brüt kapatıldı — stopaj ${tl(r.stopaj)} TL otomatik kaydedildi, HAVALEYİ NET ${tl(r.net ?? 0)} TL YAP (gider pusulasını yazdırmayı unutma)`
+          : `${tl(r.tutar ?? 0)} TL ödendi olarak işaretlendi`,
+      ),
+  );
+}
+
+/** Komisyoncunun "fatura mükellefi" durumunu değiştir (2026-07-31).
+ *  Mükellef = ödemeye fatura keser, stopaj UYGULANMAZ. Kapatınca eşik aşan
+ *  ödemelerde stopaj otomatik hesaplanır. */
+export async function toggleFaturaMukellefi(formData: FormData) {
+  await requireAdmin();
+  const agentId = String(formData.get("agentId") || "");
+  const agent = await prisma.agent.findUnique({
+    where: { id: agentId },
+    select: { faturaMukellefi: true, user: { select: { name: true } } },
+  });
+  if (!agent) redirect("/admin/komisyoncular?hata=" + encodeURIComponent("Komisyoncu bulunamadı."));
+  await prisma.agent.update({
+    where: { id: agentId },
+    data: { faturaMukellefi: !agent!.faturaMukellefi },
+  });
+  revalidatePath("/admin/komisyoncular");
+  redirect(
+    "/admin/komisyoncular?ok=" +
+      encodeURIComponent(
+        agent!.faturaMukellefi
+          ? `${agent!.user.name} artık fatura mükellefi DEĞİL — eşik aşan ödemelerde stopaj otomatik kesilecek.`
+          : `${agent!.user.name} fatura mükellefi olarak işaretlendi — stopaj uygulanmaz, ödemeye fatura istenir.`,
       ),
   );
 }

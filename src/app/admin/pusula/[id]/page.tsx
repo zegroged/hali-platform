@@ -24,8 +24,10 @@ export default async function GiderPusulasi({
   params: Promise<{ id: string }>;
 }) {
   // 🔴 Yetki prisma'dan ÖNCE (RSC sızıntı dersi) — belge kişisel veri içerir.
+  // ACCOUNTANT da görebilir (2026-07-31): muhtasar beyanname bu belgeden
+  // hazırlanır, mali müşavir /muhasebe dökümünden buraya tıklar.
   const u = await getSessionUser();
-  if (!u || u.role !== "ADMIN") redirect("/giris");
+  if (!u || (u.role !== "ADMIN" && u.role !== "ACCOUNTANT")) redirect("/giris");
 
   const { id } = await params;
   const t = await prisma.payoutRequest.findUnique({
@@ -43,8 +45,19 @@ export default async function GiderPusulasi({
   });
   if (!t) notFound();
 
-  const brut = Number(t.amount);
-  const d = stopajHesapla(brut);
+  const brut = Number(t.paidAmount ?? t.amount);
+  // ÖDENMİŞ talepte KAYITLI stopaj kullanılır (ödeme anında otomatik yazıldı) —
+  // oran sonradan değişse de belge tarihî gerçeği gösterir. Bekleyen talepte
+  // güncel oranla önizleme hesaplanır.
+  const d =
+    t.stopajTutar != null
+      ? {
+          brut,
+          oran: Number(t.stopajOran ?? 0) / 100,
+          stopaj: Number(t.stopajTutar),
+          net: Number(t.netTutar ?? brut - Number(t.stopajTutar)),
+        }
+      : stopajHesapla(brut);
   const bugun = new Date().toLocaleDateString("tr-TR", {
     day: "2-digit",
     month: "2-digit",
@@ -111,7 +124,7 @@ export default async function GiderPusulasi({
             </tr>
             <tr className="border-b border-slate-200">
               <td className="py-2 text-slate-600">
-                Gelir vergisi stopajı (%{Math.round(STOPAJ_ORAN * 100)})
+                Gelir vergisi stopajı (%{Math.round(d.oran * 100)})
               </td>
               <td className="py-2 text-right font-semibold text-red-700">
                 − {tl(d.stopaj)} TL

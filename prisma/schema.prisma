@@ -634,6 +634,10 @@ model Agent {
   ibanName  String?
   // Gider pusulası için TCKN/VKN (opsiyonel; stopajlı ödemede belgeye yazılır).
   taxId     String?
+  // FATURA MÜKELLEFİ (2026-07-31): true = komisyoncu vergi mükellefi, ödemeye
+  // FATURA keser → stopaj UYGULANMAZ (brüt ödenir). false = mükellef değil →
+  // aylık eşik aşıldığında ödeme anında stopaj OTOMATİK hesaplanıp kaydedilir.
+  faturaMukellefi Boolean @default(false)
   payoutDay Int? // 1-28: her ay bu gün otomatik çekim talebi oluşur
 
   createdAt DateTime @default(now())
@@ -683,6 +687,12 @@ model PayoutRequest {
   paidAmount Decimal?  @db.Decimal(10, 2) // ödeme anında fiilen kapatılan tutar
   iban       String? // talep anındaki IBAN kopyası (sonradan değişse de kayıt sabit)
   ibanName   String? // talep anındaki hesap sahibi adı (havale isim uyuşması için)
+  // STOPAJ KAYDI (2026-07-31, kullanıcı kararı: "kesinti otomatik olmalı"):
+  // ödeme PAID işaretlenirken sistem hesaplar ve BURAYA yazar — sonradan oran
+  // değişse de tarihi kayıt sabittir. Mükellef/eşik-altı ödemede üçü de null.
+  stopajOran  Decimal? @db.Decimal(5, 2)
+  stopajTutar Decimal? @db.Decimal(10, 2)
+  netTutar    Decimal? @db.Decimal(10, 2)
   status     String    @default("PENDING")
   auto       Boolean   @default(false) // aylık otomatik mi, elle mi
   note       String? // komisyoncunun notu
