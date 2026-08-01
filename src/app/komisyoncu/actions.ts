@@ -49,18 +49,14 @@ export async function generateReferralCode(formData: FormData) {
       hataDon("İndirim tanımlama yetkin yok — yöneticiyle görüş.");
     const pct = Number(pctRaw);
     const ay = Number(ayRaw);
-    // 🔴 MUTLAK PLATFORM TAVANI (2026-08-02, kullanıcı kararı — 4.21'deki
-    // "admin'in premium yaptığı sınırsız olsun" tasarımı GERİ ALINDI):
-    // HİÇBİR komisyoncu %20'den fazla ya da 12 aydan uzun indirim basamaz.
-    // Kişiye özel tavan (maxDiscountPercent/Months) yalnız DAHA SIKI olabilir.
-    const tavan = Math.min(
-      Number(agent.maxDiscountPercent ?? MAX_SUB_DISCOUNT),
-      MAX_SUB_DISCOUNT,
-    );
-    const ayTavan = Math.min(
-      agent.maxDiscountMonths ?? MAX_SUB_DISCOUNT_MONTHS,
-      MAX_SUB_DISCOUNT_MONTHS,
-    );
+    // TAVAN MODELİ (2026-08-02, kullanıcı kararı — DEVIR 4.46):
+    // Varsayılan HERKES için %20 / 12 ay (MAX_SUB_DISCOUNT*). Admin, kişi
+    // bazında bu tavanı YÜKSELTEBİLİR ya da düşürebilir (admin/komisyoncular
+    // "tavan belirle" formu → maxDiscountPercent/Months). Baş komisyoncunun
+    // ALTINA verdiği tavan ise hâlâ ≤%20/12 ay ile sınırlı (o yol değişmedi).
+    // null = varsayılan %20/12; SINIRSIZ diye bir durum artık YOK.
+    const tavan = Number(agent.maxDiscountPercent ?? MAX_SUB_DISCOUNT);
+    const ayTavan = agent.maxDiscountMonths ?? MAX_SUB_DISCOUNT_MONTHS;
     if (!Number.isFinite(pct) || pct <= 0)
       hataDon("İndirim yüzdesi 1 ile " + tavan + " arasında olmalı.");
     if (pct > tavan)

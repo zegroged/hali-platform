@@ -160,7 +160,13 @@ export default async function PanelHome({
       )}
       <div>
         <h1 className="text-lg font-semibold text-slate-900">
-          Hoş geldin, {b.name}
+          Hoş geldin, {b.name}{" "}
+          <Link
+            href="/sifre"
+            className="align-middle text-sm font-medium text-slate-500 underline hover:text-slate-700"
+          >
+            🔑 Şifremi değiştir
+          </Link>
         </h1>
         <div className="mt-2 flex flex-wrap items-center gap-2">
           {/* Yayın durumu — tek bakışta: yayında / ödeme bekliyor / eksik var */}

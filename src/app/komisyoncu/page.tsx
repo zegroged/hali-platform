@@ -197,6 +197,12 @@ export default async function KomisyoncuSayfasi({
         className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
       >
         🗺 Bölge Haritası
+      </Link>{" "}
+      <Link
+        href="/sifre"
+        className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+      >
+        🔑 Şifremi Değiştir
       </Link>
         <p className="mt-1 text-sm text-slate-500">
           Komisyon oranın: <strong>%{Number(agent.percent)}</strong> (KDV hariç
@@ -591,17 +597,9 @@ export default async function KomisyoncuSayfasi({
             <strong>Premium yetkin var:</strong> istersen koda indirim göm —
             kodla kaydolan işletme, seçtiğin süre boyunca aboneliği o yüzde
             indirimli öder (komisyonun da indirimli tutar üzerinden hesaplanır).
-            Boş bırakırsan kod indirimsiz olur. Tavan: en fazla %
-            {Math.min(
-              Number(agent.maxDiscountPercent ?? MAX_SUB_DISCOUNT),
-              MAX_SUB_DISCOUNT,
-            )}{" "}
-            indirim,{" "}
-            {Math.min(
-              agent.maxDiscountMonths ?? MAX_SUB_DISCOUNT_MONTHS,
-              MAX_SUB_DISCOUNT_MONTHS,
-            )}{" "}
-            ay süre.
+            Boş bırakırsan kod indirimsiz olur. Senin tavanın: en fazla %
+            {Number(agent.maxDiscountPercent ?? MAX_SUB_DISCOUNT)} indirim,{" "}
+            {agent.maxDiscountMonths ?? MAX_SUB_DISCOUNT_MONTHS} ay süre.
           </p>
         )}
         {agent.codes.length > 0 && (

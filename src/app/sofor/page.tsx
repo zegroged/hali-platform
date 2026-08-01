@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import MoneyInput from "@/components/MoneyInput";
 import { PendingButton } from "@/components/PendingButton";
 import { PhotoForm } from "@/components/PhotoForm";
@@ -60,7 +61,13 @@ export default async function SoforPage() {
       <DriverShift initialOnShift={driver.isOnShift} />
 
       <h1 className="text-lg font-semibold text-slate-900">
-        İşlerim ({orders.length})
+        İşlerim ({orders.length}){" "}
+        <Link
+          href="/sifre"
+          className="align-middle text-sm font-medium text-slate-500 underline hover:text-slate-700"
+        >
+          🔑 Şifremi değiştir
+        </Link>
       </h1>
 
       {orders.length === 0 && (

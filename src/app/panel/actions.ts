@@ -772,6 +772,9 @@ export async function advanceOrderPanel(formData: FormData) {
     } catch (e) {
       console.error("advanceOrderPanel SMS hatası:", e);
     }
+    // İKİZ (2026-08-02 denetim açığı): şoför yollarındaki "yolda" e-postası
+    // panel yolunda eksikti — WhatsApp'ı olmayan müşteri haberi hiç almıyordu.
+    await bildirMusteriyeEposta(orderId, "yolda");
   }
   revalidatePath("/panel/siparisler");
   revalidatePath(`/panel/siparisler/${orderId}`);

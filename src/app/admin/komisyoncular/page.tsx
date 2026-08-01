@@ -16,6 +16,8 @@ import {
   payoutMarkPaid,
   toggleFaturaMukellefi,
   payoutReject,
+  resetAgentPassword,
+  setAgentDiscountCap,
 } from "../actions";
 import { PendingButton } from "@/components/PendingButton";
 import BolgeSecici from "@/components/BolgeSecici";
@@ -517,7 +519,8 @@ export default async function AdminAgents({
                   )}
                   {a.canDiscount && (
                     <span className="rounded-full bg-violet-100 px-2.5 py-0.5 text-xs font-medium text-violet-700">
-                      Premium (indirim yetkili)
+                      Premium · tavan %{Number(a.maxDiscountPercent ?? 20)} /{" "}
+                      {a.maxDiscountMonths ?? 12} ay
                     </span>
                   )}
                   {a.faturaMukellefi && (
@@ -573,6 +576,44 @@ export default async function AdminAgents({
                     />
                     <PendingButton className="rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50">
                       {a.isHead ? "Havuzu güncelle" : "Oranı güncelle"}
+                    </PendingButton>
+                  </form>
+                  {/* İndirim tavanı (yalnız premium): boş+boş = varsayılana dön.
+                      Admin %20/12 ayın üstüne çıkabilir — bilinçli yetki. */}
+                  {a.canDiscount && (
+                    <form action={setAgentDiscountCap} className="flex items-center gap-1">
+                      <input type="hidden" name="id" value={a.id} />
+                      <input
+                        name="maxPercent"
+                        inputMode="decimal"
+                        defaultValue={
+                          a.maxDiscountPercent != null
+                            ? String(Number(a.maxDiscountPercent))
+                            : ""
+                        }
+                        placeholder="%20"
+                        aria-label="İndirim tavanı %"
+                        className="w-16 rounded-lg border border-violet-300 px-2 py-1 text-xs"
+                      />
+                      <input
+                        name="maxMonths"
+                        inputMode="numeric"
+                        defaultValue={
+                          a.maxDiscountMonths != null ? String(a.maxDiscountMonths) : ""
+                        }
+                        placeholder="12 ay"
+                        aria-label="İndirim süre tavanı (ay)"
+                        className="w-16 rounded-lg border border-violet-300 px-2 py-1 text-xs"
+                      />
+                      <PendingButton className="rounded-lg border border-violet-300 px-2.5 py-1 text-xs font-medium text-violet-700 hover:bg-violet-50">
+                        Tavanı kaydet
+                      </PendingButton>
+                    </form>
+                  )}
+                  <form action={resetAgentPassword}>
+                    <input type="hidden" name="id" value={a.id} />
+                    <PendingButton className="rounded-lg border border-amber-300 px-2.5 py-1 text-xs font-medium text-amber-700 hover:bg-amber-50">
+                      Şifre sıfırla
                     </PendingButton>
                   </form>
                 </div>

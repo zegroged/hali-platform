@@ -375,7 +375,7 @@ export function waFiyatOnayi(
   );
 }
 
-/** Yıkama bitti, teslime hazır. (Henüz hiçbir olaya bağlı değil.) */
+/** Yıkama bitti, teslime hazır. (Panel "hazır" düğmesi — notifyOrderReady.) */
 export function waSiparisHazir(to: string, ad: string, isletme: string, kod: string) {
   return sendTemplate(to, "siparis_hazir", [ad, isletme, kod]);
 }

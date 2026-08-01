@@ -1147,6 +1147,83 @@ export async function payoutMarkPaid(formData: FormData) {
 /** Komisyoncunun "fatura mükellefi" durumunu değiştir (2026-07-31).
  *  Mükellef = ödemeye fatura keser, stopaj UYGULANMAZ. Kapatınca eşik aşan
  *  ödemelerde stopaj otomatik hesaplanır. */
+// KOMİSYONCU ŞİFRE SIFIRLAMA (2026-08-02): resetOwnerPassword ikizi.
+// Geçici şifre mesaj banner'ında gösterilir; sessionsValidFrom mobil
+// token'ları düşürür. Komisyoncu sonra /sifre'den kendisi değiştirir.
+export async function resetAgentPassword(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("id") || "");
+  const agent = await prisma.agent.findUnique({
+    where: { id },
+    select: { userId: true, user: { select: { name: true } } },
+  });
+  if (!agent)
+    redirect(
+      "/admin/komisyoncular?hata=" + encodeURIComponent("Komisyoncu bulunamadı."),
+    );
+  const temp = "Gecici-" + crypto.randomBytes(4).toString("hex");
+  await prisma.user.update({
+    where: { id: agent.userId },
+    data: { password: await hashPassword(temp), sessionsValidFrom: new Date() },
+  });
+  redirect(
+    "/admin/komisyoncular?ok=" +
+      encodeURIComponent(
+        `${agent.user.name} için geçici şifre: ${temp} — telefonla ilet; girişten sonra 🔑 Şifremi Değiştir'den kendisi değiştirsin.`,
+      ),
+  );
+}
+
+// İNDİRİM TAVANI (2026-08-02, kullanıcı kararı): admin komisyoncu bazında
+// tavan belirler — varsayılan %20/12 ayın ÜSTÜNE de çıkabilir (yalnız admin;
+// baş komisyoncunun altına verdiği tavan hâlâ ≤%20/12 ay). İki alan da boş
+// gönderilirse varsayılana (null → %20/12) döner.
+export async function setAgentDiscountCap(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("id") || "");
+  const geri = (m: string, ok = false): never => {
+    redirect(
+      "/admin/komisyoncular?" + (ok ? "ok" : "hata") + "=" + encodeURIComponent(m),
+    );
+  };
+  const agent = await prisma.agent.findUnique({
+    where: { id },
+    select: { canDiscount: true, user: { select: { name: true } } },
+  });
+  if (!agent)
+    redirect(
+      "/admin/komisyoncular?hata=" + encodeURIComponent("Komisyoncu bulunamadı."),
+    );
+  if (!agent.canDiscount)
+    geri("Tavan için önce Premium yap — indirim yetkisi olmayan komisyoncuda tavanın anlamı yok.");
+  const pctRaw = String(formData.get("maxPercent") || "").replace(",", ".").trim();
+  const ayRaw = String(formData.get("maxMonths") || "").trim();
+  if (!pctRaw && !ayRaw) {
+    await prisma.agent.update({
+      where: { id },
+      data: { maxDiscountPercent: null, maxDiscountMonths: null },
+    });
+    revalidatePath("/admin/komisyoncular");
+    geri(`${agent.user.name}: tavan varsayılana döndü (%20 / 12 ay).`, true);
+  }
+  const pct = Number(pctRaw);
+  const ay = Number(ayRaw);
+  if (!Number.isFinite(pct) || pct < 1 || pct > 100)
+    geri("İndirim tavanı yüzdesi 1-100 arası olmalı (ikisini de boş bırakırsan varsayılana döner).");
+  if (!Number.isInteger(ay) || ay < 1 || ay > 1200)
+    geri("Süre tavanı tam sayı ay olmalı (1-1200).");
+  const pctYuvarlak = Math.round(pct * 100) / 100;
+  await prisma.agent.update({
+    where: { id },
+    data: { maxDiscountPercent: pctYuvarlak, maxDiscountMonths: ay },
+  });
+  revalidatePath("/admin/komisyoncular");
+  geri(
+    `${agent.user.name}: indirim tavanı %${pctYuvarlak} / ${ay} ay olarak kaydedildi.`,
+    true,
+  );
+}
+
 export async function toggleFaturaMukellefi(formData: FormData) {
   await requireAdmin();
   const agentId = String(formData.get("agentId") || "");
