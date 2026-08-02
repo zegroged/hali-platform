@@ -12,6 +12,7 @@ import { extendSubscription } from "@/lib/subscription";
 import { taxIdError } from "@/lib/taxId";
 import { isTrPhone, normalizePhone } from "@/lib/phone";
 import { normalizeCityName, normalizeDistrictName } from "@/lib/cities";
+import { demoPaneliKur, demoPaneliSil } from "@/lib/demoPanel";
 import { normalizeUsername, validateUsername } from "@/lib/username";
 import { saveObject } from "@/lib/storage";
 import { CONTRACT_VERSION } from "@/lib/legal";
@@ -1683,5 +1684,47 @@ export async function setAgentEmail(formData: FormData) {
   geri(
     `${agent!.user.name} için e-posta kaydedildi: ${eposta} — adresi bir kez daha oku, "Şifremi unuttum" bağlantısı BURAYA gidecek.`,
     true,
+  );
+}
+
+// KOMİSYONCUNUN DEMO PANELİNİ ADMİNDEN SIFIRLA (2026-08-02)
+//
+// Demo verisi zenginleştikçe (halı numaraları, rota geçmişi, örnek WhatsApp
+// yazışması) MEVCUT demolar eski kalıyor — çünkü demo yalnız kurulduğu anda
+// üretiliyor. Komisyoncu kendi panelinden "Sıfırla"ya basabilir ama sahadaki
+// kişiye bunu tek tek söyletmek gerekiyordu; yöneticinin bir düğmesi yoktu.
+//
+// Demo YOKSA kurar, VARSA silip yeniden kurar. Giriş bilgileri türetilmiş
+// olduğu için (demoKullaniciAdi/demoSifre) sıfırlamadan sonra da AYNI kalır —
+// komisyoncunun elindeki kullanıcı adı/şifre bozulmaz.
+export async function resetAgentDemo(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("id") || "");
+  const agent = await prisma.agent.findUnique({
+    where: { id },
+    select: { id: true, user: { select: { name: true } } },
+  });
+  if (!agent)
+    redirect("/admin/komisyoncular?hata=" + encodeURIComponent("Komisyoncu bulunamadı."));
+
+  let vardi = false;
+  try {
+    vardi = await demoPaneliSil(agent!.id);
+    await demoPaneliKur(agent!.id);
+  } catch (e) {
+    if (e && typeof e === "object" && "digest" in e) throw e;
+    console.error("[admin-demo] sıfırlama hatası:", e);
+    redirect(
+      "/admin/komisyoncular?hata=" +
+        encodeURIComponent(
+          `${agent!.user.name} için demo panel kurulamadı — tekrar dene.`,
+        ),
+    );
+  }
+  redirect(
+    "/admin/komisyoncular?ok=" +
+      encodeURIComponent(
+        `${agent!.user.name} için demo panel ${vardi ? "sıfırlandı" : "oluşturuldu"} — güncel örnek veriyle (halı numaraları, rota geçmişi, örnek yazışma). Giriş bilgileri değişmedi.`,
+      ),
   );
 }

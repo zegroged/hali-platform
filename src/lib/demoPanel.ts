@@ -8,6 +8,8 @@ import { saveObject } from "@/lib/storage";
 import { CONTRACT_VERSION } from "@/lib/legal";
 import { districtsOfCity } from "@/lib/cities";
 import { genOrderCode } from "@/lib/ordercode";
+import { waNumber } from "@/lib/whatsapp";
+import { trDayBoundsUTC } from "@/lib/time";
 
 // KOMİSYONCU DEMO PANELİ (2026-07-30).
 //
@@ -591,9 +593,9 @@ export async function demoPaneliKur(agentId: string): Promise<DemoBilgi> {
       },
     });
 
-    // 4) Yıkanıyor — yıkama aşaması fotoğrafı.
+    // 4) Yıkanıyor — yıkama aşaması fotoğrafı + Halı Bul + Mesajlar demosu.
     const s4 = yeni(3);
-    await siparisOlustur({
+    const yikamaSiparis = await siparisOlustur({
       businessId,
       driverId: sofor2.id,
       customerName: s4.ad,
@@ -839,6 +841,108 @@ export async function demoPaneliKur(agentId: string): Promise<DemoBilgi> {
         },
       ],
     });
+
+    // ---- ROTA GEÇMİŞİ demosu (2026-08-02, kullanıcı isteği) ----
+    // "Şoför takibi" satışın 1 numaralı kozu ama demoda Rota Geçmişi ekranı
+    // BOŞTU ("bu gün mesaiye çıkılmamış") — komisyoncu en güçlü özelliği
+    // gösteremiyordu. Burada mesaideki şoföre BUGÜNE ait gerçekçi bir gün
+    // kuruluyor: kapalı bir tur + üç DURAK (adresi ve kaç dakika durduğu ile).
+    //
+    // Zaman penceresi TR gününe kelepçeli: demo gece yarısından hemen sonra
+    // kurulursa rota düne taşıp ekran yine boş görünmesin.
+    {
+      const { start: gunBasi } = trDayBoundsUTC();
+      const bitis = simdi - 6 * 60 * 1000; // 6 dk önce (canlı takiple tutarlı)
+      const baslangic = Math.max(gunBasi.getTime() + 5 * 60 * 1000, bitis - 4 * SAAT);
+      const sure = Math.max(30 * 60 * 1000, bitis - baslangic);
+      const ADIM = 26;
+      // Dükkândan çıkıp mahalleyi dolaşan kapalı halka (başladığı yere döner).
+      const pingler = Array.from({ length: ADIM }, (_, i) => {
+        const t = i / (ADIM - 1);
+        const aci = 2 * Math.PI * t;
+        return {
+          driverId: sofor1.id,
+          lat: lat + 0.014 * Math.sin(aci) + 0.002 * Math.sin(3 * aci),
+          lng: lng + 0.018 * (1 - Math.cos(aci)) * 0.6,
+          recordedAt: new Date(baslangic + sure * t),
+        };
+      });
+      await prisma.driverLocationPing.createMany({ data: pingler });
+
+      // Duraklar: eşik 3 dk (STOP_MIN_SEC) — üçü de rahat geçiyor.
+      const trAy = new Date(baslangic);
+      const duraklar = [
+        { oran: 0.22, dk: 12, adres: MUSTERILER[0].adres, not: "halı alımı" },
+        { oran: 0.55, dk: 47, adres: MUSTERILER[4].adres, not: "öğle molası" },
+        { oran: 0.82, dk: 8, adres: MUSTERILER[5].adres, not: "teslimat" },
+      ];
+      await prisma.driverStop.createMany({
+        data: duraklar.map((d) => {
+          const bas = new Date(baslangic + sure * d.oran);
+          return {
+            driverId: sofor1.id,
+            lat: lat + 0.014 * Math.sin(2 * Math.PI * d.oran),
+            lng: lng + 0.018 * (1 - Math.cos(2 * Math.PI * d.oran)) * 0.6,
+            address: `${d.adres}, ${district}/${city}`,
+            startedAt: bas,
+            endedAt: new Date(bas.getTime() + d.dk * 60 * 1000),
+            durationSec: d.dk * 60,
+            periodYear: trAy.getUTCFullYear(),
+            periodMonth: trAy.getUTCMonth() + 1,
+          };
+        }),
+      });
+    }
+
+    // ---- MESAJLAR ekranı demosu (2026-08-02, kullanıcı isteği) ----
+    // Gelen kutusu boş kalınca komisyoncu "Mesajlar" sekmesini gösteremiyordu.
+    // Yazışma BİLEREK yıkamadaki siparişin müşterisine bağlanıyor: böylece
+    // sohbet başlığında WhatsApp profil adı ("Hasan") DEĞİL, siparişteki
+    // GERÇEK ad ("Hasan Şahin") görünür — 2026-08-02'de eklenen kimlik
+    // eşleştirmesi demoda da anlaşılsın diye.
+    //
+    // Son mesaj 3 saat önce GELEN olduğu için cevap kutusu AÇIK görünür
+    // (24 saatlik pencere). Gerçek gönderim olmaz: cevap ucunda demo kalkanı
+    // var (api/panel/whatsapp/mesaj).
+    const demoWaNo = waNumber(tel(3));
+    if (demoWaNo) {
+      const ilkAd = s4.ad.split(" ")[0];
+      await prisma.whatsAppMessage.createMany({
+        data: [
+          {
+            waId: `demo-${businessId}-1`,
+            direction: "OUT",
+            phone: demoWaNo,
+            body: "Halınız teslim alındı; ölçüm sonrası kesin fiyat onayınıza gönderilecek.",
+            businessId,
+            orderId: yikamaSiparis.id,
+            createdAt: new Date(simdi - 2 * GUN),
+          },
+          {
+            waId: `demo-${businessId}-2`,
+            direction: "OUT",
+            phone: demoWaNo,
+            body: "Halınızın yıkama işlemi başladı.",
+            businessId,
+            orderId: yikamaSiparis.id,
+            createdAt: new Date(simdi - GUN),
+          },
+          {
+            waId: `demo-${businessId}-3`,
+            direction: "IN",
+            phone: demoWaNo,
+            // WhatsApp profil adı bilerek KISA — panelde siparişteki tam ad
+            // birinci satırda, bu ad ikincil satırda "WhatsApp: Hasan" diye çıkar.
+            name: ilkAd,
+            body: "Merhaba, halılarım ne zaman hazır olur acaba?",
+            businessId,
+            orderId: yikamaSiparis.id,
+            createdAt: new Date(simdi - 3 * SAAT),
+          },
+        ],
+        skipDuplicates: true,
+      });
+    }
 
     // ---- Şoförden halıcıya nakit devri (gün sonu mutabakatı) ----
     await prisma.cashHandover.createMany({

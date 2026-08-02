@@ -16,6 +16,7 @@ import {
   payoutMarkPaid,
   toggleFaturaMukellefi,
   payoutReject,
+  resetAgentDemo,
   resetAgentPassword,
   setAgentEmail,
   toggleAgentHead,
@@ -734,6 +735,16 @@ export default async function AdminAgents({
                     <input type="hidden" name="id" value={a.id} />
                     <PendingButton className="rounded-lg border border-amber-300 px-2.5 py-1 text-xs font-medium text-amber-700 hover:bg-amber-50">
                       Şifre sıfırla
+                    </PendingButton>
+                  </form>
+                  {/* Demo panel yalnız KURULDUĞU ANDA üretiliyor; örnek veri
+                      zenginleştikçe eski demolar geride kalıyor. Bu düğme
+                      yoksa kurar, varsa güncel veriyle yeniden kurar. Giriş
+                      bilgileri türetilmiş olduğu için DEĞİŞMEZ. */}
+                  <form action={resetAgentDemo}>
+                    <input type="hidden" name="id" value={a.id} />
+                    <PendingButton className="rounded-lg border border-violet-300 px-2.5 py-1 text-xs font-medium text-violet-700 hover:bg-violet-50">
+                      Demoyu yenile
                     </PendingButton>
                   </form>
                 </div>

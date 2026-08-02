@@ -46,6 +46,21 @@ export async function POST(req: NextRequest) {
   const b = await getCurrentBusiness();
   if (!b) return NextResponse.json({ error: "Yetkisiz" }, { status: 401 });
 
+  // DEMO KALKANI (2026-08-02): demo panele örnek bir yazışma eklendi; o sohbette
+  // cevap kutusu AÇIK görünür (müşteri "3 saat önce" yazmış gibi). Kalkan
+  // olmasaydı komisyoncu dükkânda cevap yazmayı denediğinde sistem uydurma bir
+  // numaraya GERÇEK gönderim yapmaya kalkardı. Aynı ilke `waGonderVeKaydet` ve
+  // `sendSms` içinde de var — demo hiçbir gerçek mesaj üretmez.
+  if (b.isDemo) {
+    return NextResponse.json(
+      {
+        error:
+          "Demo hesap: mesaj gerçekten gönderilmez. Gerçek panelde bu kutudan müşteriye cevap yazarsın (müşteri son 24 saatte yazmışsa).",
+      },
+      { status: 400 },
+    );
+  }
+
   // HIZ SINIRI: her mesaj Meta'da faturalanabilir. Elle yazan bir halıcı 10
   // dakikada 20 mesajı zor geçer; bunu aşan şey ya bozuk bir döngü ya kötüye
   // kullanımdır. Sınır İŞLETME başına (IP değil) — aynı hesap farklı ağdan da
