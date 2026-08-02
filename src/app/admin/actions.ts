@@ -1621,3 +1621,67 @@ export async function setAgentTerritory(formData: FormData) {
   revalidatePath("/admin/bolgeler");
   redirect("/admin/komisyoncular?ok=" + encodeURIComponent("Bölge güncellendi"));
 }
+
+// KOMİSYONCUYA SONRADAN E-POSTA BAĞLA (2026-08-02 — kullanıcı boşluğu yakaladı)
+//
+// SORUN: `createAgent` e-posta alanını yalnız HESAP AÇARKEN kabul ediyordu;
+// alan 2026-08-02'de eklendiği için ondan ÖNCE açılmış komisyoncuların
+// (canlıda üçünün de) e-postası YOK. E-postası olmayan hesapta
+// "Şifremi unuttum" ÇALIŞMAZ — komisyoncu her seferinde yöneticiyi aramak
+// zorunda kalıyordu ve yöneticinin sonradan adres ekleyecek bir ekranı da
+// yoktu. Tek yol komisyoncunun kendi girip /sifre'den eklemesiydi.
+//
+// ⚠️ ADMİN'İN GİRDİĞİ ADRES DOĞRULANMIŞ SAYILIR (createAgent ile aynı kural).
+// Sebebi: doğrulama kodunu yine komisyoncunun kendisi girmek zorunda kalsa
+// sorun çözülmezdi. Bedeli: yanlış yazılan adres şifre sıfırlama bağlantısını
+// alır. Bu yüzden arayüzde uyarı var ve kaydedilen adres onay mesajında
+// aynen gösteriliyor (yönetici gözüyle doğrulasın).
+//
+// Boş gönderilirse adres KALDIRILIR (emailVerified=false) — yanlış adres
+// düzeltilebilsin. Oturumlar düşürülmez: e-posta değişimi şifre değişimi
+// değildir.
+export async function setAgentEmail(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("id") || "");
+  const eposta = String(formData.get("email") || "").trim().toLowerCase();
+  const geri = (m: string, ok = false): never =>
+    redirect(
+      `/admin/komisyoncular?${ok ? "ok" : "hata"}=` + encodeURIComponent(m),
+    );
+
+  const agent = await prisma.agent.findUnique({
+    where: { id },
+    select: { userId: true, user: { select: { name: true } } },
+  });
+  if (!agent) geri("Komisyoncu bulunamadı.");
+
+  if (!eposta) {
+    await prisma.user.update({
+      where: { id: agent!.userId },
+      data: { email: null, emailVerified: false },
+    });
+    geri(
+      `${agent!.user.name} hesabından e-posta kaldırıldı. Artık "Şifremi unuttum" çalışmaz; şifresini sen sıfırlaman gerekir.`,
+      true,
+    );
+  }
+
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(eposta)) geri("Geçerli bir e-posta gir.");
+
+  // Aynı adres başka bir hesapta olamaz (User.email @unique) — çakışmayı
+  // veritabanı hatasına bırakmak yerine anlaşılır mesajla döndür.
+  const baskasi = await prisma.user.findFirst({
+    where: { email: eposta, NOT: { id: agent!.userId } },
+    select: { id: true },
+  });
+  if (baskasi) geri("Bu e-posta başka bir hesapta kayıtlı.");
+
+  await prisma.user.update({
+    where: { id: agent!.userId },
+    data: { email: eposta, emailVerified: true },
+  });
+  geri(
+    `${agent!.user.name} için e-posta kaydedildi: ${eposta} — adresi bir kez daha oku, "Şifremi unuttum" bağlantısı BURAYA gidecek.`,
+    true,
+  );
+}

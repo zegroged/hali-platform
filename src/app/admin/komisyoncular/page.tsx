@@ -17,6 +17,7 @@ import {
   toggleFaturaMukellefi,
   payoutReject,
   resetAgentPassword,
+  setAgentEmail,
   toggleAgentHead,
   toggleAgentTrial,
   removeAgentTerritoryCity,
@@ -48,7 +49,17 @@ export default async function AdminAgents({
   const agents = await prisma.agent.findMany({
     orderBy: { createdAt: "desc" },
     include: {
-      user: { select: { name: true, username: true, phone: true } },
+      user: {
+        select: {
+          name: true,
+          username: true,
+          phone: true,
+          // E-posta: "Şifremi unuttum" akışının ön şartı. Yoksa kartta uyarı
+          // çıkar ve şifreyi yalnız admin sıfırlayabilir (2026-08-02).
+          email: true,
+          emailVerified: true,
+        },
+      },
       // Bölge: kartta gösterilir ve oradan değiştirilebilir (2026-07-28).
       territories: { select: { city: true, district: true } },
       // BAŞ KOMİSYONCU ağacı: kimin altında / kimleri açmış.
@@ -727,6 +738,48 @@ export default async function AdminAgents({
                   </form>
                 </div>
               </div>
+
+              {/* E-POSTA (2026-08-02): "Şifremi unuttum" bunsuz çalışmaz.
+                  Hesap açarken girilebiliyordu ama SONRADAN eklenemiyordu —
+                  alan eklenmeden önce açılan komisyoncular e-postasız kalmıştı. */}
+              <form
+                action={setAgentEmail}
+                className={`flex flex-wrap items-center gap-2 rounded-lg border p-2 ${
+                  a.user.email
+                    ? "border-slate-200 bg-slate-50"
+                    : "border-amber-300 bg-amber-50"
+                }`}
+              >
+                <input type="hidden" name="id" value={a.id} />
+                <span className="text-xs font-medium text-slate-600">
+                  E-posta
+                </span>
+                <input
+                  name="email"
+                  type="email"
+                  defaultValue={a.user.email ?? ""}
+                  placeholder="ornek@eposta.com"
+                  aria-label={`${a.user.name} e-posta adresi`}
+                  className="min-w-[12rem] flex-1 rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs"
+                />
+                <PendingButton className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100">
+                  Kaydet
+                </PendingButton>
+                <span className="w-full text-xs text-slate-500">
+                  {a.user.email ? (
+                    <>
+                      Şifre sıfırlama bağlantısı bu adrese gider. Değiştirirsen
+                      yeni adrese gider; boş bırakıp kaydedersen kaldırılır.
+                    </>
+                  ) : (
+                    <span className="font-medium text-amber-800">
+                      ⚠️ E-postası yok — &quot;Şifremi unuttum&quot; çalışmaz,
+                      şifresini yalnız sen sıfırlayabilirsin. Adresini gir ya da
+                      kendisi panelinden 🔑 ile eklesin.
+                    </span>
+                  )}
+                </span>
+              </form>
 
               <div className="grid grid-cols-3 gap-2 text-center">
                 <div className="rounded-lg bg-slate-50 p-2">
