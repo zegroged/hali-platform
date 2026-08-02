@@ -7,6 +7,7 @@ import { NotificationBell } from "@/components/NotificationBell";
 import PanelNav from "@/components/PanelNav";
 import { demoBiletiVarMi } from "@/lib/auth";
 import { demodanDon } from "@/app/komisyoncu/demo-actions";
+import { demoGunuTazele } from "@/lib/demoPanel";
 import { PendingButton } from "@/components/PendingButton";
 
 // Panel sayfaları arama motorlarına kapalı (robots.txt'e ek ikinci savunma hattı).
@@ -27,9 +28,16 @@ export default async function PanelLayout({
   // yavaşlatıyordu. Yalnız ad + varlık kontrolü çek.
   const business = await prisma.cleanerBusiness.findUnique({
     where: { ownerId: u.id },
-    select: { name: true },
+    select: { id: true, name: true, isDemo: true },
   });
   if (!business) redirect("/giris");
+
+  // DEMO TAZELEME (2026-08-03): demo verisi kurulduğu ana çakılıydı; ertesi gün
+  // Canlı Takip "konum yok", Rota Geçmişi boş, Mesajlar'da cevap kutusu kapalı
+  // görünüyordu — yani komisyoncunun en güçlü üç satış ekranı ölüydü. Panel her
+  // açıldığında demo verisi "bugüne" çekilir. GERÇEK işletme bu yoldan geçmez:
+  // koşul burada, ikinci kontrol de fonksiyonun içinde (isDemo).
+  if (business.isDemo) await demoGunuTazele(business.id);
 
   // DEMO ŞERİDİ (2026-08-02): komisyoncu tek tıkla demo hesabına geçtiyse
   // buradan tek tıkla kendi paneline döner (şifre sorulmaz, bilet çerezde).

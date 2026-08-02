@@ -1,3 +1,4 @@
+import { geocodeDistrict } from "@/lib/geocodeDistrict";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
@@ -55,37 +56,6 @@ const DEFAULT_WORKING_HOURS = {
   sat: { open: "10:00", close: "17:00" },
   sun: null,
 };
-
-// İlçe merkezini koordinata çevir — keşif "mesafe" sıralaması için gerekli.
-// Nominatim erişilemezse İstanbul merkeziyle açılır; panelden adres
-// güncellenince düzelir.
-async function geocodeDistrict(
-  district: string,
-  city: string,
-): Promise<{ lat: number; lng: number }> {
-  try {
-    const url =
-      "https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=tr&q=" +
-      encodeURIComponent(`${district}, ${city}`);
-    const res = await fetch(url, {
-      headers: {
-        "User-Agent": "EnYakinHaliYikama/1.0 (+https://enyakinhaliyikamaservisi.com; destek@enyakinhaliyikamaservisim.com)",
-        "Accept-Language": "tr",
-      },
-      cache: "no-store",
-      signal: AbortSignal.timeout(5000),
-    });
-    if (res.ok) {
-      const data = (await res.json()) as Array<{ lat: string; lon: string }>;
-      if (data.length) {
-        return { lat: Number(data[0].lat), lng: Number(data[0].lon) };
-      }
-    }
-  } catch {
-    // sessiz düş — varsayılan koordinat
-  }
-  return { lat: 41.0082, lng: 28.9784 };
-}
 
 export async function POST(req: NextRequest) {
   const ip = clientIp(req);

@@ -10,6 +10,7 @@ import { districtsOfCity } from "@/lib/cities";
 import { genOrderCode } from "@/lib/ordercode";
 import { waNumber } from "@/lib/whatsapp";
 import { trDayBoundsUTC } from "@/lib/time";
+import { geocodeDistrict } from "@/lib/geocodeDistrict";
 
 // KOMİSYONCU DEMO PANELİ (2026-07-30).
 //
@@ -211,6 +212,11 @@ export async function demoPaneliSil(agentId: string): Promise<boolean> {
       phone: { startsWith: DEMO_TEL_ONEK },
     },
   });
+  // Rota tazeleme işaretini de kaldır: işletme silinince o anahtar ölü kalır
+  // (sıfırlamada yeni işletme yeni kimlik alır).
+  await prisma.appState
+    .deleteMany({ where: { key: `demo-rota-${b.id}` } })
+    .catch(() => {});
   return true;
 }
 
@@ -332,8 +338,10 @@ export async function demoPaneliKur(agentId: string): Promise<DemoBilgi> {
   // Koordinat sabit (ağ çağrısı yok): demo keşifte zaten görünmediğinden
   // mesafe sıralamasına girmiyor. Şoför konumları buna göre kaydırılır ki
   // paneldeki harita kendi içinde tutarlı olsun.
-  const lat = 41.0082;
-  const lng = 28.9784;
+  // KOORDİNAT GERÇEK İLÇEDEN (2026-08-03): önce sabit İstanbul yazılıyordu,
+  // yani demo işletme "Aliağa/İzmir" derken rota ve canlı takip haritası
+  // İstanbul'u gösteriyordu. Nominatim erişilemezse yine İstanbul'a düşer.
+  const { lat, lng } = await geocodeDistrict(district, city);
 
   const ilceler = districtsOfCity(city);
   const hizmetIlceleri = Array.from(
@@ -842,57 +850,9 @@ export async function demoPaneliKur(agentId: string): Promise<DemoBilgi> {
       ],
     });
 
-    // ---- ROTA GEÇMİŞİ demosu (2026-08-02, kullanıcı isteği) ----
-    // "Şoför takibi" satışın 1 numaralı kozu ama demoda Rota Geçmişi ekranı
-    // BOŞTU ("bu gün mesaiye çıkılmamış") — komisyoncu en güçlü özelliği
-    // gösteremiyordu. Burada mesaideki şoföre BUGÜNE ait gerçekçi bir gün
-    // kuruluyor: kapalı bir tur + üç DURAK (adresi ve kaç dakika durduğu ile).
-    //
-    // Zaman penceresi TR gününe kelepçeli: demo gece yarısından hemen sonra
-    // kurulursa rota düne taşıp ekran yine boş görünmesin.
-    {
-      const { start: gunBasi } = trDayBoundsUTC();
-      const bitis = simdi - 6 * 60 * 1000; // 6 dk önce (canlı takiple tutarlı)
-      const baslangic = Math.max(gunBasi.getTime() + 5 * 60 * 1000, bitis - 4 * SAAT);
-      const sure = Math.max(30 * 60 * 1000, bitis - baslangic);
-      const ADIM = 26;
-      // Dükkândan çıkıp mahalleyi dolaşan kapalı halka (başladığı yere döner).
-      const pingler = Array.from({ length: ADIM }, (_, i) => {
-        const t = i / (ADIM - 1);
-        const aci = 2 * Math.PI * t;
-        return {
-          driverId: sofor1.id,
-          lat: lat + 0.014 * Math.sin(aci) + 0.002 * Math.sin(3 * aci),
-          lng: lng + 0.018 * (1 - Math.cos(aci)) * 0.6,
-          recordedAt: new Date(baslangic + sure * t),
-        };
-      });
-      await prisma.driverLocationPing.createMany({ data: pingler });
-
-      // Duraklar: eşik 3 dk (STOP_MIN_SEC) — üçü de rahat geçiyor.
-      const trAy = new Date(baslangic);
-      const duraklar = [
-        { oran: 0.22, dk: 12, adres: MUSTERILER[0].adres, not: "halı alımı" },
-        { oran: 0.55, dk: 47, adres: MUSTERILER[4].adres, not: "öğle molası" },
-        { oran: 0.82, dk: 8, adres: MUSTERILER[5].adres, not: "teslimat" },
-      ];
-      await prisma.driverStop.createMany({
-        data: duraklar.map((d) => {
-          const bas = new Date(baslangic + sure * d.oran);
-          return {
-            driverId: sofor1.id,
-            lat: lat + 0.014 * Math.sin(2 * Math.PI * d.oran),
-            lng: lng + 0.018 * (1 - Math.cos(2 * Math.PI * d.oran)) * 0.6,
-            address: `${d.adres}, ${district}/${city}`,
-            startedAt: bas,
-            endedAt: new Date(bas.getTime() + d.dk * 60 * 1000),
-            durationSec: d.dk * 60,
-            periodYear: trAy.getUTCFullYear(),
-            periodMonth: trAy.getUTCMonth() + 1,
-          };
-        }),
-      });
-    }
+    // ROTA GEÇMİŞİ demosu: kurulumda da tazeleme fonksiyonuyla üretilir
+    // (tek kaynak). Panel her açıldığında aynı fonksiyon veriyi bugüne
+    // çeker — bkz. demoGunuTazele.
 
     // ---- MESAJLAR ekranı demosu (2026-08-02, kullanıcı isteği) ----
     // Gelen kutusu boş kalınca komisyoncu "Mesajlar" sekmesini gösteremiyordu.
@@ -943,6 +903,8 @@ export async function demoPaneliKur(agentId: string): Promise<DemoBilgi> {
         skipDuplicates: true,
       });
     }
+
+    await demoGunuTazele(businessId);
 
     // ---- Şoförden halıcıya nakit devri (gün sonu mutabakatı) ----
     await prisma.cashHandover.createMany({
@@ -1080,5 +1042,159 @@ export async function demoPaneliKur(agentId: string): Promise<DemoBilgi> {
       // Temizlik de patlarsa asıl hatayı gizleme.
     }
     throw err;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// DEMO GÜNÜNÜ TAZELE (2026-08-03)
+//
+// 🔴 NEDEN VAR: demo verisi KURULDUĞU ANA çakılıydı; ertesi gün komisyoncu
+// dükkânda paneli açtığında satışın en güçlü üç ekranı ÖLÜ görünüyordu:
+//   1) Canlı Takip — panel yalnız ≤5 dk taze konumu haritaya basar
+//      (2026-07-16 kararı). Demo şoförün son görülme damgası kurulum anındaydı
+//      → demo kurulduktan 5 dk sonra "konum yok". Bu kusur 30 Temmuz'dan beri
+//      vardı ve 3 Ağustos'ta canlı sağlamada yakalandı.
+//   2) Rota Geçmişi — gün değişince "bugün" boş ("mesaiye çıkılmamış").
+//   3) Mesajlar — 24 saatlik pencere kapanınca cevap kutusu kayboluyordu.
+//
+// ÇÖZÜM: panel layout'u demo hesapta bunu çağırır; ekran ne zaman açılırsa
+// açılsın veri "bugün" görünür. İki hız var:
+//   - HER ÇAĞRIDA (ucuz): şoför canlılığı + bayatlamış demo mesajı.
+//   - GÜNDE BİR (AppState CAS ile): rota yeniden üretilir.
+// Gerçek işletmeler bu yoldan HİÇ geçmez (yalnız isDemo).
+// ---------------------------------------------------------------------------
+
+/** TR takvim gününü YYYY-MM-DD verir (konteyner UTC — yerel tarihe güvenilmez). */
+function trGunu(): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Istanbul" }).format(
+    new Date(),
+  );
+}
+
+/** Dükkândan çıkıp dönen kapalı tur — kurulum ve tazeleme AYNI şekli üretir. */
+function demoRotaNoktalari(lat: number, lng: number, adim: number) {
+  return Array.from({ length: adim }, (_, i) => {
+    const t = i / (adim - 1);
+    const aci = 2 * Math.PI * t;
+    return {
+      t,
+      lat: lat + 0.014 * Math.sin(aci) + 0.002 * Math.sin(3 * aci),
+      lng: lng + 0.018 * (1 - Math.cos(aci)) * 0.6,
+    };
+  });
+}
+
+export async function demoGunuTazele(businessId: string): Promise<void> {
+  try {
+    const b = await prisma.cleanerBusiness.findUnique({
+      where: { id: businessId },
+      select: {
+        id: true,
+        isDemo: true,
+        lat: true,
+        lng: true,
+        city: true,
+        district: true,
+        drivers: {
+          where: { isOnShift: true },
+          select: { id: true },
+          take: 1,
+        },
+      },
+    });
+    if (!b?.isDemo) return; // gerçek işletme buraya HİÇ girmez
+    const sofor = b.drivers[0];
+    const simdi = Date.now();
+
+    // ---- 1) ŞOFÖR CANLILIĞI (her çağrıda, tek UPDATE) ----
+    // Panel haritası 5 dakikadan eski konumu "bayat" sayıp basmıyor.
+    if (sofor) {
+      const nokta = demoRotaNoktalari(b.lat, b.lng, 26).at(-4)!;
+      await prisma.driver.update({
+        where: { id: sofor.id },
+        data: {
+          lastLat: nokta.lat,
+          lastLng: nokta.lng,
+          lastSeenAt: new Date(simdi - 60 * 1000),
+        },
+      });
+    }
+
+    // ---- 2) BAYATLAMIŞ DEMO MESAJI (her çağrıda, koşullu) ----
+    // Gelen mesaj 20 saatten eskiyse pencere kapanmak üzere/kapanmış demektir;
+    // "3 saat önce"ye çekilir ki cevap kutusu demoda hep açık görünsün.
+    await prisma.whatsAppMessage.updateMany({
+      where: {
+        businessId: b.id,
+        direction: "IN",
+        createdAt: { lt: new Date(simdi - 20 * 60 * 60 * 1000) },
+      },
+      data: { createdAt: new Date(simdi - 3 * 60 * 60 * 1000) },
+    });
+
+    if (!sofor) return;
+
+    // ---- 3) ROTA (günde bir kez; AppState CAS ile yarış kilidi) ----
+    const anahtar = `demo-rota-${b.id}`;
+    const bugun = trGunu();
+    const mevcut = await prisma.appState.findUnique({ where: { key: anahtar } });
+    if (mevcut) {
+      if (mevcut.value === bugun) return; // bugün zaten üretildi
+      const r = await prisma.appState.updateMany({
+        where: { key: anahtar, value: { not: bugun } },
+        data: { value: bugun },
+      });
+      if (r.count === 0) return; // yarışı başka istek kazandı
+    } else {
+      try {
+        await prisma.appState.create({ data: { key: anahtar, value: bugun } });
+      } catch {
+        return; // aynı anda başka istek oluşturdu
+      }
+    }
+
+    const { start: gunBasi } = trDayBoundsUTC();
+    const bitis = simdi - 6 * 60 * 1000;
+    const baslangic = Math.max(gunBasi.getTime() + 5 * 60 * 1000, bitis - 4 * SAAT);
+    const sure = Math.max(30 * 60 * 1000, bitis - baslangic);
+    const noktalar = demoRotaNoktalari(b.lat, b.lng, 26);
+
+    // Eski günlerin izleri birikmesin: demo şoförün tüm kaydı yenilenir.
+    await prisma.driverLocationPing.deleteMany({ where: { driverId: sofor.id } });
+    await prisma.driverStop.deleteMany({ where: { driverId: sofor.id } });
+    await prisma.driverLocationPing.createMany({
+      data: noktalar.map((n) => ({
+        driverId: sofor.id,
+        lat: n.lat,
+        lng: n.lng,
+        recordedAt: new Date(baslangic + sure * n.t),
+      })),
+    });
+
+    const trAy = new Date(baslangic);
+    const duraklar = [
+      { oran: 0.22, dk: 12, adres: MUSTERILER[0].adres },
+      { oran: 0.55, dk: 47, adres: MUSTERILER[4].adres },
+      { oran: 0.82, dk: 8, adres: MUSTERILER[5].adres },
+    ];
+    await prisma.driverStop.createMany({
+      data: duraklar.map((d) => {
+        const bas = new Date(baslangic + sure * d.oran);
+        return {
+          driverId: sofor.id,
+          lat: b.lat + 0.014 * Math.sin(2 * Math.PI * d.oran),
+          lng: b.lng + 0.018 * (1 - Math.cos(2 * Math.PI * d.oran)) * 0.6,
+          address: `${d.adres}, ${b.district}/${b.city}`,
+          startedAt: bas,
+          endedAt: new Date(bas.getTime() + d.dk * 60 * 1000),
+          durationSec: d.dk * 60,
+          periodYear: trAy.getUTCFullYear(),
+          periodMonth: trAy.getUTCMonth() + 1,
+        };
+      }),
+    });
+  } catch (e) {
+    // Tazeleme hiçbir zaman paneli bozmaz — demo eskisi gibi görünür, o kadar.
+    console.error("[demo-tazele] hata:", e);
   }
 }
