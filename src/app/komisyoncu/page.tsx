@@ -23,6 +23,8 @@ import {
   demoSoforaGec,
 } from "./demo-actions";
 import { demoPaneliOku } from "@/lib/demoPanel";
+import RehberListesi from "@/components/RehberListesi";
+import { rehberleriListele } from "@/lib/rehberler";
 import { agentBalance } from "@/lib/payout";
 import {
   MAX_SUB_DISCOUNT,
@@ -207,6 +209,12 @@ export default async function KomisyoncuSayfasi({
         className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
       >
         🗺 Bölge Haritası
+      </Link>{" "}
+      <Link
+        href="/komisyoncu/rehberler"
+        className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+      >
+        📚 Rehberler
       </Link>{" "}
       <Link
         href="/sifre"
@@ -437,6 +445,31 @@ export default async function KomisyoncuSayfasi({
             </p>
           </>
         )}
+      </section>
+
+      {/* REHBERLER (2026-08-02): dört el kitabı panelin içinden okunur ve tek
+          tıkla HTML olarak indirilir (çevrimdışı açılır). Baş komisyoncu
+          dördünü de görür — ekibine vereceği sürüm dahil. Alt komisyoncuya
+          BAŞ rehberi KAPALIDIR (havuz matematiği); süzme sunucuda yapılır. */}
+      <section className="rounded-2xl border border-slate-200 bg-white p-5">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="font-semibold text-slate-900">
+            📚 Rehberler{" "}
+            <span className="text-xs font-normal text-slate-400">
+              (oku ya da telefonuna indir)
+            </span>
+          </h2>
+          <Link
+            href="/komisyoncu/rehberler"
+            className="text-sm font-medium text-brand-dark hover:underline"
+          >
+            Tümü ve toplu indirme →
+          </Link>
+        </div>
+        <RehberListesi
+          rehberler={rehberleriListele(agent.isHead)}
+          basKomisyoncu={agent.isHead}
+        />
       </section>
 
       {/* ÖDEMEM — bakiye + ay sonu bilgisi + havale/vergi bilgileri formu */}

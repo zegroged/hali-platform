@@ -3,7 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "predev": "node scripts/rehber-derle.mjs",
     "dev": "next dev",
+    "prebuild": "node scripts/rehber-derle.mjs",
     "build": "next build",
     "start": "next start",
     "db:generate": "prisma generate",
@@ -11,6 +13,7 @@
     "db:migrate": "prisma migrate dev",
     "db:seed": "tsx prisma/seed.ts",
     "db:studio": "prisma studio",
+    "test:rehber": "tsx scripts/rehber-kontrol.ts",
     "test:tahsilat": "tsc src/lib/tahsilat.ts --outDir .tmp-test --target es2022 --module esnext --moduleResolution bundler && node scripts/test-tahsilat.mjs"
   },
   "dependencies": {
