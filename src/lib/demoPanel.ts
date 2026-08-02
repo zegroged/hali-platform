@@ -437,7 +437,10 @@ export async function demoPaneliKur(agentId: string): Promise<DemoBilgi> {
     businessId = owner.ownedBusiness!.id;
 
     // ---- Fotoğraflar (profil "tam" görünsün) ----
-    const [genel, oncesi, sonrasi, alimFoto, yikamaFoto, teslimFoto] =
+    // hali1..3: "Halı Bul" ekranının demosu için AYRI GÖRÜNEN üç halı — aynı
+    // müşterinin 3 halısı numaralanmış olarak görünsün (2026-08-02). Tek bir
+    // görseli üç kez kullanmak numaralamayı anlatmıyordu.
+    const [genel, oncesi, sonrasi, alimFoto, yikamaFoto, teslimFoto, hali1, hali2, hali3] =
       await Promise.all([
         demoGorsel(businessId, "Örnek Halı Yıkama", "Dükkân görseli", [15, 118, 110]),
         demoGorsel(businessId, "ÖNCESİ", "Yıkama öncesi", [120, 83, 55]),
@@ -445,6 +448,9 @@ export async function demoPaneliKur(agentId: string): Promise<DemoBilgi> {
         demoGorsel(businessId, "ALIM", "Halı teslim alındı", [71, 85, 105]),
         demoGorsel(businessId, "YIKAMA", "Yıkama hattında", [13, 148, 136]),
         demoGorsel(businessId, "TESLİM", "Kapıda teslim", [22, 101, 52]),
+        demoGorsel(businessId, "HALI 1", "Salon halısı", [124, 45, 18]),
+        demoGorsel(businessId, "HALI 2", "Yolluk", [67, 56, 202]),
+        demoGorsel(businessId, "HALI 3", "Shaggy", [161, 98, 7]),
       ]);
     const fotolar: { url: string; isBefore: boolean; isAfter: boolean; caption: string }[] =
       [];
@@ -601,12 +607,16 @@ export async function demoPaneliKur(agentId: string): Promise<DemoBilgi> {
       estimatedDays: 3,
       pickupPhotoUrl: alimFoto,
       createdAt: new Date(simdi - 2 * GUN),
-      ...(alimFoto && yikamaFoto
+      // HALI BUL demosu: bu müşterinin ÜÇ halısı var, her biri numaralı.
+      // Şoförün ALIM kanıt fotoğrafı numarasız (yükün tamamının karesi).
+      ...(alimFoto && hali1 && hali2 && hali3
         ? {
             photos: {
               create: [
                 { url: alimFoto, stage: "ALIM" },
-                { url: yikamaFoto, stage: "YIKAMA" },
+                { url: hali1, stage: "YIKAMA", carpetNo: 1 },
+                { url: hali2, stage: "YIKAMA", carpetNo: 2 },
+                { url: hali3, stage: "YIKAMA", carpetNo: 3 },
               ],
             },
           }
@@ -640,7 +650,7 @@ export async function demoPaneliKur(agentId: string): Promise<DemoBilgi> {
       estimatedDays: 3,
       createdAt: new Date(simdi - 3 * GUN),
       ...(yikamaFoto
-        ? { photos: { create: [{ url: yikamaFoto, stage: "YIKAMA" }] } }
+        ? { photos: { create: [{ url: yikamaFoto, stage: "YIKAMA", carpetNo: 1 }] } }
         : {}),
       events: {
         create: [
