@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { verifyPassword, createSession, signSession } from "@/lib/auth";
+import {
+  verifyPassword,
+  createSession,
+  signSession,
+  demoBiletiTemizle,
+} from "@/lib/auth";
 import { rateLimit, clientIp, tooMany } from "@/lib/ratelimit";
 import { looksLikeEmail, normalizeUsername } from "@/lib/username";
 
@@ -60,6 +65,9 @@ export async function POST(req: NextRequest) {
       { status: 403 },
     );
   }
+  // Taze giriş: varsa eski demo dönüş bileti düşer (ortak telefonda başkasının
+  // oturumuna sıçrama riski — bkz. auth.ts destroySession notu).
+  await demoBiletiTemizle();
   await createSession(user.id);
   // token: native şoför uygulaması için (web çerezi de ayrıca set edildi)
   return NextResponse.json({

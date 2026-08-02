@@ -18,7 +18,12 @@ import { CONTRACT_VERSION } from "@/lib/legal";
 import { normalizeBusinessName } from "@/lib/text";
 import { ensureBillingCode } from "@/lib/billing";
 import { findUsableCode, claimCode, attachCodeToBusiness } from "@/lib/referralCode";
-import { discountUntilFromMonths, activeDiscountPercent } from "@/lib/discount";
+import {
+  discountUntilFromMonths,
+  activeDiscountPercent,
+  MAX_TRIAL_DAYS,
+  trialGunOku,
+} from "@/lib/discount";
 
 async function requireAdmin() {
   const u = await getSessionUser();
@@ -756,6 +761,16 @@ export async function createAgent(formData: FormData) {
   const percentRaw = String(formData.get("percent") || "").replace(",", ".");
   // Premium yetkisi: kod üretirken istediği yüzde + sürede indirim tanımlayabilir.
   const canDiscount = formData.get("canDiscount") === "on";
+  // YETKİ TAVANLARI HESAP AÇARKEN (2026-08-02, kullanıcı isteği): premium
+  // verirken "yüzde kaç / kaç ay" da burada girilir; boş bırakılırsa platform
+  // varsayılanı (%20 / 12 ay) geçerli olur.
+  const maxPctRaw = String(formData.get("maxDiscountPercent") || "")
+    .replace(",", ".")
+    .trim();
+  const maxAyRaw = String(formData.get("maxDiscountMonths") || "").trim();
+  // ÜCRETSİZ DENEME YETKİSİ: premium'un ikizi — 15 gün / 1 ay verebilme hakkı.
+  const canTrial = formData.get("canTrial") === "on";
+  const maxTrialRaw = String(formData.get("maxTrialDays") || "").trim();
   // BAŞ KOMİSYONCU (2026-07-25): kendi panelinden komisyoncu açar, havuz payının
   // altına verdiği yüzdenin FARKINI kendisi alır. Kendi kodundan getirdiği
   // işletmede havuzun tamamını alır → percent = poolPercent.
@@ -786,6 +801,25 @@ export async function createAgent(formData: FormData) {
   const percent = isHead ? poolPercent! : Number(percentRaw);
   if (!Number.isFinite(percent) || percent <= 0 || percent > 100)
     err("Komisyon yüzdesi 0 ile 100 arasında olmalı (örn. 50).");
+  let maxDiscountPercent: number | null = null;
+  let maxDiscountMonths: number | null = null;
+  if (canDiscount && (maxPctRaw || maxAyRaw)) {
+    const t = Number(maxPctRaw);
+    if (!Number.isFinite(t) || t < 1 || t > 100)
+      err("İndirim tavanı yüzdesi 1-100 arası olmalı (boş bırakırsan %20).");
+    const a = Number(maxAyRaw);
+    if (!Number.isInteger(a) || a < 1 || a > 1200)
+      err("İndirim süre tavanı tam sayı ay olmalı (boş bırakırsan 12).");
+    maxDiscountPercent = Math.round(t * 100) / 100;
+    maxDiscountMonths = a;
+  }
+  let maxTrialDays: number | null = null;
+  if (canTrial && maxTrialRaw) {
+    const g = trialGunOku(maxTrialRaw);
+    if (g == null) err("Deneme tavanı 15 gün ya da 1 ay olabilir.");
+    maxTrialDays = g;
+  }
+
   const exists = await prisma.user.findFirst({
     where: { OR: [{ username }, { phone }] },
   });
@@ -811,7 +845,17 @@ export async function createAgent(formData: FormData) {
         },
       });
       const agent = await tx.agent.create({
-        data: { userId: user.id, percent, canDiscount, isHead, poolPercent },
+        data: {
+          userId: user.id,
+          percent,
+          canDiscount,
+          maxDiscountPercent,
+          maxDiscountMonths,
+          canTrial,
+          maxTrialDays,
+          isHead,
+          poolPercent,
+        },
       });
       // BÖLGE (2026-07-28): hangi il/ilçelerden sorumlu. Çakışma engel değil,
       // form zaten dolu ilçeleri uyarıyla gösteriyor (bkz. lib/territory.ts).
@@ -833,7 +877,12 @@ export async function createAgent(formData: FormData) {
     throw e;
   }
   revalidatePath("/admin/komisyoncular");
-  redirect("/admin/komisyoncular?ok=" + encodeURIComponent(username));
+  redirect(
+    "/admin/komisyoncular?ok=" +
+      encodeURIComponent(
+        `Komisyoncu oluşturuldu: ${username}. Kullanıcı adı ve şifreyi kendisine ilet; girişten sonra her müşteri için kendi panelinden tek kullanımlık kod üretir.`,
+      ),
+  );
 }
 
 /** İşletmeye komisyoncu bağla/kaldır (admin işletme detayından, kodla). */
@@ -1007,6 +1056,7 @@ export async function updateAgentPercent(formData: FormData) {
       id: true,
       isHead: true,
       parentId: true,
+      percent: true,
       children: { select: { percent: true } },
       parent: { select: { poolPercent: true } },
     },
@@ -1027,11 +1077,29 @@ export async function updateAgentPercent(formData: FormData) {
       err(
         `Havuz payı, ekipteki en yüksek komisyoncu oranının (%${enYuksekAlt}) altına indirilemez — önce onun oranını düşürün.`,
       );
+    // 2026-08-02 denetim: bu kutu HAVUZ diye etiketliydi ama başın KENDİ
+    // kodundan getirdiği işletmelerdeki oranını da aynı sayıya çekiyor. Terfi
+    // mesajı buraya yönlendirdiği için sessiz zam tuzağı oluşuyordu: %10'luk
+    // komisyoncu terfi edip havuz %50 yazılınca kendi 30 işletmesi de %50'ye
+    // çıkıyordu. Artık YÜKSELTME açık onay ister ve mesaj iki sayıyı da yazar.
+    const eskiOran = Number(agent!.percent);
+    const onay = String(formData.get("onay") || "") === "evet";
+    if (yeni > eskiOran && !onay)
+      err(
+        `DİKKAT: havuzu %${eskiOran} → %${yeni} yapmak, bu komisyoncunun KENDİ kodundan getirdiği işletmelerdeki oranını da %${yeni} yapar (yalnız bundan sonraki ödemelerde). Onaylıyorsan kutunun yanındaki "Kendi oranı da artsın" kutucuğunu işaretleyip tekrar kaydet.`,
+      );
     await prisma.agent.update({
       where: { id: agent!.id },
       // Baş komisyoncunun kendi oranı = havuz payı (kendi kodundan tamamını alır).
       data: { poolPercent: yeni, percent: yeni },
     });
+    revalidatePath("/admin/komisyoncular");
+    redirect(
+      "/admin/komisyoncular?ok=" +
+        encodeURIComponent(
+          `Havuz payı %${eskiOran} → %${yeni}. Bu komisyoncunun kendi kodundan gelen işletmelerdeki oranı da %${yeni} oldu (geçmiş tahakkuklar değişmez).`,
+        ),
+    );
   } else {
     // ALT komisyoncu: başının havuz payını AŞAMAZ.
     const havuz = Number(agent!.parent?.poolPercent ?? 0);
@@ -1147,6 +1215,148 @@ export async function payoutMarkPaid(formData: FormData) {
 /** Komisyoncunun "fatura mükellefi" durumunu değiştir (2026-07-31).
  *  Mükellef = ödemeye fatura keser, stopaj UYGULANMAZ. Kapatınca eşik aşan
  *  ödemelerde stopaj otomatik hesaplanır. */
+// BAŞ KOMİSYONCU YAP / GERİ AL (2026-08-02): eskiden `isHead` yalnız hesap
+// AÇILIRKEN işaretlenebiliyordu; iyi çalışan bir komisyoncuyu sonradan
+// ekip kurar hale getirmenin tek yolu hesabı silip yeniden açmaktı.
+//
+// 🔴 PARA DEĞİŞMEZİ: commission.ts `isHead`e BAKMAZ — kazanç `percent` ile,
+// baş payı ise ALT komisyoncunun `parent.poolPercent`i ile hesaplanır. Bu
+// yüzden terfi ederken poolPercent = mevcut percent yapılır: komisyoncunun
+// KENDİ kazancı kuruşu kuruşuna aynı kalır. Havuzu sonra "Havuzu güncelle"
+// kutusundan değiştirirsin. Geçmiş tahakkuklar zaten satırda donmuştur.
+export async function toggleAgentHead(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("id") || "");
+  const err = (m: string): never => {
+    redirect("/admin/komisyoncular?hata=" + encodeURIComponent(m));
+  };
+  const agent = await prisma.agent.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      isHead: true,
+      parentId: true,
+      percent: true,
+      poolPercent: true,
+      active: true,
+      user: { select: { name: true } },
+      // Ekip: geri almada AKTİF olanlar engel; pasifler ekipten çıkarılır.
+      children: {
+        select: { id: true, active: true, percent: true, user: { select: { name: true } } },
+      },
+    },
+  });
+  if (!agent)
+    redirect(
+      "/admin/komisyoncular?hata=" + encodeURIComponent("Komisyoncu bulunamadı."),
+    );
+
+  if (agent.isHead) {
+    // GERİ ALMA. AKTİF ekip üyesi varsa engel — onların havuz sahibi kalmaz,
+    // baş payı hesabı bozulur (commission.ts head.active şartı). PASİF üyeler
+    // zaten tahakkuk üretmiyor; onları ekipten ÇIKARIP (parentId=null) bağımsız
+    // komisyoncuya çeviriyoruz. 2026-08-02 denetim: eskiden pasif üye de
+    // engelliyordu ve "başka bir başa taşı" diye OLMAYAN bir yol öneriliyordu
+    // (parentId'yi değiştiren tek kod yolu yok) → ekibi olan baş sonsuza dek
+    // kilitli kalıyordu.
+    const aktifEkip = agent.children.filter((c) => c.active);
+    if (aktifEkip.length > 0)
+      err(
+        `${agent.user.name} baş komisyoncu olmaktan çıkarılamaz — ekibinde AKTİF komisyoncu var: ${aktifEkip
+          .map((c) => c.user.name)
+          .join(", ")}. Önce onları "Pasife al" ile durdur, sonra tekrar dene.`,
+      );
+    const pasifSayi = agent.children.length;
+    await prisma.$transaction(async (tx) => {
+      // Pasif ekip bağımsızlaşır: havuz sahibi kalmadığı için bağ kopar.
+      if (pasifSayi > 0)
+        await tx.agent.updateMany({
+          where: { parentId: agent.id },
+          data: { parentId: null },
+        });
+      // CAS (ev kuralı): arada başkası çevirdiyse bu yazma boşa düşsün.
+      await tx.agent.updateMany({
+        where: { id, isHead: true },
+        // poolPercent NULL'lanır; kendi oranı (percent) değişmez → kazanç aynı.
+        data: { isHead: false, poolPercent: null },
+      });
+    });
+    revalidatePath("/admin/komisyoncular");
+    redirect(
+      "/admin/komisyoncular?ok=" +
+        encodeURIComponent(
+          `${agent.user.name} normal komisyoncu yapıldı — kendi oranı %${Number(agent.percent)} olarak kaldı (bu, baş komisyoncuyken kullandığı havuz oranıdır; farklı olsun istiyorsan "Oranı güncelle" kutusundan düşür).${pasifSayi > 0 ? ` Ekibindeki ${pasifSayi} pasif komisyoncu bağımsız komisyoncuya çevrildi.` : ""}`,
+        ),
+    );
+  }
+
+  // TERFİ: 3. kademe YOK — birinin ekibindeki komisyoncu baş olamaz.
+  if (agent.parentId)
+    err(
+      `${agent.user.name} bir baş komisyoncunun ekibinde; ekip üyesi baş komisyoncu yapılamaz (3. kademe yok). Önce ekipten çıkarılmalı.`,
+    );
+  // Pasif/dondurulmuş hesaba yetki genişletilmez (denetim bulgusu): pasif
+  // komisyoncu tahakkuk almıyor ama baş olunca kendi panelinden hesap açabilir.
+  if (!agent.active)
+    err(
+      `${agent.user.name} pasif — önce "Aktive et", sonra baş komisyoncu yap.`,
+    );
+  const havuz = Number(agent.poolPercent ?? agent.percent);
+  if (!Number.isFinite(havuz) || havuz <= 0 || havuz > 100)
+    err("Havuz payı hesaplanamadı — önce komisyon oranını düzeltin.");
+  // Havuz, ekipteki en yüksek orandan düşük olamaz (updateAgentPercent'teki
+  // kuralın ikizi). Normalde terfi edenin ekibi olmaz, ama geri alınıp yeniden
+  // terfi ettirilen bir hesapta bu kapı olmazsa alt, havuzdan fazla alırdı.
+  const enYuksekAlt = agent.children.reduce(
+    (m, c) => Math.max(m, Number(c.percent)),
+    0,
+  );
+  if (havuz < enYuksekAlt)
+    err(
+      `Havuz payı (%${havuz}) ekipteki en yüksek komisyoncu oranının (%${enYuksekAlt}) altında olamaz — önce oranları düzelt.`,
+    );
+  await prisma.agent.updateMany({
+    where: { id, isHead: false },
+    data: { isHead: true, poolPercent: havuz, percent: havuz },
+  });
+  revalidatePath("/admin/komisyoncular");
+  redirect(
+    "/admin/komisyoncular?ok=" +
+      encodeURIComponent(
+        `${agent.user.name} BAŞ KOMİSYONCU yapıldı — havuz payı %${havuz} (mevcut oranı korundu, kazancı değişmedi). Artık kendi panelinden komisyoncu açabilir. DİKKAT: havuzu değiştirirsen kendi kodundan gelen işletmelerdeki oranı da aynı sayıya çıkar.`,
+      ),
+  );
+}
+
+/** ÜCRETSİZ DENEME yetkisini aç/kapat (premium toggle'ının ikizi).
+ *  Kapatmak, DAHA ÖNCE verilmiş denemeleri durdurmaz — verilen söz tutulur;
+ *  yalnız yeni kodlara deneme gömülemez. */
+export async function toggleAgentTrial(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("id") || "");
+  const agent = await prisma.agent.findUnique({
+    where: { id },
+    select: { canTrial: true, user: { select: { name: true } } },
+  });
+  if (!agent)
+    redirect(
+      "/admin/komisyoncular?hata=" + encodeURIComponent("Komisyoncu bulunamadı."),
+    );
+  await prisma.agent.updateMany({
+    where: { id, canTrial: agent.canTrial },
+    data: { canTrial: !agent.canTrial },
+  });
+  revalidatePath("/admin/komisyoncular");
+  redirect(
+    "/admin/komisyoncular?ok=" +
+      encodeURIComponent(
+        agent.canTrial
+          ? `${agent.user.name}: ücretsiz deneme yetkisi kaldırıldı (verilmiş denemeler devam eder).`
+          : `${agent.user.name}: artık ürettiği koda ${MAX_TRIAL_DAYS} güne kadar ücretsiz deneme koyabilir.`,
+      ),
+  );
+}
+
 // KOMİSYONCU ŞİFRE SIFIRLAMA (2026-08-02): resetOwnerPassword ikizi.
 // Geçici şifre mesaj banner'ında gösterilir; sessionsValidFrom mobil
 // token'ları düşürür. Komisyoncu sonra /sifre'den kendisi değiştirir.
@@ -1198,13 +1408,24 @@ export async function setAgentDiscountCap(formData: FormData) {
     geri("Tavan için önce Premium yap — indirim yetkisi olmayan komisyoncuda tavanın anlamı yok.");
   const pctRaw = String(formData.get("maxPercent") || "").replace(",", ".").trim();
   const ayRaw = String(formData.get("maxMonths") || "").trim();
+  // Deneme tavanı aynı formdan yönetilir (boş = varsayılan 30 gün).
+  const denemeRaw = String(formData.get("maxTrial") || "").trim();
+  let maxTrialDays: number | null = null;
+  if (denemeRaw) {
+    const g = trialGunOku(denemeRaw);
+    if (g == null) geri("Deneme tavanı 15 gün ya da 1 ay olabilir.");
+    maxTrialDays = g;
+  }
   if (!pctRaw && !ayRaw) {
     await prisma.agent.update({
       where: { id },
-      data: { maxDiscountPercent: null, maxDiscountMonths: null },
+      data: { maxDiscountPercent: null, maxDiscountMonths: null, maxTrialDays },
     });
     revalidatePath("/admin/komisyoncular");
-    geri(`${agent.user.name}: tavan varsayılana döndü (%20 / 12 ay).`, true);
+    geri(
+      `${agent.user.name}: indirim tavanı varsayılana döndü (%20 / 12 ay).${maxTrialDays ? ` Deneme tavanı ${maxTrialDays} gün.` : ""}`,
+      true,
+    );
   }
   const pct = Number(pctRaw);
   const ay = Number(ayRaw);
@@ -1215,11 +1436,11 @@ export async function setAgentDiscountCap(formData: FormData) {
   const pctYuvarlak = Math.round(pct * 100) / 100;
   await prisma.agent.update({
     where: { id },
-    data: { maxDiscountPercent: pctYuvarlak, maxDiscountMonths: ay },
+    data: { maxDiscountPercent: pctYuvarlak, maxDiscountMonths: ay, maxTrialDays },
   });
   revalidatePath("/admin/komisyoncular");
   geri(
-    `${agent.user.name}: indirim tavanı %${pctYuvarlak} / ${ay} ay olarak kaydedildi.`,
+    `${agent.user.name}: indirim tavanı %${pctYuvarlak} / ${ay} ay${maxTrialDays ? `, deneme tavanı ${maxTrialDays} gün` : ""} olarak kaydedildi.`,
     true,
   );
 }
@@ -1293,6 +1514,24 @@ export async function payoutReject(formData: FormData) {
  * Gönderilen ilçe kümesi bölgenin TAMAMIDIR (ekle-çıkar değil, değiştir):
  * seçilmeyenler silinir. Boş gönderim = bölgeyi kaldır.
  */
+/** Baş komisyoncunun sorumluluğundan BİR İLİ tamamen çıkarır (çok-il modu). */
+export async function removeAgentTerritoryCity(formData: FormData) {
+  await requireAdmin();
+  const agentId = String(formData.get("agentId") || "");
+  const city = String(formData.get("city") || "");
+  if (!agentId || !city)
+    redirect(
+      "/admin/komisyoncular?hata=" + encodeURIComponent("İl bulunamadı."),
+    );
+  await prisma.agentTerritory.deleteMany({ where: { agentId, city } });
+  revalidatePath("/admin/komisyoncular");
+  revalidatePath("/admin/bolgeler");
+  redirect(
+    "/admin/komisyoncular?ok=" +
+      encodeURIComponent(`${city} bölgeden çıkarıldı.`),
+  );
+}
+
 export async function setAgentTerritory(formData: FormData) {
   await requireAdmin();
   const agentId = String(formData.get("agentId") || "");
@@ -1308,13 +1547,19 @@ export async function setAgentTerritory(formData: FormData) {
 
   const agent = await prisma.agent.findUnique({
     where: { id: agentId },
-    select: { id: true },
+    select: { id: true, isHead: true },
   });
   if (!agent) err("Komisyoncu bulunamadı.");
 
-  // Tek transaction: eskiyi sil, yeniyi yaz. Yarım kalırsa bölge bozulmasın.
+  // ÇOK İL (2026-08-02): BAŞ komisyoncu birden fazla ilden sorumlu olabilir —
+  // kaydederken YALNIZ seçilen ilin satırları tazelenir, diğer iller durur.
+  // Normal komisyoncu tek il ile sınırlı (eski davranış: hepsi silinir).
   await prisma.$transaction(async (tx) => {
-    await tx.agentTerritory.deleteMany({ where: { agentId } });
+    const silmeKapsami: { agentId: string; city?: string } =
+      agent!.isHead && bolge.ok && bolge.city
+        ? { agentId, city: bolge.city }
+        : { agentId };
+    await tx.agentTerritory.deleteMany({ where: silmeKapsami });
     if (bolge.ok && bolge.city && bolge.districts.length > 0) {
       await tx.agentTerritory.createMany({
         data: bolge.districts.map((d: string) => ({

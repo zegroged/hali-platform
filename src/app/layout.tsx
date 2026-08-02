@@ -47,6 +47,11 @@ export const metadata: Metadata = {
     card: "summary_large_image",
   },
   appleWebApp: { title: "Halı Yıkama", statusBarStyle: "default" },
+  // META DOMAIN DOĞRULAMASI (2026-08-02): Business Suite → Güvenlik Merkezi →
+  // Domainler ekranının verdiği jeton. `other` sunucuda <head>'e basılır —
+  // Meta, JS ile sonradan eklenen etiketi KABUL ETMEZ, bu yüzden metadata API
+  // ile gömüldü. Doğrulama geçtikten sonra da KALMALI (silinirse düşer).
+  other: { "facebook-domain-verification": "q9ujxrc7b2y6m4d1m3g3wpydwmuj0w" },
 };
 
 export const viewport = {

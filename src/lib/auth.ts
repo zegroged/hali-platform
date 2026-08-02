@@ -72,6 +72,8 @@ function readToken(token: string): string | null {
 
 export async function createSession(userId: string): Promise<void> {
   const c = await cookies();
+  // Not: demo bileti burada SİLİNMEZ — demoyaGec bileti bu çağrıdan hemen
+  // ÖNCE bırakıyor. Girişte (login) temizlik ayrıca yapılır (route.ts).
   c.set(COOKIE, makeToken(userId), {
     httpOnly: true,
     sameSite: "strict", // server action'lara CSRF yüzeyini kapatır
@@ -81,9 +83,60 @@ export async function createSession(userId: string): Promise<void> {
   });
 }
 
+// DEMO GİRİŞİ DÖNÜŞ BİLETİ (2026-08-02) — komisyoncu dükkânda tek tıkla kendi
+// demo işletmesine geçer, dönüşte şifre sormamak için mevcut oturum jetonu bu
+// ayrı çerezde saklanır. Çerez adı ve jeton biçimi burada kapalı kalır.
+//
+// 🔴 Bilet, oturum jetonunun kendisidir: aynı imza, aynı süre kuralı. httpOnly
+// + sameSite:strict + secure; 2 saatte düşer. Kime dönüleceğine biletin
+// içindeki kimlik karar verir, ÇAĞIRAN DEĞİL — ve dönüşte rol yeniden okunur
+// (bkz. demo-actions.ts: yalnız AGENT rolüne dönülür).
+const DEMO_GERI_COOKIE = "hali_demo_geri";
+
+/** Mevcut oturumu "dönüş bileti" olarak sakla (varsa). */
+export async function demoBiletiBirak(): Promise<void> {
+  const c = await cookies();
+  const mevcut = c.get(COOKIE)?.value;
+  if (!mevcut) return;
+  c.set(DEMO_GERI_COOKIE, mevcut, {
+    httpOnly: true,
+    sameSite: "strict",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: 2 * 60 * 60,
+  });
+}
+
+/** Dönüş biletindeki kullanıcı kimliği (bileti HER durumda tüketir). */
+export async function demoBiletiKullan(): Promise<string | null> {
+  const c = await cookies();
+  const bilet = c.get(DEMO_GERI_COOKIE)?.value;
+  c.delete(DEMO_GERI_COOKIE);
+  if (!bilet) return null;
+  return readToken(bilet);
+}
+
+/** Bileti koşulsuz sil (girişte ve şifre değişiminde çağrılır). */
+export async function demoBiletiTemizle(): Promise<void> {
+  const c = await cookies();
+  c.delete(DEMO_GERI_COOKIE);
+}
+
+/** Demo oturumundayız ve dönülecek bir komisyoncu oturumu var mı? */
+export async function demoBiletiVarMi(): Promise<boolean> {
+  const c = await cookies();
+  return Boolean(c.get(DEMO_GERI_COOKIE)?.value);
+}
+
 export async function destroySession(): Promise<void> {
   const c = await cookies();
   c.delete(COOKIE);
+  // 🔴 DEMO BİLETİ DE SİLİNİR (2026-08-02 öz-denetim bulgusu): eskiden çıkışta
+  // yalnız oturum çerezi gidiyordu; bilet kalınca ORTAK KULLANILAN telefonda
+  // sonradan giren BAŞKA biri /panel'de "Komisyoncu paneline dön" şeridini
+  // görüp tek tıkla KOMİSYONCUNUN hesabına düşebiliyordu. Bilet oturumun
+  // ömrünü aşmamalı.
+  c.delete(DEMO_GERI_COOKIE);
 }
 
 // username: giriş kimliği (telefon yerine). Eski hesaplarda null olabilir —

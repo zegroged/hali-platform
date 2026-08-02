@@ -17,6 +17,9 @@ import {
   toggleFaturaMukellefi,
   payoutReject,
   resetAgentPassword,
+  toggleAgentHead,
+  toggleAgentTrial,
+  removeAgentTerritoryCity,
   setAgentDiscountCap,
 } from "../actions";
 import { PendingButton } from "@/components/PendingButton";
@@ -223,11 +226,16 @@ export default async function AdminAgents({
         </p>
       </div>
 
+      {/* BANNER (2026-08-02 denetim): eskiden HER `?ok=` mesajı "Komisyoncu
+          oluşturuldu: …" kalıbına sarılıyordu — şifre sıfırlama, tavan
+          kaydetme, baş komisyoncu terfisi gibi mesajlar saçmalıyordu.
+          Artık mesaj olduğu gibi basılır; hesap açma kendi cümlesini yazar. */}
       {ok && (
-        <p className="rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-          Komisyoncu oluşturuldu: <strong>{ok}</strong>. Kullanıcı adı ve şifreyi
-          kendisine iletin; girişten sonra her müşteri için kendi panelinden
-          tek kullanımlık kod üretir.
+        <p
+          role="status"
+          className="rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm text-emerald-800"
+        >
+          {ok}
         </p>
       )}
       {hata && (
@@ -442,6 +450,45 @@ export default async function AdminAgents({
             kaydolan işletme o süre boyunca aboneliği indirimli öder.
           </span>
         </label>
+        {/* YETKİ TAVANLARI (2026-08-02): premium verirken "yüzde kaç / kaç ay"
+            burada girilir; boş bırakılırsa platform varsayılanı %20 / 12 ay. */}
+        <div className="grid gap-3 sm:grid-cols-3">
+          <div>
+            <label className={lbl}>İndirim tavanı %</label>
+            <input
+              name="maxDiscountPercent"
+              inputMode="decimal"
+              placeholder="Varsayılan 20"
+              className={inp}
+            />
+          </div>
+          <div>
+            <label className={lbl}>İndirim süre tavanı (ay)</label>
+            <input
+              name="maxDiscountMonths"
+              inputMode="numeric"
+              placeholder="Varsayılan 12"
+              className={inp}
+            />
+          </div>
+          <div>
+            <label className={lbl}>Deneme tavanı</label>
+            <select name="maxTrialDays" defaultValue="" className={inp}>
+              <option value="">Varsayılan (1 ay)</option>
+              <option value="15">En fazla 15 gün</option>
+              <option value="30">En fazla 1 ay</option>
+            </select>
+          </div>
+        </div>
+        <label className="flex items-start gap-2 text-sm text-slate-700">
+          <input type="checkbox" name="canTrial" className="mt-0.5" />
+          <span>
+            <strong>Ücretsiz deneme yetkisi:</strong> ürettiği koda 15 günlük ya
+            da 1 aylık <em>ücretsiz</em> dönem gömebilir. Deneme süresince
+            işletme para ödemez, komisyon da işlemez — komisyoncu ancak işletme
+            ilk ödemeyi yapınca kazanır.
+          </span>
+        </label>
         <label className="flex items-start gap-2 text-sm text-slate-700">
           <input type="checkbox" name="isHead" className="mt-0.5" />
           <span>
@@ -478,8 +525,15 @@ export default async function AdminAgents({
         </p>
       ) : (
         agents.map((a) => {
-          const toplam = toplamMap.get(a.id) ?? 0;
-          const bekleyen = bekleyenMap.get(a.id) ?? 0;
+          // TOPLAMLAR = kendi payı + havuz farkı (2026-08-02 denetim): kutu
+          // yalnız `amount` topluyordu, ay-sonu ödeme talebi ise agentBalance
+          // ile kendi+havuzu topluyor. İkisi ayrışınca havaleyi elle yapan
+          // yönetici eksik tutar görüyordu.
+          const toplam = (toplamMap.get(a.id) ?? 0) + (headToplamMap.get(a.id) ?? 0);
+          const bekleyen =
+            (bekleyenMap.get(a.id) ?? 0) + (headBekleyenMap.get(a.id) ?? 0);
+          const havuzVar =
+            (headToplamMap.get(a.id) ?? 0) > 0 || (headBekleyenMap.get(a.id) ?? 0) > 0;
           const kayitlar = kayitMap.get(a.id) ?? [];
           return (
             <section
@@ -492,6 +546,8 @@ export default async function AdminAgents({
                 mevcut={a.territories}
                 ilceAdlari={ilceAdlari}
                 doluluk={doluluk}
+                cokIl={a.isHead}
+                ilKaldirAction={removeAgentTerritoryCity}
               />
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
@@ -523,6 +579,11 @@ export default async function AdminAgents({
                       {a.maxDiscountMonths ?? 12} ay
                     </span>
                   )}
+                  {a.canTrial && (
+                    <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-700">
+                      Deneme yetkili · en fazla {a.maxTrialDays ?? 30} gün
+                    </span>
+                  )}
                   {a.faturaMukellefi && (
                     <span className="rounded-full bg-sky-100 px-2.5 py-0.5 text-xs font-medium text-sky-700">
                       Fatura mükellefi (stopaj yok)
@@ -541,10 +602,26 @@ export default async function AdminAgents({
                         ? "Pasif (yönetim dondurdu)"
                         : "Pasif"}
                   </span>
+                  {/* Baş komisyoncu yap/geri al (2026-08-02). Ekip üyesi
+                      terfi edemez (3. kademe yok); ekibi olan düşürülemez. */}
+                  {!a.parent && (
+                    <form action={toggleAgentHead}>
+                      <input type="hidden" name="id" value={a.id} />
+                      <PendingButton className="rounded-lg border border-indigo-300 px-2.5 py-1 text-xs font-medium text-indigo-700 hover:bg-indigo-50">
+                        {a.isHead ? "Baş komisyoncuyu geri al" : "Baş komisyoncu yap"}
+                      </PendingButton>
+                    </form>
+                  )}
                   <form action={toggleAgentDiscount}>
                     <input type="hidden" name="id" value={a.id} />
                     <PendingButton className="rounded-lg border border-violet-300 px-2.5 py-1 text-xs font-medium text-violet-700 hover:bg-violet-50">
                       {a.canDiscount ? "Premium'u kaldır" : "Premium yap"}
+                    </PendingButton>
+                  </form>
+                  <form action={toggleAgentTrial}>
+                    <input type="hidden" name="id" value={a.id} />
+                    <PendingButton className="rounded-lg border border-emerald-300 px-2.5 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-50">
+                      {a.canTrial ? "Deneme yetkisini kaldır" : "Deneme yetkisi ver"}
                     </PendingButton>
                   </form>
                   <form action={toggleFaturaMukellefi}>
@@ -571,9 +648,21 @@ export default async function AdminAgents({
                       defaultValue={String(
                         a.isHead ? Number(a.poolPercent ?? 0) : Number(a.percent),
                       )}
-                      aria-label={a.isHead ? "Havuz payı %" : "Komisyon yüzdesi %"}
+                      aria-label={
+                        a.isHead
+                          ? "Havuz payı % (başın kendi oranı da bu olur)"
+                          : "Komisyon yüzdesi %"
+                      }
                       className="w-16 rounded-lg border border-slate-300 px-2 py-1 text-xs"
                     />
+                    {/* Havuz YÜKSELTMEK başın kendi oranını da yükseltir —
+                        sunucu bu kutucuk işaretsizken yükseltmeyi reddeder. */}
+                    {a.isHead && (
+                      <label className="flex items-center gap-1 text-xs text-slate-600">
+                        <input type="checkbox" name="onay" value="evet" />
+                        Kendi oranı da artsın
+                      </label>
+                    )}
                     <PendingButton className="rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50">
                       {a.isHead ? "Havuzu güncelle" : "Oranı güncelle"}
                     </PendingButton>
@@ -605,6 +694,16 @@ export default async function AdminAgents({
                         aria-label="İndirim süre tavanı (ay)"
                         className="w-16 rounded-lg border border-violet-300 px-2 py-1 text-xs"
                       />
+                      <select
+                        name="maxTrial"
+                        defaultValue={a.maxTrialDays ? String(a.maxTrialDays) : ""}
+                        aria-label="Deneme tavanı (gün)"
+                        className="rounded-lg border border-emerald-300 px-2 py-1 text-xs"
+                      >
+                        <option value="">Deneme: 1 ay</option>
+                        <option value="15">Deneme: 15 gün</option>
+                        <option value="30">Deneme: 1 ay</option>
+                      </select>
                       <PendingButton className="rounded-lg border border-violet-300 px-2.5 py-1 text-xs font-medium text-violet-700 hover:bg-violet-50">
                         Tavanı kaydet
                       </PendingButton>
@@ -630,17 +729,21 @@ export default async function AdminAgents({
                   <div className="text-lg font-bold text-slate-900">
                     {fmtTL(toplam)} TL
                   </div>
-                  <div className="text-xs text-slate-500">Toplam tahakkuk</div>
+                  <div className="text-xs text-slate-500">
+                    Toplam tahakkuk{havuzVar ? " (kendi + havuz)" : ""}
+                  </div>
                 </div>
                 <div className="rounded-lg bg-slate-50 p-2">
                   <div className="text-lg font-bold text-amber-700">
                     {fmtTL(bekleyen)} TL
                   </div>
-                  <div className="text-xs text-slate-500">Ödenmemiş</div>
+                  <div className="text-xs text-slate-500">
+                    Ödenmemiş{havuzVar ? " (kendi + havuz)" : ""}
+                  </div>
                 </div>
               </div>
 
-              {a.isHead && (
+              {(a.isHead || havuzVar) && (
                 <div className="rounded-xl border border-indigo-200 bg-indigo-50/50 p-3">
                   <p className="text-sm text-slate-700">
                     <strong>Ekip (havuz %{Number(a.poolPercent ?? 0)}):</strong>{" "}

@@ -51,3 +51,16 @@ export function discountUntilFromMonths(months: number): Date {
   if (d.getDate() < gun) d.setDate(0); // taştı → hedef ayın son günü
   return d;
 }
+
+// DENEME SÜRESİ (2026-08-02, kullanıcı kararı): komisyoncu satışı kapatmak için
+// ücretsiz deneme verebilir. Yalnız İKİ seçenek vardır — 15 gün ve 1 ay — ki
+// saha konuşması basit kalsın ("iki hafta mı bir ay mı?").
+export const TRIAL_SECENEKLERI = [15, 30] as const;
+/** Platform tavanı: kimse 30 günden uzun ücretsiz deneme veremez. */
+export const MAX_TRIAL_DAYS = 30;
+/** Gün sayısını geçerli seçeneğe oturtur; geçersizse null. */
+export function trialGunOku(raw: string): number | null {
+  const n = Number(String(raw || "").trim());
+  if (!Number.isInteger(n) || n <= 0) return null;
+  return (TRIAL_SECENEKLERI as readonly number[]).includes(n) ? n : null;
+}

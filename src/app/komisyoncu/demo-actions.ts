@@ -3,7 +3,12 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { getSessionUser } from "@/lib/auth";
+import {
+  getSessionUser,
+  createSession,
+  demoBiletiBirak,
+  demoBiletiKullan,
+} from "@/lib/auth";
 import { demoPaneliKur, demoPaneliSil } from "@/lib/demoPanel";
 
 // KOMİSYONCU DEMO PANELİ — aksiyonlar (2026-07-30).
@@ -121,4 +126,49 @@ export async function deleteDemoPanel() {
   }
   revalidatePath("/komisyoncu");
   redirect("/komisyoncu?demo=silindi");
+}
+
+// ---------------------------------------------------------- TEK TIK DEMO GİRİŞİ
+//
+// DERT (2026-08-02, kullanıcı): komisyoncu dükkânda demo göstermek için
+// telefonda kullanıcı adı + şifre yazmaya uğraşıyor, halıcının önünde vakit
+// kaybediyor.
+//
+// ÇÖZÜM: tek düğme. Oturum, komisyoncunun KENDİ demo işletmesinin sahibine
+// çevrilir; dönüş için eski oturum jetonu ayrı çerezde (bilet) saklanır ve
+// panelin üstünde "Komisyoncu paneline dön" şeridi çıkar.
+//
+// 🔴 GÜVENLİK SINIRLARI (bilerek dar):
+//  - Yalnız AGENT rolü çağırabilir.
+//  - Hedef, `isDemo: true` VE `referredByAgentId = kendi id'si` olan işletmenin
+//    sahibidir; kimlik DIŞARIDAN ALINMAZ, sorguyla bulunur → başka bir
+//    işletmeye geçiş imkânsız (bu bir "impersonation" ucu DEĞİLDİR).
+//  - Dönüşte rol yeniden okunur: bilet yalnız AGENT hesabına dönüş açar,
+//    banlı hesaba dönmez.
+export async function demoyaGec() {
+  const agent = await requireAgent();
+  // Pasif/dondurulmuş komisyoncu satış yapmıyor — demoya da geçemez.
+  if (!agent.active || agent.suspendedByAdmin)
+    hata("Hesabın pasif — demo panele giriş için yöneticiyle görüş.");
+  const demo = await prisma.cleanerBusiness.findFirst({
+    where: { isDemo: true, referredByAgentId: agent.id },
+    select: { ownerId: true },
+  });
+  if (!demo) hata("Önce demo panelini oluştur, sonra tek tıkla girebilirsin.");
+  await demoBiletiBirak();
+  await createSession(demo!.ownerId);
+  redirect("/panel");
+}
+
+/** Demo panelinden komisyoncu paneline dön (bileti tüketir). */
+export async function demodanDon() {
+  const agentUserId = await demoBiletiKullan();
+  if (!agentUserId) redirect("/giris");
+  const sahip = await prisma.user.findUnique({
+    where: { id: agentUserId },
+    select: { id: true, role: true, bannedAt: true },
+  });
+  if (!sahip || sahip.role !== "AGENT" || sahip.bannedAt) redirect("/giris");
+  await createSession(sahip.id);
+  redirect("/komisyoncu");
 }

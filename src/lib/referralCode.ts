@@ -26,11 +26,15 @@ export async function findUsableCode(code: string) {
   if (!row || row.usedAt || !row.agent.active) return null;
   const pct = Number(row.discountPercent ?? 0);
   const ay = row.discountMonths ?? 0;
+  const deneme = row.trialDays ?? 0;
   return {
     codeId: row.id,
     agentId: row.agent.id,
     discountPercent: pct > 0 && ay > 0 ? pct : null,
     discountMonths: pct > 0 && ay > 0 ? ay : null,
+    // ÜCRETSİZ DENEME (2026-08-02): kayıt akışı bunu görürse işletmeye TRIAL
+    // aboneliği açar. 0/None = deneme yok.
+    trialDays: deneme > 0 ? deneme : null,
   };
 }
 

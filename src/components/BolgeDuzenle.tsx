@@ -21,6 +21,11 @@ type Props = {
   doluluk: Record<string, number>;
   /** Baş komisyoncu kendi ili dışına atayamasın diye kısıt (opsiyonel). */
   sadeceIl?: string;
+  /** ÇOK İL modu (baş komisyoncu): kaydetmek yalnız SEÇİLEN ili tazeler,
+   *  diğer iller korunur; her il ayrıca tek tek kaldırılabilir. */
+  cokIl?: boolean;
+  /** Çok-il modunda bir ili tamamen kaldıran server action. */
+  ilKaldirAction?: (formData: FormData) => void | Promise<void>;
 };
 
 export default function BolgeDuzenle({
@@ -30,11 +35,19 @@ export default function BolgeDuzenle({
   ilceAdlari,
   doluluk,
   sadeceIl,
+  cokIl = false,
+  ilKaldirAction,
 }: Props) {
   const [acik, setAcik] = useState(false);
+  // İl bazında grupla — çok-il modunda birden fazla satır çıkar.
+  const iller = Array.from(new Set(mevcut.map((t) => t.city)));
+  const satirlar = iller.map((il) => ({
+    il,
+    ilceler: mevcut.filter((t) => t.city === il).map((t) => t.district),
+  }));
   const ozet =
-    mevcut.length > 0
-      ? `${mevcut[0].city} — ${mevcut.map((t) => t.district).join(", ")}`
+    satirlar.length > 0
+      ? satirlar.map((r) => `${r.il} — ${r.ilceler.join(", ")}`).join(" · ")
       : null;
 
   return (
@@ -55,9 +68,32 @@ export default function BolgeDuzenle({
           onClick={() => setAcik((v) => !v)}
           className="rounded-lg border border-slate-300 px-3 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
         >
-          {acik ? "Vazgeç" : ozet ? "Değiştir" : "Bölge ata"}
+          {acik ? "Vazgeç" : ozet ? (cokIl ? "İl ekle / değiştir" : "Değiştir") : "Bölge ata"}
         </button>
       </div>
+
+      {/* Çok-il modunda her il ayrı satır + tek tıkla kaldırma. */}
+      {cokIl && ilKaldirAction && satirlar.length > 0 && (
+        <ul className="mt-2 space-y-1">
+          {satirlar.map((r) => (
+            <li
+              key={r.il}
+              className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-slate-50 px-2.5 py-1.5"
+            >
+              <span className="min-w-0 text-xs text-slate-700">
+                <strong>{r.il}</strong> — {r.ilceler.join(", ")}
+              </span>
+              <form action={ilKaldirAction}>
+                <input type="hidden" name="agentId" value={agentId} />
+                <input type="hidden" name="city" value={r.il} />
+                <PendingButton className="rounded-lg border border-slate-300 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50">
+                  İli kaldır
+                </PendingButton>
+              </form>
+            </li>
+          ))}
+        </ul>
+      )}
 
       {acik && (
         <form action={action} className="mt-3 space-y-3">
@@ -69,8 +105,19 @@ export default function BolgeDuzenle({
             zorunlu={false}
           />
           <p className="text-xs text-slate-500">
-            Seçtiklerin bölgenin <strong>tamamı</strong> olur — seçmediğin ilçeler
-            kaldırılır. Hiçbir şey seçmeden kaydedersen bölge tamamen silinir.
+            {cokIl ? (
+              <>
+                Kaydettiğinde <strong>yalnız seçtiğin il</strong> güncellenir —
+                diğer iller olduğu gibi kalır. Yeni il eklemek için o ili seçip
+                ilçelerini işaretle ve kaydet.
+              </>
+            ) : (
+              <>
+                Seçtiklerin bölgenin <strong>tamamı</strong> olur — seçmediğin
+                ilçeler kaldırılır. Hiçbir şey seçmeden kaydedersen bölge
+                tamamen silinir.
+              </>
+            )}
           </p>
           <PendingButton className="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark">
             Bölgeyi kaydet

@@ -617,6 +617,12 @@ model Agent {
   // parentId: alt komisyoncunun baş komisyoncusu (3. kademe YOK — alt hesap açamaz).
   isHead      Boolean  @default(false)
   poolPercent Decimal? @db.Decimal(5, 2)
+  // DENEME SÜRESİ YETKİSİ (2026-08-02): canTrial olan komisyoncu ürettiği koda
+  // ÜCRETSİZ deneme gömebilir (15 veya 30 gün). maxTrialDays kişiye özel tavan
+  // (null = platform varsayılanı 30). Deneme dönemi ÖDEME değildir → komisyon
+  // işlemez; komisyoncu ancak işletme parayı ödeyince kazanır.
+  canTrial     Boolean @default(false)
+  maxTrialDays Int?
   // ADMIN DONDURDU: baş komisyoncu bunu kendi panelinden geri AÇAMAZ (inceleme
   // bulgusu — aynı `active` bayrağı kullanılınca admin kararı sessizce geri
   // alınabiliyordu). Yalnız admin kaldırır.
@@ -722,6 +728,9 @@ model AgentReferralCode {
   // kodla kaydolan işletmenin fiyatı discountMonths boyunca %discountPercent düşer.
   discountPercent Decimal? @db.Decimal(5, 2)
   discountMonths  Int?
+  // Koda gömülü ÜCRETSİZ deneme (gün). Kod bir işletmeye bağlanınca o işletmeye
+  // TRIAL aboneliği açılır; süre bitince ödeme istenir (indirimden bağımsız).
+  trialDays Int?
   createdAt DateTime  @default(now())
   usedAt    DateTime? // dolunca kod tükenmiştir
   usedByBusiness   CleanerBusiness? @relation("CodeUsedBy", fields: [usedByBusinessId], references: [id], onDelete: SetNull)

@@ -9,7 +9,12 @@ import { getSessionUser, hashPassword } from "@/lib/auth";
 import { uretKodMetni } from "@/lib/referralCode";
 import { normalizePhone, isTrPhone } from "@/lib/phone";
 import { normalizeUsername, validateUsername } from "@/lib/username";
-import { MAX_SUB_DISCOUNT, MAX_SUB_DISCOUNT_MONTHS } from "@/lib/discount";
+import {
+  MAX_SUB_DISCOUNT,
+  MAX_SUB_DISCOUNT_MONTHS,
+  MAX_TRIAL_DAYS,
+  trialGunOku,
+} from "@/lib/discount";
 
 // Komisyoncunun TEK yetkili aksiyonu: kendi adına tek kullanımlık kod üretmek.
 // Her müşteri için ayrı kod üretilir; kod bir işletmeye bağlanınca yanar.
@@ -26,6 +31,8 @@ export async function generateReferralCode(formData: FormData) {
       canDiscount: true,
       maxDiscountPercent: true,
       maxDiscountMonths: true,
+      canTrial: true,
+      maxTrialDays: true,
     },
   });
   if (!agent) redirect("/giris");
@@ -69,6 +76,23 @@ export async function generateReferralCode(formData: FormData) {
     discountMonths = ay;
   }
 
+  // ÜCRETSİZ DENEME (2026-08-02): yalnız canTrial yetkisi olan komisyoncu
+  // koda deneme gömebilir. Seçenekler 15 gün / 1 ay; kişisel tavan daha kısa
+  // olabilir. Deneme İNDİRİMDEN BAĞIMSIZDIR — ikisi aynı kodda birleşebilir
+  // (önce ücretsiz dönem işler, bitince indirimli fiyattan devam eder).
+  const denemeRaw = String(formData.get("trialDays") || "").trim();
+  let trialDays: number | null = null;
+  if (denemeRaw && denemeRaw !== "0") {
+    if (!agent.canTrial)
+      hataDon("Ücretsiz deneme tanımlama yetkin yok — yöneticiyle görüş.");
+    const gun = trialGunOku(denemeRaw);
+    if (gun == null) hataDon("Deneme süresi 15 gün ya da 1 ay olabilir.");
+    const gunTavan = Math.min(agent.maxTrialDays ?? MAX_TRIAL_DAYS, MAX_TRIAL_DAYS);
+    if (gun! > gunTavan)
+      hataDon(`En fazla ${gunTavan} günlük deneme tanımlayabilirsin.`);
+    trialDays = gun;
+  }
+
   // Spam freni: aynı anda en fazla 25 kullanılmamış kod.
   const bekleyen = await prisma.agentReferralCode.count({
     where: { agentId: agent.id, usedAt: null },
@@ -87,7 +111,7 @@ export async function generateReferralCode(formData: FormData) {
     const kod = uretKodMetni();
     try {
       await prisma.agentReferralCode.create({
-        data: { agentId: agent.id, code: kod, discountPercent, discountMonths },
+        data: { agentId: agent.id, code: kod, discountPercent, discountMonths, trialDays },
       });
       revalidatePath("/komisyoncu");
       redirect("/komisyoncu?yeni=" + encodeURIComponent(kod));
@@ -125,7 +149,15 @@ async function requireHeadAgent() {
   if (!u || u.role !== "AGENT") redirect("/giris");
   const agent = await prisma.agent.findUnique({
     where: { userId: u!.id },
-    select: { id: true, active: true, isHead: true, poolPercent: true, canDiscount: true },
+    select: {
+      id: true,
+      active: true,
+      isHead: true,
+      poolPercent: true,
+      canDiscount: true,
+      canTrial: true,
+      maxTrialDays: true,
+    },
   });
   if (!agent || !agent.isHead) redirect("/komisyoncu");
   // PASİF baş komisyoncu ekibini yönetemez (inceleme bulgusu: yalnız
@@ -164,6 +196,10 @@ export async function createSubAgent(formData: FormData) {
   // komisyoncuya indirim yetkisi verebilir — AMA yalnız KENDİSİNDE varsa.
   // Sahip olmadığı yetkiyi dağıtamaz (yetki yükseltme deliği olmasın).
   const altIndirim = formData.get("canDiscount") === "on" && head.canDiscount;
+  // DENEME YETKİSİ DEVRİ (2026-08-02): indirim yetkisiyle aynı kural — baş
+  // komisyoncu SAHİP OLMADIĞI yetkiyi dağıtamaz ve kendi tavanını aşamaz.
+  const altDeneme = formData.get("canTrial") === "on" && head.canTrial;
+  const altDenemeRaw = String(formData.get("maxTrialDays") || "").trim();
   // TAVAN: baş komisyoncu seçer, platform sınırı %20 (MAX_SUB_DISCOUNT).
   const tavanRaw = String(formData.get("maxDiscount") || "").replace(",", ".").trim();
   const ayTavanRaw = String(formData.get("maxDiscountMonths") || "").trim();
@@ -191,6 +227,16 @@ export async function createSubAgent(formData: FormData) {
     if (!Number.isInteger(a) || a <= 0 || a > MAX_SUB_DISCOUNT_MONTHS)
       hata(`İndirim süresi tavanı 1 ile ${MAX_SUB_DISCOUNT_MONTHS} ay arasında olmalı.`);
     altAyTavan = a;
+  }
+
+  let altDenemeTavan: number | null = null;
+  if (altDeneme) {
+    const headTavan = Math.min(head.maxTrialDays ?? MAX_TRIAL_DAYS, MAX_TRIAL_DAYS);
+    const g = altDenemeRaw ? trialGunOku(altDenemeRaw) : headTavan;
+    if (g == null) hata("Deneme tavanı 15 gün ya da 1 ay olabilir.");
+    if (g! > headTavan)
+      hata(`Deneme tavanı en fazla ${headTavan} gün olabilir (senin tavanın).`);
+    altDenemeTavan = g;
   }
 
   // SAYI SINIRI YOK (2026-07-26 kullanıcı kararı): baş komisyoncu istediği kadar
@@ -227,6 +273,8 @@ export async function createSubAgent(formData: FormData) {
           canDiscount: altIndirim,
           maxDiscountPercent: altTavan,
           maxDiscountMonths: altAyTavan,
+          canTrial: altDeneme,
+          maxTrialDays: altDenemeTavan,
         },
       });
       if (bolge.ok && bolge.city) {

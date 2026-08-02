@@ -15,10 +15,19 @@ import {
   setSubAgentDiscount,
   savePayoutInfo,
 } from "./actions";
-import { createDemoPanel, resetDemoPanel, deleteDemoPanel } from "./demo-actions";
+import {
+  createDemoPanel,
+  resetDemoPanel,
+  deleteDemoPanel,
+  demoyaGec,
+} from "./demo-actions";
 import { demoPaneliOku } from "@/lib/demoPanel";
 import { agentBalance } from "@/lib/payout";
-import { MAX_SUB_DISCOUNT, MAX_SUB_DISCOUNT_MONTHS } from "@/lib/discount";
+import {
+  MAX_SUB_DISCOUNT,
+  MAX_SUB_DISCOUNT_MONTHS,
+  MAX_TRIAL_DAYS,
+} from "@/lib/discount";
 import { PendingButton } from "@/components/PendingButton";
 import { ConfirmButton } from "@/app/panel/ConfirmButton";
 
@@ -326,6 +335,19 @@ export default async function KomisyoncuSayfasi({
           </>
         ) : (
           <>
+            {/* TEK TIK (2026-08-02): dükkânda kullanıcı adı/şifre yazmak
+                zor — düğme oturumu demo hesabına çevirir, panelin üstündeki
+                şeritten geri dönülür. Bilgiler aşağıda yine duruyor (başka
+                telefondan girmek isteyene). */}
+            <form action={demoyaGec} className="mt-3">
+              <PendingButton className="w-full rounded-lg bg-violet-600 px-4 py-3 text-base font-semibold text-white hover:bg-violet-700">
+                📱 Demo panelime gir (tek tık)
+              </PendingButton>
+            </form>
+            <p className="mt-1.5 text-xs text-slate-500">
+              Şifre girmene gerek yok. Demo panelinin üstünde{" "}
+              <strong>&quot;Komisyoncu paneline dön&quot;</strong> düğmesi çıkar.
+            </p>
             <dl className="mt-3 grid gap-2 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm sm:grid-cols-2">
               <div className="sm:col-span-2">
                 <dt className="text-xs text-slate-500">İşletme</dt>
@@ -587,11 +609,40 @@ export default async function KomisyoncuSayfasi({
                 </div>
               </>
             )}
+            {agent.canTrial && (
+              <div>
+                <label className="mb-1 block text-xs font-medium text-slate-600">
+                  Ücretsiz deneme
+                </label>
+                <select
+                  name="trialDays"
+                  defaultValue=""
+                  className="rounded-lg border border-emerald-300 px-2.5 py-2 text-sm focus:border-brand focus:outline-none"
+                >
+                  <option value="">Yok</option>
+                  {15 <= Math.min(agent.maxTrialDays ?? MAX_TRIAL_DAYS, MAX_TRIAL_DAYS) && (
+                    <option value="15">15 gün</option>
+                  )}
+                  {30 <= Math.min(agent.maxTrialDays ?? MAX_TRIAL_DAYS, MAX_TRIAL_DAYS) && (
+                    <option value="30">1 ay</option>
+                  )}
+                </select>
+              </div>
+            )}
             <PendingButton className="rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-dark">
               + Kod Üret
             </PendingButton>
           </form>
         </div>
+        {agent.canTrial && (
+          <p className="mt-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900">
+            <strong>Ücretsiz deneme yetkin var:</strong> koda deneme koyarsan o
+            kodla kaydolan işletme seçtiğin süre boyunca <strong>hiç ödeme
+            yapmadan</strong> yayına girer. Süre bitince normal aidat başlar.
+            Deneme süresince komisyon işlemez — kazancın işletme ilk ödemeyi
+            yaptığında başlar.
+          </p>
+        )}
         {agent.canDiscount && (
           <p className="mt-2 text-xs text-slate-500">
             <strong>Premium yetkin var:</strong> istersen koda indirim göm —
@@ -608,6 +659,11 @@ export default async function KomisyoncuSayfasi({
               <li key={k.id} className="flex items-center justify-between gap-2 py-2">
                 <span className="font-mono font-semibold text-slate-800">
                   {k.code}
+                  {(k.trialDays ?? 0) > 0 && (
+                    <span className="ml-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                      {k.trialDays === 30 ? "1 ay" : `${k.trialDays} gün`} ücretsiz
+                    </span>
+                  )}
                   {Number(k.discountPercent ?? 0) > 0 && (
                     <span className="ml-2 rounded-full bg-violet-100 px-2 py-0.5 font-sans text-xs font-medium text-violet-700">
                       %{Number(k.discountPercent).toLocaleString("tr-TR", { maximumFractionDigits: 2 })} indirim · {k.discountMonths} ay
@@ -860,6 +916,32 @@ export default async function KomisyoncuSayfasi({
                 />
               </div>
             </div>
+            {agent.canTrial && (
+              <>
+                <label className="flex items-start gap-2 text-sm text-slate-700 sm:col-span-2">
+                  <input type="checkbox" name="canTrial" className="mt-0.5" />
+                  <span>
+                    <strong>Ücretsiz deneme yetkisi ver:</strong> bu komisyoncu
+                    da ürettiği koda ücretsiz deneme dönemi koyabilsin. Deneme
+                    süresince işletme ödeme yapmaz — sana da, ona da komisyon
+                    işletme ilk parayı ödediğinde başlar.
+                  </span>
+                </label>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-slate-600">
+                    Deneme tavanı (en fazla{" "}
+                    {Math.min(agent.maxTrialDays ?? MAX_TRIAL_DAYS, MAX_TRIAL_DAYS)} gün)
+                  </label>
+                  <select name="maxTrialDays" defaultValue="" className={inp}>
+                    <option value="">Tavanım kadar</option>
+                    <option value="15">En fazla 15 gün</option>
+                    {Math.min(agent.maxTrialDays ?? MAX_TRIAL_DAYS, MAX_TRIAL_DAYS) >= 30 && (
+                      <option value="30">En fazla 1 ay</option>
+                    )}
+                  </select>
+                </div>
+              </>
+            )}
             {agent.canDiscount && (
               <>
                 <label className="flex items-start gap-2 text-sm text-slate-700 sm:col-span-2">

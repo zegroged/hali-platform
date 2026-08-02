@@ -209,6 +209,8 @@ export async function POST(req: NextRequest) {
   let agentId: string | null = null;
   let claimedCodeId: string | null = null;
   let kodIndirim: { percent: number; months: number } | null = null;
+  // Koda gömülü ÜCRETSİZ deneme (gün) — varsa kayıt sonunda TRIAL açılır.
+  let kodDeneme: number | null = null;
   const referralCode = (parsed.data.referralCode ?? "").trim().toUpperCase();
   if (referralCode) {
     // TEK KULLANIMLIK kod: önce dostane ön-kontrol, sonra atomik tüketim.
@@ -232,6 +234,7 @@ export async function POST(req: NextRequest) {
     claimedCodeId = bulunan.codeId;
     if (bulunan.discountPercent && bulunan.discountMonths)
       kodIndirim = { percent: bulunan.discountPercent, months: bulunan.discountMonths };
+    kodDeneme = bulunan.trialDays;
   }
 
   // Kod doğru + çakışma yok → kodu tüket (tekrar kullanılamaz).
@@ -296,6 +299,25 @@ export async function POST(req: NextRequest) {
   if (biz) {
     await ensureBillingCode(biz.id).catch(() => {});
     if (claimedCodeId) await attachCodeToBusiness(claimedCodeId, biz.id);
+    // ÜCRETSİZ DENEME (2026-08-02): koda gömülüyse abonelik TRIAL olarak açılır
+    // ve süre bitince kendiliğinden düşer (görünürlük filtresi canlı hesaplar).
+    // ÖDEME KAYDI OLUŞMAZ → komisyon işlemez; komisyoncu ancak işletme parayı
+    // ödediğinde kazanır. Kayıt akışını bozmasın diye hatası yutulur.
+    if (kodDeneme && kodDeneme > 0) {
+      const bitis = new Date(Date.now() + kodDeneme * 24 * 60 * 60 * 1000);
+      await prisma.subscription
+        .upsert({
+          where: { businessId: biz.id },
+          create: {
+            businessId: biz.id,
+            status: "TRIAL",
+            currentPeriodStart: new Date(),
+            currentPeriodEnd: bitis,
+          },
+          update: {},
+        })
+        .catch(() => {});
+    }
   }
 
   await createSession(owner.id);
