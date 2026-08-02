@@ -542,6 +542,7 @@ export default async function OrderManagePage({
               id: p.id,
               url: p.url,
               stage: p.stage,
+              carpetNo: p.carpetNo,
               createdAt: p.createdAt.toISOString(),
             }))}
             uploadStage={o.status === "WASHING" ? "YIKAMA" : undefined}

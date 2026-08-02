@@ -17,6 +17,7 @@ import {
   IconPlus,
   IconReceipt,
   IconRoute,
+  IconSearch,
   IconStore,
   IconTruck,
   IconWallet,
@@ -60,6 +61,13 @@ export const PANEL_SAYFALAR: PanelSayfa[] = [
     kisa: "Takip",
     aciklama: "Şoför şu an nerede",
     Icon: IconMapPin,
+  },
+  {
+    href: "/panel/halilar",
+    label: "Halı Bul",
+    kisa: "Halı Bul",
+    aciklama: "Bu kimin halısı?",
+    Icon: IconSearch,
   },
   {
     href: "/panel/mesajlar",

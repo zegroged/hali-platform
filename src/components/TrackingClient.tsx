@@ -43,7 +43,13 @@ type Track = {
   paymentMethod: string;
   estimatedDays: number | null;
   // Fotoğraflar aşamaya bağlı gelir (ALIM/YIKAMA/TESLIM); eski kayıtlarda null.
-  photos: { id: string; url: string; stage: string | null; createdAt: string }[];
+  photos: {
+    id: string;
+    url: string;
+    stage: string | null;
+    carpetNo: number | null;
+    createdAt: string;
+  }[];
   business: { name: string; phone: string };
   events: { status: OrderStatus; note: string | null; at: string }[];
   driver: { name: string; lat: number; lng: number } | null;

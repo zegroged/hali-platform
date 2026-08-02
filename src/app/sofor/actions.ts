@@ -3,7 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { bildirTeslimEdildi, bildirMusteriyeEposta } from "@/lib/orderNotify";
+import {
+  bildirAraAdim,
+  bildirTeslimEdildi,
+  bildirMusteriyeEposta,
+} from "@/lib/orderNotify";
 import { parseTutar } from "@/lib/money";
 import { getSessionUser } from "@/lib/auth";
 import { sendSms, trackingLink } from "@/lib/sms";
@@ -108,6 +112,8 @@ export async function savePickup(formData: FormData) {
   await prisma.orderEvent.create({
     data: { orderId: id, status: "PICKED_UP", note: "Halı alındı" },
   });
+  // "Halın teslim alındı" bildirimi — panel ve şoför uygulamasıyla İKİZ.
+  await bildirAraAdim(id, "alindi");
   revalidatePath("/sofor");
 }
 
@@ -121,6 +127,16 @@ export async function advanceOrder(formData: FormData) {
   if (!o) return;
   const next = DRIVER_NEXT[o.status];
   if (!next) return;
+
+  // 🔴 KESİN FİYAT ZORUNLU (2026-08-02) — panel/actions ve driverOrders ile İKİZ.
+  // Şoför fiyatı giremez; işletme paneli girer. Bu yüzden mesaj şoförü
+  // işletmeye yönlendirir. Sessizce dönmek yerine görünür hata: şoför neden
+  // ilerleyemediğini bilmeli.
+  if (o.status === "PICKED_UP" && next === "WASHING" && o.quotedPrice == null) {
+    throw new Error(
+      "Yıkamaya geçilemez: işletme henüz kesin fiyatı bildirmedi. İşletmeye haber ver, panelden tutarı girsin.",
+    );
+  }
 
   // CAS (denetim bulgusu): koşulsuz yazım, tam o sırada işletme panelden iptal
   // ederse (PICKED_UP/WASHING→CANCELED) müşteriye "iptal/ücretsiz" denmiş
@@ -151,9 +167,9 @@ export async function advanceOrder(formData: FormData) {
     });
   }
 
-  // "Yıkanmaya başladı" e-postası — panel ve şoför uygulamasıyla İKİZ.
+  // "Yıkanmaya başladı" bildirimi — panel ve şoför uygulamasıyla İKİZ.
   if (next === "WASHING") {
-    await bildirMusteriyeEposta(id, "yikama");
+    await bildirAraAdim(id, "yikama");
   }
 
   if (next === "OUT_FOR_DELIVERY") {

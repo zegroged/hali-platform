@@ -27,7 +27,13 @@ export async function GET(
       // karesini göremez. `stage` galeride "Alım/Yıkama/Teslim" etiketi olur.
       photos: {
         orderBy: { createdAt: "asc" },
-        select: { id: true, url: true, stage: true, createdAt: true },
+        select: {
+          id: true,
+          url: true,
+          stage: true,
+          carpetNo: true,
+          createdAt: true,
+        },
       },
       review: { select: { rating: true } },
     },

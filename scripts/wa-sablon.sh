@@ -15,12 +15,18 @@ LOG=/var/log/hali-wa-sablon.log
 FLAG_ESKI=/opt/hali-probe/wa-onaylandi-3-alti-sablon.flag
 FLAG_LINK=/opt/hali-probe/wa-onaylandi-4-linkli.flag
 FLAG_SEZON=/opt/hali-probe/wa-onaylandi-5-sezon.flag
+FLAG_ARA=/opt/hali-probe/wa-onaylandi-6-ara-adim.flag
 FLAG_RED=/opt/hali-probe/wa-red-uyarisi-4.flag
 GRUP_ESKI="siparis_alindi fiyat_onayi_bekleniyor siparis_hazir siparis_yolda siparis_teslim_edildi siparis_iptal"
 GRUP_LINK="siparis_alindi_link fiyat_onayi_link siparis_yolda_link siparis_teslim_link siparis_iptal_link"
 # Sezon hatirlatmasi (MARKETING, /admin/hatirlatma yonetir). Onaylanmasa da
 # sistem calisir: kod e-postaya duser.
 GRUP_SEZON="sezon_hatirlatma"
+# 2026-08-02 (v6): ARA ADIM sablonlari — "halin alindi" ve "yikamaya baslandi".
+# Kullanici karari: musteriye her adimda haber gitsin (onceden tipik akista
+# yalniz 2 mesaj gidiyordu). Kod bunlari ZATEN cagiriyor ama sessizHata ile —
+# onaylanana kadar panelde iz birakmaz, onay geldigi an mesajlar akmaya baslar.
+GRUP_ARA="hali_alindi_link yikama_basladi_link"
 TOKEN=$(grep "^WHATSAPP_TOKEN=" /opt/hali/.env | cut -d= -f2-)
 OUT=$(curl -s -m 25 "https://graph.facebook.com/v21.0/1355565982729678/message_templates?fields=name,status&limit=100" -H "Authorization: Bearer $TOKEN")
 
@@ -64,6 +70,12 @@ for S in $GRUP_SEZON; do
   [ "$D" = "APPROVED" ] || SEZON_OK=0
   [ "$D" = "REJECTED" ] && REDLER="$REDLER $S"
 done
+ARA_OK=1
+for S in $GRUP_ARA; do
+  D=$(durum "$S"); SATIR="$SATIR $S=$D"
+  [ "$D" = "APPROVED" ] || ARA_OK=0
+  [ "$D" = "REJECTED" ] && REDLER="$REDLER $S"
+done
 echo "$(date "+%F %T")$SATIR" >> $LOG
 
 # Ret bayragi ICERIK karsilastirmali (dusman denetimi bulgusu): duz "dosya var
@@ -104,4 +116,16 @@ Kod tarafinda is YOK: sendTemplateLinkli ilk denemede linkliyi kullanir.
 Su andan itibaren musteriye giden her bildirimde 'takip et / fiyati onayla'
 butonu var. Kendi ikinci telefonunuza test siparisi verip butonu dogrulayin."
   touch $FLAG_LINK
+fi
+
+if [ "$ARA_OK" = "1" ] && [ ! -f "$FLAG_ARA" ]; then
+  posta "WhatsApp: ARA ADIM sablonlari ONAYLANDI - her adimda mesaj CANLI" \
+"hali_alindi_link ve yikama_basladi_link APPROVED.
+
+Kod tarafinda is YOK. Bu andan itibaren musteriye:
+  siparis alindi -> HALI ALINDI -> fiyat onayi -> YIKAMA BASLADI ->
+  yolda -> teslim
+adimlarinin HEPSINDE WhatsApp gidiyor. Ikinci telefonunuzdan test siparisi
+verip zinciri dogrulayin."
+  touch $FLAG_ARA
 fi

@@ -7,6 +7,8 @@ export type GalleryPhoto = {
   id: string;
   url: string;
   stage?: string | null;
+  /** Halı numarası (sipariş içinde 1'den başlar) — "hangi halı kimin". */
+  carpetNo?: number | null;
   createdAt?: string | null;
 };
 
@@ -76,6 +78,13 @@ export function OrderPhotoGallery({
                     className="aspect-square w-full rounded-lg border border-slate-200 object-cover"
                   />
                 </a>
+                {/* HALI NO (2026-08-02): depoda "bu kimin halısı" bakışında
+                    fotoğrafın üstündeki numara siparişteki halıyı gösterir. */}
+                {p.carpetNo != null && (
+                  <span className="absolute left-1 top-1 rounded-md bg-slate-900/75 px-1.5 py-0.5 text-xs font-bold text-white">
+                    #{p.carpetNo}
+                  </span>
+                )}
                 {onRemove && (
                   <button
                     type="button"

@@ -244,6 +244,15 @@ export async function waGonderVeKaydet(opts: {
   etiket: string; // "Takip kodu", "Fiyat onayı", "Teslimat bilgisi"
   /** Sohbet ekranında görünecek okunur özet. Verilmezse `etiket` kullanılır. */
   metin?: string;
+  /**
+   * ŞABLONU META ONAYINDA OLAN BİLDİRİMLER İÇİN (2026-08-02).
+   * Başarısızlıkta sipariş geçmişine "gönderilemedi" satırı YAZILMAZ ve
+   * halıcıya zil ÇALMAZ — yalnız sunucu log'una düşer. Sebebi: yeni bir
+   * şablon onaylanana kadar HER siparişte hata kaydı üretmek paneli
+   * kirletir ve halıcıyı boşuna telaşlandırır. Şablon onaylandığı an
+   * mesajlar kendiliğinden gitmeye başlar (ek deploy gerekmez).
+   */
+  sessizHata?: boolean;
   gonder: () => Promise<SonucKaydi>;
 }): Promise<void> {
   if (!whatsappEnabled) return; // kapalıyken iz bırakma
@@ -328,6 +337,12 @@ export async function waGonderVeKaydet(opts: {
       }
       return;
     }
+    if (opts.sessizHata) {
+      console.warn(
+        `[whatsapp] sessiz hata (şablon onayı bekleniyor olabilir) — ${opts.etiket}: ${r.error ?? "bilinmeyen"}`,
+      );
+      return;
+    }
     await prisma.orderEvent.create({
       data: {
         orderId: opts.orderId,
@@ -373,6 +388,27 @@ export function waFiyatOnayi(
     to, "fiyat_onayi_link", [ad, isletme],
     "fiyat_onayi_bekleniyor", [ad, isletme, kod], token,
   );
+}
+
+// ---- ARA ADIM BİLDİRİMLERİ (2026-08-02 kullanıcı kararı) ----
+// Öncesinde tipik akışta müşteriye YALNIZ 2 mesaj gidiyordu (yolda + teslim);
+// "halımı aldılar mı, yıkanıyor mu" sorusu halıcıyı telefonda buluyordu.
+// Bu iki şablonun ESKİ (linksiz) karşılığı YOKTUR → sendTemplateLinkli ile
+// düşülecek yedek yok, doğrudan gönderilir. Onay gelene kadar başarısız olur;
+// çağıran taraf `sessizHata: true` verdiği için panelde gürültü yapmaz.
+
+/** Şoför halıyı teslim aldı (PICKED_UP). */
+export function waHaliAlindi(to: string, ad: string, isletme: string, token: string) {
+  return sendTemplate(to, "hali_alindi_link", [ad, isletme], {
+    butonUrlParam: token,
+  });
+}
+
+/** Yıkama başladı (WASHING). */
+export function waYikamaBasladi(to: string, ad: string, isletme: string, token: string) {
+  return sendTemplate(to, "yikama_basladi_link", [ad, isletme], {
+    butonUrlParam: token,
+  });
 }
 
 /** Yıkama bitti, teslime hazır. (Panel "hazır" düğmesi — notifyOrderReady.) */

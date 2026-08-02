@@ -1,0 +1,232 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import { redirect } from "next/navigation";
+import { getCurrentBusiness } from "@/lib/panel";
+import { prisma } from "@/lib/prisma";
+import { ORDER_STATUS_META } from "@/lib/orderStatus";
+import { photoStageLabel } from "@/lib/photoStage";
+
+export const metadata: Metadata = {
+  title: "Halı Bul",
+  robots: { index: false, follow: false },
+};
+export const dynamic = "force-dynamic";
+
+// HALI BUL — "bu kimin halısı?" (2026-08-02, işletme sahibinin isteği)
+//
+// PROBLEM: günde 200 halı yıkayan dükkânda halılar birbirine karışıyor.
+// Önce QR/barkod düşünüldü, BIRAKILDI: ıslak halıya etiket tutturmak,
+// etiket yazıcısı, iOS'ta barkod okuma derdi... Yerine FOTOĞRAF seçildi —
+// altyapı zaten vardı.
+//
+// EKSİK OLAN parça buydu: fotoğraflar siparişin İÇİNDE duruyordu, yani halıyı
+// elinde tutan kişi hangi siparişe ait olduğunu bilmeden fotoğrafı bulamıyordu.
+// Bu ekran tersini yapar: dükkândaki TÜM halıların fotoğrafını tek duvarda
+// gösterir, her karenin altında MÜŞTERİ ADI + HALI NO + sipariş kodu yazar.
+// Elindeki halıyı gözünle eşleştirir, kimin olduğunu görürsün.
+//
+// KAPSAM: yalnız "dükkânda/yolda" olan siparişler (alındı · yıkanıyor ·
+// teslimatta). Teslim edilenler listeyi şişirir, aranan halı onlar değildir.
+
+const AKTIF = ["PICKED_UP", "WASHING", "OUT_FOR_DELIVERY"] as const;
+
+const inp =
+  "w-full rounded-lg border border-slate-300 px-4 py-3 text-base focus:border-brand focus:outline-none";
+
+export default async function HalilarSayfasi({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string }>;
+}) {
+  const b = await getCurrentBusiness();
+  if (!b) redirect("/giris");
+  const { q } = await searchParams;
+  const arama = (q ?? "").trim();
+
+  // Arama sunucuda: 200 halılık dükkânda istemci tarafı filtre için tüm veriyi
+  // telefona indirmek gerekirdi. Boş aramada da liste gelir (duvar görünümü).
+  const siparisler = await prisma.order.findMany({
+    where: {
+      businessId: b.id,
+      status: { in: [...AKTIF] },
+      ...(arama
+        ? {
+            OR: [
+              { customerName: { contains: arama, mode: "insensitive" as const } },
+              { customerPhone: { contains: arama } },
+              { code: { contains: arama.toUpperCase() } },
+              { note: { contains: arama, mode: "insensitive" as const } },
+            ],
+          }
+        : {}),
+    },
+    orderBy: { createdAt: "desc" },
+    take: 200,
+    select: {
+      id: true,
+      code: true,
+      status: true,
+      customerName: true,
+      customerPhone: true,
+      createdAt: true,
+      photos: {
+        orderBy: [{ carpetNo: "asc" }, { createdAt: "asc" }],
+        select: { id: true, url: true, stage: true, carpetNo: true },
+      },
+    },
+  });
+
+  // Her fotoğraf = bir kart. Fotoğrafı olmayan sipariş de görünür ("fotoğraf
+  // yok" uyarısıyla) — aksi halde o halı bu ekranda YOK sayılır ve ekranın
+  // vaadi ("dükkândaki her halı burada") yalan olurdu.
+  type Kart = {
+    key: string;
+    orderId: string;
+    url: string | null;
+    no: number | null;
+    stage: string | null;
+    ad: string;
+    tel: string;
+    kod: string;
+    durum: (typeof AKTIF)[number];
+  };
+  const kartlar: Kart[] = [];
+  for (const o of siparisler) {
+    const ortak = {
+      orderId: o.id,
+      ad: o.customerName,
+      tel: o.customerPhone,
+      kod: o.code ?? "",
+      durum: o.status as (typeof AKTIF)[number],
+    };
+    if (o.photos.length === 0) {
+      kartlar.push({ key: `${o.id}-yok`, url: null, no: null, stage: null, ...ortak });
+      continue;
+    }
+    for (const p of o.photos) {
+      kartlar.push({
+        key: p.id,
+        url: p.url,
+        no: p.carpetNo,
+        stage: p.stage,
+        ...ortak,
+      });
+    }
+  }
+
+  const fotografsiz = kartlar.filter((k) => !k.url).length;
+
+  return (
+    <div className="space-y-4 py-4">
+      <div>
+        <h1 className="text-lg font-semibold text-slate-900">Halı Bul</h1>
+        <p className="mt-1 text-sm text-slate-600">
+          Elindeki halı kimin? Fotoğrafından bul. Dükkânda ve yolda olan{" "}
+          <strong>{siparisler.length}</strong> siparişin{" "}
+          <strong>{kartlar.filter((k) => k.url).length}</strong> halı fotoğrafı
+          burada — her karenin altında müşterinin adı ve halı numarası yazıyor.
+        </p>
+      </div>
+
+      <form method="GET" className="flex flex-wrap gap-2">
+        <input
+          name="q"
+          defaultValue={arama}
+          placeholder="Müşteri adı, telefon veya sipariş kodu"
+          aria-label="Halı ara"
+          className={`${inp} sm:max-w-sm`}
+        />
+        <button
+          type="submit"
+          className="rounded-lg bg-brand px-5 py-3 text-sm font-semibold text-white hover:bg-brand-dark"
+        >
+          Ara
+        </button>
+        {arama && (
+          <Link
+            href="/panel/halilar"
+            className="rounded-lg border border-slate-300 bg-white px-5 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          >
+            Temizle
+          </Link>
+        )}
+      </form>
+
+      {fotografsiz > 0 && (
+        <p className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <strong>{fotografsiz} siparişin hiç fotoğrafı yok.</strong> O halılar
+          karışırsa fotoğraftan bulunamaz — siparişi açıp{" "}
+          <strong>Fotoğraf ekle</strong> ile birer kare çek. Her fotoğraf
+          otomatik numara alır (#1, #2, …).
+        </p>
+      )}
+
+      {kartlar.length === 0 ? (
+        <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center">
+          <p className="font-medium text-slate-800">
+            {arama ? "Aramana uyan halı yok." : "Dükkânda bekleyen halı yok."}
+          </p>
+          <p className="mt-1 text-sm text-slate-600">
+            {arama
+              ? "Müşterinin adını, telefonunu ya da sipariş kodunu dene."
+              : "Halı alındığında (şoför ya da panelden) burada görünür."}
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+          {kartlar.map((k) => (
+            <Link
+              key={k.key}
+              href={`/panel/siparisler/${k.orderId}`}
+              className="overflow-hidden rounded-xl border border-slate-200 bg-white transition hover:border-brand"
+            >
+              <div className="relative">
+                {k.url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={k.url}
+                    alt={`${k.ad} — halı ${k.no ?? ""}`}
+                    loading="lazy"
+                    decoding="async"
+                    className="aspect-square w-full bg-slate-100 object-cover"
+                  />
+                ) : (
+                  <div className="flex aspect-square w-full items-center justify-center bg-slate-100 text-center text-xs text-slate-500">
+                    Fotoğraf yok —<br />
+                    eklemek için dokun
+                  </div>
+                )}
+                {k.no != null && (
+                  <span className="absolute left-1.5 top-1.5 rounded-md bg-slate-900/80 px-2 py-0.5 text-sm font-bold text-white">
+                    #{k.no}
+                  </span>
+                )}
+                {k.stage && (
+                  <span className="absolute right-1.5 top-1.5 rounded-md bg-white/90 px-1.5 py-0.5 text-xs font-medium text-slate-700">
+                    {photoStageLabel(k.stage)}
+                  </span>
+                )}
+              </div>
+              <div className="p-2.5">
+                <p className="truncate font-semibold text-slate-900">{k.ad}</p>
+                <p className="truncate text-xs text-slate-500">
+                  {k.kod ? `${k.kod} · ` : ""}
+                  {k.tel}
+                </p>
+                <span className="mt-1.5 inline-block rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700">
+                  {ORDER_STATUS_META[k.durum].label}
+                </span>
+              </div>
+            </Link>
+          ))}
+        </div>
+      )}
+
+      <p className="text-xs text-slate-500">
+        Halı numarası, o siparişe yüklediğin fotoğrafların sırasıdır: bir
+        müşterinin 5 halısı varsa #1…#5. Şoförün alım/teslim kanıt fotoğrafları
+        numaralanmaz — onlar yükün tamamının karesidir.
+      </p>
+    </div>
+  );
+}

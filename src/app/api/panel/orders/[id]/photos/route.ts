@@ -49,6 +49,16 @@ export async function POST(
     return NextResponse.json({ error: "Sipariş bulunamadı" }, { status: 404 });
   }
 
+  // HALI NUMARASI (2026-08-02): panelden yüklenen her fotoğraf BİR HALI sayılır
+  // ve sipariş içinde 1'den başlayarak numaralanır. Depoda "bu kimin halısı"
+  // sorusu /panel/halilar ekranında bu numara + fotoğraf + müşteri adıyla
+  // cevaplanıyor. Şoförün alım/teslim kanıt fotoğrafları numaralanmaz.
+  const sonNo = await prisma.orderPhoto.aggregate({
+    where: { orderId: order.id },
+    _max: { carpetNo: true },
+  });
+  let siradakiNo = (sonNo._max.carpetNo ?? 0) + 1;
+
   const form = await req.formData();
   // AŞAMA (2026-07-30): panelden YALNIZ "YIKAMA" etiketlenebilir. Alım/teslim
   // fotoğrafı şoför akışında zorunlu çekilen KANIT'tır; panelden o etiketin
@@ -88,8 +98,14 @@ export async function POST(
         img.contentType,
       );
       const row = await prisma.orderPhoto.create({
-        data: { orderId: order.id, url, stage },
-        select: { id: true, url: true, stage: true, createdAt: true },
+        data: { orderId: order.id, url, stage, carpetNo: siradakiNo++ },
+        select: {
+          id: true,
+          url: true,
+          stage: true,
+          carpetNo: true,
+          createdAt: true,
+        },
       });
       created.push(row);
     } catch (e) {

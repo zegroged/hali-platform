@@ -4,7 +4,11 @@
 // aynı bildirim/SMS yan etkileri. Web actions.ts'e dokunmadan (risk yok) burada
 // paralel tutulur; ileride actions.ts de buraya bağlanabilir.
 import { prisma } from "@/lib/prisma";
-import { bildirTeslimEdildi, bildirMusteriyeEposta } from "@/lib/orderNotify";
+import {
+  bildirAraAdim,
+  bildirTeslimEdildi,
+  bildirMusteriyeEposta,
+} from "@/lib/orderNotify";
 import { getAuthedUser } from "@/lib/auth";
 import { saveOrderPhotoFile } from "@/lib/orderPhoto";
 import { sendSms, trackingLink } from "@/lib/sms";
@@ -140,6 +144,8 @@ export async function driverPickup(
   await prisma.orderEvent.create({
     data: { orderId, status: "PICKED_UP", note: "Halı alındı" },
   });
+  // "Halın teslim alındı" bildirimi — panel ve şoför web ile İKİZ.
+  await bildirAraAdim(orderId, "alindi");
   return { ok: true };
 }
 
@@ -156,6 +162,7 @@ export async function driverAdvance(
       code: true,
       status: true,
       priceApprovedAt: true,
+      quotedPrice: true,
       customerPhone: true,
       customerName: true,
       trackingToken: true,
@@ -166,6 +173,15 @@ export async function driverAdvance(
   if (!o) return { ok: false, error: "Bu adım şu an yapılamıyor.", code: 409 };
   const next = DRIVER_NEXT[o.status];
   if (!next) return { ok: false, error: "Sıradaki adım yok.", code: 409 };
+  // 🔴 KESİN FİYAT ZORUNLU (2026-08-02) — panel/actions ve sofor/actions ile İKİZ.
+  if (o.status === "PICKED_UP" && next === "WASHING" && o.quotedPrice == null) {
+    return {
+      ok: false,
+      error:
+        "Yıkamaya geçilemez: işletme henüz kesin fiyatı bildirmedi. İşletmeye haber ver, panelden tutarı girsin.",
+      code: 409,
+    };
+  }
   const r = await prisma.order.updateMany({
     where: { id: orderId, driverId, status: o.status },
     data: { status: next },
@@ -193,9 +209,9 @@ export async function driverAdvance(
     // WhatsApp vardı ama e-posta HİÇ yoktu — uygulamadan ilerletilen sipariş
     // yola çıktığında müşteriye e-posta gitmiyordu).
   }
-  // "Yıkanmaya başladı" e-postası — panel ve şoför web ile İKİZ.
+  // "Yıkanmaya başladı" bildirimi — panel ve şoför web ile İKİZ.
   if (next === "WASHING") {
-    await bildirMusteriyeEposta(orderId, "yikama");
+    await bildirAraAdim(orderId, "yikama");
   }
   if (next === "OUT_FOR_DELIVERY") {
     await bildirMusteriyeEposta(orderId, "yolda");

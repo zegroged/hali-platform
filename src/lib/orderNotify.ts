@@ -4,8 +4,10 @@ import { sendEmail, wrapEmail } from "@/lib/email";
 import { getAppBaseUrl } from "@/lib/config";
 import {
   waGonderVeKaydet,
+  waHaliAlindi,
   waSiparisIptal,
   waSiparisTeslim,
+  waYikamaBasladi,
 } from "@/lib/whatsapp";
 
 // SİPARİŞ KESİNTİ BİLDİRİMLERİ (2026-07-28 denetim — KRİTİK bulgular).
@@ -223,7 +225,7 @@ export async function bildirTeslimEdildi(orderId: string): Promise<void> {
  */
 export async function bildirMusteriyeEposta(
   orderId: string,
-  olay: "fiyat-onayi" | "yolda" | "yikama",
+  olay: "fiyat-onayi" | "yolda" | "yikama" | "alindi",
 ): Promise<void> {
   try {
     const order = await prisma.order.findUnique({
@@ -241,7 +243,18 @@ export async function bildirMusteriyeEposta(
     const url = `${getAppBaseUrl()}/takip/${order.trackingToken}`;
 
     const icerik =
-      olay === "yikama"
+      olay === "alindi"
+        ? {
+            // "Halın alındı" (2026-08-02): müşterinin en çok sorduğu adım.
+            konu: `Halın teslim alındı (${kod})`,
+            duz: `${order.business.name} halını teslim aldı. Ölçüm sonrası kesin fiyat onayına gönderilecek. Takip: ${url}`,
+            html: `<p style="margin:0 0 12px;">Merhaba ${esc(order.customerName)},</p>
+              <p style="margin:0 0 12px;"><strong>${esc(order.business.name)}</strong> halını teslim aldı.</p>
+              <p style="margin:0 0 16px;">Sırada ölçüm var: kesin fiyat çıkınca onayına göndereceğiz. <strong>Sen onaylamadan yıkama başlamaz.</strong></p>
+              <p style="margin:0 0 16px;"><a href="${url}" style="display:inline-block;background-color:#0f766e;color:#ffffff;text-decoration:none;font-weight:bold;padding:12px 24px;border-radius:8px;">Siparişimi takip et</a></p>`,
+            etiket: "Alım bilgisi",
+          }
+        : olay === "yikama"
         ? {
             // "Yıkanmaya başladı" (2026-07-30, bildirim paketinin son parçası).
             // WhatsApp şablonu YOK (siparis_hazir farklı bir adımı anlatıyor,
@@ -285,5 +298,67 @@ export async function bildirMusteriyeEposta(
     );
   } catch (e) {
     console.error("[musteri-eposta] hata:", e);
+  }
+}
+
+/**
+ * ARA ADIM BİLDİRİMİ — "halın alındı" (PICKED_UP) ve "yıkama başladı" (WASHING).
+ *
+ * NEDEN AYRI FONKSİYON (2026-08-02): bu iki adımda müşteriye HİÇBİR bildirim
+ * gitmiyordu; tipik akışta müşteri yalnız 2 mesaj alıyordu (yolda + teslim) ve
+ * aradaki günlerde "halım ne oldu" diye halıcıyı arıyordu. Bildirimi tek yere
+ * koyup üç akışın da (panel · şoför web · şoför uygulaması) buradan çağırması
+ * İKİZ MANTIK kuralının gereği — bu projede aynı hata bir kez WhatsApp
+ * bildirimlerinde yaşandı ve asıl akış olan şoför yolundan giden siparişlerde
+ * müşteriye hiçbir şey gitmedi (DEVIR §9/7).
+ *
+ * WhatsApp şablonları (`hali_alindi_link`, `yikama_basladi_link`) Meta onayına
+ * 2026-08-02'de gönderildi. Onaylanana kadar gönderim başarısız olur ama
+ * `sessizHata` sayesinde panelde iz bırakmaz; e-posta zaten gider. Onay geldiği
+ * an mesajlar kendiliğinden akmaya başlar — EK DEPLOY GEREKMEZ.
+ */
+export async function bildirAraAdim(
+  orderId: string,
+  adim: "alindi" | "yikama",
+): Promise<void> {
+  await bildirMusteriyeEposta(orderId, adim);
+  try {
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      select: {
+        customerName: true,
+        customerPhone: true,
+        trackingToken: true,
+        business: { select: { name: true, ownerId: true } },
+      },
+    });
+    if (!order) return;
+    await waGonderVeKaydet({
+      orderId,
+      status: adim === "alindi" ? "PICKED_UP" : "WASHING",
+      ownerUserId: order.business.ownerId,
+      etiket: adim === "alindi" ? "Alım bilgisi" : "Yıkama bilgisi",
+      metin:
+        adim === "alindi"
+          ? "Halınız teslim alındı; ölçüm sonrası kesin fiyat onayınıza gönderilecek."
+          : "Halınızın yıkama işlemi başladı.",
+      sessizHata: true,
+      gonder: () =>
+        adim === "alindi"
+          ? waHaliAlindi(
+              order.customerPhone,
+              order.customerName,
+              order.business.name,
+              order.trackingToken,
+            )
+          : waYikamaBasladi(
+              order.customerPhone,
+              order.customerName,
+              order.business.name,
+              order.trackingToken,
+            ),
+    });
+  } catch (e) {
+    console.error("[ara-adim] hata:", e);
   }
 }

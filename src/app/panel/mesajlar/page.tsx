@@ -4,6 +4,7 @@ import { getCurrentBusiness } from "@/lib/panel";
 import EmptyState from "@/components/EmptyState";
 import { IconWhatsApp } from "@/components/icons";
 import WhatsAppReply from "@/components/WhatsAppReply";
+import { waTelefonAdaylari } from "@/lib/whatsapp";
 
 // GELEN KUTUSU (2026-07-29): müşterinin WhatsApp'tan yazdığı mesajlar eskiden
 // YALNIZ webhook log'una düşüyordu — halıcı ne görüyordu ne cevaplayabiliyordu.
@@ -102,7 +103,11 @@ export default async function MesajlarSayfasi({
   type Kayit = (typeof sonMesajlar)[number];
   type Sohbet = {
     phone: string;
+    /** WhatsApp profil adı — yalnız GELEN mesajda gelir, müşterinin bize
+     *  verdiği ad olmak zorunda değil ("Ahmet", "Baba", boş...). */
     ad: string | null;
+    /** Siparişteki GERÇEK müşteri adı (asıl kimlik). */
+    musteriAdi: string | null;
     son: Kayit;
     okunmamis: number;
     siparis: { id: string; code: string | null } | null;
@@ -114,7 +119,14 @@ export default async function MesajlarSayfasi({
   for (const m of tumu) {
     let s = harita.get(m.phone);
     if (!s) {
-      s = { phone: m.phone, ad: null, son: m, okunmamis: 0, siparis: null };
+      s = {
+        phone: m.phone,
+        ad: null,
+        musteriAdi: null,
+        son: m,
+        okunmamis: 0,
+        siparis: null,
+      };
       harita.set(m.phone, s);
     }
     if (!s.ad && m.name) s.ad = m.name;
@@ -122,6 +134,60 @@ export default async function MesajlarSayfasi({
     if (m.direction === "IN" && !m.readAt) s.okunmamis++;
   }
   const sohbetler = [...harita.values()];
+
+  // 🔴 KİMLİK EŞLEŞTİRME (2026-08-02, kullanıcı isteği: "sadece numara yazıyor,
+  // isim soyisim eşleştirmemiz gerekiyor, karışıklık olur").
+  //
+  // Önceki durumda ekranda ya WhatsApp PROFİL adı ya da çıplak numara vardı:
+  // - Giden bildirimle başlayan sohbette profil adı HİÇ gelmiyor (yalnız IN
+  //   mesajlarda geliyor) → halıcı yalnız numara görüyordu.
+  // - Gelse bile profil adı müşterinin bize verdiği ad değil ("Baba", "Ahmet")
+  //   → halıcı kiminle konuştuğunu numaradan çıkarmak zorundaydı.
+  //
+  // Artık numara, BU İŞLETMENİN siparişlerindeki müşteri adıyla eşleştiriliyor.
+  // `waTelefonAdaylari` TR dışı numarada BOŞ liste döner → yanlış eşleşme yerine
+  // eşleşmemeyi seçer (aynı ilke gelen mesaj yönlendirmesinde de var).
+  const adaylarHaritasi = new Map<string, string[]>();
+  const tumAdaylar: string[] = [];
+  for (const s of sohbetler) {
+    const a = waTelefonAdaylari(s.phone);
+    adaylarHaritasi.set(s.phone, a);
+    tumAdaylar.push(...a);
+  }
+  const musteriSiparisleri = tumAdaylar.length
+    ? await prisma.order.findMany({
+        where: { businessId: b.id, customerPhone: { in: tumAdaylar } },
+        orderBy: { createdAt: "desc" },
+        select: { id: true, code: true, customerPhone: true, customerName: true },
+      })
+    : [];
+  // En yeni sipariş kazanır (sorgu desc; ilk yazan kalır).
+  const kimlikler = new Map<
+    string,
+    { ad: string; siparis: { id: string; code: string | null } }
+  >();
+  for (const o of musteriSiparisleri) {
+    if (!kimlikler.has(o.customerPhone)) {
+      kimlikler.set(o.customerPhone, {
+        ad: o.customerName,
+        siparis: { id: o.id, code: o.code },
+      });
+    }
+  }
+  for (const s of sohbetler) {
+    for (const aday of adaylarHaritasi.get(s.phone) ?? []) {
+      const k = kimlikler.get(aday);
+      if (!k) continue;
+      s.musteriAdi = k.ad;
+      // Mesaj hiçbir siparişe bağlanmamışsa (eski kayıt) müşterinin son
+      // siparişini göster — halıcı tek dokunuşla siparişe geçebilsin.
+      if (!s.siparis) s.siparis = k.siparis;
+      break;
+    }
+  }
+  const seciliKimlik = seciliTel
+    ? (sohbetler.find((s) => s.phone === seciliTel) ?? null)
+    : null;
 
   // Açık sohbetin TAM geçmişi. 🔴 businessId olmadan ASLA sorgulanmaz.
   const mesajlar = seciliTel
@@ -208,14 +274,27 @@ export default async function MesajlarSayfasi({
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
+                        {/* Kimlik sırası: siparişteki müşteri adı → WhatsApp
+                            profil adı → numara. Numara HER ZAMAN altta yazar
+                            (aynı ada sahip iki müşteri karışmasın). */}
                         <p className="truncate font-medium text-slate-900">
-                          {s.ad ?? telGoster(s.phone)}
+                          {s.musteriAdi ?? s.ad ?? telGoster(s.phone)}
                         </p>
-                        {s.ad && (
-                          <p className="text-xs text-slate-500">
-                            {telGoster(s.phone)}
-                          </p>
-                        )}
+                        <p className="truncate text-xs text-slate-500">
+                          {telGoster(s.phone)}
+                          {s.musteriAdi && s.ad && s.ad !== s.musteriAdi && (
+                            <span className="text-slate-400">
+                              {" "}
+                              · WhatsApp: {s.ad}
+                            </span>
+                          )}
+                          {!s.musteriAdi && (
+                            <span className="text-amber-700">
+                              {" "}
+                              · kayıtlı müşteri değil
+                            </span>
+                          )}
+                        </p>
                       </div>
                       <div className="shrink-0 text-right">
                         <p className="text-xs text-slate-400">
@@ -268,10 +347,18 @@ export default async function MesajlarSayfasi({
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div>
                     <p className="font-semibold text-slate-900">
-                      {seciliAd ?? telGoster(seciliTel)}
+                      {seciliKimlik?.musteriAdi ?? seciliAd ?? telGoster(seciliTel)}
                     </p>
                     <p className="text-sm text-slate-500">
                       {telGoster(seciliTel)}
+                      {seciliKimlik?.musteriAdi &&
+                        seciliAd &&
+                        seciliAd !== seciliKimlik.musteriAdi && (
+                          <span className="text-slate-400">
+                            {" "}
+                            · WhatsApp adı: {seciliAd}
+                          </span>
+                        )}
                     </p>
                   </div>
                   <div className="flex items-center gap-3 text-sm">

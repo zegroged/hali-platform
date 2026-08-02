@@ -4,7 +4,12 @@ import crypto from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { bildirSiparisKesintisi, bildirTeslimEdildi, bildirMusteriyeEposta } from "@/lib/orderNotify";
+import {
+  bildirAraAdim,
+  bildirSiparisKesintisi,
+  bildirTeslimEdildi,
+  bildirMusteriyeEposta,
+} from "@/lib/orderNotify";
 import { parseTutar } from "@/lib/money";
 import { getCurrentBusiness, profileComplete, syncVisibility } from "@/lib/panel";
 import { hashPassword } from "@/lib/auth";
@@ -681,6 +686,17 @@ export async function advanceOrderPanel(formData: FormData) {
   const step = PANEL_NEXT[order.status];
   if (!step) return;
 
+  // 🔴 KESİN FİYAT BİLDİRİMİ ZORUNLU (2026-08-02 kullanıcı kararı).
+  // Öncesinde "Kesin fiyat bildir" isteğe bağlıydı; atlandığında müşteriye
+  // fiyat onayı mesajı HİÇ gitmiyordu (tipik akışta yalnız 2 bildirim kalması
+  // bundandı) ve teslimde tutar tartışması ispatsız kalıyordu. Artık ölçüm
+  // yapılmadan yıkamaya geçilemez.
+  if (order.status === "PICKED_UP" && step.next === "WASHING" && order.quotedPrice == null) {
+    throw new Error(
+      "Yıkamaya geçmeden önce KESİN FİYAT bildirmelisin. Halıyı ölç, aşağıdaki \"Kesin fiyat bildir\" alanına tutarı gir — müşteriye onay bildirimi gitsin.",
+    );
+  }
+
   // md.15/1-h: dijital fiyat onayı yokken yıkamaya geçiş, ancak işletmenin
   // "sözlü onay aldım" beyanıyla mümkündür — beyan zaman damgalı kayda geçer.
   const verbalConsent = formData.get("verbalConsent") != null;
@@ -734,11 +750,14 @@ export async function advanceOrderPanel(formData: FormData) {
   // WASHING→OUT_FOR_DELIVERY tanımlıyor; DELIVERED buradan hiç geçmiyor.
   // Panelden teslim `deliverOrderPanel` ile yapılıyor — kayıt oraya taşındı.
 
-  // "Yıkanmaya başladı" e-postası (2026-07-30, bildirim paketinin son parçası).
-  // ⚠️ İKİZ KURAL: aynı çağrı şoför web (sofor/actions) ve şoför uygulaması
+  // ARA ADIM BİLDİRİMLERİ (e-posta + WhatsApp).
+  // ⚠️ İKİZ KURAL: aynı çağrılar şoför web (sofor/actions) ve şoför uygulaması
   // (lib/driverOrders) yollarında da var — üçü birlikte değişir.
+  if (step.next === "PICKED_UP") {
+    await bildirAraAdim(orderId, "alindi");
+  }
   if (step.next === "WASHING") {
-    await bildirMusteriyeEposta(orderId, "yikama");
+    await bildirAraAdim(orderId, "yikama");
   }
 
   if (step.next === "OUT_FOR_DELIVERY") {
