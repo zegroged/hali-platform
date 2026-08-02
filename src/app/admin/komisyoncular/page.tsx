@@ -427,6 +427,16 @@ export default async function AdminAgents({
             <input name="password" required minLength={8} className={inp} />
           </div>
           <div>
+            <label className={lbl}>E-posta (şifre kurtarma için)</label>
+            <input name="email" type="email" className={inp} placeholder="ornek@eposta.com" />
+            <p className="mt-1 text-xs text-slate-500">
+              Boş bırakabilirsin ama <strong>şiddetle önerilir</strong>: e-postası
+              olmayan komisyoncu şifresini unutursa kendi kendine yenileyemez,
+              seni aramak zorunda kalır. Komisyoncu sonradan kendi panelinden de
+              ekleyip doğrulayabilir.
+            </p>
+          </div>
+          <div>
             <label className={lbl}>
               Komisyon yüzdesi (KDV hariç net üzerinden)
             </label>
@@ -669,7 +679,7 @@ export default async function AdminAgents({
                   </form>
                   {/* İndirim tavanı (yalnız premium): boş+boş = varsayılana dön.
                       Admin %20/12 ayın üstüne çıkabilir — bilinçli yetki. */}
-                  {a.canDiscount && (
+                  {(a.canDiscount || a.canTrial) && (
                     <form action={setAgentDiscountCap} className="flex items-center gap-1">
                       <input type="hidden" name="id" value={a.id} />
                       <input
@@ -700,7 +710,7 @@ export default async function AdminAgents({
                         aria-label="Deneme tavanı (gün)"
                         className="rounded-lg border border-emerald-300 px-2 py-1 text-xs"
                       >
-                        <option value="">Deneme: 1 ay</option>
+                        <option value="">Deneme: varsayılan (1 ay)</option>
                         <option value="15">Deneme: 15 gün</option>
                         <option value="30">Deneme: 1 ay</option>
                       </select>

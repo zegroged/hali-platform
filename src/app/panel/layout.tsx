@@ -38,7 +38,7 @@ export default async function PanelLayout({
   return (
     <div className="min-h-screen bg-slate-50">
       {demodaMi && (
-        <div className="bg-violet-600 px-4 py-2 text-white">
+        <div className="sticky top-0 z-30 bg-violet-600 px-4 py-2 text-white">
           <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-2 lg:max-w-5xl">
             <p className="text-sm font-medium">
               🧪 Demo panelindesin — buradaki hiçbir şey gerçek değil.

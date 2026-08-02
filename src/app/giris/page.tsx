@@ -155,6 +155,12 @@ export default function GirisPage() {
           </button>
         </form>
 
+        <p className="mt-3 text-sm">
+          <Link href="/sifremi-unuttum" className="text-brand-dark underline">
+            Şifremi unuttum
+          </Link>
+        </p>
+
         <p className="mt-3 text-xs text-slate-500">
           Şoförsün ve giriş bilgini bilmiyor musun? Kullanıcı adını çalıştığın
           işletmeden öğrenebilirsin.

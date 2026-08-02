@@ -236,6 +236,11 @@ export async function POST(req: NextRequest) {
       kodIndirim = { percent: bulunan.discountPercent, months: bulunan.discountMonths };
     kodDeneme = bulunan.trialDays;
   }
+  // Deneme bitişi create'ten ÖNCE hesaplanır: indirim penceresi buradan başlar.
+  const denemeBitis =
+    kodDeneme && kodDeneme > 0
+      ? new Date(Date.now() + kodDeneme * 24 * 60 * 60 * 1000)
+      : null;
 
   // Kod doğru + çakışma yok → kodu tüket (tekrar kullanılamaz).
   await prisma.signupOtp.delete({ where: { email } });
@@ -266,7 +271,10 @@ export async function POST(req: NextRequest) {
           ...(kodIndirim
             ? {
                 discountPercent: kodIndirim.percent,
-                discountUntil: discountUntilFromMonths(kodIndirim.months),
+                discountUntil: discountUntilFromMonths(
+                  kodIndirim.months,
+                  denemeBitis,
+                ),
                 // İndirimi VEREN komisyoncu: yarısı onun komisyonundan düşer.
                 discountGrantedByAgentId: agentId,
               }
@@ -303,8 +311,8 @@ export async function POST(req: NextRequest) {
     // ve süre bitince kendiliğinden düşer (görünürlük filtresi canlı hesaplar).
     // ÖDEME KAYDI OLUŞMAZ → komisyon işlemez; komisyoncu ancak işletme parayı
     // ödediğinde kazanır. Kayıt akışını bozmasın diye hatası yutulur.
-    if (kodDeneme && kodDeneme > 0) {
-      const bitis = new Date(Date.now() + kodDeneme * 24 * 60 * 60 * 1000);
+    if (denemeBitis) {
+      const bitis = denemeBitis;
       await prisma.subscription
         .upsert({
           where: { businessId: biz.id },

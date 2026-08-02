@@ -155,6 +155,10 @@ async function requireHeadAgent() {
       isHead: true,
       poolPercent: true,
       canDiscount: true,
+      // Kendi indirim tavanı (denetim: seçilmiyordu → baş, admin'in kendisine
+      // koyduğu %5 tavana rağmen altına %20 verebiliyordu).
+      maxDiscountPercent: true,
+      maxDiscountMonths: true,
       canTrial: true,
       maxTrialDays: true,
     },
@@ -219,13 +223,23 @@ export async function createSubAgent(formData: FormData) {
   let altTavan: number | null = null;
   let altAyTavan: number | null = null;
   if (altIndirim) {
+    // TAVANIN TAVANI: baş komisyoncu KENDİ tavanını aşan yetki dağıtamaz
+    // (denetim bulgusu: yalnız platform sınırına bakılıyordu).
+    const kendiTavan = Math.min(
+      Number(head.maxDiscountPercent ?? MAX_SUB_DISCOUNT),
+      MAX_SUB_DISCOUNT,
+    );
+    const kendiAyTavan = Math.min(
+      head.maxDiscountMonths ?? MAX_SUB_DISCOUNT_MONTHS,
+      MAX_SUB_DISCOUNT_MONTHS,
+    );
     const t = Number(tavanRaw);
-    if (!Number.isFinite(t) || t <= 0 || t > MAX_SUB_DISCOUNT)
-      hata(`İndirim tavanı 1 ile ${MAX_SUB_DISCOUNT} arasında olmalı.`);
+    if (!Number.isFinite(t) || t <= 0 || t > kendiTavan)
+      hata(`İndirim tavanı 1 ile ${kendiTavan} arasında olmalı (senin tavanın).`);
     altTavan = Math.round(t * 100) / 100;
     const a = Number(ayTavanRaw);
-    if (!Number.isInteger(a) || a <= 0 || a > MAX_SUB_DISCOUNT_MONTHS)
-      hata(`İndirim süresi tavanı 1 ile ${MAX_SUB_DISCOUNT_MONTHS} ay arasında olmalı.`);
+    if (!Number.isInteger(a) || a <= 0 || a > kendiAyTavan)
+      hata(`İndirim süresi tavanı 1 ile ${kendiAyTavan} ay arasında olmalı (senin tavanın).`);
     altAyTavan = a;
   }
 

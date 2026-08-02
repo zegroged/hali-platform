@@ -20,6 +20,7 @@ import {
   resetDemoPanel,
   deleteDemoPanel,
   demoyaGec,
+  demoSoforaGec,
 } from "./demo-actions";
 import { demoPaneliOku } from "@/lib/demoPanel";
 import { agentBalance } from "@/lib/payout";
@@ -339,14 +340,23 @@ export default async function KomisyoncuSayfasi({
                 zor — düğme oturumu demo hesabına çevirir, panelin üstündeki
                 şeritten geri dönülür. Bilgiler aşağıda yine duruyor (başka
                 telefondan girmek isteyene). */}
-            <form action={demoyaGec} className="mt-3">
-              <PendingButton className="w-full rounded-lg bg-violet-600 px-4 py-3 text-base font-semibold text-white hover:bg-violet-700">
-                📱 Demo panelime gir (tek tık)
-              </PendingButton>
-            </form>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              <form action={demoyaGec}>
+                <PendingButton className="w-full rounded-lg bg-violet-600 px-4 py-3 text-base font-semibold text-white hover:bg-violet-700">
+                  🏪 Demo halıcı paneli
+                </PendingButton>
+              </form>
+              <form action={demoSoforaGec}>
+                <PendingButton className="w-full rounded-lg bg-violet-600 px-4 py-3 text-base font-semibold text-white hover:bg-violet-700">
+                  🚚 Demo şoför ekranı
+                </PendingButton>
+              </form>
+            </div>
             <p className="mt-1.5 text-xs text-slate-500">
-              Şifre girmene gerek yok. Demo panelinin üstünde{" "}
+              Şifre girmene gerek yok — tek tık. İkisinin de üstünde{" "}
               <strong>&quot;Komisyoncu paneline dön&quot;</strong> düğmesi çıkar.
+              Halıcıya önce paneli, sonra şoförün ekranını göster: iş nasıl
+              düşüyor, fotoğrafı nasıl çekiyor, teslimi nasıl kapatıyor.
             </p>
             <dl className="mt-3 grid gap-2 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm sm:grid-cols-2">
               <div className="sm:col-span-2">

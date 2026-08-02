@@ -42,10 +42,15 @@ export function effectiveSubscriptionGross(b: DiscountLike): {
   return { gross: gross < 1 ? 0 : gross, pct };
 }
 
-/** Kod/admin "kaç ay" girdisinden bitiş tarihi (şimdiden itibaren).
- *  Ay sonu taşmasını kelepçeler: 31 Oca + 1 ay = 28/29 Şub (3 Mar değil). */
-export function discountUntilFromMonths(months: number): Date {
-  const d = new Date();
+/** Kod/admin "kaç ay" girdisinden bitiş tarihi.
+ *  Ay sonu taşmasını kelepçeler: 31 Oca + 1 ay = 28/29 Şub (3 Mar değil).
+ *  `basla` verilirse (ücretsiz deneme bitişi) pencere ORADAN başlar — denetim
+ *  bulgusu: deneme ile indirim aynı anda başlayınca bedava ay indirim
+ *  süresinden yeniyordu, "1 ay bedava + 12 ay indirim" sözü 11 aya düşüyordu. */
+export function discountUntilFromMonths(months: number, basla?: Date | null): Date {
+  const d = new Date(
+    basla && basla.getTime() > Date.now() ? basla.getTime() : Date.now(),
+  );
   const gun = d.getDate();
   d.setMonth(d.getMonth() + months);
   if (d.getDate() < gun) d.setDate(0); // taştı → hedef ayın son günü

@@ -94,7 +94,11 @@ export async function startSubscriptionPayment() {
         // Emniyet kemeri: tek istek EN FAZLA 1 dönem açabilir. Subscription
         // satırı henüz yokken iki paralel isteğin INSERT/ON CONFLICT yarışı
         // gibi kalan her delikte sonuç 34 günü aşar → geri al.
-        if (end.getTime() > Date.now() + 34 * 24 * 60 * 60 * 1000)
+        // TABAN = mevcut dönem sonu (denetim: `now`a göre ölçülünce ücretsiz
+        // dalda erken fren ile bu fren birbirini kesiyordu — %100 indirimli
+        // işletme dönemini hiç açamıyor, yayından düşüyordu).
+        const yigilmaTaban = Math.max(kilitliSon, Date.now());
+        if (end.getTime() > yigilmaTaban + 35 * 24 * 60 * 60 * 1000)
           throw new Error("yigilma");
         await tx.subscriptionPayment.create({
           data: {

@@ -72,8 +72,14 @@ function readToken(token: string): string | null {
 
 export async function createSession(userId: string): Promise<void> {
   const c = await cookies();
-  // Not: demo bileti burada SİLİNMEZ — demoyaGec bileti bu çağrıdan hemen
-  // ÖNCE bırakıyor. Girişte (login) temizlik ayrıca yapılır (route.ts).
+  // 🔴 DEMO BİLETİ HER YENİ OTURUMDA DÜŞER (2026-08-02 denetim, KRİTİK):
+  // temizliği tek tek çağıran uçlara bırakmak delik bırakıyordu — /giris
+  // temizleniyordu ama KAYIT (register / customer-register) temizlemiyordu.
+  // Sonuç: komisyoncunun telefonundan hesap açan halıcı, /panel'de "Komisyoncu
+  // paneline dön" şeridini görüp tek tıkla KOMİSYONCUNUN hesabına düşüyordu
+  // (IBAN, kazanç, ekip). Artık oturum açan HER yol bileti siler; demoyaGec
+  // bileti bu çağrıdan SONRA bırakır (sıra önemli).
+  c.delete(DEMO_GERI_COOKIE);
   c.set(COOKIE, makeToken(userId), {
     httpOnly: true,
     sameSite: "strict", // server action'lara CSRF yüzeyini kapatır
@@ -93,17 +99,24 @@ export async function createSession(userId: string): Promise<void> {
 // (bkz. demo-actions.ts: yalnız AGENT rolüne dönülür).
 const DEMO_GERI_COOKIE = "hali_demo_geri";
 
-/** Mevcut oturumu "dönüş bileti" olarak sakla (varsa). */
-export async function demoBiletiBirak(): Promise<void> {
+/** Şu anki oturum jetonu (demo geçişinde SAKLANIP sonra bilete yazılır). */
+export async function mevcutOturumJetonu(): Promise<string | null> {
   const c = await cookies();
-  const mevcut = c.get(COOKIE)?.value;
-  if (!mevcut) return;
-  c.set(DEMO_GERI_COOKIE, mevcut, {
+  return c.get(COOKIE)?.value ?? null;
+}
+
+/** Verilen jetonu "dönüş bileti" olarak yaz (createSession'dan SONRA çağrılır). */
+export async function demoBiletiYaz(jeton: string): Promise<void> {
+  const c = await cookies();
+  c.set(DEMO_GERI_COOKIE, jeton, {
     httpOnly: true,
     sameSite: "strict",
     secure: process.env.NODE_ENV === "production",
     path: "/",
-    maxAge: 2 * 60 * 60,
+    // Ömür = oturum ömrü (denetim: 2 saatlik bilet dolunca komisyoncu demo
+    // hesabında kilitli kalıyordu — kendi şifresini hatırlamıyorsa çıkamıyor).
+    // Risk profili oturum çerezinin AYNISI; her yeni oturumda zaten siliniyor.
+    maxAge: TOKEN_TTL_MS / 1000,
   });
 }
 

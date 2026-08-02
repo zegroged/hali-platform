@@ -521,14 +521,21 @@ export async function activateSubscription(formData: FormData) {
     where: { businessId: id },
     select: { status: true, currentPeriodEnd: true },
   });
+  // 🔴 TRIAL MUAF (2026-08-02 denetim, PARA KAYBI): ücretsiz deneme dönem sonunu
+  // 30 gün ileri kurduğu için bu fren denemenin ilk 5 günü DIŞINDA hep
+  // tetikleniyordu — deneme sürerken havale yapan işletmenin parası alınıp
+  // dönem EKLENMİYORDU. Deneme ücretsizdir; para geldiyse üstüne eklenir
+  // (extendSubscription GREATEST(now, periodEnd) + 1 ay + 3 gün → deneme
+  // kalanı korunur).
   const farEnough =
-    sub?.currentPeriodEnd != null &&
+    sub?.status === "ACTIVE" &&
+    sub.currentPeriodEnd != null &&
     sub.currentPeriodEnd.getTime() > Date.now() + 25 * 24 * 60 * 60 * 1000;
   if (farEnough) {
     redirect(
       `/admin/isletme/${id}?mesaj=` +
         encodeURIComponent(
-          "Abonelik zaten aktif (dönem sonu 25+ gün ileride). Tekrar uzatılmadı.",
+          "DÖNEM EKLENMEDİ — abonelik zaten aktif (dönem sonu 25+ gün ileride). Para aldıysan bu ekranı kapatma, önce dönem sonunu kontrol et.",
         ),
     );
   }
@@ -761,6 +768,9 @@ export async function createAgent(formData: FormData) {
   const percentRaw = String(formData.get("percent") || "").replace(",", ".");
   // Premium yetkisi: kod üretirken istediği yüzde + sürede indirim tanımlayabilir.
   const canDiscount = formData.get("canDiscount") === "on";
+  // E-POSTA (2026-08-02): "şifremi unuttum" akışının ön şartı. Opsiyonel —
+  // komisyoncu sonradan /sifre sayfasından kendisi de ekleyip doğrulayabilir.
+  const emailRaw = String(formData.get("email") || "").trim().toLowerCase();
   // YETKİ TAVANLARI HESAP AÇARKEN (2026-08-02, kullanıcı isteği): premium
   // verirken "yüzde kaç / kaç ay" da burada girilir; boş bırakılırsa platform
   // varsayılanı (%20 / 12 ay) geçerli olur.
@@ -801,6 +811,14 @@ export async function createAgent(formData: FormData) {
   const percent = isHead ? poolPercent! : Number(percentRaw);
   if (!Number.isFinite(percent) || percent <= 0 || percent > 100)
     err("Komisyon yüzdesi 0 ile 100 arasında olmalı (örn. 50).");
+  if (!canDiscount && (maxPctRaw || maxAyRaw))
+    err(
+      "İndirim tavanı girdin ama \"Premium yetki\" kutusunu işaretlemedin — ya kutuyu işaretle ya tavan alanlarını boşalt.",
+    );
+  if (!canTrial && maxTrialRaw)
+    err(
+      "Deneme tavanı seçtin ama \"Ücretsiz deneme yetkisi\" kutusunu işaretlemedin — ya kutuyu işaretle ya seçimi boşalt.",
+    );
   let maxDiscountPercent: number | null = null;
   let maxDiscountMonths: number | null = null;
   if (canDiscount && (maxPctRaw || maxAyRaw)) {
@@ -820,14 +838,21 @@ export async function createAgent(formData: FormData) {
     maxTrialDays = g;
   }
 
+  if (emailRaw && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(emailRaw))
+    err("Geçerli bir e-posta yaz ya da alanı boş bırak.");
+
   const exists = await prisma.user.findFirst({
-    where: { OR: [{ username }, { phone }] },
+    where: emailRaw
+      ? { OR: [{ username }, { phone }, { email: emailRaw }] }
+      : { OR: [{ username }, { phone }] },
   });
   if (exists) {
     err(
       exists.username === username
         ? "Bu kullanıcı adı zaten kullanımda."
-        : "Bu telefon zaten kayıtlı.",
+        : exists.email && exists.email === emailRaw
+          ? "Bu e-posta başka bir hesapta kayıtlı."
+          : "Bu telefon zaten kayıtlı.",
     );
   }
 
@@ -842,6 +867,8 @@ export async function createAgent(formData: FormData) {
           phone,
           username,
           password: await hashPassword(password),
+          // Admin'in girdiği adres doğrulanmış sayılır (yönetici teyidi).
+          ...(emailRaw ? { email: emailRaw, emailVerified: true } : {}),
         },
       });
       const agent = await tx.agent.create({
@@ -1336,7 +1363,11 @@ export async function toggleAgentTrial(formData: FormData) {
   const id = String(formData.get("id") || "");
   const agent = await prisma.agent.findUnique({
     where: { id },
-    select: { canTrial: true, user: { select: { name: true } } },
+    select: {
+      canTrial: true,
+      maxTrialDays: true,
+      user: { select: { name: true } },
+    },
   });
   if (!agent)
     redirect(
@@ -1352,7 +1383,7 @@ export async function toggleAgentTrial(formData: FormData) {
       encodeURIComponent(
         agent.canTrial
           ? `${agent.user.name}: ücretsiz deneme yetkisi kaldırıldı (verilmiş denemeler devam eder).`
-          : `${agent.user.name}: artık ürettiği koda ${MAX_TRIAL_DAYS} güne kadar ücretsiz deneme koyabilir.`,
+          : `${agent.user.name}: artık ürettiği koda ${Math.min(agent.maxTrialDays ?? MAX_TRIAL_DAYS, MAX_TRIAL_DAYS)} güne kadar ücretsiz deneme koyabilir.`,
       ),
   );
 }
@@ -1398,14 +1429,20 @@ export async function setAgentDiscountCap(formData: FormData) {
   };
   const agent = await prisma.agent.findUnique({
     where: { id },
-    select: { canDiscount: true, user: { select: { name: true } } },
+    select: {
+      canDiscount: true,
+      canTrial: true,
+      user: { select: { name: true } },
+    },
   });
   if (!agent)
     redirect(
       "/admin/komisyoncular?hata=" + encodeURIComponent("Komisyoncu bulunamadı."),
     );
-  if (!agent.canDiscount)
-    geri("Tavan için önce Premium yap — indirim yetkisi olmayan komisyoncuda tavanın anlamı yok.");
+  if (!agent.canDiscount && !agent.canTrial)
+    geri(
+      "Tavan için önce Premium ya da Deneme yetkisi ver — yetkisiz komisyoncuda tavanın anlamı yok.",
+    );
   const pctRaw = String(formData.get("maxPercent") || "").replace(",", ".").trim();
   const ayRaw = String(formData.get("maxMonths") || "").trim();
   // Deneme tavanı aynı formdan yönetilir (boş = varsayılan 30 gün).
@@ -1424,6 +1461,15 @@ export async function setAgentDiscountCap(formData: FormData) {
     revalidatePath("/admin/komisyoncular");
     geri(
       `${agent.user.name}: indirim tavanı varsayılana döndü (%20 / 12 ay).${maxTrialDays ? ` Deneme tavanı ${maxTrialDays} gün.` : ""}`,
+      true,
+    );
+  }
+  if (!agent.canDiscount) {
+    // Yalnız deneme yetkisi var: indirim alanları yok sayılır.
+    await prisma.agent.update({ where: { id }, data: { maxTrialDays } });
+    revalidatePath("/admin/komisyoncular");
+    geri(
+      `${agent.user.name}: deneme tavanı ${maxTrialDays ?? 30} gün olarak kaydedildi.`,
       true,
     );
   }

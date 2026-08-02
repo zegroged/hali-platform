@@ -6,10 +6,15 @@ import { prisma } from "@/lib/prisma";
 import {
   getSessionUser,
   createSession,
-  demoBiletiBirak,
+  mevcutOturumJetonu,
+  demoBiletiYaz,
   demoBiletiKullan,
 } from "@/lib/auth";
-import { demoPaneliKur, demoPaneliSil } from "@/lib/demoPanel";
+import {
+  demoPaneliKur,
+  demoPaneliSil,
+  demoKullaniciAdi,
+} from "@/lib/demoPanel";
 
 // KOMİSYONCU DEMO PANELİ — aksiyonlar (2026-07-30).
 // Komisyoncu dükkânda ürünü gösterebilsin diye kendi adına, gerçekçi veriyle
@@ -145,19 +150,50 @@ export async function deleteDemoPanel() {
 //    işletmeye geçiş imkânsız (bu bir "impersonation" ucu DEĞİLDİR).
 //  - Dönüşte rol yeniden okunur: bilet yalnız AGENT hesabına dönüş açar,
 //    banlı hesaba dönmez.
-export async function demoyaGec() {
+async function demoOturumuAc(hedef: "isletme" | "sofor") {
   const agent = await requireAgent();
   // Pasif/dondurulmuş komisyoncu satış yapmıyor — demoya da geçemez.
   if (!agent.active || agent.suspendedByAdmin)
     hata("Hesabın pasif — demo panele giriş için yöneticiyle görüş.");
   const demo = await prisma.cleanerBusiness.findFirst({
     where: { isDemo: true, referredByAgentId: agent.id },
-    select: { ownerId: true },
+    select: {
+      ownerId: true,
+      // Şoför hedefi: panelde gösterilen "demo.sofor1.*" hesabı; bulunamazsa
+      // (eski demo, elle silinmiş şoför) ilk şoföre düşülür.
+      drivers: {
+        select: { userId: true, user: { select: { username: true } } },
+        orderBy: { createdAt: "asc" },
+      },
+    },
   });
   if (!demo) hata("Önce demo panelini oluştur, sonra tek tıkla girebilirsin.");
-  await demoBiletiBirak();
-  await createSession(demo!.ownerId);
-  redirect("/panel");
+  let hedefUserId = demo!.ownerId;
+  if (hedef === "sofor") {
+    const beklenen = demoKullaniciAdi(agent.id, "sofor1");
+    const sofor =
+      demo!.drivers.find((d) => d.user.username === beklenen) ?? demo!.drivers[0];
+    if (!sofor)
+      hata("Demo panelinde şoför bulunamadı — demoyu sıfırlayıp tekrar dene.");
+    hedefUserId = sofor!.userId;
+  }
+  // SIRA ÖNEMLİ: createSession bileti siler (bkz. auth.ts), o yüzden bilet
+  // ondan SONRA bırakılır. Bırakılan jeton komisyoncunun kendi oturumudur —
+  // demoBiletiBirak bunu createSession'dan önce okumalı, aşağıda saklıyoruz.
+  const kendiJeton = await mevcutOturumJetonu();
+  await createSession(hedefUserId);
+  if (kendiJeton) await demoBiletiYaz(kendiJeton);
+  redirect(hedef === "sofor" ? "/sofor" : "/panel");
+}
+
+/** Demo İŞLETME paneline tek tıkla gir. */
+export async function demoyaGec() {
+  await demoOturumuAc("isletme");
+}
+
+/** Demo ŞOFÖR ekranına tek tıkla gir (halıcıya şoför akışını göstermek için). */
+export async function demoSoforaGec() {
+  await demoOturumuAc("sofor");
 }
 
 /** Demo panelinden komisyoncu paneline dön (bileti tüketir). */

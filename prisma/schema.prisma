@@ -106,6 +106,7 @@ model User {
   orders        Order[]          @relation("CustomerOrders")
   reviews       Review[]
   notifications Notification[]
+  passwordResets PasswordReset[]
 }
 
 // Uygulama-içi bildirim (halıcı paneli + şoför + admin). SMS mock olduğundan
@@ -478,6 +479,21 @@ model PhoneOtp {
   expiresAt DateTime
   attempts  Int      @default(0) // 5 yanlışta kilit
   createdAt DateTime @default(now())
+}
+
+// ŞİFRE SIFIRLAMA BİLETİ (2026-08-02): "şifremi unuttum" akışı. Jetonun
+// KENDİSİ saklanmaz — yalnız sha256 özeti; e-postayı ele geçiren biri DB'ye
+// bakmadan kullanamaz, DB'yi ele geçiren biri de jetonu üretemez.
+model PasswordReset {
+  id        String    @id @default(cuid())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, createdAt])
 }
 
 model SignupOtp {
