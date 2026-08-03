@@ -26,10 +26,16 @@ export default function WhatsAppReply({
   phone,
   kalanDk,
   kapanisISO,
+  /** Cevap ucu — halıcı paneli varsayılan, admin sahipsiz kutusu farklı
+   *  (2026-08-03): kurallar farklı olduğu için uç de ayrıdır. */
+  endpoint = "/api/panel/whatsapp/mesaj",
+  yerTutucu,
 }: {
   phone: string;
   kalanDk: number;
   kapanisISO: string | null;
+  endpoint?: string;
+  yerTutucu?: string;
 }) {
   const router = useRouter();
   const [kalan, setKalan] = useState(kalanDk);
@@ -66,7 +72,7 @@ export default function WhatsAppReply({
     setGonderiliyor(true);
     let res: Response;
     try {
-      res = await fetch("/api/panel/whatsapp/mesaj", {
+      res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ phone, body: govde }),
@@ -123,7 +129,7 @@ export default function WhatsAppReply({
         maxLength={1000}
         placeholder={
           acik
-            ? "Müşteriye yazacağın mesaj…"
+            ? (yerTutucu ?? "Müşteriye yazacağın mesaj…")
             : "Yanıt penceresi kapalı — mesaj yazılamaz"
         }
         className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
