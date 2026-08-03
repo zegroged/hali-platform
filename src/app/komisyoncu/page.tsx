@@ -654,8 +654,43 @@ export default async function KomisyoncuSayfasi({
           </div>
           <form
             action={generateReferralCode}
-            className="flex flex-wrap items-end gap-2"
+            className="flex w-full flex-wrap items-end gap-2"
           >
+            {agent.canTrial && (
+              <div className="w-full rounded-xl border-2 border-emerald-300 bg-emerald-50 p-3">
+                <p className="text-sm font-semibold text-emerald-900">
+                  🎁 Bu koda ücretsiz deneme ekle
+                </p>
+                <p className="mt-0.5 text-xs text-emerald-800">
+                  Seçtiğin süre boyunca işletme hiç ödeme yapmadan yayına girer.
+                </p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {[
+                    { v: "", e: "Deneme yok" },
+                    ...(15 <= Math.min(agent.maxTrialDays ?? MAX_TRIAL_DAYS, MAX_TRIAL_DAYS)
+                      ? [{ v: "15", e: "15 gün bedava" }]
+                      : []),
+                    ...(30 <= Math.min(agent.maxTrialDays ?? MAX_TRIAL_DAYS, MAX_TRIAL_DAYS)
+                      ? [{ v: "30", e: "1 ay bedava" }]
+                      : []),
+                  ].map((o) => (
+                    <label
+                      key={o.v || "yok"}
+                      className="flex min-h-[44px] cursor-pointer items-center gap-2 rounded-lg border border-emerald-300 bg-white px-3 py-2 text-sm font-medium text-emerald-900 has-[:checked]:border-emerald-600 has-[:checked]:bg-emerald-600 has-[:checked]:text-white"
+                    >
+                      <input
+                        type="radio"
+                        name="trialDays"
+                        value={o.v}
+                        defaultChecked={o.v === ""}
+                        className="accent-emerald-600"
+                      />
+                      {o.e}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
             {agent.canDiscount && (
               <>
                 <div>
@@ -682,26 +717,13 @@ export default async function KomisyoncuSayfasi({
                 </div>
               </>
             )}
-            {agent.canTrial && (
-              <div>
-                <label className="mb-1 block text-xs font-medium text-slate-600">
-                  Ücretsiz deneme
-                </label>
-                <select
-                  name="trialDays"
-                  defaultValue=""
-                  className="rounded-lg border border-emerald-300 px-2.5 py-2 text-sm focus:border-brand focus:outline-none"
-                >
-                  <option value="">Yok</option>
-                  {15 <= Math.min(agent.maxTrialDays ?? MAX_TRIAL_DAYS, MAX_TRIAL_DAYS) && (
-                    <option value="15">15 gün</option>
-                  )}
-                  {30 <= Math.min(agent.maxTrialDays ?? MAX_TRIAL_DAYS, MAX_TRIAL_DAYS) && (
-                    <option value="30">1 ay</option>
-                  )}
-                </select>
-              </div>
-            )}
+            {/* DENEME SEÇİCİSİ (2026-08-03): eskiden burada, "İndirim %" ve
+                "Süre" kutularının yanında 12px etiketli küçük bir açılır
+                listeydi ve dar ekranda "+ Kod Üret" düğmesinin altına kayıp
+                gözden kaçıyordu — yetkisi olan komisyoncu özelliğin farkına
+                varmıyordu ("KASA'daki gizli ek gelir" hatasının aynısı,
+                DEVIR 4.22). Artık formun ÜSTÜNDE, büyük seçeneklerle duruyor.
+                Alan yine aynı formun içinde (name="trialDays"). */}
             <PendingButton className="rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-dark">
               + Kod Üret
             </PendingButton>
