@@ -91,7 +91,7 @@ export function BusinessCard({ b }: { b: BusinessSummary }) {
                 Yeni
               </span>
             )}
-            <Badges badges={b.badges} />
+            <Badges badges={b.badges} notlar={b.badgeNotes} />
           </div>
         )}
 

@@ -98,6 +98,19 @@ async function dailyTick() {
   }
 
   try {
+    // HAK EDİLEN ROZETLER (2026-08-03): gece gerçek veriden yeniden hesaplanır.
+    // Şartı sağlamayan rozet SİLİNİR — rozet güncel durumu gösterir, geçmişte
+    // kazanılmış madalya değildir. Elle verilen VERIFIED'e dokunulmaz.
+    const { rozetleriYenidenHesapla } = await import("@/lib/badgeCompute");
+    const r = await rozetleriYenidenHesapla();
+    console.log(
+      `[rozet] ${r.isletme} işletme tarandı · ${r.verilen} rozet güncel · ${r.kaldirilan} kaldırıldı`,
+    );
+  } catch (e) {
+    console.error("[rozet] hata:", e);
+  }
+
+  try {
     // Sezon hatırlatması — ayar VERİTABANINDA (AppState, /admin/hatirlatma).
     // Admin açmadıysa fonksiyon hemen döner; elle tetikleme admin ekranından.
     const { sendSeasonReminders } = await import("@/lib/seasonReminder");

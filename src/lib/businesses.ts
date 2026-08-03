@@ -32,6 +32,8 @@ export type BusinessSummary = {
   deliveryMinDays: number | null;
   deliveryMaxDays: number | null;
   badges: BadgeType[];
+  /** Rozetin NEDEN hak edildiği (hesaplananlarda dolu, elle verilende boş). */
+  badgeNotes: Partial<Record<BadgeType, string>>;
   minPrice: number | null;
   distanceKm: number | null;
   isNew: boolean;
@@ -67,13 +69,33 @@ export function maskName(name: string): string {
   return first + initial;
 }
 
-// Sıralama puanı: yeni halıcıya küçük destek, red oranına güvenle-ölçekli ceza
+// Sıralama puanı: red oranına güvenle-ölçekli ceza + eksik profil cezası.
+//
+// 🔴 DÜZELTİLDİ (2026-08-03): eski hâlde YORUMU OLMAYAN ve YENİ OLMAYAN
+// işletme `ratingAvg = 0` ile puanlanıyordu; yeni olan ise 4.0 alıyordu.
+// Platformda henüz 0 yorum olduğu için bu, "en son kaydolanlar başa, eski
+// işletmeler en sona" demekti — yani ziyaretçinin gördüğü ilk işletmeler
+// "iyi olanlar" değil "en yeniler"di. Artık yorumu olmayan herkes aynı NÖTR
+// tabandan başlar; ayrım gerçek veriden (yorum, red oranı, profil) gelir.
+const NOTR_PUAN = 3.9;
 function sortRating(b: BusinessSummary): number {
-  const base =
-    b.isNew && b.ratingCount === 0
-      ? 4.0
-      : b.ratingAvg + (b.isNew ? 0.15 : 0);
-  return base - b.rejectRate * 1.5 * rejectConfidence(b.totalOrders);
+  const base = b.ratingCount > 0 ? b.ratingAvg : NOTR_PUAN + (b.isNew ? 0.1 : 0);
+  // VİTRİN CEZASI: fotoğrafsız veya fiyatsız profil müşteriyi kaçırıyor;
+  // eşit koşulda tam profil öne çıksın (kullanıcı kararı: "ilk gösterilenler
+  // güzel olmalı").
+  const eksikVitrin = (b.coverUrl ? 0 : 0.25) + (b.minPrice != null ? 0 : 0.15);
+  return base - eksikVitrin - b.rejectRate * 1.5 * rejectConfidence(b.totalOrders);
+}
+
+// ADİL SIRA (2026-08-03): konum yoksa ve puanlar eşitse liste her zaman aynı
+// sırayla açılıyordu — hep aynı işletmeler ilk üçte kalıyordu. Saatlik değişen
+// bir tohumla eşit puanlılar arasında sıra döner; sayfalama kararlı kalsın
+// diye tohum SAAT bazlıdır (aynı saatte aynı sıra).
+function adilTohum(id: string): number {
+  const saat = Math.floor(Date.now() / (60 * 60 * 1000));
+  let h = saat;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
+  return h % 1000;
 }
 
 type Hours = Record<string, { open: string; close: string } | null>;
@@ -114,23 +136,24 @@ function isOpenNow(wh: unknown): boolean {
   return cur >= oh * 60 + om && cur <= ch * 60 + cm;
 }
 
-// Otomatik kazanılan rozetler (veriden) + manuel rozetler (VERIFIED/INSURED)
-function deriveBadges(opts: {
-  manual: BadgeType[];
-  ratingAvg: number;
-  ratingCount: number;
-  deliveryMaxDays: number | null;
-  totalOrders: number;
-  rejectRate: number;
-}): BadgeType[] {
-  const derived: BadgeType[] = [];
-  if (opts.deliveryMaxDays != null && opts.deliveryMaxDays <= 2)
-    derived.push("FAST_DELIVERY");
-  if (opts.ratingCount >= 20 && opts.ratingAvg >= 4.5)
-    derived.push("TOP_RATED");
-  if (opts.totalOrders >= 5 && opts.rejectRate < 0.15)
-    derived.push("FAST_RESPONDER");
-  return Array.from(new Set([...opts.manual, ...derived]));
+// ROZETLER ARTIK OKUMA ANINDA TÜRETİLMİYOR (2026-08-03, "hak edilen rozet").
+//
+// Eski türetim ölçtüğünü sanıyordu ama ölçmüyordu: "Hızlı Teslim" işletmenin
+// PROFİLİNE YAZDIĞI tahmini süreye bakıyordu (kendi beyanı), "Çok Tercih
+// Edilen" 20 yorum istiyordu (platformda 0 yorum var), "Güvenilir" ise yalnız
+// red oranına bakıyordu. Artık dördü de gece GERÇEK veriden hesaplanıp
+// gerekçesiyle birlikte Badge tablosuna yazılıyor (bkz. lib/badgeCompute.ts);
+// burada yalnız OKUNUR. Elle verilen VERIFIED de aynı tablodadır.
+function rozetleriOku(
+  kayitlar: { type: BadgeType; note: string | null }[],
+): { badges: BadgeType[]; badgeNotes: Partial<Record<BadgeType, string>> } {
+  const badges: BadgeType[] = [];
+  const badgeNotes: Partial<Record<BadgeType, string>> = {};
+  for (const k of kayitlar) {
+    badges.push(k.type);
+    if (k.note) badgeNotes[k.type] = k.note;
+  }
+  return { badges, badgeNotes };
 }
 
 async function orderStats(
@@ -222,7 +245,7 @@ export async function getBusinesses(
   const rows = await prisma.cleanerBusiness.findMany({
     where,
     include: {
-      badges: true,
+      badges: { select: { type: true, note: true } },
       pricing: { where: { isAddon: false } },
       photos: { orderBy: { isAfter: "desc" }, take: 1 },
     },
@@ -238,9 +261,7 @@ export async function getBusinesses(
     const prices = b.pricing.map((p) => Number(p.price));
     const s = stat.get(b.id);
     const rejectRate = s && s.total > 0 ? s.rejected / s.total : 0;
-    const manual = b.badges
-      .map((x) => x.type)
-      .filter((t) => t === "VERIFIED" || t === "INSURED");
+    const { badges: rozetler, badgeNotes } = rozetleriOku(b.badges);
 
     return {
       id: b.id,
@@ -253,14 +274,8 @@ export async function getBusinesses(
       ratingCount: b.ratingCount,
       deliveryMinDays: b.deliveryEstimateMinDays,
       deliveryMaxDays: b.deliveryEstimateMaxDays,
-      badges: deriveBadges({
-        manual,
-        ratingAvg: b.ratingAvg,
-        ratingCount: b.ratingCount,
-        deliveryMaxDays: b.deliveryEstimateMaxDays,
-        totalOrders: s?.total ?? 0,
-        rejectRate,
-      }),
+      badges: rozetler,
+      badgeNotes,
       minPrice: prices.length ? Math.min(...prices) : null,
       distanceKm,
       isNew: Date.now() - b.createdAt.getTime() < NEW_WINDOW_MS,
@@ -317,8 +332,9 @@ export async function getBusinesses(
         if (Math.abs(ea - eb) > 0.05) return ea - eb;
       }
       const sr = sortRating(b) - sortRating(a);
-      if (sr !== 0) return sr;
-      return a.id.localeCompare(b.id); // kararlı tie-breaker (D4)
+      if (Math.abs(sr) > 0.001) return sr;
+      // Eşit puanda saatlik dönen adil sıra (hep aynı işletme öne çıkmasın).
+      return adilTohum(a.id) - adilTohum(b.id);
     });
   }
 
@@ -388,7 +404,7 @@ export async function getBusinessById(id: string) {
   const b = await prisma.cleanerBusiness.findFirst({
     where: { id, isVisible: true, verification: { not: "REJECTED" } },
     include: {
-      badges: true,
+      badges: { select: { type: true, note: true } },
       pricing: true,
       photos: true,
       reviews: {
@@ -407,17 +423,7 @@ export async function getBusinessById(id: string) {
   const stat = await orderStats([b.id]);
   const s = stat.get(b.id);
   const rejectRate = s && s.total > 0 ? s.rejected / s.total : 0;
-  const manual = b.badges
-    .map((x) => x.type)
-    .filter((t) => t === "VERIFIED" || t === "INSURED");
-  const badges = deriveBadges({
-    manual,
-    ratingAvg: b.ratingAvg,
-    ratingCount: b.ratingCount,
-    deliveryMaxDays: b.deliveryEstimateMaxDays,
-    totalOrders: s?.total ?? 0,
-    rejectRate,
-  });
+  const { badges, badgeNotes } = rozetleriOku(b.badges);
 
   return {
     id: b.id,
@@ -443,6 +449,7 @@ export async function getBusinessById(id: string) {
     googleProfileUrl: b.googleProfileUrl,
     logoUrl: b.logoUrl,
     badges,
+    badgeNotes,
     pricing: b.pricing.map((p) => ({
       label: p.label,
       unit: p.unit,

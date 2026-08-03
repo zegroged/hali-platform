@@ -235,7 +235,7 @@ export default async function HaliciProfile({
             </div>
 
             <div className="mt-3">
-              <Badges badges={b.badges} />
+              <Badges badges={b.badges} notlar={b.badgeNotes} />
             </div>
 
             {/* Fotoğraflar (before/after) */}

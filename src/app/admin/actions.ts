@@ -349,7 +349,12 @@ export async function createBusinessByAdmin(formData: FormData) {
           ...(pricePerM2
             ? { pricing: { create: [{ label: "Makine Halısı", unit: "PER_M2", price: pricePerM2 }] } }
             : {}),
-          badges: { create: [{ type: "VERIFIED" }] },
+          // OTOMATİK "Doğrulanmış" ROZETİ KALDIRILDI (2026-08-03).
+          // Admin/destek panelinden açılan HER işletmeye otomatik veriliyordu;
+          // canlıdaki görünür işletmelerin neredeyse tamamı böyle açıldığı için
+          // rozet hiçbir şeyi ayırt etmiyordu. Artık güven rozeti ancak gerçekten
+          // belge kontrolü yapıldığında admin tarafından elle verilir; performans
+          // rozetleri ise geceleri veriden hesaplanır (lib/badgeCompute.ts).
           subscription: {
             create: {
               status: "ACTIVE",

@@ -811,6 +811,14 @@ model Badge {
   businessId String
   type       BadgeType
   grantedAt  DateTime        @default(now())
+  // HAK EDİLME GEREKÇESİ (2026-08-03, "hak edilen rozet" kararı).
+  // Rozetler artık gece gerçek veriden hesaplanıyor; müşteri rozete
+  // dokununca NEDEN verildiğini okuyor ("son 30 günde 34 siparişin 32'si
+  // 2 saat içinde kabul edildi"). Elle verilen rozetlerde (VERIFIED) boş.
+  note       String?
+  // true → gece hesaplanan rozet. Yeniden hesapta silinip yeniden yazılır;
+  // elle verilenlere (VERIFIED) hesaplama ASLA dokunmaz.
+  earned     Boolean         @default(false)
 
   @@unique([businessId, type])
 }
