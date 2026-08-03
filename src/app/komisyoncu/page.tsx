@@ -74,6 +74,17 @@ export default async function KomisyoncuSayfasi({
   const u = await getSessionUser();
   if (!u || u.role !== "AGENT") redirect("/giris");
 
+  // E-POSTA UYARISI (2026-08-03, kullanıcı kararı: "komisyoncu kendisi girsin").
+  // "Şifremi unuttum" DOĞRULANMIŞ e-posta ister; komisyoncu hesapları bu alan
+  // eklenmeden önce açıldığı için canlıdaki üçünün de e-postası yoktu ve her
+  // unutulan şifre yöneticiye telefon demekti. Yöneticinin elle girmesi yerine
+  // komisyoncuya panelde görünür bir uyarı: kendi ekler, kendi doğrular.
+  const hesap = await prisma.user.findUnique({
+    where: { id: u.id },
+    select: { email: true, emailVerified: true },
+  });
+  const epostaEksik = !hesap?.email || !hesap.emailVerified;
+
   const agent = await prisma.agent.findUnique({
     where: { userId: u.id },
     include: {
@@ -247,6 +258,25 @@ export default async function KomisyoncuSayfasi({
           </p>
         )}
       </div>
+
+      {epostaEksik && (
+        <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <p className="font-semibold">
+            ⚠️ Hesabında doğrulanmış e-posta yok.
+          </p>
+          <p className="mt-1">
+            Şifreni unutursan giriş sayfasındaki <strong>&quot;Şifremi
+            unuttum&quot;</strong> çalışmaz; yöneticiyi aramak zorunda kalırsın.
+            Bir dakikanı alır: e-postanı yaz, gelen 6 haneli kodu gir, bitti.
+          </p>
+          <Link
+            href="/sifre"
+            className="mt-2 inline-flex min-h-[44px] items-center rounded-lg bg-amber-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-amber-700"
+          >
+            E-postamı ekle ve doğrula
+          </Link>
+        </div>
+      )}
 
       {yeni && (
         <p className="rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
