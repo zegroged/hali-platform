@@ -11,7 +11,7 @@ import EmptyState from "@/components/EmptyState";
 import { IconTruck } from "@/components/icons";
 
 const inp =
-  "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand";
+  "w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:border-brand";
 const lbl = "mb-1 block text-sm font-medium text-slate-700";
 
 export default async function PanelDrivers() {

@@ -103,7 +103,7 @@ export default function BolgeHaritasi({
               value={arama}
               onChange={(e) => setArama(e.target.value)}
               placeholder="İl ya da ilçe ara — ör. Gaziantep, Şehitkamil"
-              className="min-w-[16rem] flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand focus:outline-none"
+              className="min-w-[16rem] flex-1 rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:border-brand focus:outline-none"
             />
             <button
               type="button"

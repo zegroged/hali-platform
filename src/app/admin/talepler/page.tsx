@@ -75,7 +75,7 @@ export default async function AdminCityLeads() {
                   key={l.id}
                   className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 text-sm"
                 >
-                  <span className="font-medium text-slate-800">{l.email}</span>
+                  <span className="break-all font-medium text-slate-800">{l.email}</span>
                   <span className="text-xs text-slate-500">
                     {l.district ? `${l.district} · ` : ""}
                     {l.createdAt.toLocaleDateString("tr-TR")}

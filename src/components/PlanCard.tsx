@@ -34,13 +34,20 @@ export default function PlanCard({
     </Link>
   );
 
+  // "Günde ~80 lira" (2026-08-03): 2.400 tek başına büyük duruyor; sahadaki
+  // satış dili de fiyatı hep günlük hesapla veriyor (Pazarlamacı El Kitabı §4).
   const Price = (
-    <p>
-      <span className="text-5xl font-extrabold tracking-tight text-slate-900">
-        ₺{PLAN.priceAmount}
-      </span>
-      <span className="text-sm font-medium text-slate-500"> + KDV / ay</span>
-    </p>
+    <>
+      <p>
+        <span className="text-4xl font-extrabold tracking-tight text-slate-900 sm:text-5xl">
+          ₺{PLAN.priceAmount}
+        </span>
+        <span className="text-sm font-medium text-slate-500"> + KDV / ay</span>
+      </p>
+      <p className="mt-1 text-sm text-slate-500">
+        Aylık {PLAN.priceGrossMonthly} TL — günde yaklaşık 80 lira.
+      </p>
+    </>
   );
 
   const Features = (
@@ -67,12 +74,17 @@ export default function PlanCard({
               Tek paket, gizli ücret yok.
             </p>
           </div>
-          <p>
-            <span className="text-5xl font-extrabold tracking-tight">
-              ₺{PLAN.priceAmount}
-            </span>
-            <span className="text-sm font-medium text-teal-50"> + KDV / ay</span>
-          </p>
+          <div>
+            <p>
+              <span className="text-4xl font-extrabold tracking-tight sm:text-5xl">
+                ₺{PLAN.priceAmount}
+              </span>
+              <span className="text-sm font-medium text-teal-50"> + KDV / ay</span>
+            </p>
+            <p className="mt-1 text-sm text-teal-50">
+              Aylık {PLAN.priceGrossMonthly} TL — günde yaklaşık 80 lira.
+            </p>
+          </div>
           {onCta ? (
             <button
               type="button"

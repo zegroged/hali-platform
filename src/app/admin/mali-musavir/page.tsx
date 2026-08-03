@@ -25,7 +25,7 @@ export default async function AdminAccountants({
   });
 
   const inp =
-    "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand focus:outline-none";
+    "w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:border-brand focus:outline-none";
   const lbl = "mb-1 block text-sm font-medium text-slate-700";
 
   return (

@@ -27,7 +27,7 @@ import {
 export const dynamic = "force-dynamic";
 
 const inp =
-  "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand";
+  "w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:border-brand";
 
 export default async function SoforPage() {
   const u = await getSessionUser();

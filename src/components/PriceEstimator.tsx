@@ -35,7 +35,7 @@ export default function PriceEstimator({ prices }: { prices: number[] }) {
           value={m2}
           onChange={(e) => setM2(e.target.value)}
           placeholder="örn. 12"
-          className="w-24 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand"
+          className="w-24 rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:border-brand"
         />
         <span className="text-sm text-slate-600">m²</span>
         {ok && (

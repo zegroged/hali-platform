@@ -133,12 +133,14 @@ export default function PanelNav() {
                 href={n.href}
                 onClick={() => setAcik(false)}
                 aria-current={active ? "page" : undefined}
-                className={`flex min-h-[56px] flex-1 flex-col items-center justify-center gap-0.5 rounded-lg px-0.5 py-1.5 text-center text-xs font-medium ${
+                className={`flex min-h-[56px] min-w-0 flex-1 basis-0 flex-col items-center justify-center gap-0.5 rounded-lg px-0.5 py-1.5 text-center font-medium ${
                   active ? "bg-brand-light text-brand-dark" : "text-slate-600"
                 }`}
               >
                 <Icon size={21} />
-                <span className="leading-tight">{n.kisa ?? n.label}</span>
+                <span className="w-full truncate text-[11px] leading-tight">
+                  {n.kisa ?? n.label}
+                </span>
               </Link>
             );
           })}
@@ -146,7 +148,7 @@ export default function PanelNav() {
             type="button"
             onClick={() => setAcik((v) => !v)}
             aria-expanded={acik}
-            className={`flex min-h-[56px] flex-1 flex-col items-center justify-center gap-0.5 rounded-lg px-0.5 py-1.5 text-center text-xs font-medium ${
+            className={`flex min-h-[56px] min-w-0 flex-1 basis-0 flex-col items-center justify-center gap-0.5 rounded-lg px-0.5 py-1.5 text-center font-medium ${
               digerAktif || acik ? "bg-brand-light text-brand-dark" : "text-slate-600"
             }`}
           >
@@ -154,7 +156,9 @@ export default function PanelNav() {
             <span aria-hidden className="text-xl leading-none">
               {acik ? "✕" : "☰"}
             </span>
-            <span className="leading-tight">{acik ? "Kapat" : "Diğer"}</span>
+            <span className="w-full truncate text-[11px] leading-tight">
+              {acik ? "Kapat" : "Diğer"}
+            </span>
           </button>
         </nav>
       </div>

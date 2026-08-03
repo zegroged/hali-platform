@@ -52,7 +52,7 @@ const fmtTL = (n: number) =>
 const fmtTarih = (d: Date) =>
   d.toLocaleDateString("tr-TR", { day: "2-digit", month: "2-digit", year: "numeric" });
 const inp =
-  "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand focus:outline-none";
+  "w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:border-brand focus:outline-none";
 
 // Komisyoncu ekranı (YALNIZ AGENT rolü): kendi kodu, getirdiği işletmeler ve
 // komisyon tahakkukları — salt-okunur. Admin/panele giremez.
@@ -730,13 +730,13 @@ export default async function KomisyoncuSayfasi({
 
       <div className="grid grid-cols-3 gap-2 text-center">
         <div className="rounded-xl border border-slate-200 bg-white p-3">
-          <div className="text-xl font-bold text-slate-900">
+          <div className="text-base font-bold leading-tight text-slate-900 sm:text-xl">
             {agent.referrals.length}
           </div>
           <div className="text-xs text-slate-500">Getirdiğin işletme</div>
         </div>
         <div className="rounded-xl border border-slate-200 bg-white p-3">
-          <div className="text-xl font-bold text-slate-900">
+          <div className="text-base font-bold leading-tight text-slate-900 sm:text-xl">
             {fmtTL(toplam + headToplam)} TL
           </div>
           <div className="text-xs text-slate-500">
@@ -744,7 +744,7 @@ export default async function KomisyoncuSayfasi({
           </div>
         </div>
         <div className="rounded-xl border border-slate-200 bg-white p-3">
-          <div className="text-xl font-bold text-green-700">
+          <div className="text-base font-bold leading-tight text-green-700 sm:text-xl">
             {fmtTL(odenen + headOdenen)} TL
           </div>
           <div className="text-xs text-slate-500">Ödenen</div>
@@ -868,7 +868,8 @@ export default async function KomisyoncuSayfasi({
                   (son 30)
                 </span>
               </h3>
-              <table className="w-full text-sm">
+              <div className="overflow-x-auto">
+              <table className="w-full min-w-[420px] text-sm">
                 <thead>
                   <tr className="border-b border-slate-200 text-left text-xs text-slate-500">
                     <th className="py-1.5">Tarih</th>
@@ -905,6 +906,7 @@ export default async function KomisyoncuSayfasi({
                   ))}
                 </tbody>
               </table>
+              </div>
             </div>
           )}
 

@@ -100,7 +100,7 @@ export function OrderPhotoManager({
           accept="image/jpeg,image/png,image/webp"
           multiple
           aria-label={yikama ? "Yıkama fotoğrafı seç" : "Fotoğraf seç"}
-          className="flex-1 text-sm text-slate-600 file:mr-2 file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-sm"
+          className="min-w-0 flex-1 text-sm text-slate-600 file:mr-2 file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-sm"
         />
         <button
           onClick={upload}

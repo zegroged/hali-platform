@@ -624,7 +624,7 @@ export default async function AdminBusinessDetail({
             rows={3}
             maxLength={2000}
             placeholder="Denetim gerekçesi, telefon görüşmesi, ödeme kaydı…"
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand"
+            className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:border-brand"
           />
           <button className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
             Notu kaydet

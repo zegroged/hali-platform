@@ -85,7 +85,7 @@ export default function GirisPage() {
   }
 
   const inputCls = (bad?: string) =>
-    `w-full rounded-lg border px-3 py-2 focus:border-brand ${
+    `w-full rounded-lg border px-3 py-3 text-base focus:border-brand ${
       bad ? "border-red-500" : "border-slate-300"
     }`;
   const labelCls = "mb-1 block text-sm font-medium text-slate-700";
@@ -97,10 +97,11 @@ export default function GirisPage() {
           ← Ana sayfa
         </Link>
         <h1 className="text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">
-          Giriş Yap
+          Hoş geldin
         </h1>
-        <p className="mt-1 text-sm text-slate-500">
-          Müşteri, halıcı veya şoför hesabınla e-postanla giriş yap.
+        <p className="mt-1 text-sm text-slate-600">
+          Müşteri, halıcı, şoför ya da komisyoncu — hepsi buradan giriyor.
+          E-postanı ya da kullanıcı adını yaz, yeter.
         </p>
 
         <form onSubmit={submit} noValidate className="mt-6 space-y-3">
@@ -149,7 +150,7 @@ export default function GirisPage() {
           )}
           <button
             disabled={loading}
-            className="w-full rounded-lg bg-brand px-4 py-2.5 font-semibold text-white transition hover:bg-brand-dark active:scale-[0.99] disabled:opacity-60"
+            className="w-full rounded-lg bg-brand px-4 py-3.5 text-base font-semibold text-white transition hover:bg-brand-dark active:scale-[0.99] disabled:opacity-60"
           >
             {loading ? "Giriş yapılıyor…" : "Giriş Yap"}
           </button>
@@ -162,8 +163,8 @@ export default function GirisPage() {
         </p>
 
         <p className="mt-3 text-xs text-slate-500">
-          Şoförsün ve giriş bilgini bilmiyor musun? Kullanıcı adını çalıştığın
-          işletmeden öğrenebilirsin.
+          Şoförsen kullanıcı adını çalıştığın işletme verir. Şifreni
+          unuttuysan da onlar sıfırlayabilir.
         </p>
 
         <p className="mt-4 text-sm text-slate-500">
@@ -180,28 +181,32 @@ export default function GirisPage() {
             Müşteri misin?
           </p>
           <p className="mt-1 text-sm text-slate-600">
-            Ücretsiz üye ol; siparişlerini takip et, hizmetini değerlendir ve
-            puan biriktir.
+            Üyelik ücretsiz: siparişini takip et, memnun kaldıysan puan ver,
+            her değerlendirmede puan kazan.
           </p>
           <Link
             href="/uye-ol"
-            className="mt-3 inline-flex min-h-[40px] items-center rounded-lg border border-brand px-4 py-2 text-sm font-semibold text-brand-dark transition hover:bg-brand-light"
+            className="mt-3 inline-flex min-h-[44px] items-center rounded-lg border border-brand px-4 py-2.5 text-sm font-semibold text-brand-dark transition hover:bg-brand-light"
           >
             Üye Ol
           </Link>
         </div>
 
+        {/* 2026-08-03: eski metin "bölgendeki müşterilere ulaş" diyordu — yani
+            bedelin karşılığı MÜŞTERİ olarak anlatılıyordu (4.36 doğruluk
+            geçişinde bu dilden vazgeçildi). Artık ödediği şeyi anlatıyor. */}
         <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
           <p className="text-sm font-medium text-slate-700">
-            İşletme misin?
+            Halı yıkamacı mısın?
           </p>
           <p className="mt-1 text-sm text-slate-600">
-            Halı yıkama işletmeni birkaç dakikada kaydet, bölgendeki
-            müşterilere ulaş.
+            Dükkânın düzeni tek panelde: sipariş defteri, şoför takibi,
+            fotoğraflı teslim, kesin fiyat onayı, kasa. Bölgendeki arama
+            sayfasında listelenmen de cabası.
           </p>
           <Link
             href="/kayit"
-            className="mt-3 inline-flex min-h-[40px] items-center rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-dark"
+            className="mt-3 inline-flex min-h-[44px] items-center rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark"
           >
             İşletmeni Ekle
           </Link>

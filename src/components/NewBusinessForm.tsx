@@ -2,7 +2,7 @@ import { createBusinessByAdmin } from "@/app/admin/actions";
 import CityDistrictSelect from "@/components/CityDistrictSelect";
 
 const inp =
-  "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand";
+  "w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:border-brand";
 const lbl = "mb-1 block text-xs font-medium text-slate-600";
 
 // Doğrulamasız işletme açma formu — /admin/yeni ve /destek aynı formu kullanır;

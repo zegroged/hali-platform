@@ -16,7 +16,7 @@ const HAZIR = [
 ] as const;
 
 const inp =
-  "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand";
+  "w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:border-brand";
 const lbl = "text-xs font-medium text-slate-500";
 
 /** Türkçe küçültme — varsayılan toLowerCase "İ"yi bozar, "Makine Halısı" eşleşmezdi. */

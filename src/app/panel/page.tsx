@@ -248,7 +248,7 @@ export default async function PanelHome({
               <li key={o.id}>
                 <Link
                   href={`/panel/siparisler/${o.id}`}
-                  className="-mx-1 flex items-center gap-3 rounded-lg px-1 py-2.5 transition hover:bg-slate-50"
+                  className="flex items-center gap-3 rounded-lg px-1 py-2.5 transition hover:bg-slate-50"
                 >
                   {o.deliveryPhotoUrl || o.pickupPhotoUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element

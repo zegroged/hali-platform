@@ -341,7 +341,7 @@ export default async function OrderManagePage({
                     o.quotedPrice != null ? String(o.quotedPrice) : ""
                   }
                   placeholder="Ör. 850"
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand"
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:border-brand"
                 />
               </div>
             </div>
@@ -363,7 +363,7 @@ export default async function OrderManagePage({
                   id="teslim-tahsilat"
                   name="collected"
                   defaultValue="CASH"
-                  className="mt-0.5 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand"
+                  className="mt-0.5 rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:border-brand"
                 >
                   <option value="CASH">Nakit aldım</option>
                   <option value="IBAN">IBAN&apos;a geldi</option>
@@ -442,7 +442,7 @@ export default async function OrderManagePage({
                           o.quotedPrice != null ? String(o.quotedPrice) : ""
                         }
                         placeholder="Ör. 850"
-                        className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand"
+                        className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:border-brand"
                       />
                     </div>
                   </div>
@@ -483,7 +483,7 @@ export default async function OrderManagePage({
                   max="60"
                   defaultValue={o.estimatedDays ?? ""}
                   required
-                  className="mt-0.5 w-24 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand"
+                  className="mt-0.5 w-24 rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:border-brand"
                 />
               </div>
               <PendingButton className="rounded-lg border border-brand px-4 py-2 text-sm font-semibold text-brand-dark transition hover:bg-brand-light/50 disabled:opacity-60">

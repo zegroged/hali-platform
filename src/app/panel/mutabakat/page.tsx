@@ -261,7 +261,7 @@ export default async function MutabakatSayfasi({
           <select
             id="mut-sofor"
             name="driverId"
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand"
+            className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:border-brand"
           >
             {soforler.map((d) => (
               <option key={d.id} value={d.id}>
@@ -280,7 +280,7 @@ export default async function MutabakatSayfasi({
             name="amount"
             required
             placeholder="Ör. 6.000"
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand"
+            className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:border-brand"
           />
         </div>
         <div className="sm:col-span-1">
@@ -292,7 +292,7 @@ export default async function MutabakatSayfasi({
             name="note"
             maxLength={120}
             placeholder="Ör. akşam teslim"
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand"
+            className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:border-brand"
           />
         </div>
         <div className="flex items-end sm:col-span-1">
