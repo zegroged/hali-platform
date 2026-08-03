@@ -323,9 +323,14 @@ export default async function AdminBusinessDetail({
               Bağlı komisyoncu yok. Kod girerek bağlayabilirsin.
             </p>
           )}
-          <form action={setBusinessAgent} className="mt-2 flex items-end gap-2">
+          <form
+            action={setBusinessAgent}
+            className="mt-2 flex flex-wrap items-end gap-2"
+          >
             <input type="hidden" name="businessId" value={b.id} />
-            <div className="flex-1">
+            {/* min-w-0 ŞART: flex-1 tek başına KÜÇÜLME garantisi değildir —
+                girdinin kendi asgari eni (≈177px) taban yapar (4.50 dersi). */}
+            <div className="min-w-0 flex-1">
               <label className="mb-1 block text-xs text-slate-500">
                 Tek kullanımlık komisyoncu kodu (boş gönder = bağı kaldır)
               </label>
@@ -358,7 +363,10 @@ export default async function AdminBusinessDetail({
               andan itibaren işler (uzatmak için tekrar kaydet).
             </p>
           )}
-          <form action={setBusinessDiscount} className="mt-2 flex items-end gap-2">
+          <form
+            action={setBusinessDiscount}
+            className="mt-2 flex flex-wrap items-end gap-2"
+          >
             <input type="hidden" name="businessId" value={b.id} />
             <div>
               <label className="mb-1 block text-xs text-slate-500">
@@ -368,7 +376,7 @@ export default async function AdminBusinessDetail({
                 name="percent"
                 inputMode="decimal"
                 placeholder="Örn. 50"
-                className="w-28 rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                className="w-28 max-w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
               />
             </div>
             <div>

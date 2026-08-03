@@ -584,23 +584,29 @@ export default async function AdminAgents({
                   </div>
                 )}
                 <div className="mt-2 flex flex-wrap items-end gap-2">
-                  <form action={payoutMarkPaid} className="flex items-end gap-2">
+                  <form
+                    action={payoutMarkPaid}
+                    className="flex flex-wrap items-end gap-2"
+                  >
                     <input type="hidden" name="id" value={t.id} />
                     <input
                       name="adminNote"
                       placeholder="Havale referansı (ops.)"
-                      className="w-44 rounded-lg border border-slate-300 px-2 py-1.5 text-xs"
+                      className="w-44 max-w-full rounded-lg border border-slate-300 px-2 py-1.5 text-xs"
                     />
-                    <PendingButton className="rounded-lg bg-green-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-green-700">
+                    <PendingButton className="w-full rounded-lg bg-green-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-green-700 sm:w-auto">
                       Havaleyi yaptım — Ödendi
                     </PendingButton>
                   </form>
-                  <form action={payoutReject} className="flex items-end gap-2">
+                  <form
+                    action={payoutReject}
+                    className="flex flex-wrap items-end gap-2"
+                  >
                     <input type="hidden" name="id" value={t.id} />
                     <input
                       name="adminNote"
                       placeholder="Ret sebebi"
-                      className="w-36 rounded-lg border border-slate-300 px-2 py-1.5 text-xs"
+                      className="w-36 max-w-full rounded-lg border border-slate-300 px-2 py-1.5 text-xs"
                     />
                     <PendingButton className="rounded-lg border border-red-300 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50">
                       Reddet
