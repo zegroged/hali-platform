@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { ayTahakkuklari, stopajHesapla, STOPAJ_ESIK, STOPAJ_ORAN } from "@/lib/stopaj";
+import { agentBalance } from "@/lib/payout";
 import {
   createAgent,
   setAgentTerritory,
@@ -178,6 +179,50 @@ export default async function AdminAgents({
       },
     },
   });
+  // AY SONU ODEME OZETI (2026-08-03, kullanici istegi: "bu ay komisyonculara
+  // ne kadar odeyecegim yazmiyor").
+  //
+  // Odemeler ayin SON GUNU otomatik talebe donusuyor (lib/payout.ts) ama admin
+  // o gune kadar TOPLAMI hicbir yerde goremiyordu: kartlarda kisi bazinda
+  // "odenmemis" yaziyordu; toplam yoktu, stopaj sonrasi NET yoktu, IBAN'i
+  // eksik olan kimdi belli degildi. Bu blok ucunu birden veriyor.
+  const aktifAjanlar = agents.filter((a) => a.active && !a.suspendedByAdmin);
+  // Bu takvim ayindaki brut tahakkuklar — stopaj esigi bunun uzerinden olculur
+  // (odeme talebi acildiginda da ayni kaynak kullanilir, lib/payout.ts).
+  const buAyMap = await ayTahakkuklari(aktifAjanlar.map((a) => a.id));
+  const odenecekler = await Promise.all(
+    aktifAjanlar
+      .map(async (a) => {
+        const bakiye = await agentBalance(a.id);
+        const buAy = buAyMap.get(a.id) ?? 0;
+        // Stopaj: yalniz fatura mukellefi OLMAYAN ve bu ay esige ULASAN kiside.
+        const stopajli = !a.faturaMukellefi && buAy >= STOPAJ_ESIK;
+        const dokum = stopajli ? stopajHesapla(bakiye.toplam) : null;
+        const eksikBilgi = [];
+        if (!a.iban) eksikBilgi.push("IBAN");
+        if (!a.ibanName) eksikBilgi.push("hesap sahibi adi");
+        if (stopajli && !a.taxId) eksikBilgi.push("T.C. no");
+        if (stopajli && !a.address) eksikBilgi.push("adres");
+        return { a, bakiye, buAy, dokum, eksikBilgi };
+      }),
+  );
+  const odenecekListe = odenecekler.filter((o) => o.bakiye.toplam > 0);
+  const toplamBrut = odenecekListe.reduce((t, o) => t + o.bakiye.toplam, 0);
+  const toplamNet = odenecekListe.reduce(
+    (t, o) => t + (o.dokum ? o.dokum.net : o.bakiye.toplam),
+    0,
+  );
+  const toplamStopaj = odenecekListe.reduce((t, o) => t + (o.dokum?.stopaj ?? 0), 0);
+  const bekletilecek = odenecekListe.filter((o) => o.eksikBilgi.length > 0).length;
+  const [oy, om] = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Istanbul" })
+    .format(new Date())
+    .split("-")
+    .map(Number);
+  const odemeGunu = new Date(oy, om, 0).toLocaleDateString("tr-TR", {
+    day: "numeric",
+    month: "long",
+  });
+
   const bekleyenTalepler = talepler.filter((t) => t.status === "PENDING");
   const gecmisTalepler = talepler.filter((t) => t.status !== "PENDING");
   // STOPAJ GÖSTERGESİ (2026-07-31): bu ay ESIK'i asan komisyoncunun bekleyen
@@ -277,6 +322,132 @@ export default async function AdminAgents({
           {hata}
         </p>
       )}
+
+      {/* AY SONU ODEME OZETI — "bu ay ne kadar odeyecegim" */}
+      <section className="rounded-2xl border-2 border-slate-300 bg-white p-5">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="font-semibold text-slate-900">
+            Bu Ay Ödenecek{" "}
+            <span className="text-sm font-normal text-slate-500">
+              ({odemeGunu} — ay sonu)
+            </span>
+          </h2>
+          <span className="text-sm text-slate-600">
+            {odenecekListe.length} komisyoncu
+          </span>
+        </div>
+
+        {odenecekListe.length === 0 ? (
+          <p className="mt-2 text-sm text-slate-600">
+            Şu an ödenecek bakiye yok. Komisyon, getirilen işletme abonelik
+            ödemesini yaptığında işler.
+          </p>
+        ) : (
+          <>
+            <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+              <div className="rounded-xl bg-slate-50 p-3">
+                <div className="text-xs text-slate-500">Brüt toplam</div>
+                <div className="text-base font-bold leading-tight text-slate-900 sm:text-xl">
+                  {fmtTL(toplamBrut)} TL
+                </div>
+              </div>
+              <div className="rounded-xl bg-emerald-50 p-3">
+                <div className="text-xs text-emerald-700">Havale edilecek (net)</div>
+                <div className="text-base font-bold leading-tight text-emerald-800 sm:text-xl">
+                  {fmtTL(toplamNet)} TL
+                </div>
+              </div>
+              {toplamStopaj > 0 && (
+                <div className="rounded-xl bg-amber-50 p-3">
+                  <div className="text-xs text-amber-700">
+                    Stopaj (beyan edeceğin)
+                  </div>
+                  <div className="text-base font-bold leading-tight text-amber-800 sm:text-xl">
+                    {fmtTL(toplamStopaj)} TL
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {bekletilecek > 0 && (
+              <p className="mt-3 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                ⚠️ <strong>{bekletilecek} komisyoncunun</strong> ödeme bilgisi
+                eksik — ay sonunda talebi AÇILMAZ, ödemesi bekler. Aşağıda
+                kırmızıyla işaretli.
+              </p>
+            )}
+
+            <div className="mt-3 overflow-x-auto">
+              <table className="w-full min-w-[520px] text-sm">
+                <thead>
+                  <tr className="border-b border-slate-200 text-left text-xs text-slate-500">
+                    <th className="py-1.5">Komisyoncu</th>
+                    <th className="py-1.5 text-right">Bu ay tahakkuk</th>
+                    <th className="py-1.5 text-right">Ödenmemiş bakiye</th>
+                    <th className="py-1.5 text-right">Stopaj</th>
+                    <th className="py-1.5 text-right">Havale (net)</th>
+                    <th className="py-1.5">IBAN</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {odenecekListe.map((o) => (
+                    <tr key={o.a.id}>
+                      <td className="py-2">
+                        <span className="font-medium text-slate-900">
+                          {o.a.user.name}
+                        </span>
+                        {o.a.isHead && (
+                          <span className="ml-1 rounded-full bg-indigo-100 px-1.5 py-0.5 text-xs text-indigo-700">
+                            baş
+                          </span>
+                        )}
+                        {o.bakiye.havuz > 0 && (
+                          <div className="text-xs text-slate-500">
+                            kendi {fmtTL(o.bakiye.kendi)} + ekip{" "}
+                            {fmtTL(o.bakiye.havuz)}
+                          </div>
+                        )}
+                      </td>
+                      <td className="py-2 text-right text-slate-600">
+                        {fmtTL(o.buAy)}
+                      </td>
+                      <td className="py-2 text-right font-medium">
+                        {fmtTL(o.bakiye.toplam)}
+                      </td>
+                      <td className="py-2 text-right text-amber-700">
+                        {o.dokum ? fmtTL(o.dokum.stopaj) : "—"}
+                      </td>
+                      <td className="py-2 text-right font-bold text-emerald-800">
+                        {fmtTL(o.dokum ? o.dokum.net : o.bakiye.toplam)}
+                      </td>
+                      <td className="py-2">
+                        {o.eksikBilgi.length > 0 ? (
+                          <span className="text-xs font-medium text-red-600">
+                            eksik: {o.eksikBilgi.join(", ")}
+                          </span>
+                        ) : (
+                          <span className="break-all text-xs text-slate-500">
+                            {o.a.iban}
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <p className="mt-3 text-xs text-slate-500">
+              Stopaj yalnız <strong>fatura kesemeyen</strong> ve bu ayki
+              tahakkuku <strong>{fmtTL(STOPAJ_ESIK)} TL</strong>&apos;ye ulaşan
+              komisyoncuda hesaplanır (%{Math.round(STOPAJ_ORAN * 100)}). Fatura
+              mükellefi olana brüt gönderilir, faturayı o keser. Kesin tutarlar
+              ödeme talebi açıldığında kalıcı yazılır — buradaki tablo anlık
+              tahmindir.
+            </p>
+          </>
+        )}
+      </section>
 
       {/* ÖDEME TALEPLERİ — havale yapılacaklar en üstte */}
       <section className="rounded-2xl border border-amber-300 bg-amber-50/50 p-5">
