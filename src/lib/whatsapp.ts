@@ -260,6 +260,12 @@ export async function waGonderVeKaydet(opts: {
   // numaraları uydurmadır (tahsissiz 0500 aralığı — WhatsApp'ta yoklar).
   // Gönderilseydi her satış gösterisi hem kotadan/paradan yerdi hem de
   // panelde "WhatsApp mesajı gitmedi" zili çalıp demoyu bozardı.
+  //
+  // TEK İSTİSNA (2026-08-04): komisyoncu demoyu karşısındaki halıcının GERÇEK
+  // numarasına bağladıysa (lib/demoWa.ts, 24 saatlik süreli bağ) o numaraya
+  // gönderim SERBEST — satışın en güçlü anı halıcının kendi telefonunda
+  // mesajı görmesi. Bağ yalnız bağlanan numarayı açar; uydurma 0500
+  // numaralarına gönderim yine kapalıdır.
   let siparis: {
     businessId: string;
     customerPhone: string;
@@ -274,7 +280,18 @@ export async function waGonderVeKaydet(opts: {
         business: { select: { isDemo: true } },
       },
     });
-    if (siparis?.business.isDemo) return;
+    if (siparis?.business.isDemo) {
+      // Bağ sorgusu patlarsa KAPALI kabul et: demo panelinden yanlışlıkla
+      // gerçek mesaj çıkmasındansa demo sessiz kalsın.
+      let serbest = false;
+      try {
+        const { demoWaGecerliMi } = await import("@/lib/demoWa");
+        serbest = await demoWaGecerliMi(siparis.businessId, siparis.customerPhone);
+      } catch (e) {
+        console.error("[whatsapp] demo bağı okunamadı:", e);
+      }
+      if (!serbest) return;
+    }
   } catch {
     // Kontrol sorgusu patlarsa gerçek siparişin bildirimi durmasın.
   }

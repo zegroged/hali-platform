@@ -5,6 +5,9 @@ import EmptyState from "@/components/EmptyState";
 import { IconWhatsApp } from "@/components/icons";
 import WhatsAppReply from "@/components/WhatsAppReply";
 import { waTelefonAdaylari } from "@/lib/whatsapp";
+import { demoWaOku, DEMO_WA_SURE_SAAT } from "@/lib/demoWa";
+import { PendingButton } from "@/components/PendingButton";
+import { demoWaBaglaAction, demoWaCozAction } from "./actions";
 
 // GELEN KUTUSU (2026-07-29): müşterinin WhatsApp'tan yazdığı mesajlar eskiden
 // YALNIZ webhook log'una düşüyordu — halıcı ne görüyordu ne cevaplayabiliyordu.
@@ -60,12 +63,15 @@ const siparisKodu = (o: { id: string; code: string | null }) =>
 export default async function MesajlarSayfasi({
   searchParams,
 }: {
-  searchParams: Promise<{ tel?: string }>;
+  searchParams: Promise<{ tel?: string; hata?: string; kaydedildi?: string }>;
 }) {
   // 🔴 Oturum + rol + işletme — mesaj sorgusundan ÖNCE.
   const b = await getCurrentBusiness();
   if (!b) return null;
-  const { tel } = await searchParams;
+  const { tel, hata, kaydedildi } = await searchParams;
+
+  // DEMO WHATSAPP BAĞI (2026-08-04): yalnız demo panelinde görünür.
+  const demoBag = b.isDemo ? await demoWaOku(b.id) : null;
 
   // Adres çubuğundan gelen numara: yalnız rakam. (İzolasyonu bu sağlamıyor —
   // sorgu zaten businessId ile daraltılıyor — ama saçma girdi sorguya girmesin.)
@@ -242,6 +248,98 @@ export default async function MesajlarSayfasi({
           WhatsApp — müşteriden gelen yazışmalar
         </span>
       </div>
+
+      {hata && (
+        <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          {hata}
+        </p>
+      )}
+      {kaydedildi && (
+        <p className="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800">
+          {kaydedildi}
+        </p>
+      )}
+
+      {/* DEMO WHATSAPP BAĞI — yalnız komisyoncunun demo panelinde.
+          Sahadaki en güçlü an: halıcının KENDİ telefonuna gerçek mesaj düşmesi.
+          Ayrıntı ve güvenlik gerekçeleri: lib/demoWa.ts */}
+      {b.isDemo && (
+        <div className="rounded-xl border border-violet-200 bg-violet-50 p-4">
+          {demoBag ? (
+            <>
+              <p className="text-sm font-semibold text-violet-900">
+                Demo şu numaraya bağlı: {telGoster(demoBag.phone)}
+              </p>
+              <p className="mt-1 text-sm text-violet-800">
+                Siparişi ilerlettiğinde (halı alındı · yıkama başladı · fiyat
+                onayı · hazır · yolda · teslim) mesajlar{" "}
+                <strong>gerçekten</strong> bu telefona gidiyor. Cevap kutusu ise
+                ancak <strong>o sana yazdıktan sonra</strong> çalışır — WhatsApp
+                kuralı: serbest mesaj için 24 saatlik pencerenin müşteri
+                tarafından açılması gerekir. En iyi gösteri sırası: sen ilerlet
+                → telefonu titresin → “şuna cevap yaz” de → cevabı bu ekranda
+                çıksın. Bağ{" "}
+                {demoBag.until.toLocaleString("tr-TR", {
+                  day: "2-digit",
+                  month: "2-digit",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                  timeZone: TZ,
+                })}{" "}
+                itibarıyla kendiliğinden kalkar.
+              </p>
+              <form action={demoWaCozAction} className="mt-3">
+                <PendingButton className="rounded-lg border border-violet-300 bg-white px-3 py-2 text-sm font-semibold text-violet-800 hover:bg-violet-100 disabled:opacity-60">
+                  Bağı kaldır
+                </PendingButton>
+              </form>
+            </>
+          ) : (
+            <>
+              <p className="text-sm font-semibold text-violet-900">
+                Demoyu telefona bağla
+              </p>
+              <p className="mt-1 text-sm text-violet-800">
+                Karşındaki halıcının numarasını yaz: bundan sonra demo
+                siparişini ilerlettiğinde WhatsApp mesajları{" "}
+                <strong>gerçekten onun telefonuna</strong> düşer, yazdığı cevap
+                da bu ekranda görünür. Bağ {DEMO_WA_SURE_SAAT} saat sonra
+                kendiliğinden kalkar.
+              </p>
+              <form
+                action={demoWaBaglaAction}
+                className="mt-3 flex flex-wrap items-end gap-2"
+              >
+                <div className="min-w-0">
+                  <label
+                    htmlFor="demo-wa-tel"
+                    className="block text-xs font-medium text-violet-900"
+                  >
+                    Halıcının cep numarası
+                  </label>
+                  <input
+                    id="demo-wa-tel"
+                    name="phone"
+                    type="tel"
+                    inputMode="numeric"
+                    required
+                    placeholder="05XX XXX XX XX"
+                    className="mt-0.5 w-52 max-w-full rounded-lg border border-violet-300 px-3 py-2.5 text-sm focus:border-violet-500"
+                  />
+                </div>
+                <PendingButton className="w-full rounded-lg bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-700 disabled:opacity-60 sm:w-auto">
+                  Bağla
+                </PendingButton>
+              </form>
+              <p className="mt-2 text-xs text-violet-700">
+                Numarayı yalnız <strong>izniyle</strong> yaz — mesajlar
+                platformun kendi WhatsApp numarasından gider. Günde en fazla 5
+                farklı numara.
+              </p>
+            </>
+          )}
+        </div>
+      )}
 
       {sohbetler.length === 0 ? (
         <>

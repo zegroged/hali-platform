@@ -46,21 +46,6 @@ export async function POST(req: NextRequest) {
   const b = await getCurrentBusiness();
   if (!b) return NextResponse.json({ error: "Yetkisiz" }, { status: 401 });
 
-  // DEMO KALKANI (2026-08-02): demo panele örnek bir yazışma eklendi; o sohbette
-  // cevap kutusu AÇIK görünür (müşteri "3 saat önce" yazmış gibi). Kalkan
-  // olmasaydı komisyoncu dükkânda cevap yazmayı denediğinde sistem uydurma bir
-  // numaraya GERÇEK gönderim yapmaya kalkardı. Aynı ilke `waGonderVeKaydet` ve
-  // `sendSms` içinde de var — demo hiçbir gerçek mesaj üretmez.
-  if (b.isDemo) {
-    return NextResponse.json(
-      {
-        error:
-          "Demo hesap: mesaj gerçekten gönderilmez. Gerçek panelde bu kutudan müşteriye cevap yazarsın (müşteri son 24 saatte yazmışsa).",
-      },
-      { status: 400 },
-    );
-  }
-
   // HIZ SINIRI: her mesaj Meta'da faturalanabilir. Elle yazan bir halıcı 10
   // dakikada 20 mesajı zor geçer; bunu aşan şey ya bozuk bir döngü ya kötüye
   // kullanımdır. Sınır İŞLETME başına (IP değil) — aynı hesap farklı ağdan da
@@ -71,6 +56,8 @@ export async function POST(req: NextRequest) {
   const rl = rateLimit(`wa-cevap:${b.id}`, 20, 60 * 60 * 1000);
   if (!rl.ok) return tooMany(rl.retryAfterSec);
 
+  // Gövde demo kalkanından ÖNCE ayrıştırılıyor: kalkanın hangi numaraya
+  // yazıldığını bilmesi gerekiyor (istek gövdesi bir kez okunabilir).
   const parsed = Body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) {
     const first = parsed.error.issues[0];
@@ -78,6 +65,28 @@ export async function POST(req: NextRequest) {
       { error: first?.message ?? "Geçersiz veri" },
       { status: 400 },
     );
+  }
+
+  // DEMO KALKANI (2026-08-02): demo panele örnek bir yazışma eklendi; o sohbette
+  // cevap kutusu AÇIK görünür (müşteri "3 saat önce" yazmış gibi). Kalkan
+  // olmasaydı komisyoncu dükkânda cevap yazmayı denediğinde sistem uydurma bir
+  // numaraya GERÇEK gönderim yapmaya kalkardı. Aynı ilke `waGonderVeKaydet` ve
+  // `sendSms` içinde de var.
+  // TEK İSTİSNA (2026-08-04): komisyoncu demoyu karşısındaki halıcının GERÇEK
+  // numarasına bağladıysa (lib/demoWa.ts) O NUMARAYA cevap yazmak serbesttir —
+  // "sana yazayım, telefonuna baksana" anı satışın kendisidir. Kalkan diğer
+  // bütün numaralar için aynen duruyor.
+  if (b.isDemo) {
+    const { demoWaGecerliMi } = await import("@/lib/demoWa");
+    if (!(await demoWaGecerliMi(b.id, parsed.data.phone))) {
+      return NextResponse.json(
+        {
+          error:
+            "Demo hesap: bu numaraya mesaj gerçekten gönderilmez. Mesajlar ekranındaki “Demoyu telefona bağla” kutusuna karşındakinin numarasını yazarsan mesajlar ona GERÇEKTEN gider.",
+        },
+        { status: 400 },
+      );
+    }
   }
   const metin = parsed.data.body.trim();
   if (!metin)

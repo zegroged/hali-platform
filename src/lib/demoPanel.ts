@@ -201,6 +201,17 @@ export async function demoPaneliSil(agentId: string): Promise<boolean> {
   if (!b) return false;
   const kullaniciIdleri = [b.ownerId, ...b.drivers.map((d) => d.userId)];
 
+  // WHATSAPP BAĞI ÖNCE ÇÖZÜLÜR (2026-08-04): demo sırasında gerçek bir numaraya
+  // bağlanmış olabilir. Çözüm, o numaraya ait mesaj satırlarını da siler —
+  // kişinin üstünde "bu işletmeye bağlıydı" izi kalmasın (webhook'un kaçırma
+  // savunması ileride onun gerçek mesajlarını sahipsiz bırakırdı).
+  try {
+    const { demoWaCoz } = await import("@/lib/demoWa");
+    await demoWaCoz(b.id);
+  } catch (e) {
+    console.error("[demo] silmeden önce whatsapp bağı çözülemedi:", e);
+  }
+
   await prisma.order.deleteMany({ where: { businessId: b.id } });
   await prisma.cleanerBusiness.delete({ where: { id: b.id } });
   // GÜVENLİK AĞI: yalnız demo kullanıcıları sil. Rol + telefon öneki birlikte
@@ -1105,6 +1116,17 @@ export async function demoGunuTazele(businessId: string): Promise<void> {
     if (!b?.isDemo) return; // gerçek işletme buraya HİÇ girmez
     const sofor = b.drivers[0];
     const simdi = Date.now();
+
+    // ---- 0) SÜRESİ DOLMUŞ WHATSAPP BAĞI (2026-08-04) ----
+    // Komisyoncu demoyu bir halıcının gerçek numarasına bağlamış olabilir.
+    // 24 saat dolduğunda siparişler uydurma numaralarına geri döner; kimse
+    // "kaldır" demese bile o kişiye bir daha mesaj gitmez.
+    try {
+      const { demoWaSuresiDolduysaCoz } = await import("@/lib/demoWa");
+      await demoWaSuresiDolduysaCoz(businessId);
+    } catch (e) {
+      console.error("[demo] whatsapp bağı temizlenemedi:", e);
+    }
 
     // ---- 1) ŞOFÖR CANLILIĞI (her çağrıda, tek UPDATE) ----
     // Panel haritası 5 dakikadan eski konumu "bayat" sayıp basmıyor.

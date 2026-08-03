@@ -114,7 +114,7 @@ export default async function PanelOrders() {
                 <>
                   <form
                     action={reassignOrder}
-                    className="flex items-end gap-1.5"
+                    className="flex flex-wrap items-end gap-1.5"
                   >
                     <input type="hidden" name="orderId" value={o.id} />
                     <div className="min-w-0 flex-1 sm:flex-none">
@@ -153,7 +153,7 @@ export default async function PanelOrders() {
                   {(o.status === "CREATED" || o.status === "ACCEPTED") && (
                     <form
                       action={rejectOrder}
-                      className="flex items-end gap-1.5"
+                      className="flex flex-wrap items-end gap-1.5"
                     >
                       <input type="hidden" name="orderId" value={o.id} />
                       <div className="min-w-0 flex-1 sm:flex-none">

@@ -246,14 +246,14 @@ export default async function OrderManagePage({
 
         {/* Sıradaki adım — duruma göre tek net aksiyon */}
         {o.status === "CREATED" && (
-          <div className="mt-4 flex flex-col gap-2 border-t border-slate-100 pt-4 sm:flex-row sm:items-end">
+          <div className="mt-4 flex flex-col gap-2 border-t border-slate-100 pt-4 sm:flex-row sm:flex-wrap sm:items-end">
             <form action={acceptOrderPanel} className="sm:mr-2">
               <input type="hidden" name="orderId" value={o.id} />
               <PendingButton className="w-full rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark active:scale-[0.99] disabled:opacity-60 sm:w-auto">
                 Siparişi Onayla
               </PendingButton>
             </form>
-            <form action={rejectOrder} className="flex items-end gap-1.5">
+            <form action={rejectOrder} className="flex flex-wrap items-end gap-1.5">
               <input type="hidden" name="orderId" value={o.id} />
               <div className="min-w-0 flex-1 sm:flex-none">
                 <span className="block text-xs font-medium text-slate-500">
@@ -319,10 +319,10 @@ export default async function OrderManagePage({
         {o.status === "OUT_FOR_DELIVERY" && (
           <form
             action={deliverOrderPanel}
-            className="mt-4 flex items-end gap-2 border-t border-slate-100 pt-4"
+            className="mt-4 flex flex-wrap items-end gap-2 border-t border-slate-100 pt-4"
           >
             <input type="hidden" name="orderId" value={o.id} />
-            <div>
+            <div className="min-w-0">
               <label
                 htmlFor="teslim-tutar"
                 className="block text-xs font-medium text-slate-500"
@@ -332,7 +332,7 @@ export default async function OrderManagePage({
               {/* Anlaşılan/bildirilen tutar varsa HAZIR gelir (2026-07-26):
                   halıcı manuel kayıtta ya da kesin fiyatta yazdıysa teslimde
                   tekrar yazmasın — tek tıkla teslim etsin. */}
-              <div className="mt-0.5 w-40">
+              <div className="mt-0.5 w-40 max-w-full">
                 <MoneyInput
                   id="teslim-tutar"
                   name="price"
@@ -352,7 +352,7 @@ export default async function OrderManagePage({
                 kalıyor. Kurumsal müşteri (ay sonu fatura) ve gün sonu
                 mutabakatı bu duruma dayanıyor. */}
             {o.paymentMethod === "CASH" && (
-              <div>
+              <div className="min-w-0">
                 <label
                   htmlFor="teslim-tahsilat"
                   className="block text-xs font-medium text-slate-500"
@@ -363,7 +363,7 @@ export default async function OrderManagePage({
                   id="teslim-tahsilat"
                   name="collected"
                   defaultValue="CASH"
-                  className="mt-0.5 rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:border-brand"
+                  className="mt-0.5 w-full max-w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:border-brand sm:w-auto"
                 >
                   <option value="CASH">Nakit aldım</option>
                   <option value="IBAN">IBAN&apos;a geldi</option>
@@ -371,7 +371,7 @@ export default async function OrderManagePage({
                 </select>
               </div>
             )}
-            <PendingButton className="rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark active:scale-[0.99] disabled:opacity-60">
+            <PendingButton className="w-full rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark active:scale-[0.99] disabled:opacity-60 sm:w-auto">
               Teslim Edildi
             </PendingButton>
           </form>
@@ -423,17 +423,17 @@ export default async function OrderManagePage({
               {o.status === "PICKED_UP" && (
                 <form
                   action={quoteOrderPrice}
-                  className="mt-3 flex items-end gap-2"
+                  className="mt-3 flex flex-wrap items-end gap-2"
                 >
                   <input type="hidden" name="orderId" value={o.id} />
-                  <div>
+                  <div className="min-w-0">
                     <label
                       htmlFor="kesin-fiyat"
                       className="block text-xs font-medium text-slate-500"
                     >
                       Kesin fiyat (TL)
                     </label>
-                    <div className="mt-0.5 w-40">
+                    <div className="mt-0.5 w-40 max-w-full">
                       <MoneyInput
                         id="kesin-fiyat"
                         name="price"
@@ -446,7 +446,7 @@ export default async function OrderManagePage({
                       />
                     </div>
                   </div>
-                  <PendingButton className="rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark active:scale-[0.99] disabled:opacity-60">
+                  <PendingButton className="w-full rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark active:scale-[0.99] disabled:opacity-60 sm:w-auto">
                     {o.quotedPrice != null ? "Fiyatı güncelle" : "Fiyatı bildir"}
                   </PendingButton>
                 </form>
@@ -466,7 +466,10 @@ export default async function OrderManagePage({
                 ? `Müşteriye ~${o.estimatedDays} gün olarak gösteriliyor.`
                 : "Henüz belirtilmedi — müşteriye süre ver, güven artar."}
             </p>
-            <form action={setOrderEta} className="mt-3 flex items-end gap-2">
+            <form
+              action={setOrderEta}
+              className="mt-3 flex flex-wrap items-end gap-2"
+            >
               <input type="hidden" name="orderId" value={o.id} />
               <div>
                 <label
@@ -497,7 +500,10 @@ export default async function OrderManagePage({
             <p className="mt-1 text-sm text-slate-600">
               {o.driver ? o.driver.user.name : "Atanmamış"}
             </p>
-            <form action={reassignOrder} className="mt-3 flex items-end gap-2">
+            <form
+              action={reassignOrder}
+              className="mt-3 flex flex-wrap items-end gap-2"
+            >
               <input type="hidden" name="orderId" value={o.id} />
               <select
                 name="driverId"
