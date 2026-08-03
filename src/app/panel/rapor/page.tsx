@@ -42,6 +42,45 @@ export default async function PanelReport({
   const prev = month === 1 ? `${year - 1}-12` : `${year}-${String(month - 1).padStart(2, "0")}`;
   const next = month === 12 ? `${year + 1}-01` : `${year}-${String(month + 1).padStart(2, "0")}`;
 
+  // AY ÖZETİ (2026-08-03): alt menüdeki açıklama "Aylık ciro ve sayılar"
+  // diyordu ama sayfa yalnız şoför duraklarını gösteriyordu — halıcı raporlara
+  // girip ciro arıyor, durak listesi buluyordu. Ay penceresi TR takvimine göre.
+  const ayBasi = new Date(Date.UTC(year, month - 1, 1, -3, 0, 0));
+  const aySonu = new Date(Date.UTC(year, month, 1, -3, 0, 0));
+  const [siparisler, teslimEdilen, tahsilat] = await Promise.all([
+    prisma.order.groupBy({
+      by: ["status"],
+      where: { businessId: b.id, createdAt: { gte: ayBasi, lt: aySonu } },
+      _count: true,
+    }),
+    prisma.order.aggregate({
+      where: {
+        businessId: b.id,
+        status: "DELIVERED",
+        deliveredAt: { gte: ayBasi, lt: aySonu },
+      },
+      _sum: { priceTotal: true },
+      _count: true,
+    }),
+    prisma.order.aggregate({
+      where: {
+        businessId: b.id,
+        collectedAt: { gte: ayBasi, lt: aySonu },
+      },
+      _sum: { collectedAmount: true },
+    }),
+  ]);
+  const toplamSiparis = siparisler.reduce((a, g) => a + g._count, 0);
+  const iptalRed = siparisler
+    .filter((g) => g.status === "CANCELED" || g.status === "REJECTED")
+    .reduce((a, g) => a + g._count, 0);
+  const ciro = Number(teslimEdilen._sum.priceTotal ?? 0);
+  const teslimAdet = teslimEdilen._count;
+  const tahsilEdilen = Number(tahsilat._sum.collectedAmount ?? 0);
+  const ortSepet = teslimAdet > 0 ? ciro / teslimAdet : 0;
+  const fmtTL = (n: number) =>
+    n.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
   const driverIds = b.drivers.map((d) => d.id);
   const stops = await prisma.driverStop.findMany({
     where: {
@@ -65,9 +104,7 @@ export default async function PanelReport({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-lg font-semibold text-slate-900">
-          Şoför Durak Raporu
-        </h1>
+        <h1 className="text-lg font-semibold text-slate-900">Raporlar</h1>
         <div className="flex items-center gap-2 text-sm">
           <Link
             href={`/panel/rapor?ym=${prev}`}
@@ -89,6 +126,40 @@ export default async function PanelReport({
         </div>
       </div>
 
+      {/* AY ÖZETİ */}
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        {[
+          { e: "Ciro", d: fmtTL(ciro) + " TL", a: "teslim edilen siparişler" },
+          { e: "Tahsil edilen", d: fmtTL(tahsilEdilen) + " TL", a: "nakit + IBAN" },
+          { e: "Teslim", d: String(teslimAdet), a: "bu ay tamamlanan" },
+          { e: "Ortalama sepet", d: fmtTL(ortSepet) + " TL", a: "teslim başına" },
+        ].map((k) => (
+          <div key={k.e} className="rounded-xl border border-slate-200 bg-white p-3">
+            <div className="text-xs text-slate-500">{k.e}</div>
+            <div className="mt-0.5 text-base font-bold leading-tight text-slate-900 sm:text-lg">
+              {k.d}
+            </div>
+            <div className="mt-0.5 text-xs text-slate-500">{k.a}</div>
+          </div>
+        ))}
+      </div>
+      <p className="text-sm text-slate-600">
+        Bu ay <strong>{toplamSiparis}</strong> sipariş geldi
+        {iptalRed > 0 && (
+          <>
+            , <strong>{iptalRed}</strong> tanesi iptal/red oldu
+          </>
+        )}
+        . Gelir-gider defterinin tamamı{" "}
+        <Link href="/panel/kasa" className="text-brand-dark underline">
+          KASA
+        </Link>{" "}
+        sayfasında.
+      </p>
+
+      <h2 className="pt-2 text-base font-semibold text-slate-900">
+        Şoför Durak Raporu
+      </h2>
       <p className="text-sm text-slate-500">
         Şoförlerin bu ay nerede, ne zaman, ne kadar durduğunun kaydı.
       </p>

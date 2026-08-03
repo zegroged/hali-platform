@@ -108,7 +108,7 @@ export const PANEL_SAYFALAR: PanelSayfa[] = [
   {
     href: "/panel/rapor",
     label: "Raporlar",
-    aciklama: "Aylık ciro ve sayılar",
+    aciklama: "Aylık ciro, teslim, durak",
     Icon: IconChart,
   },
 ];

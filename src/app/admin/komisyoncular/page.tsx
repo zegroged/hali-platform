@@ -40,12 +40,12 @@ const fmtTarih = (d: Date) =>
 export default async function AdminAgents({
   searchParams,
 }: {
-  searchParams: Promise<{ hata?: string; ok?: string }>;
+  searchParams: Promise<{ hata?: string; ok?: string; sifre?: string; kim?: string }>;
 }) {
   // Yetki kapısı prisma'dan ÖNCE (RSC sızıntısı önlemi).
   const admin = await getSessionUser();
   if (!admin || admin.role !== "ADMIN") redirect("/giris");
-  const { hata, ok } = await searchParams;
+  const { hata, ok, sifre, kim } = await searchParams;
 
   const agents = await prisma.agent.findMany({
     orderBy: { createdAt: "desc" },
@@ -242,6 +242,25 @@ export default async function AdminAgents({
           oluşturuldu: …" kalıbına sarılıyordu — şifre sıfırlama, tavan
           kaydetme, baş komisyoncu terfisi gibi mesajlar saçmalıyordu.
           Artık mesaj olduğu gibi basılır; hesap açma kendi cümlesini yazar. */}
+      {sifre && (
+        <div className="rounded-xl border-2 border-amber-400 bg-amber-50 px-4 py-3">
+          <p className="text-sm font-semibold text-amber-900">
+            🔑 {kim || "Komisyoncu"} için yeni şifre
+          </p>
+          {/* select-all: telefonda tek dokunuşta hepsi seçilir. Şifre bir daha
+              GÖSTERİLEMEZ (veritabanında yalnız bcrypt özeti var) — bu yüzden
+              uyarı da burada. */}
+          <p className="mt-2 select-all break-all rounded-lg border border-amber-300 bg-white px-3 py-2.5 font-mono text-lg font-bold text-slate-900">
+            {sifre}
+          </p>
+          <p className="mt-2 text-xs text-amber-900">
+            <strong>Şimdi kopyala/yaz — bu şifre bir daha gösterilmeyecek.</strong>{" "}
+            Kaybedersen tekrar sıfırlarsın ama o zaman bu şifre geçersiz olur.
+            Komisyoncu girdikten sonra panelinden 🔑 ile kendi şifresini
+            belirlesin.
+          </p>
+        </div>
+      )}
       {ok && (
         <p
           role="status"
@@ -731,9 +750,16 @@ export default async function AdminAgents({
                       </PendingButton>
                     </form>
                   )}
-                  <form action={resetAgentPassword}>
+                  <form action={resetAgentPassword} className="flex items-center gap-1">
                     <input type="hidden" name="id" value={a.id} />
-                    <PendingButton className="rounded-lg border border-amber-300 px-2.5 py-1 text-xs font-medium text-amber-700 hover:bg-amber-50">
+                    <input
+                      name="password"
+                      placeholder="şifre (boşsa rastgele)"
+                      aria-label={`${a.user.name} için yeni şifre`}
+                      minLength={8}
+                      className="w-40 rounded-lg border border-amber-300 px-2 py-1.5 text-xs"
+                    />
+                    <PendingButton className="rounded-lg border border-amber-300 px-2.5 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-50">
                       Şifre sıfırla
                     </PendingButton>
                   </form>

@@ -1400,6 +1400,15 @@ export async function toggleAgentTrial(formData: FormData) {
 export async function resetAgentPassword(formData: FormData) {
   await requireAdmin();
   const id = String(formData.get("id") || "");
+  // ADMİN KENDİ ŞİFRESİNİ BELİRLEYEBİLİR (2026-08-03).
+  //
+  // NEDEN: eski hâlde rastgele "Gecici-xxxxxxxx" üretiliyordu ve YALNIZ bir kez,
+  // yeşil bantta gösteriliyordu. Sayfa yenilenince/başka işlem yapılınca şifre
+  // KAYBOLUYORDU — veritabanında yalnız bcrypt özeti var, geri okunamaz. Admin
+  // "sıfırladım ama işe yaramıyor" diyordu: aslında sıfırlama çalışıyor, ama
+  // elinde kalan şifre eski/yanlış oluyordu. Telefonda "şifreni şu yaptım" demek
+  // için önceden bilinen bir şifre gerekiyor.
+  const secilen = String(formData.get("password") || "").trim();
   const agent = await prisma.agent.findUnique({
     where: { id },
     select: { userId: true, user: { select: { name: true } } },
@@ -1408,16 +1417,21 @@ export async function resetAgentPassword(formData: FormData) {
     redirect(
       "/admin/komisyoncular?hata=" + encodeURIComponent("Komisyoncu bulunamadı."),
     );
-  const temp = "Gecici-" + crypto.randomBytes(4).toString("hex");
+  if (secilen && secilen.length < 8)
+    redirect(
+      "/admin/komisyoncular?hata=" +
+        encodeURIComponent("Şifre en az 8 karakter olmalı (boş bırakırsan rastgele üretilir)."),
+    );
+  const temp = secilen || "Gecici-" + crypto.randomBytes(4).toString("hex");
   await prisma.user.update({
     where: { id: agent.userId },
     data: { password: await hashPassword(temp), sessionsValidFrom: new Date() },
   });
   redirect(
-    "/admin/komisyoncular?ok=" +
-      encodeURIComponent(
-        `${agent.user.name} için geçici şifre: ${temp} — telefonla ilet; girişten sonra 🔑 Şifremi Değiştir'den kendisi değiştirsin.`,
-      ),
+    "/admin/komisyoncular?sifre=" +
+      encodeURIComponent(temp) +
+      "&kim=" +
+      encodeURIComponent(agent.user.name),
   );
 }
 
