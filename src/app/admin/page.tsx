@@ -12,14 +12,18 @@ export const dynamic = "force-dynamic";
 export default async function AdminHome({
   searchParams,
 }: {
-  searchParams: Promise<{ hata?: string }>;
+  searchParams: Promise<{ hata?: string; q?: string }>;
 }) {
   // YETKİ KAPISI — prisma sorgularından ÖNCE (layout redirect'i RSC sızıntısını
   // tek başına engellemez; işletme listesi yetkisiz akışa girerdi).
   const admin = await getSessionUser();
   if (!admin || admin.role !== "ADMIN") redirect("/giris");
 
-  const { hata } = await searchParams;
+  const { hata, q } = await searchParams;
+  // ARAMA (2026-08-04, kullanıcı: "büyüdüğümüzde yarım saat insan mı arayacağım").
+  // Sayaçlar HER ZAMAN tüm kayıtları sayar; arama yalnız aşağıdaki TABLOYU
+  // daraltır — yoksa "kaç işletmemiz var" rakamı arama kutusuna göre değişirdi.
+  const aranan = (q ?? "").trim().toLocaleLowerCase("tr");
 
   const [businesses, driverCount, orderCount, cityLeads, staleOrders] =
     await Promise.all([
@@ -28,6 +32,9 @@ export default async function AdminHome({
       include: {
         subscription: true,
         _count: { select: { drivers: true, orders: true } },
+        // Arama için: admin sahayı çoğu zaman KİŞİ üzerinden hatırlıyor
+        // ("Ahmet usta"), işletme adından değil.
+        owner: { select: { name: true, username: true, email: true, phone: true } },
       },
     }),
     // DEMO SAYILMAZ (2026-07-30): komisyoncuların dükkânda gösterdiği demo
@@ -83,6 +90,39 @@ export default async function AdminHome({
       b.isVisible &&
       subscriptionActive(b.subscription),
   ).length;
+
+  // TABLO SATIRLARI: arama varsa daralt. Rakam/harf farkı gözetmez; il, ilçe,
+  // vergi no, sahibin adı/telefonu/e-postası ve kullanıcı adı da taranır.
+  const norm = (s: string | null | undefined) =>
+    (s ?? "").toLocaleLowerCase("tr");
+  const telNorm = (s: string | null | undefined) => (s ?? "").replace(/\D/g, "");
+  const arananTel = aranan.replace(/\D/g, "");
+  const tabloTumu = aranan
+    ? businesses.filter((b) => {
+        const alanlar = [
+          b.name,
+          b.city,
+          b.district,
+          b.address,
+          b.taxNumber,
+          b.billingTitle,
+          b.owner?.name,
+          b.owner?.username,
+          b.owner?.email,
+        ];
+        if (alanlar.some((a) => norm(a).includes(aranan))) return true;
+        // Telefon: "0532 111" ile de "5321112233" ile de bulunsun.
+        if (arananTel.length >= 3) {
+          return [b.phone, b.landlinePhone, b.owner?.phone].some((t) =>
+            telNorm(t).includes(arananTel),
+          );
+        }
+        return false;
+      })
+    : businesses;
+  // Ekranı korumak için tavan; arama zaten daraltıyor.
+  const TABLO_TAVAN = 200;
+  const tablo = tabloTumu.slice(0, TABLO_TAVAN);
 
   // Gözetim sayaçları — platformun bir bakışta durumu
   const stats = [
@@ -299,6 +339,54 @@ export default async function AdminHome({
             </span>
           )}
         </h2>
+
+        {/* ARAMA — GET formu: adres çubuğuna yazılır, sayfa paylaşılabilir ve
+            geri tuşu çalışır (JS'e gerek yok). */}
+        <form method="get" className="mb-3 flex flex-wrap items-end gap-2">
+          <div className="min-w-0 flex-1 sm:max-w-md">
+            <label
+              htmlFor="isletme-ara"
+              className="block text-xs font-medium text-slate-500"
+            >
+              İşletme ara — ad, sahibi, telefon, il/ilçe, vergi no
+            </label>
+            <input
+              id="isletme-ara"
+              name="q"
+              type="search"
+              defaultValue={q ?? ""}
+              placeholder="Ör. Ahmet · 0532 · Gaziantep · Şehitkamil"
+              className="mt-0.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:border-brand"
+            />
+          </div>
+          <button
+            type="submit"
+            className="w-full rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark sm:w-auto"
+          >
+            Ara
+          </button>
+          {aranan && (
+            <Link
+              href="/admin"
+              className="w-full rounded-lg border border-slate-300 px-4 py-2.5 text-center text-sm font-medium text-slate-600 hover:bg-slate-50 sm:w-auto"
+            >
+              Temizle
+            </Link>
+          )}
+        </form>
+        {aranan && (
+          <p className="mb-2 text-sm text-slate-600">
+            <strong>{tabloTumu.length}</strong> sonuç ({businesses.length} kayıt
+            içinde)
+            {tabloTumu.length === 0 && " — başka bir kelimeyle dene."}
+          </p>
+        )}
+        {tabloTumu.length > TABLO_TAVAN && (
+          <p className="mb-2 text-sm text-amber-700">
+            İlk {TABLO_TAVAN} kayıt gösteriliyor — aradığını bulmak için yukarıya
+            yaz.
+          </p>
+        )}
         {konumsuz.length > 0 && (
           <p
             role="alert"
@@ -334,7 +422,7 @@ export default async function AdminHome({
               </tr>
             </thead>
             <tbody>
-              {businesses.map((b) => {
+              {tablo.map((b) => {
                 const verif = verifMeta(b.verification);
                 return (
                   <tr key={b.id} className="border-t border-slate-100">

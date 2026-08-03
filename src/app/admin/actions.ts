@@ -847,6 +847,30 @@ export async function createAgent(formData: FormData) {
   if (emailRaw && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(emailRaw))
     err("Geçerli bir e-posta yaz ya da alanı boş bırak.");
 
+  // EKİBE DOĞRUDAN AÇ (2026-08-04): admin, yeni komisyoncuyu bir baş
+  // komisyoncunun altına açabilsin. Öncesinde bunu YALNIZ baş komisyoncu kendi
+  // panelinden yapabiliyordu. Kurallar setAgentParent ile aynı.
+  const parentIdRaw = String(formData.get("parentId") || "").trim();
+  let parentId: string | null = null;
+  if (parentIdRaw) {
+    if (isHead)
+      err(
+        "Baş komisyoncu başka bir ekibe bağlanamaz (sistem iki kademeli). Ya \"Baş komisyoncu\" kutusunu kaldır ya ekip seçimini boşalt.",
+      );
+    const parent = await prisma.agent.findUnique({
+      where: { id: parentIdRaw },
+      select: { id: true, isHead: true, poolPercent: true, user: { select: { name: true } } },
+    });
+    if (!parent) err("Seçilen baş komisyoncu bulunamadı.");
+    if (!parent!.isHead) err("Seçtiğin kişi baş komisyoncu değil.");
+    const havuz = Number(parent!.poolPercent ?? 0);
+    if (percent > havuz)
+      err(
+        `${parent!.user.name} ekibinin havuz payı %${havuz}; alt komisyoncuya daha fazlası (%${percent}) verilemez.`,
+      );
+    parentId = parent!.id;
+  }
+
   const exists = await prisma.user.findFirst({
     where: emailRaw
       ? { OR: [{ username }, { phone }, { email: emailRaw }] }
@@ -888,6 +912,7 @@ export async function createAgent(formData: FormData) {
           maxTrialDays,
           isHead,
           poolPercent,
+          parentId,
         },
       });
       // BÖLGE (2026-07-28): hangi il/ilçelerden sorumlu. Çakışma engel değil,
@@ -1145,6 +1170,94 @@ export async function updateAgentPercent(formData: FormData) {
   }
   revalidatePath("/admin/komisyoncular");
   redirect("/admin/komisyoncular?ok=" + encodeURIComponent("oran güncellendi"));
+}
+
+/**
+ * KOMİSYONCUYU BİR BAŞ KOMİSYONCUYA BAĞLA / EKİPTEN ÇIKAR (2026-08-04).
+ *
+ * NEDEN: bugüne kadar alt komisyoncuyu YALNIZ baş komisyoncu kendi panelinden
+ * açabiliyordu. Admin, mevcut bağımsız bir komisyoncuyu bir ekibe alamıyordu —
+ * saha gerçeği ise tersi: kişi önce tek başına başlıyor, sonra bir başın
+ * ekibine giriyor.
+ *
+ * KURALLAR (havuz matematiği bozulmasın):
+ *  - 2 KADEME: baş komisyoncu başka bir başın altına GİREMEZ.
+ *  - Alt komisyoncunun oranı, başın havuz payını AŞAMAZ (updateAgentPercent'teki
+ *    kuralın aynısı) — aşıyorsa admin önce oranı düşürmeli.
+ *  - Ekipten çıkarma serbest: `parentId = null` (kişi bağımsız komisyoncu olur;
+ *    GEÇMİŞ tahakkuklar değişmez, onlar kendi satırlarında donmuş durumda).
+ */
+export async function setAgentParent(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("id") || "");
+  const parentId = String(formData.get("parentId") || "").trim();
+  const err = (m: string) =>
+    redirect("/admin/komisyoncular?hata=" + encodeURIComponent(m));
+
+  const agent = await prisma.agent.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      isHead: true,
+      parentId: true,
+      percent: true,
+      user: { select: { name: true } },
+    },
+  });
+  if (!agent) err("Komisyoncu bulunamadı.");
+  if (agent!.isHead)
+    err(
+      "Baş komisyoncu başka bir ekibe bağlanamaz (sistem iki kademelidir). Önce baş komisyonculuğunu geri al.",
+    );
+
+  // EKİPTEN ÇIKAR
+  if (!parentId) {
+    if (!agent!.parentId)
+      err(`${agent!.user.name} zaten bir ekipte değil.`);
+    await prisma.agent.update({
+      where: { id: agent!.id },
+      data: { parentId: null },
+    });
+    revalidatePath("/admin/komisyoncular");
+    redirect(
+      "/admin/komisyoncular?ok=" +
+        encodeURIComponent(
+          `${agent!.user.name} ekipten çıkarıldı — artık bağımsız komisyoncu (geçmiş tahakkuklar değişmedi).`,
+        ),
+    );
+  }
+
+  if (parentId === agent!.id) err("Bir komisyoncu kendi ekibine bağlanamaz.");
+  const parent = await prisma.agent.findUnique({
+    where: { id: parentId },
+    select: {
+      id: true,
+      isHead: true,
+      poolPercent: true,
+      user: { select: { name: true } },
+    },
+  });
+  if (!parent) err("Baş komisyoncu bulunamadı.");
+  if (!parent!.isHead) err("Seçtiğin kişi baş komisyoncu değil.");
+
+  const havuz = Number(parent!.poolPercent ?? 0);
+  const oran = Number(agent!.percent);
+  if (oran > havuz)
+    err(
+      `${agent!.user.name} şu an %${oran} alıyor; ${parent!.user.name} ekibinin havuz payı ise %${havuz}. Önce oranını %${havuz} veya altına indir, sonra bağla.`,
+    );
+
+  await prisma.agent.update({
+    where: { id: agent!.id },
+    data: { parentId: parent!.id },
+  });
+  revalidatePath("/admin/komisyoncular");
+  redirect(
+    "/admin/komisyoncular?ok=" +
+      encodeURIComponent(
+        `${agent!.user.name} artık ${parent!.user.name} ekibinde (%${oran}; havuz %${havuz}).`,
+      ),
+  );
 }
 
 /** Premium (indirim tanımlama) yetkisini aç/kapat. Kapatınca mevcut kodlardaki

@@ -24,6 +24,7 @@ import {
   toggleAgentTrial,
   removeAgentTerritoryCity,
   setAgentDiscountCap,
+  setAgentParent,
 } from "../actions";
 import { PendingButton } from "@/components/PendingButton";
 import BolgeSecici from "@/components/BolgeSecici";
@@ -41,12 +42,19 @@ const fmtTarih = (d: Date) =>
 export default async function AdminAgents({
   searchParams,
 }: {
-  searchParams: Promise<{ hata?: string; ok?: string; sifre?: string; kim?: string }>;
+  searchParams: Promise<{
+    hata?: string;
+    ok?: string;
+    sifre?: string;
+    kim?: string;
+    q?: string;
+  }>;
 }) {
   // Yetki kapısı prisma'dan ÖNCE (RSC sızıntısı önlemi).
   const admin = await getSessionUser();
   if (!admin || admin.role !== "ADMIN") redirect("/giris");
-  const { hata, ok, sifre, kim } = await searchParams;
+  const { hata, ok, sifre, kim, q } = await searchParams;
+  const aranan = (q ?? "").trim().toLocaleLowerCase("tr");
 
   const agents = await prisma.agent.findMany({
     orderBy: { createdAt: "desc" },
@@ -187,6 +195,34 @@ export default async function AdminAgents({
   // "odenmemis" yaziyordu; toplam yoktu, stopaj sonrasi NET yoktu, IBAN'i
   // eksik olan kimdi belli degildi. Bu blok ucunu birden veriyor.
   const aktifAjanlar = agents.filter((a) => a.active && !a.suspendedByAdmin);
+
+  // ARAMA (2026-08-04): ad, kullanıcı adı, telefon, e-posta, bölge ve
+  // GETİRDİĞİ İŞLETME adı taranır — admin komisyoncuyu çoğu zaman
+  // "şu dükkânı getiren adam" diye hatırlıyor. Ekip üyesinin adıyla arayınca
+  // BAŞ komisyoncu da çıkar (ekip kutusu onun kartında).
+  // Alt komisyoncu satırlarında tam kaydı (getirdiği işletmeler vb.) bulmak için.
+  const ajanHaritasi = new Map(agents.map((a) => [a.id, a]));
+  // "Ekibe bağla" seçicisinin kaynağı.
+  const basAjanlar = agents.filter((a) => a.isHead);
+  const nrm = (s: string | null | undefined) => (s ?? "").toLocaleLowerCase("tr");
+  const arananTel = aranan.replace(/\D/g, "");
+  const gosterilecek = aranan
+    ? agents.filter((a) => {
+        const metin = [
+          a.user.name,
+          a.user.username,
+          a.user.email,
+          ...a.territories.map((t) => `${t.city} ${t.district}`),
+          ...a.referrals.map((r) => r.name),
+          ...a.children.map((c) => `${c.user.name} ${c.user.username ?? ""}`),
+          a.parent?.user.name,
+        ];
+        if (metin.some((m) => nrm(m).includes(aranan))) return true;
+        return arananTel.length >= 3
+          ? (a.user.phone ?? "").replace(/\D/g, "").includes(arananTel)
+          : false;
+      })
+    : agents;
   // Bu takvim ayindaki brut tahakkuklar — stopaj esigi bunun uzerinden olculur
   // (odeme talebi acildiginda da ayni kaynak kullanilir, lib/payout.ts).
   const buAyMap = await ayTahakkuklari(aktifAjanlar.map((a) => a.id));
@@ -724,11 +760,75 @@ export default async function AdminAgents({
             yerine bu kullanılır.
           </p>
         </div>
+        {/* EKİBE DOĞRUDAN AÇ (2026-08-04): önceden alt komisyoncuyu yalnız baş
+            komisyoncu kendi panelinden açabiliyordu; admin ekibe kişi
+            ekleyemiyordu. */}
+        {basAjanlar.length > 0 && (
+          <div className="max-w-xs">
+            <label className={lbl}>Baş komisyoncu ekibi (isteğe bağlı)</label>
+            <select name="parentId" defaultValue="" className={inp}>
+              <option value="">(bağımsız komisyoncu)</option>
+              {basAjanlar.map((h) => (
+                <option key={h.id} value={h.id}>
+                  {h.user.name} — havuz %{Number(h.poolPercent ?? 0)}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-xs text-slate-500">
+              Ekip seçersen komisyon yüzdesi havuz payını aşamaz. Baş komisyoncu
+              kutusuyla birlikte kullanılamaz.
+            </p>
+          </div>
+        )}
         <BolgeSecici ilceAdlari={ilceAdlari} doluluk={doluluk} zorunlu={false} />
         <PendingButton className="rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-dark">
           Komisyoncu Oluştur
         </PendingButton>
       </form>
+
+      {/* ARAMA — GET formu (adres çubuğuna yazılır, geri tuşu çalışır) */}
+      {agents.length > 0 && (
+        <form method="get" className="flex flex-wrap items-end gap-2">
+          <div className="min-w-0 flex-1 sm:max-w-md">
+            <label
+              htmlFor="komisyoncu-ara"
+              className="block text-xs font-medium text-slate-500"
+            >
+              Komisyoncu ara — ad, kullanıcı adı, telefon, e-posta, bölge,
+              getirdiği işletme
+            </label>
+            <input
+              id="komisyoncu-ara"
+              name="q"
+              type="search"
+              defaultValue={q ?? ""}
+              placeholder="Ör. Ad · 05XX · Şehir · İşletme adı"
+              className="mt-0.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:border-brand"
+            />
+          </div>
+          <button
+            type="submit"
+            className="w-full rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark sm:w-auto"
+          >
+            Ara
+          </button>
+          {aranan && (
+            <Link
+              href="/admin/komisyoncular"
+              className="w-full rounded-lg border border-slate-300 px-4 py-2.5 text-center text-sm font-medium text-slate-600 hover:bg-slate-50 sm:w-auto"
+            >
+              Temizle
+            </Link>
+          )}
+        </form>
+      )}
+      {aranan && (
+        <p className="text-sm text-slate-600">
+          <strong>{gosterilecek.length}</strong> sonuç ({agents.length}{" "}
+          komisyoncu içinde)
+          {gosterilecek.length === 0 && " — başka bir kelimeyle dene."}
+        </p>
+      )}
 
       {/* Mevcutlar */}
       {agents.length === 0 ? (
@@ -736,7 +836,7 @@ export default async function AdminAgents({
           Henüz komisyoncu yok.
         </p>
       ) : (
-        agents.map((a) => {
+        gosterilecek.map((a) => {
           // TOPLAMLAR = kendi payı + havuz farkı (2026-08-02 denetim): kutu
           // yalnız `amount` topluyordu, ay-sonu ödeme talebi ise agentBalance
           // ile kendi+havuzu topluyor. İkisi ayrışınca havaleyi elle yapan
@@ -1014,19 +1114,113 @@ export default async function AdminAgents({
                 </div>
               </div>
 
+              {/* EKİBE BAĞLA / ÇIKAR (2026-08-04) — yalnız alt kademe için;
+                  baş komisyoncu başka bir ekibe giremez (2 kademe kuralı). */}
+              {!a.isHead && basAjanlar.length > 0 && (
+                <form
+                  action={setAgentParent}
+                  className="flex flex-wrap items-end gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3"
+                >
+                  <input type="hidden" name="id" value={a.id} />
+                  <div className="min-w-0 flex-1 sm:max-w-xs">
+                    <label
+                      htmlFor={`bas-${a.id}`}
+                      className="block text-xs font-medium text-slate-500"
+                    >
+                      Baş komisyoncu ekibi
+                    </label>
+                    <select
+                      id={`bas-${a.id}`}
+                      name="parentId"
+                      defaultValue={a.parentId ?? ""}
+                      className="mt-0.5 w-full rounded-lg border border-slate-300 px-2 py-2.5 text-sm"
+                    >
+                      <option value="">(bağımsız — ekipte değil)</option>
+                      {basAjanlar.map((h) => (
+                        <option key={h.id} value={h.id}>
+                          {h.user.name} — havuz %{Number(h.poolPercent ?? 0)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <PendingButton className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-60 sm:w-auto">
+                    Kaydet
+                  </PendingButton>
+                  <p className="w-full text-xs text-slate-500">
+                    Ekibe alınca bu kişinin oranı (%{Number(a.percent)}) başın
+                    havuz payını aşamaz; geçmiş tahakkuklar değişmez.
+                  </p>
+                </form>
+              )}
+
               {(a.isHead || havuzVar) && (
                 <div className="rounded-xl border border-indigo-200 bg-indigo-50/50 p-3">
-                  <p className="text-sm text-slate-700">
-                    <strong>Ekip (havuz %{Number(a.poolPercent ?? 0)}):</strong>{" "}
-                    {a.children.length === 0
-                      ? "henüz komisyoncu açmadı."
-                      : a.children
-                          .map(
-                            (c) =>
-                              `${c.user.name} (%${Number(c.percent)}${c.active ? "" : ", pasif"})`,
-                          )
-                          .join(" · ")}
+                  {/* ALT KOMİSYONCULAR (2026-08-04, kullanıcı isteği: "adminde
+                      alt komisyoncularını da göreyim"). Önceden tek satır metin
+                      vardı: "Ali (%20) · Veli (%15)" — kimin ne getirdiği,
+                      kimin borcu olduğu görünmüyordu. */}
+                  <p className="text-sm font-semibold text-slate-800">
+                    Ekip — havuz %{Number(a.poolPercent ?? 0)} ·{" "}
+                    {a.children.length} alt komisyoncu
                   </p>
+                  {a.children.length === 0 ? (
+                    <p className="mt-1 text-sm text-slate-600">
+                      Henüz komisyoncu açmadı. Aşağıdan sen de bağlayabilirsin.
+                    </p>
+                  ) : (
+                    <div className="mt-2 overflow-x-auto">
+                      <table className="w-full min-w-[520px] text-sm">
+                        <thead>
+                          <tr className="border-b border-indigo-200 text-left text-xs text-slate-500">
+                            <th className="py-1.5">Alt komisyoncu</th>
+                            <th className="py-1.5">Oranı</th>
+                            <th className="py-1.5 text-right">Getirdiği</th>
+                            <th className="py-1.5 text-right">Kazandığı</th>
+                            <th className="py-1.5 text-right">Ödenmemiş</th>
+                            <th className="py-1.5">Durum</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-indigo-100">
+                          {a.children.map((c) => {
+                            const tam = ajanHaritasi.get(c.id);
+                            return (
+                              <tr key={c.id}>
+                                <td className="py-1.5">
+                                  <span className="font-medium text-slate-800">
+                                    {c.user.name}
+                                  </span>
+                                  <div className="text-xs text-slate-500">
+                                    {c.user.username}
+                                  </div>
+                                </td>
+                                <td className="py-1.5">%{Number(c.percent)}</td>
+                                <td className="py-1.5 text-right">
+                                  {tam ? tam.referrals.length : "—"}
+                                </td>
+                                <td className="py-1.5 text-right">
+                                  {fmtTL(toplamMap.get(c.id) ?? 0)} TL
+                                </td>
+                                <td className="py-1.5 text-right font-medium text-amber-700">
+                                  {fmtTL(bekleyenMap.get(c.id) ?? 0)} TL
+                                </td>
+                                <td className="py-1.5">
+                                  {c.active ? (
+                                    <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
+                                      aktif
+                                    </span>
+                                  ) : (
+                                    <span className="rounded-full bg-slate-200 px-2 py-0.5 text-xs font-medium text-slate-600">
+                                      pasif
+                                    </span>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                   <p className="mt-1 text-sm text-slate-700">
                     Havuz farkı kazancı:{" "}
                     <strong>{fmtTL(headToplamMap.get(a.id) ?? 0)} TL</strong> ·
