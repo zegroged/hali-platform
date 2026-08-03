@@ -10,12 +10,23 @@ import {
 } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { login, getToken, logout, setShift } from "./src/api";
+import { login, getToken, getRole, logout, setShift, type Rol } from "./src/api";
 import { startTracking, stopTracking, isTracking } from "./src/tracking";
 import { ensureNotifPermission } from "./src/notify";
 import { Orders } from "./src/Orders";
+import { Panel } from "./src/Panel";
 
 const NAME_KEY = "hali_driver_name";
+
+/** Panel şeridinde gösterilecek rol adı. */
+const ROL_ADI: Record<string, string> = {
+  CLEANER: "İşletme paneli",
+  AGENT: "Komisyoncu paneli",
+  ADMIN: "Yönetim",
+  SUPPORT: "Müşteri hizmetleri",
+  ACCOUNTANT: "Muhasebe",
+  CUSTOMER: "Hesabım",
+};
 const PRIVACY_URL = "https://enyakinhaliyikamaservisi.com/gizlilik";
 
 /**
@@ -42,6 +53,9 @@ function askLocationDisclosure(): Promise<boolean> {
 
 function Driver() {
   const [authed, setAuthed] = useState(false);
+  // ROL (2026-08-04): tek giriş ekranı, rol sunucudan gelir — sitedeki /giris
+  // gibi. DRIVER native ekranlara, diğerleri gömülü panele düşer.
+  const [role, setRole] = useState<Rol | null>(null);
   const [name, setName] = useState("");
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
@@ -51,6 +65,7 @@ function Driver() {
   useEffect(() => {
     (async () => {
       setAuthed(!!(await getToken()));
+      setRole(await getRole());
       setOnShift(await isTracking());
       // Ad kalıcı: uygulama yeniden açılınca başlık "Şoför"e düşmesin.
       const savedName = await AsyncStorage.getItem(NAME_KEY);
@@ -64,6 +79,7 @@ function Driver() {
       const d = await login(identifier.trim(), password);
       setName(d.name);
       await AsyncStorage.setItem(NAME_KEY, d.name);
+      setRole(d.role);
       setAuthed(true);
     } catch (e) {
       Alert.alert("Hata", e instanceof Error ? e.message : "Giriş başarısız");
@@ -122,6 +138,7 @@ function Driver() {
     await logout();
     await AsyncStorage.removeItem(NAME_KEY);
     setAuthed(false);
+    setRole(null);
     setOnShift(false);
   }
 
@@ -135,10 +152,10 @@ function Driver() {
     return (
       <SafeAreaView style={s.screen}>
         <View style={s.box}>
-          <Text style={s.title}>🚚 Halı Şoför</Text>
+          <Text style={s.title}>🧼 En Yakın Halı Yıkama</Text>
           <TextInput
             style={s.input}
-            placeholder="Kullanıcı adı"
+            placeholder="Kullanıcı adı veya e-posta"
             value={identifier}
             onChangeText={setIdentifier}
             autoCapitalize="none"
@@ -155,10 +172,28 @@ function Driver() {
             <Text style={s.btnText}>{busy ? "..." : "Giriş Yap"}</Text>
           </TouchableOpacity>
           <Text style={s.hint}>
-            Kullanıcı adını ve şifreni çalıştığın işletmeden alabilirsin.
+            İşletme, şoför ve komisyoncu — hepsi buradan giriyor. Şoförler
+            kullanıcı adını çalıştığı işletmeden alır.
           </Text>
           {privacyLink}
         </View>
+      </SafeAreaView>
+    );
+  }
+
+  // ŞOFÖR DIŞINDAKİ ROLLER: panelin kendisi uygulamanın içinde açılır.
+  // (Gerekçe ve sınırlar src/Panel.tsx başında yazılı.)
+  if (role && role !== "DRIVER") {
+    return (
+      <SafeAreaView style={s.screenTop}>
+        <Panel
+          rolAdi={`${name || "Hesabım"} · ${ROL_ADI[role] ?? "Panel"}`}
+          onLogout={doLogout}
+          onSessionLost={() => {
+            setAuthed(false);
+            setRole(null);
+          }}
+        />
       </SafeAreaView>
     );
   }

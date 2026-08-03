@@ -4,16 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Footer from "@/components/Footer";
-
-const ROLE_HOME: Record<string, string> = {
-  CLEANER: "/panel",
-  DRIVER: "/sofor",
-  ADMIN: "/admin",
-  SUPPORT: "/destek",
-  ACCOUNTANT: "/muhasebe",
-  AGENT: "/komisyoncu",
-  CUSTOMER: "/hesabim",
-};
+// Rol → açılış sayfası TEK KAYNAKTAN (mobil devir de aynısını kullanıyor).
+import { ROLE_HOME } from "@/lib/roleHome";
 
 /** Alan bazlı doğrulama hataları (alan adı → mesaj). */
 type FieldErrors = Partial<Record<"identifier" | "password", string>>;

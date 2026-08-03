@@ -10,9 +10,27 @@ export const API_BASE =
   (__DEV__ ? "http://192.168.0.11:3000" : "https://enyakinhaliyikamaservisi.com");
 
 const TOKEN_KEY = "hali_driver_token";
+const ROLE_KEY = "hali_rol";
+
+// TEK GİRİŞ EKRANI (2026-08-04, kullanıcı kararı: "aynı ekrandan girsinler,
+// sitede olduğu gibi"). Eskiden burada `role !== "DRIVER"` ise giriş
+// REDDEDİLİYORDU. Artık rol sunucudan ne gelirse gelsin kabul edilir; nereye
+// düşeceğine App.tsx karar verir:
+//   DRIVER            → native şoför ekranları (mesai, konum, foto)
+//   CLEANER / AGENT / …→ uygulamanın içinde panelin kendisi (WebView)
+// Böylece panelde çıkan her yeni özellik Play'e yeni sürüm göndermeden
+// telefonda da görünür.
+export type Rol =
+  | "DRIVER"
+  | "CLEANER"
+  | "AGENT"
+  | "ADMIN"
+  | "SUPPORT"
+  | "ACCOUNTANT"
+  | "CUSTOMER";
 
 // Token şifreli saklama (Android Keystore / iOS Keychain) — düz AsyncStorage DEĞİL.
-// Giriş kimliği: kullanıcı adı (telefonla giriş kaldırıldı — SMS doğrulaması yok).
+// Giriş kimliği: kullanıcı adı ya da e-posta (telefonla giriş kaldırıldı).
 export async function login(identifier: string, password: string) {
   const res = await fetch(`${API_BASE}/api/auth/login`, {
     method: "POST",
@@ -21,17 +39,52 @@ export async function login(identifier: string, password: string) {
   });
   if (!res.ok) throw new Error("Kullanıcı adı veya şifre hatalı.");
   const data = await res.json();
-  if (data.role !== "DRIVER") throw new Error("Bu hesap şoför değil.");
   await SecureStore.setItemAsync(TOKEN_KEY, data.token);
-  return data as { name: string; token: string };
+  await SecureStore.setItemAsync(ROLE_KEY, String(data.role ?? ""));
+  return data as { name: string; token: string; role: Rol };
 }
 
 export async function getToken() {
   return SecureStore.getItemAsync(TOKEN_KEY);
 }
 
+/** Kayıtlı rol — uygulama yeniden açıldığında hangi ekranın açılacağını belirler. */
+export async function getRole(): Promise<Rol | null> {
+  const r = await SecureStore.getItemAsync(ROLE_KEY);
+  return (r as Rol) || null;
+}
+
 export async function logout() {
   await SecureStore.deleteItemAsync(TOKEN_KEY);
+  await SecureStore.deleteItemAsync(ROLE_KEY);
+}
+
+/**
+ * PANELİ UYGULAMANIN İÇİNDE AÇMAK İÇİN TEK KULLANIMLIK BAĞLANTI.
+ *
+ * Panel çerezle kimlik doğruluyor, elimizde ise Bearer jeton var. Sunucu bu
+ * uçta 90 saniyelik, tek kullanımlık bir adres üretiyor; WebView oraya gidince
+ * çerez kuruluyor ve rolün sayfasına yönlendiriliyor.
+ * (Jetonu doğrudan adrese koymak onu sunucu log'larına ve Referer başlığına
+ * düşürürdü — bkz. api/auth/mobil-baglanti.)
+ */
+export async function panelBaglantisi(): Promise<string> {
+  const token = await getToken();
+  if (!token) throw new Error("Oturum bulunamadı");
+  const res = await fetch(`${API_BASE}/api/auth/mobil-baglanti`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    if (res.status === 401 || res.status === 403) {
+      await logout();
+      throw new Error("Oturum süresi doldu, tekrar giriş yap");
+    }
+    throw new Error("Panel açılamadı, tekrar dene");
+  }
+  const d = (await res.json()) as { url?: string };
+  if (!d.url) throw new Error("Panel adresi alınamadı");
+  return d.url;
 }
 
 export async function setShift(on: boolean) {

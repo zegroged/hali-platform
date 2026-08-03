@@ -88,15 +88,14 @@ export function Orders({ onSessionExpired }: { onSessionExpired: () => void }) {
   // Müşteri fiyatı uygulamadan onayladıysa (priceApprovedAt dolu) soru sorulmaz
   // — zaten dijital onay var. Yalnız onay YOKKEN şoföre sorulur ve NE DERSE O
   // kaydedilir.
-  function yikamayaAl(o: Order) {
+  function yikamayaAl(o: DriverOrder) {
     if (o.status !== "PICKED_UP" || o.priceApprovedAt) {
       return run(o.id, () => advanceOrder(o.id, false));
     }
     Alert.alert(
       "Fiyat onayı",
-      "Müşteri kesin fiyatı uygulamadan onaylamamış. Müşteri sana SÖZLÜ olarak onay verdi mi?
-
-Verdiği gibi işaretle — bu kayıt anlaşmazlıkta delil olarak kullanılır.",
+      "Müşteri kesin fiyatı uygulamadan onaylamamış. Müşteri sana SÖZLÜ olarak onay verdi mi?\n\n" +
+        "Verdiği gibi işaretle — bu kayıt anlaşmazlıkta delil olarak kullanılır.",
       [
         { text: "Vazgeç", style: "cancel" },
         {
