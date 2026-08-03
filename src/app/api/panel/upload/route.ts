@@ -58,6 +58,15 @@ export async function POST(req: NextRequest) {
 
   let count = 0;
   let logoUrl: string | null = null;
+  // DÜŞÜK ÇÖZÜNÜRLÜK UYARISI (2026-08-03).
+  //
+  // Canlıdaki kapak fotoğraflarını ölçtük: 165×220 ile 294×220 arasında.
+  // Kart kapağı telefonda ~343 CSS px, 2-3x piksel yoğunluğuyla ~1000 gerçek
+  // piksel istiyor. Yani yüklenen kareler kartta gerilip bulanıklaşıyor ve
+  // vitrin "çirkin" görünüyor — düzenle çözülecek bir şey değil, KAYNAK
+  // görselin kendisi küçük. Yükleyen kişi bunu bilmiyordu; artık söylüyoruz.
+  const kucukler: string[] = [];
+  const KUCUK_ESIK = 800; // uzun kenar (px)
   for (const file of files) {
     const rawExt = ALLOWED[file.type];
     if (!rawExt || file.size > MAX) continue;
@@ -85,6 +94,15 @@ export async function POST(req: NextRequest) {
       count++;
       continue;
     }
+    try {
+      const meta = await sharp(original).metadata();
+      const uzunKenar = Math.max(meta.width ?? 0, meta.height ?? 0);
+      if (uzunKenar > 0 && uzunKenar < KUCUK_ESIK) {
+        kucukler.push(`${meta.width}×${meta.height}`);
+      }
+    } catch {
+      // ölçemezsek uyarı vermeyiz; yükleme aksamasın
+    }
     const img = await optimizeImage(original, rawExt, file.type);
     const name = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${img.ext}`;
     const url = await saveObject(`uploads/${b.id}/${name}`, img.buf, img.contentType);
@@ -108,5 +126,11 @@ export async function POST(req: NextRequest) {
   // Fotoğraf, profili tamamlayan son parça olabilir — görünürlüğü yeniden değerlendir
   // (addPhoto server action'ı bunu yapıyordu, dosya yükleme ucu atlıyordu).
   await syncVisibility(b.id);
-  return NextResponse.json({ ok: true, count, logoUrl });
+  return NextResponse.json({
+    ok: true,
+    count,
+    logoUrl,
+    // Çağıran (PhotoUpload) bunu görünce halıcıya uyarı basar.
+    kucukGorseller: kucukler,
+  });
 }

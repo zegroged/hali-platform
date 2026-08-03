@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { Badges } from "@/components/Badges";
-import { IconTruck, IconClock, Logo } from "@/components/icons";
+import FotoKapak from "@/components/FotoKapak";
+import { IconTruck, IconClock } from "@/components/icons";
 import { RatingPill } from "@/components/RatingPill";
 import type { BusinessSummary } from "@/lib/businesses";
 
@@ -20,22 +20,9 @@ export function BusinessCard({ b }: { b: BusinessSummary }) {
       href={`/halici/${b.id}`}
       className="group flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition hover:border-brand hover:shadow-md active:scale-[0.98]"
     >
-      {/* Kapak görseli */}
-      <div className="relative aspect-[16/10] overflow-hidden bg-brand-light">
-        {b.coverUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={b.coverUrl}
-            alt={b.name}
-            loading="lazy"
-            decoding="async"
-            className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
-          />
-        ) : (
-          <div className="flex h-full items-center justify-center opacity-60">
-            <Logo size={44} />
-          </div>
-        )}
+      {/* Kapak görseli — kırpmadan, bulanık dolgulu (bkz. FotoKapak) */}
+      <div className="relative">
+        <FotoKapak url={b.coverUrl} alt={b.name} />
         {/* İşletme logosu — kapak görselinin köşesinde küçük kart */}
         {b.logoUrl && (
           // eslint-disable-next-line @next/next/no-img-element
@@ -84,14 +71,17 @@ export function BusinessCard({ b }: { b: BusinessSummary }) {
           />
         </div>
 
-        {(showNewChip || b.badges.length > 0) && (
-          <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-            {showNewChip && (
-              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
-                Yeni
-              </span>
-            )}
-            <Badges badges={b.badges} notlar={b.badgeNotes} />
+        {/* ROZETLER KALDIRILDI (2026-08-03, kullanıcı kararı: "rozetleri
+            kaldıralım, zaten bütün bilgileri alıyoruz"). Kart zaten puanı,
+            teslim süresini, fiyatı, açık/kapalı durumunu ve mesafeyi
+            gösteriyor; rozet çipleri bunların üstüne görsel gürültü
+            ekliyordu. Rozet HESABI arka planda duruyor (lib/badgeCompute),
+            geri açmak tek satır. */}
+        {showNewChip && (
+          <div className="mt-2.5">
+            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
+              Yeni
+            </span>
           </div>
         )}
 

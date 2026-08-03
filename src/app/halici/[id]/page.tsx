@@ -235,7 +235,9 @@ export default async function HaliciProfile({
             </div>
 
             <div className="mt-3">
-              <Badges badges={b.badges} notlar={b.badgeNotes} />
+              {/* Rozetler 2026-08-03'te kaldırıldı (kullanıcı kararı) —
+                  profil zaten puan, fiyat listesi, çalışma saatleri,
+                  fotoğraflar ve iletişim bilgisini gösteriyor. */}
             </div>
 
             {/* Fotoğraflar (before/after) */}

@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { IconTruck, Logo } from "@/components/icons";
+import { IconTruck } from "@/components/icons";
+import FotoKapak from "@/components/FotoKapak";
 import { RatingPill } from "@/components/RatingPill";
 import type { BusinessSummary } from "@/lib/businesses";
 
@@ -17,22 +18,12 @@ export function BusinessCardCompact({ b }: { b: BusinessSummary }) {
       className="block w-44 shrink-0 rounded-xl border border-slate-200 bg-white p-3 shadow-sm transition hover:border-brand hover:shadow-md active:scale-[0.98]"
     >
       {/* Kapak oranı BusinessCard ile aynı (16/10) — listeler arası tutarlılık */}
-      <div className="mb-2 aspect-[16/10] overflow-hidden rounded-lg bg-brand-light">
-        {b.coverUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={b.coverUrl}
-            alt={b.name}
-            loading="lazy"
-            decoding="async"
-            className="h-full w-full object-cover"
-          />
-        ) : (
-          <div className="flex h-full items-center justify-center opacity-60">
-            <Logo size={36} />
-          </div>
-        )}
-      </div>
+      <FotoKapak
+        url={b.coverUrl}
+        alt={b.name}
+        ikonBoyut={36}
+        className="mb-2 rounded-lg"
+      />
       <div className="flex items-center justify-between gap-1">
         <RatingPill ratingAvg={b.ratingAvg} ratingCount={b.ratingCount} />
         {/* Tatil modunda "Açık" ile çelişmesin — tek rozet */}

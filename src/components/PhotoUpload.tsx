@@ -10,6 +10,7 @@ export function PhotoUpload() {
   );
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [uyari, setUyari] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   async function upload() {
@@ -20,6 +21,7 @@ export function PhotoUpload() {
     }
     setLoading(true);
     setErr(null);
+    setUyari(null);
     const fd = new FormData();
     fd.append("kind", kind);
     for (const f of Array.from(files)) fd.append("files", f);
@@ -27,6 +29,16 @@ export function PhotoUpload() {
     setLoading(false);
     if (res.ok) {
       if (fileRef.current) fileRef.current.value = "";
+      // DÜŞÜK ÇÖZÜNÜRLÜK UYARISI (2026-08-03): yüklenen kare kartta gerilip
+      // bulanıklaşacaksa halıcı bunu ÖĞRENSİN. Yükleme başarılı sayılır,
+      // yalnız uyarı basılır — fotoğrafı reddetmek profili boş bırakırdı.
+      const veri = await res.json().catch(() => null);
+      const kucuk: string[] = veri?.kucukGorseller ?? [];
+      setUyari(
+        kucuk.length
+          ? `Yüklendi ama ${kucuk.length} fotoğraf küçük (${kucuk.join(", ")}). Vitrinde bulanık görünür — telefonla YATAY ve aydınlık bir kare çekip yeniden yükle.`
+          : null,
+      );
       router.refresh();
     } else {
       setErr("Yükleme başarısız (jpg/png/webp, ≤5MB).");
@@ -70,6 +82,11 @@ export function PhotoUpload() {
         tek dosyadır; yenisi eskisinin yerine geçer.
       </p>
       {err && <p className="text-sm text-red-600">{err}</p>}
+      {uyari && (
+        <p className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          ⚠️ {uyari}
+        </p>
+      )}
     </div>
   );
 }
