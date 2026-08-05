@@ -106,12 +106,36 @@ model User {
   orders        Order[]          @relation("CustomerOrders")
   reviews       Review[]
   notifications Notification[]
+  pushTokens    PushToken[]
   passwordResets PasswordReset[]
 }
 
 // Uygulama-içi bildirim (halıcı paneli + şoför + admin). SMS mock olduğundan
 // içerideki kullanıcılara ulaşmanın asıl yolu budur: panel/şoför başlığındaki
 // zil sayaç gösterir, açılınca liste + okundu işaretlenir.
+// TELEFON BİLDİRİM JETONU (2026-08-05).
+//
+// NEDEN: yeni sipariş geldiğinde halıcıya giden tek şey uygulama içi zildi —
+// yani panel/uygulama AÇIKSA görülüyordu. Kapalıysa hiçbir şey olmuyordu.
+// Esnaf gün boyu paneli açık tutmuyor; sipariş saatlerce fark edilmeden
+// kalabiliyordu (2 saatlik SLA bekçisi ancak İŞ İŞTEN GEÇTİKTEN sonra uyarıyor).
+// Artık `notify()` her kayıtta bu jetonlara push de gönderiyor.
+//
+// Jeton CİHAZA aittir, kullanıcıya değil: aynı telefonu iki kişi kullanırsa
+// (dükkânda ortak telefon) jeton el değiştirir. Bu yüzden `token` @unique ve
+// kayıt sırasında sahibi GÜNCELLENİR — eski sahibe bildirim gitmesin.
+model PushToken {
+  id         String   @id @default(cuid())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId     String
+  token      String   @unique // ExponentPushToken[...]
+  platform   String   @default("android")
+  createdAt  DateTime @default(now())
+  lastSeenAt DateTime @default(now())
+
+  @@index([userId])
+}
+
 model Notification {
   id        String    @id @default(cuid())
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)

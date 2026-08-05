@@ -20,7 +20,15 @@ export async function GET(
     where: { OR: [{ trackingToken: token }, { code: token.toUpperCase() }] },
     include: {
       business: { select: { name: true, phone: true, city: true } },
-      driver: { select: { lastLat: true, lastLng: true, user: { select: { name: true } } } },
+      // lastSeenAt ŞART: konumun tazeliği bununla ölçülüyor (aşağıdaki eşik).
+      driver: {
+        select: {
+          lastLat: true,
+          lastLng: true,
+          lastSeenAt: true,
+          user: { select: { name: true } },
+        },
+      },
       events: { orderBy: { createdAt: "asc" } },
       // ⚠️ İZOLASYON: fotoğraflar BU siparişin ilişkisinden geliyor (ayrı bir
       // orderPhoto sorgusu YOK) — takip token'ıyla giren biri başka siparişin
@@ -43,10 +51,27 @@ export async function GET(
   }
 
   // Müşteri canlı konumu YALNIZCA şoför teslime çıkınca görür ("siparişi bırakıyorum")
+  //
+  // 🔴 TAZELİK EŞİĞİ (2026-08-06). Önceden yalnız "konum var mı" bakılıyordu,
+  // NE KADAR ESKİ olduğuna bakılmıyordu. Canlıdaki şoförlerden birinin son
+  // konumu 34 GÜN önceydi — teslime çıksa müşteri o noktayı "canlı" sanıp
+  // yanlış mahallede bekleyecekti. Panelde bu koruma 16 Temmuz'dan beri var
+  // (5 dk), müşteriye giden bu uçta YOKTU; ikiz mantık ayrışmıştı.
+  //
+  // Eşik panelden gevşek (10 dk): şoför tünelde/kapsama dışında kalınca harita
+  // hemen kaybolmasın, ama eski nokta da "şu an burada" diye gösterilmesin.
+  // Süre aşılınca harita gizlenir ve müşteri "az sonra görünecek" mesajını
+  // görür — yanlış yer göstermektense hiç göstermemek doğrusudur.
+  const KONUM_TAZELIK_MS = 10 * 60 * 1000;
+  const konumYasiMs = order.driver?.lastSeenAt
+    ? Date.now() - order.driver.lastSeenAt.getTime()
+    : null;
   const showDriver =
     order.status === "OUT_FOR_DELIVERY" &&
     order.driver?.lastLat != null &&
-    order.driver?.lastLng != null;
+    order.driver?.lastLng != null &&
+    konumYasiMs != null &&
+    konumYasiMs <= KONUM_TAZELIK_MS;
 
   // Değerlendirme için üyelik zorunlu — görüntüleyen giriş yapmış müşteri mi?
   // (UI: üye ise yorum formu, değilse "üye ol/giriş yap" bandı gösterir.)

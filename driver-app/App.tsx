@@ -10,9 +10,23 @@ import {
 } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { login, getToken, getRole, logout, setShift, type Rol } from "./src/api";
-import { startTracking, stopTracking, isTracking } from "./src/tracking";
-import { ensureNotifPermission } from "./src/notify";
+import {
+  login,
+  getToken,
+  getRole,
+  logout,
+  setShift,
+  oturumTazele,
+  API_BASE,
+  type Rol,
+} from "./src/api";
+import {
+  startTracking,
+  stopTracking,
+  isTracking,
+  konumIzniVarMi,
+} from "./src/tracking";
+import { ensureNotifPermission, pushKaydet, pushSil } from "./src/notify";
 import { Orders } from "./src/Orders";
 import { Panel } from "./src/Panel";
 
@@ -64,8 +78,22 @@ function Driver() {
 
   useEffect(() => {
     (async () => {
-      setAuthed(!!(await getToken()));
+      const oturumVar = !!(await getToken());
+      setAuthed(oturumVar);
       setRole(await getRole());
+      if (oturumVar) {
+        pushKaydet().catch(() => {});
+        // OTURUMU TAZELE: jeton geçerliyse süresi sıfırlanır (aktif kullanan
+        // hiç çıkış yapmaz), ölmüşse giriş ekranına düşeriz. Ağ yoksa
+        // `undefined` döner ve mevcut oturumla devam edilir.
+        const rol = await oturumTazele();
+        if (rol === null) {
+          setAuthed(false);
+          setRole(null);
+        } else if (rol) {
+          setRole(rol);
+        }
+      }
       setOnShift(await isTracking());
       // Ad kalıcı: uygulama yeniden açılınca başlık "Şoför"e düşmesin.
       const savedName = await AsyncStorage.getItem(NAME_KEY);
@@ -81,6 +109,8 @@ function Driver() {
       await AsyncStorage.setItem(NAME_KEY, d.name);
       setRole(d.role);
       setAuthed(true);
+      // Bildirim jetonunu giriş SONRASI kaydet (Bearer gerekiyor).
+      pushKaydet().catch(() => {});
     } catch (e) {
       Alert.alert("Hata", e instanceof Error ? e.message : "Giriş başarısız");
     } finally {
@@ -94,8 +124,15 @@ function Driver() {
       const next = !onShift;
       if (next) {
         // Play politikası: izin isteğinden ÖNCE belirgin açıklama + onay.
-        const accepted = await askLocationDisclosure();
-        if (!accepted) return;
+        // AMA YALNIZ BİR KEZ (2026-08-06): izin zaten verilmişse yeni izin
+        // isteği tetiklenmiyor, dolayısıyla açıklamayı tekrar göstermek
+        // gereksiz — şoför her mesai açışında aynı metni okumak zorunda
+        // kalıyordu. İzin yoksa akış eskisi gibi: önce açıklama, sonra istek.
+        const izinVar = await konumIzniVarMi();
+        if (!izinVar) {
+          const accepted = await askLocationDisclosure();
+          if (!accepted) return;
+        }
         const err = await startTracking();
         if (err) {
           Alert.alert("İzin gerekli", err);
@@ -135,6 +172,8 @@ function Driver() {
 
   async function doLogout() {
     await stopTracking();
+    // Jetonu SİLMEDEN önce düşür — silince Bearer kalmaz.
+    await pushSil();
     await logout();
     await AsyncStorage.removeItem(NAME_KEY);
     setAuthed(false);
@@ -171,6 +210,24 @@ function Driver() {
           <TouchableOpacity style={s.btn} onPress={doLogin} disabled={busy}>
             <Text style={s.btnText}>{busy ? "..." : "Giriş Yap"}</Text>
           </TouchableOpacity>
+          {/* ŞİFRE SIFIRLAMA + KAYIT (2026-08-05, kullanıcı isteği).
+              İkisi de web'de ZATEN VAR — uygulamada yalnız kapısı yoktu.
+              Tarayıcıda açıyoruz, WebView'de değil: şifre sıfırlama e-postayla
+              geliyor, kullanıcı o linke zaten tarayıcıdan tıklayacak. Aynı
+              akışı iki farklı yerde yürütmek oturum karışıklığı üretirdi. */}
+          <View style={s.baglantilar}>
+            <TouchableOpacity
+              onPress={() => Linking.openURL(`${API_BASE}/sifremi-unuttum`)}
+            >
+              <Text style={s.baglanti}>Şifremi unuttum</Text>
+            </TouchableOpacity>
+            <Text style={s.ayrac}>·</Text>
+            <TouchableOpacity
+              onPress={() => Linking.openURL(`${API_BASE}/kayit`)}
+            >
+              <Text style={s.baglanti}>İşletme hesabı aç</Text>
+            </TouchableOpacity>
+          </View>
           <Text style={s.hint}>
             İşletme, şoför ve komisyoncu — hepsi buradan giriyor. Şoförler
             kullanıcı adını çalıştığı işletmeden alır.
@@ -187,7 +244,6 @@ function Driver() {
     return (
       <SafeAreaView style={s.screenTop}>
         <Panel
-          rolAdi={`${name || "Hesabım"} · ${ROL_ADI[role] ?? "Panel"}`}
           onLogout={doLogout}
           onSessionLost={() => {
             setAuthed(false);
@@ -304,4 +360,20 @@ const s = StyleSheet.create({
     fontSize: 13,
     textDecorationLine: "underline",
   },
+  baglantilar: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 14,
+  },
+  baglanti: {
+    color: "#0d9488",
+    fontSize: 14,
+    fontWeight: "600",
+    // 44px dokunma eşiği (panelde de aynı kural).
+    paddingVertical: 11,
+    paddingHorizontal: 4,
+  },
+  ayrac: { color: "#94a3b8", fontSize: 14 },
 });

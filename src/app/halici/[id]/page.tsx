@@ -356,12 +356,37 @@ export default async function HaliciProfile({
                 İşletme Bilgileri
               </h2>
               <div className="rounded-lg border border-slate-200 bg-white text-sm">
-                <div className="border-b border-slate-100 px-3 py-2 last:border-0">
-                  <div className="text-slate-600">Açık adres</div>
-                  <div className="text-slate-900">
-                    {b.address}, {b.district} / {b.city}
-                  </div>
-                </div>
+                {/* 🔴 "AÇIK ADRES" ANCAK GERÇEKTEN AÇIKSA (2026-08-04).
+                    Canlıda 35 işletmenin 34'ünde sokak adresi YOK; `address`
+                    alanı çoğunda "Karkamış, Gaziantep" gibi ilçe+il tekrarı.
+                    Ekranda "Açık adres: Karkamış, Gaziantep, Karkamış /
+                    Gaziantep" çıkıyordu — adresini saklayan bir sitenin
+                    görüntüsü. Artık: sokak bilgisi varsa "Açık adres", yoksa
+                    yalnız "Hizmet bölgesi". Kimseden yeni bilgi istemiyoruz,
+                    sadece bilmediğimizi biliyormuş gibi yapmıyoruz. */}
+                {(() => {
+                  const adres = (b.address ?? "").trim();
+                  const bolge = `${b.district} / ${b.city}`;
+                  // İlçe+il tekrarından ibaretse gerçek bir adres değildir.
+                  const sadeleşmiş = adres
+                    .replace(/[\s,./-]+/g, " ")
+                    .trim()
+                    .toLocaleLowerCase("tr");
+                  const bolgeSade = `${b.district} ${b.city}`
+                    .toLocaleLowerCase("tr");
+                  const gercekAdres =
+                    adres.length > 0 && sadeleşmiş !== bolgeSade;
+                  return (
+                    <div className="border-b border-slate-100 px-3 py-2 last:border-0">
+                      <div className="text-slate-600">
+                        {gercekAdres ? "Açık adres" : "Hizmet bölgesi"}
+                      </div>
+                      <div className="text-slate-900">
+                        {gercekAdres ? `${adres}, ${bolge}` : bolge}
+                      </div>
+                    </div>
+                  );
+                })()}
                 {b.landlinePhone && (
                   <div className="border-b border-slate-100 px-3 py-2 last:border-0">
                     <div className="text-slate-600">Telefon (Sabit Hat)</div>
@@ -393,9 +418,15 @@ export default async function HaliciProfile({
                   </div>
                 )}
               </div>
+              {/* 🔴 KALDIRILDI (2026-08-04): "doğrulanmış iletişim bilgileri ve
+                  merkez adresi platform kayıtlarında mevcuttur" cümlesi tam da
+                  adresin BOŞ göründüğü yerde duruyordu. Doğrulanmadığı hâlde
+                  doğrulanmış demek hem 29 Temmuz'daki doğruluk kararına aykırı,
+                  hem de ziyaretçide "bir şey saklıyorlar" hissi yaratıyordu.
+                  Yerine somut ve doğru olan tek şey: ödeme teslimde. */}
               <p className="mt-2 text-xs text-slate-600">
-                Bu işletmenin doğrulanmış iletişim bilgileri ve merkez adresi
-                platform kayıtlarında mevcuttur.
+                Ödeme teslimatta yapılır — sipariş verirken ön ödeme veya kapora
+                alınmaz.
               </p>
             </section>
 

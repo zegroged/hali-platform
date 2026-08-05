@@ -10,7 +10,7 @@ import TrackingBar from "@/components/TrackingBar";
 import SiteHeader from "@/components/SiteHeader";
 import HowItWorks from "@/components/HowItWorks";
 import { getSupplyCities } from "@/lib/supplyCities";
-import { featuredCities } from "@/lib/cities";
+import { CITIES, type City } from "@/lib/cities";
 import {
   IconMapPin,
   IconStar,
@@ -115,8 +115,22 @@ function HomeFaq() {
   );
 }
 
-/** Şehir kısayolları — şehir SEO sayfalarına iç link (indekslenme için). */
-function CityShortcuts() {
+/**
+ * Şehir kısayolları — şehir SEO sayfalarına iç link.
+ *
+ * 🔴 YALNIZ HALICISI OLAN İLLER (2026-08-04): burada 12 büyük ilin SABİT
+ * listesi vardı (İstanbul, Ankara, İzmir, Bursa, Antalya…). Canlıda o illerin
+ * HEPSİ BOŞTU — "İstanbul halı yıkama"ya tıklayan ziyaretçi bomboş sayfaya
+ * düşüyordu. Türkiye geneli hizmet varmış gibi durup hiçbir şey çıkmaması,
+ * siteyi doğrudan sahte gösteriyor ("dolandırıcı gibi" geri bildiriminin
+ * sebeplerinden biri). 27 Temmuz'da bu iller sitemap'ten çıkarılmış ve
+ * noindex yapılmıştı ama ANA SAYFA hâlâ link veriyordu — üstelik noindex
+ * sayfalara iç link vermek tarama bütçesini de boşa harcıyor.
+ * Artık liste `getSupplyCities()` ile besleniyor: yeni ilde halıcı açılınca
+ * buton kendiliğinden gelir, kapanınca kendiliğinden gider.
+ */
+function CityShortcuts({ cities }: { cities: City[] }) {
+  if (cities.length === 0) return null;
   return (
     <section className="mt-10">
       <div className="mb-3 flex items-baseline justify-between gap-3">
@@ -131,7 +145,7 @@ function CityShortcuts() {
         </Link>
       </div>
       <div className="flex flex-wrap gap-2">
-        {featuredCities().map((c) => (
+        {cities.map((c) => (
           <Link
             key={c.slug}
             href={`/hali-yikama/${c.slug}`}
@@ -415,7 +429,11 @@ export default async function Home({
         )}
 
         <ReviewStrip reviews={recentReviews} />
-        <CityShortcuts />
+        <CityShortcuts
+          cities={sehirler
+            .map((ad: string) => CITIES.find((c) => c.name === ad))
+            .filter((c): c is City => Boolean(c))}
+        />
         <HomeFaq />
       </main>
       <Footer />

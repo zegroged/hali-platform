@@ -12,6 +12,15 @@ export function BusinessCardCompact({ b }: { b: BusinessSummary }) {
         : `${b.distanceKm.toFixed(1)} km`
       : null;
 
+  // ⚠️ GENİŞLİĞE DOKUNMA — DENENDİ, GERİ ALINDI (2026-08-04).
+  // "Kartlar kaymıyor" geri bildirimi üzerine genişlik `w-[62%]`e çekildi ki
+  // sağdan yarım kart görünsün. SONUÇ KÖTÜ OLDU: kart büyüdü ama kapak görseli
+  // onunla büyümedi — FotoKapak `object-contain` kullanıyor (4.54 kararı:
+  // kaynak fotoğraflar 165-294px ve oranları tutmuyor, kırpmak yerine sığdır).
+  // Kutu büyüyünce zaten küçük olan fotoğraf daha da küçük kaldı, çevresi
+  // bulanık dolguyla doldu; alt yazılar da iki satıra düştü ("1-2 iş / günü").
+  // Kart geometrisini değiştirmeden önce ASIL SORUN çözülmeli: kaynak
+  // fotoğrafların kalitesi. 176px, mevcut görsellerle uyumlu tek ölçü.
   return (
     <Link
       href={`/halici/${b.id}`}

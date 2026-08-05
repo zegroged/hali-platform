@@ -13,3 +13,8 @@ reklam-varliklari/
 
 # birim testi gecici derleme ciktisi
 .tmp-test/
+
+# Firebase hizmet hesabi anahtari — ASLA depoya girmesin (canli sir)
+*firebase-adminsdk*.json
+driver-app/*firebase-adminsdk*.json
+customer-app/*firebase-adminsdk*.json

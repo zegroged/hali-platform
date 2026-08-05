@@ -12,9 +12,6 @@ export function BusinessCard({ b }: { b: BusinessSummary }) {
         : `${b.distanceKm.toFixed(1)} km`
       : null;
 
-  // ratingCount === 0'da "Yeni" bilgisini RatingPill veriyor; rozet satırında tekrar etme.
-  const showNewChip = b.isNew && b.ratingCount > 0;
-
   return (
     <Link
       href={`/halici/${b.id}`}
@@ -77,13 +74,7 @@ export function BusinessCard({ b }: { b: BusinessSummary }) {
             gösteriyor; rozet çipleri bunların üstüne görsel gürültü
             ekliyordu. Rozet HESABI arka planda duruyor (lib/badgeCompute),
             geri açmak tek satır. */}
-        {showNewChip && (
-          <div className="mt-2.5">
-            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
-              Yeni
-            </span>
-          </div>
-        )}
+        {/* "Yeni" çipi de kaldırıldı (2026-08-04) — bkz. RatingPill. */}
 
         <div className="mt-auto flex items-center justify-between border-t border-slate-100 pt-2.5 text-sm">
           {/* ALT ŞERİT — BOŞLUĞU İLAN ETMEZ (2026-07-30).

@@ -20,7 +20,14 @@ export type NotifyInput = {
   href?: string;
 };
 
-/** Tek kullanıcıya bildirim (best-effort; hata yutulur, akışı bozmaz). */
+/** Tek kullanıcıya bildirim (best-effort; hata yutulur, akışı bozmaz).
+ *
+ *  TELEFON BİLDİRİMİ (2026-08-05): zil kaydının yanına push da gönderilir.
+ *  Tek noktadan yapılıyor ki her bildirim türü (yeni sipariş, fiyat onayı,
+ *  iş atama, WhatsApp mesajı…) kendiliğinden telefona düşsün — her çağrı
+ *  yerine ayrı ayrı push eklemek klasik "biri unutulur" tuzağıydı.
+ *  Push YAZIMDAN SONRA ve `await` ile: sıra önemli değil ama hata ayrı
+ *  yakalanmalı, push patlarsa zil kaydı yine de durmalı. */
 export async function notify(input: NotifyInput): Promise<void> {
   try {
     await prisma.notification.create({
@@ -34,6 +41,12 @@ export async function notify(input: NotifyInput): Promise<void> {
     });
   } catch (e) {
     console.error("bildirim yazılamadı:", e);
+  }
+  try {
+    const { pushGonder } = await import("@/lib/push");
+    await pushGonder(input.userId, input.title, input.body, input.href);
+  } catch (e) {
+    console.error("push gönderilemedi:", e);
   }
 }
 

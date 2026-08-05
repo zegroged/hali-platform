@@ -14,13 +14,12 @@ export function RatingPill({
   ratingCount: number;
   showCount?: boolean;
 }) {
-  if (ratingCount === 0) {
-    return (
-      <span className="shrink-0 whitespace-nowrap rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
-        Yeni
-      </span>
-    );
-  }
+  // "YENİ" ROZETİ KALDIRILDI (2026-08-04, kullanıcı kararı).
+  // Canlıda 35 işletmenin neredeyse hepsinde yorum yok → rozet HER kartta
+  // çıkıyordu. Her şeyin "yeni" olduğu bir vitrin, siteyi dün kurulmuş
+  // gösteriyor ve güveni düşürüyor ("dolandırıcı gibi duruyor" geri bildirimi).
+  // Puan yoksa artık hiçbir şey yazmıyoruz — yokluk, kötü bir etiketten iyidir.
+  if (ratingCount === 0) return null;
   return (
     <span className="flex shrink-0 items-center gap-1 rounded-lg bg-amber-50 px-1.5 py-0.5 text-sm font-semibold text-amber-700">
       <IconStar size={13} filled />

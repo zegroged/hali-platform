@@ -48,6 +48,38 @@ export async function getToken() {
   return SecureStore.getItemAsync(TOKEN_KEY);
 }
 
+/**
+ * OTURUMU TAZELE (2026-08-06). Uygulama her açılışta çağırır:
+ *  - jeton geçerliyse süresi sıfırlanır → aktif kullanan hiç çıkış yapmaz
+ *  - geçersizse (süre doldu / şifre değişti / hesap engellendi) yerel kayıt
+ *    temizlenir ve giriş ekranı gösterilir
+ *
+ * Dönen değer: oturum yaşıyorsa rol, ölmüşse null.
+ * Ağ hatasında `undefined` döner — o durumda MEVCUT jetonla devam edilir
+ * (uçakta/kapsama dışında açan şoför boş yere dışarı atılmasın).
+ */
+export async function oturumTazele(): Promise<Rol | null | undefined> {
+  const token = await getToken();
+  if (!token) return null;
+  try {
+    const res = await fetch(`${API_BASE}/api/auth/yenile`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (res.status === 401 || res.status === 403) {
+      await logout();
+      return null;
+    }
+    if (!res.ok) return undefined; // sunucu hatası — mevcutla devam
+    const d = (await res.json()) as { token?: string; role?: Rol };
+    if (d.token) await SecureStore.setItemAsync(TOKEN_KEY, d.token);
+    if (d.role) await SecureStore.setItemAsync(ROLE_KEY, String(d.role));
+    return d.role ?? null;
+  } catch {
+    return undefined; // ağ yok — oturumu düşürme
+  }
+}
+
 /** Kayıtlı rol — uygulama yeniden açıldığında hangi ekranın açılacağını belirler. */
 export async function getRole(): Promise<Rol | null> {
   const r = await SecureStore.getItemAsync(ROLE_KEY);

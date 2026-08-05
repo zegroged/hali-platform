@@ -24,14 +24,13 @@ import { API_BASE, panelBaglantisi } from "./api";
 // tarayıcıda güvenilir çalışmaz.
 
 type Props = {
-  /** Rol adı — üst şeritte gösterilir. */
-  rolAdi: string;
+  /** Oturum kapandığında (panelden çıkış) uygulamayı da çıkart. */
   onLogout: () => void;
   /** Oturum düştüğünde (panel /giris'e attı) uygulamayı giriş ekranına al. */
   onSessionLost: () => void;
 };
 
-export function Panel({ rolAdi, onLogout, onSessionLost }: Props) {
+export function Panel({ onLogout, onSessionLost }: Props) {
   const [url, setUrl] = useState<string | null>(null);
   const [hata, setHata] = useState<string | null>(null);
   const [yukleniyor, setYukleniyor] = useState(true);
@@ -69,13 +68,14 @@ export function Panel({ rolAdi, onLogout, onSessionLost }: Props) {
 
   return (
     <View style={s.wrap}>
-      <View style={s.topBar}>
-        <Text style={s.rol}>{rolAdi}</Text>
-        <TouchableOpacity onPress={onLogout} style={s.cikis}>
-          <Text style={s.cikisText}>Çıkış</Text>
-        </TouchableOpacity>
-      </View>
-
+      {/* ÜST ŞERİT KALDIRILDI (2026-08-06, cihazda görüldü): panelin kendi
+          başlığı (işletme adı + bildirim zili + Çıkış) zaten var; üstüne bir de
+          native şerit koyunca ekranda İKİ AYRI "Çıkış" düğmesi oluşuyordu ve
+          hangisinin ne yaptığı belirsizdi. Şerit kaldırıldı — panel tam ekran,
+          çıkış tek yerden (panelin kendi düğmesi).
+          ⚠️ Panelden çıkış yapılınca panel /giris'e gider; aşağıdaki
+          onNavigationStateChange bunu yakalayıp uygulamanın oturumunu da
+          KAPATIR. Yoksa web tarafı çıkmış, uygulama hâlâ girişli kalırdı. */}
       {hata ? (
         <View style={s.merkez}>
           <Text style={s.hata}>{hata}</Text>
@@ -91,6 +91,17 @@ export function Panel({ rolAdi, onLogout, onSessionLost }: Props) {
           sharedCookiesEnabled
           thirdPartyCookiesEnabled
           domStorageEnabled
+          // HIZ (2026-08-05, kullanıcı: "kasıyordu, yavaştı"). Varsayılan
+          // WebView yazılım katmanında çizer; uzun listelerde kaydırma takılır.
+          // `hardware` GPU'ya alır — panelin sipariş/mesaj listeleri akıcılaşır.
+          androidLayerType="hardware"
+          cacheEnabled
+          // Sayfa sonunda zıplama efekti mobil web'de "bozuk" hissi veriyordu.
+          overScrollMode="never"
+          // Panel yeni pencere açmıyor; kapatmak gereksiz köprüyü kaldırır.
+          setSupportMultipleWindows={false}
+          // Aşağı çekip yenileme — panelde F5 karşılığı.
+          pullToRefreshEnabled
           // Dosya seçici (fotoğraf yükleme) panelde de çalışsın.
           allowsInlineMediaPlayback
           originWhitelist={["https://*"]}
@@ -100,7 +111,13 @@ export function Panel({ rolAdi, onLogout, onSessionLost }: Props) {
             // Oturum düştüyse panel /giris'e atar. Kullanıcıyı web formunda
             // bırakmak yerine uygulamanın kendi giriş ekranına döndürüyoruz —
             // yoksa iki ayrı giriş ekranı olurdu.
-            if (n.url.startsWith(`${API_BASE}/giris`)) onSessionLost();
+            if (n.url.startsWith(`${API_BASE}/giris`)) {
+              // Panelden çıkış yapıldı ya da oturum düştü: uygulamanın
+              // jetonunu da temizle, yoksa bir dahaki açılışta kendiliğinden
+              // geri girer ve "çıkış yaptım" hissi yalan olurdu.
+              onLogout();
+              onSessionLost();
+            }
           }}
           onError={() =>
             setHata("Bağlantı kurulamadı. İnternetini kontrol et.")

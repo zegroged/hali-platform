@@ -66,6 +66,26 @@ TaskManager.defineTask(LOCATION_TASK, async ({ data, error }) => {
   }
 });
 
+/**
+ * Arka plan konum izni ZATEN verilmiş mi? (İzin İSTEMEZ, yalnız sorar.)
+ *
+ * NEDEN: "belirgin açıklama" ekranı her mesai açılışında çıkıyordu ve şoförü
+ * gereksiz yere yoruyordu (2026-08-06 kullanıcı geri bildirimi). Play'in kuralı
+ * açıklamanın izin İSTEĞİNDEN ÖNCE gösterilmesi; izin zaten verilmişse yeni
+ * istek olmadığı için açıklamayı tekrarlamak gerekmiyor. App.tsx bunu sorup
+ * karar veriyor.
+ */
+export async function konumIzniVarMi(): Promise<boolean> {
+  try {
+    const fg = await Location.getForegroundPermissionsAsync();
+    if (fg.status !== "granted") return false;
+    const bg = await Location.getBackgroundPermissionsAsync();
+    return bg.status === "granted";
+  } catch {
+    return false;
+  }
+}
+
 export async function startTracking(): Promise<string | null> {
   // ÖNEMLİ (Google Play politikası): bu fonksiyon çağrılmadan ÖNCE kullanıcıya
   // "belirgin açıklama" (prominent disclosure) gösterilip onay alınmış olmalı —
