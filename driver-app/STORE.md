@@ -1,3 +1,9 @@
+> ⛔ **BU DOSYADAKİ MAĞAZA METİNLERİ (§4) BAYATTIR — KULLANMA.**
+> Güncel metinler: **`driver-app/MAGAZA-METINLERI.md`**
+> Buradaki metin *"Bu uygulama şoförler içindir… Müşteriler web sitesini
+> kullanır"* diyor; 1.1.x'te işletme, çalışan ve komisyoncu da giriyor,
+> yani bu beyan YANLIŞ olur. (2026-08-06)
+
 # Halı Şoför — Google Play Gönderim Rehberi
 
 > Bu dosya uygulamayı Play'e göndermek için gereken HER ŞEYİ içerir.
