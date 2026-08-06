@@ -196,10 +196,18 @@ export async function demoPaneliSil(agentId: string): Promise<boolean> {
       id: true,
       ownerId: true,
       drivers: { select: { userId: true } },
+      // ÇALIŞAN (2026-08-06): demo artık bir STAFF hesabı da açıyor. Buraya
+      // eklenmezse demo sıfırlanınca o kullanıcı YETİM kalır (işletmesi silinmiş
+      // ama hesabı duruyor) ve /panel'e girip /giris'e düşen ölü hesap olur.
+      staff: { select: { userId: true } },
     },
   });
   if (!b) return false;
-  const kullaniciIdleri = [b.ownerId, ...b.drivers.map((d) => d.userId)];
+  const kullaniciIdleri = [
+    b.ownerId,
+    ...b.drivers.map((d) => d.userId),
+    ...b.staff.map((c) => c.userId),
+  ];
 
   // WHATSAPP BAĞI ÖNCE ÇÖZÜLÜR (2026-08-04): demo sırasında gerçek bir numaraya
   // bağlanmış olabilir. Çözüm, o numaraya ait mesaj satırlarını da siler —
@@ -219,7 +227,7 @@ export async function demoPaneliSil(agentId: string): Promise<boolean> {
   await prisma.user.deleteMany({
     where: {
       id: { in: kullaniciIdleri },
-      role: { in: ["CLEANER", "DRIVER"] },
+      role: { in: ["CLEANER", "DRIVER", "STAFF"] },
       phone: { startsWith: DEMO_TEL_ONEK },
     },
   });
@@ -362,6 +370,7 @@ export async function demoPaneliKur(agentId: string): Promise<DemoBilgi> {
   const ownerTel = await bosTelefon(agentId + ":owner");
   const sofor1Tel = await bosTelefon(agentId + ":sofor1");
   const sofor2Tel = await bosTelefon(agentId + ":sofor2");
+  const calisanTel = await bosTelefon(agentId + ":calisan");
   const e = ek(agentId);
 
   const isletmeAdi = "Örnek Halı Yıkama (Demo)";
@@ -490,6 +499,23 @@ export async function demoPaneliKur(agentId: string): Promise<DemoBilgi> {
       });
     }
 
+    // ---- Çalışan hesabı (2026-08-06) ----
+    // Demo panelinde ÇALIŞANLAR sayfası boş görünmesin: komisyoncu sahada
+    // "çırağına ayrı hesap açabilirsin, kasanı görmez" derken ekranda gerçek
+    // bir kayıt göstersin. Bu, yeni özelliklerin en güçlü satış argümanı.
+    const calisanUser = await prisma.user.create({
+      data: {
+        role: "STAFF",
+        name: "Ayşe Demir",
+        phone: calisanTel,
+        username: demoKullaniciAdi(agentId, "calisan"),
+        password: await hashPassword(demoSifre(agentId, "calisan")),
+      },
+    });
+    await prisma.staff.create({
+      data: { userId: calisanUser.id, businessId },
+    });
+
     // ---- Şoförler: biri MESAİDE (canlı takip demosu için) ----
     const sofor1User = await prisma.user.create({
       data: {
@@ -595,6 +621,10 @@ export async function demoPaneliKur(agentId: string): Promise<DemoBilgi> {
       approxM2: 12,
       status: "PICKED_UP",
       paymentMethod: "CASH",
+      // HALI SAYISI ALIMDA (2026-08-06). Bilerek 2 halı ama tek fotoğraf:
+      // komisyoncu demoda "Halı Bul"daki **eksik fotoğraf uyarısını**
+      // gösterebilsin — yeni özelliğin en çarpıcı yanı bu.
+      carpetCount: 2,
       quotedPrice: 1440,
       priceApprovedAt: new Date(simdi - 20 * SAAT),
       estimatedDays: 2,
@@ -627,6 +657,8 @@ export async function demoPaneliKur(agentId: string): Promise<DemoBilgi> {
       priceApprovedAt: new Date(simdi - 2 * GUN),
       estimatedDays: 3,
       pickupPhotoUrl: alimFoto,
+      // Alımda 3 halı girilmiş ve üçünün de fotoğrafı çekilmiş — "tam" örnek.
+      carpetCount: 3,
       createdAt: new Date(simdi - 2 * GUN),
       // HALI BUL demosu: bu müşterinin ÜÇ halısı var, her biri numaralı.
       // Şoförün ALIM kanıt fotoğrafı numarasız (yükün tamamının karesi).
@@ -669,6 +701,7 @@ export async function demoPaneliKur(agentId: string): Promise<DemoBilgi> {
       priceTotal: 1920,
       priceApprovedAt: new Date(simdi - 3 * GUN),
       estimatedDays: 3,
+      carpetCount: 1,
       createdAt: new Date(simdi - 3 * GUN),
       ...(yikamaFoto
         ? { photos: { create: [{ url: yikamaFoto, stage: "YIKAMA", carpetNo: 1 }] } }
@@ -1045,8 +1078,8 @@ export async function demoPaneliKur(agentId: string): Promise<DemoBilgi> {
       if (businessId) await demoPaneliSil(agentId);
       await prisma.user.deleteMany({
         where: {
-          role: { in: ["CLEANER", "DRIVER"] },
-          phone: { in: [ownerTel, sofor1Tel, sofor2Tel] },
+          role: { in: ["CLEANER", "DRIVER", "STAFF"] },
+          phone: { in: [ownerTel, sofor1Tel, sofor2Tel, calisanTel] },
         },
       });
     } catch {

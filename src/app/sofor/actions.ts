@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { normalizeCarpetCount, CARPET_COUNT_HATA } from "@/lib/carpet";
+import { hataylaDon } from "@/lib/hata";
 import {
   bildirAraAdim,
   bildirTeslimEdildi,
@@ -107,7 +108,7 @@ export async function savePickup(formData: FormData) {
   // Numaralar buradan doğar; öncesinde fotoğraftan doğuyordu ve fotoğrafı
   // çekilmeyen halı sistemde hiç yoktu (bkz. lib/carpet.ts).
   const sayi = normalizeCarpetCount(formData.get("carpetCount"));
-  if (sayi === "gecersiz") throw new Error(CARPET_COUNT_HATA);
+  if (sayi === "gecersiz") hataylaDon("/sofor", CARPET_COUNT_HATA);
 
   // CAS (denetim bulgusu): koşulsuz yazım, eşzamanlı panel iptali/reddini
   // (ACCEPTED→CANCELED/REJECTED) ezip siparişi PICKED_UP'a diriltiyordu.
@@ -144,7 +145,8 @@ export async function advanceOrder(formData: FormData) {
   // işletmeye yönlendirir. Sessizce dönmek yerine görünür hata: şoför neden
   // ilerleyemediğini bilmeli.
   if (o.status === "PICKED_UP" && next === "WASHING" && o.quotedPrice == null) {
-    throw new Error(
+    hataylaDon(
+      "/sofor",
       "Yıkamaya geçilemez: işletme henüz kesin fiyatı bildirmedi. İşletmeye haber ver, panelden tutarı girsin.",
     );
   }
@@ -235,7 +237,7 @@ export async function deliverOrder(formData: FormData) {
 
   // Geçersiz/sıfır/negatif tutar sessizce yutulmasın → şoför net hata görsün.
   if (!Number.isFinite(price) || price <= 0) {
-    throw new Error("Geçerli bir teslim tutarı girin (0'dan büyük).");
+    hataylaDon("/sofor", "Geçerli bir teslim tutarı girin (0'dan büyük bir tutar).");
   }
 
   const o = await prisma.order.findFirst({

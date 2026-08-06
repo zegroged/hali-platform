@@ -25,6 +25,7 @@ import { notify, notifyAdmins } from "@/lib/notify";
 import { getAppBaseUrl } from "@/lib/config";
 import { ORDER_STATUS_META, PANEL_NEXT } from "@/lib/orderStatus";
 import { normalizeCarpetCount, CARPET_COUNT_HATA } from "@/lib/carpet";
+import { hataylaDon } from "@/lib/hata";
 import { taxIdError } from "@/lib/taxId";
 import { normalizePhone, isMobilePhone, isLandlinePhone } from "@/lib/phone";
 import { normalizeGoogleProfileUrl } from "@/lib/googleUrl";
@@ -322,12 +323,12 @@ export async function addDriver(formData: FormData) {
   // e-postası yok). Halıcı belirler ve şoförüne iletir — şifrede olduğu gibi.
   const username = normalizeUsername(String(formData.get("username") || ""));
   if (!name || phone.length < 10) {
-    throw new Error("Geçerli ad ve telefon (05xx...) girin.");
+    hataylaDon("/panel/soforler", "Ad soyad ve 05xx ile başlayan 11 haneli telefon girin.");
   }
   const usernameError = validateUsername(username);
-  if (usernameError) throw new Error(usernameError);
+  if (usernameError) hataylaDon("/panel/soforler", usernameError);
   if (chosen && chosen.length < 8) {
-    throw new Error("Şifre en az 8 karakter olmalı.");
+    hataylaDon("/panel/soforler", "Şifre en az 8 karakter olmalı (şoföre sen ileteceksin).");
   }
   const exists = await prisma.user.findFirst({
     where: { OR: [{ phone }, { username }] },
@@ -335,10 +336,11 @@ export async function addDriver(formData: FormData) {
   });
   if (exists) {
     // Sessiz başarısızlık yerine halıcıya neden eklenemediğini söyle.
-    throw new Error(
+    hataylaDon(
+      "/panel/soforler",
       exists.username === username
-        ? "Bu kullanıcı adı alınmış. Başka bir tane seçin."
-        : "Bu telefon numarası başka bir hesapta zaten kayıtlı.",
+        ? `"${username}" kullanıcı adı başkası tarafından alınmış. Başka bir ad deneyin.`
+        : `${phone} numarası platformda başka bir hesapta kayıtlı (şoför daha önce müşteri olarak sipariş vermiş olabilir). Farklı bir numara girin.`,
     );
   }
   // Şifreyi halıcı belirleyebilir (SMS canlı olana kadar tek pratik yol).
@@ -381,8 +383,9 @@ export async function removeDriver(formData: FormData) {
     },
   });
   if (activeOrders > 0) {
-    throw new Error(
-      "Bu şoförün aktif siparişi var. Önce siparişleri başka şoföre devredin.",
+    hataylaDon(
+      "/panel/soforler",
+      `Bu şoförün ${activeOrders} aktif siparişi var. Silmeden önce siparişleri başka şoföre devret (Siparişler → ilgili sipariş → şoför değiştir).`,
     );
   }
   await prisma.driver.delete({ where: { id: d.id } });
@@ -401,7 +404,7 @@ export async function setDriverUsername(formData: FormData) {
   const id = String(formData.get("id"));
   const username = normalizeUsername(String(formData.get("username") || ""));
   const err = validateUsername(username);
-  if (err) throw new Error(err);
+  if (err) hataylaDon("/panel/soforler", err);
   // sadece bu işletmenin şoförü güncellenebilir
   const d = await prisma.driver.findFirst({ where: { id, businessId: b.id } });
   if (!d) return;
@@ -410,7 +413,7 @@ export async function setDriverUsername(formData: FormData) {
     select: { id: true },
   });
   if (taken && taken.id !== d.userId) {
-    throw new Error("Bu kullanıcı adı alınmış. Başka bir tane seçin.");
+    hataylaDon("/panel/soforler", `"${username}" kullanıcı adı başkası tarafından alınmış. Başka bir ad deneyin.`);
   }
   await prisma.user.update({ where: { id: d.userId }, data: { username } });
   revalidatePath("/panel/soforler");
@@ -422,7 +425,7 @@ export async function setDriverPassword(formData: FormData) {
   const id = String(formData.get("id"));
   const pw = String(formData.get("password") || "");
   if (pw.length < 8) {
-    throw new Error("Şifre en az 8 karakter olmalı.");
+    hataylaDon("/panel/soforler", "Şifre en az 8 karakter olmalı.");
   }
   // sadece bu işletmenin şoförü güncellenebilir
   const d = await prisma.driver.findFirst({ where: { id, businessId: b.id } });
@@ -450,9 +453,12 @@ export async function submitForVerification() {
   // Zaten doğrulanmışı tekrar PENDING'e düşürme (istemeden görünürlük kaybı, B5).
   if (b.verification === "VERIFIED") return;
   // Eksikse sessiz geçme — halıcıya nedenini söyle (B5).
-  if (!profileComplete(b)) throw new Error("Önce profil bilgilerini tamamlayın.");
-  if (!b.owner.emailVerified) throw new Error("Önce e-posta adresinizi doğrulayın.");
-  if (!b.contractAcceptedAt) throw new Error("Önce platform sözleşmesini onaylayın.");
+  if (!profileComplete(b))
+    hataylaDon("/panel", "Doğrulamaya göndermeden önce profil bilgilerini tamamlayın (Profil & Fiyat sayfasındaki eksikler listesine bakın).");
+  if (!b.owner.emailVerified)
+    hataylaDon("/panel", "Doğrulamaya göndermeden önce e-posta adresinizi doğrulayın (Özet sayfasındaki E-posta Doğrulama bölümü).");
+  if (!b.contractAcceptedAt)
+    hataylaDon("/panel", "Doğrulamaya göndermeden önce platform sözleşmesini onaylayın (Özet sayfasının altında).");
   await prisma.cleanerBusiness.update({
     where: { id: b.id },
     data: { verification: "PENDING" },
@@ -640,7 +646,7 @@ export async function quoteOrderPrice(formData: FormData) {
   const orderId = String(formData.get("orderId"));
   const price = parseTutar(formData.get("price"));
   if (!Number.isFinite(price) || price <= 0) {
-    throw new Error("Geçerli bir kesin fiyat girin (0'dan büyük).");
+    hataylaDon(`/panel/siparisler/${orderId}`, "Geçerli bir kesin fiyat girin (0'dan büyük bir tutar).");
   }
   const order = await prisma.order.findFirst({
     where: { id: orderId, businessId: b.id },
@@ -658,8 +664,9 @@ export async function quoteOrderPrice(formData: FormData) {
     data: { quotedPrice: price },
   });
   if (updated.count === 0) {
-    throw new Error(
-      "Fiyat bildirilemedi: sipariş uygun durumda değil veya müşteri fiyatı zaten onayladı.",
+    hataylaDon(
+      `/panel/siparisler/${orderId}`,
+      "Fiyat bildirilemedi: sipariş uygun durumda değil ya da müşteri fiyatı bu arada onayladı. Sayfayı yenileyip güncel duruma bak.",
     );
   }
   await prisma.orderEvent.create({
@@ -718,7 +725,8 @@ export async function advanceOrderPanel(formData: FormData) {
   // bundandı) ve teslimde tutar tartışması ispatsız kalıyordu. Artık ölçüm
   // yapılmadan yıkamaya geçilemez.
   if (order.status === "PICKED_UP" && step.next === "WASHING" && order.quotedPrice == null) {
-    throw new Error(
+    hataylaDon(
+      `/panel/siparisler/${orderId}`,
       "Yıkamaya geçmeden önce KESİN FİYAT bildirmelisin. Halıyı ölç, aşağıdaki \"Kesin fiyat bildir\" alanına tutarı gir — müşteriye onay bildirimi gitsin.",
     );
   }
@@ -731,7 +739,8 @@ export async function advanceOrderPanel(formData: FormData) {
     step.next === "WASHING" &&
     !order.priceApprovedAt;
   if (needsConsentDeclaration && !verbalConsent) {
-    throw new Error(
+    hataylaDon(
+      `/panel/siparisler/${orderId}`,
       "Müşterinin dijital fiyat onayı yok. Yıkamaya geçmek için sözlü onay beyanını işaretleyin veya müşterinin takip sayfasından onaylamasını bekleyin.",
     );
   }
@@ -740,7 +749,7 @@ export async function advanceOrderPanel(formData: FormData) {
   // Numaralar 1..N olarak buradan doğar; öncesinde fotoğraftan doğuyordu, yani
   // fotoğrafı çekilmeyen halı sistemde hiç yoktu (bkz. lib/carpet.ts).
   const sayi = normalizeCarpetCount(formData.get("carpetCount"));
-  if (sayi === "gecersiz") throw new Error(CARPET_COUNT_HATA);
+  if (sayi === "gecersiz") hataylaDon(`/panel/siparisler/${orderId}`, CARPET_COUNT_HATA);
 
   const updated = await prisma.order.updateMany({
     where: { id: orderId, businessId: b.id, status: order.status },
@@ -842,7 +851,7 @@ export async function deliverOrderPanel(formData: FormData) {
   const orderId = String(formData.get("orderId"));
   const price = parseTutar(formData.get("price"));
   if (!Number.isFinite(price) || price <= 0) {
-    throw new Error("Geçerli bir teslim tutarı girin (0'dan büyük).");
+    hataylaDon(`/panel/siparisler/${orderId}`, "Geçerli bir teslim tutarı girin (0'dan büyük bir tutar).");
   }
   const order = await prisma.order.findFirst({
     where: { id: orderId, businessId: b.id, status: "OUT_FOR_DELIVERY" },

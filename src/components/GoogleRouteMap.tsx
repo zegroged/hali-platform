@@ -1,13 +1,15 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   GoogleMap,
+  InfoWindowF,
   MarkerF,
   PolylineF,
   useJsApiLoader,
 } from "@react-google-maps/api";
 import { GOOGLE_MAPS_KEY } from "@/lib/maps";
+import { durakEtiketi } from "@/lib/durak";
 import LeafletRouteMap from "@/components/LeafletRouteMap";
 
 type Stop = {
@@ -15,6 +17,9 @@ type Stop = {
   lng: number;
   durationMin: number;
   address: string | null;
+  /** Durağın başlangıç anı (ISO). Haritada "ne zaman" sorusunun cevabı —
+   *  2026-08-06'ya kadar yalnız listede vardı, işaretçide yoktu. */
+  startedAt?: string;
 };
 type Props = {
   points: [number, number][];
@@ -60,6 +65,8 @@ export default function GoogleRouteMap({
   onDone,
   height = 360,
 }: Props) {
+  // Açık durak balonu (mobilde dokunmayla açılır).
+  const [acikDurak, setAcikDurak] = useState<number | null>(null);
   const { isLoaded, loadError } = useJsApiLoader({
     id: "hali-gmaps",
     googleMapsApiKey: GOOGLE_MAPS_KEY,
@@ -180,14 +187,28 @@ export default function GoogleRouteMap({
           options={{ strokeColor: "#0d9488", strokeWeight: 4, strokeOpacity: 0.8 }}
         />
       )}
+      {/* 🔴 `title` FARE İPUCUDUR — mobilde fare yok, dokununca hiçbir şey
+          görünmüyordu (kullanıcı bildirdi 2026-08-06). Artık işaretçiye
+          BASINCA balon açılıyor: saat · süre · adres. */}
       {stops.map((s, i) => (
         <MarkerF
           key={i}
           position={{ lat: s.lat, lng: s.lng }}
           icon={pinIcon("#dc2626")}
-          title={`${s.durationMin} dk durdu`}
+          title={durakEtiketi(s)}
+          onClick={() => setAcikDurak(acikDurak === i ? null : i)}
         />
       ))}
+      {acikDurak != null && stops[acikDurak] && (
+        <InfoWindowF
+          position={{ lat: stops[acikDurak].lat, lng: stops[acikDurak].lng }}
+          onCloseClick={() => setAcikDurak(null)}
+        >
+          <div style={{ fontSize: 13, lineHeight: 1.4, maxWidth: 220 }}>
+            {durakEtiketi(stops[acikDurak])}
+          </div>
+        </InfoWindowF>
+      )}
     </GoogleMap>
   );
 }

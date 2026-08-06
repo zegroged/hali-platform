@@ -1,3 +1,4 @@
+import { HataSeridi } from "@/components/HataSeridi";
 import { sadeceSahip } from "@/lib/panelYetki";
 import { getCurrentBusiness } from "@/lib/panel";
 import { prisma } from "@/lib/prisma";
@@ -16,11 +17,16 @@ const inp =
   "w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:border-brand";
 const lbl = "mb-1 block text-sm font-medium text-slate-700";
 
-export default async function PanelStaff() {
+export default async function PanelStaff({
+  searchParams,
+}: {
+  searchParams: Promise<{ hata?: string }>;
+}) {
   // 🔴 SAHİBE ÖZEL SAYFA (2026-08-06). Kapı PRISMA'DAN ÖNCE: App Router'da
   // layout ile page paralel render edilir, layout yönlendirse bile buradaki
   // sorgu çalışır ve veri RSC yükünde sızabilir.
   await sadeceSahip();
+  const { hata } = await searchParams;
   const b = await getCurrentBusiness();
   if (!b) return null;
 
@@ -36,6 +42,7 @@ export default async function PanelStaff() {
 
   return (
     <div className="space-y-4">
+      <HataSeridi mesaj={hata} />
       <div>
         <h1 className="text-lg font-semibold text-slate-900">Çalışanlar</h1>
         <p className="mt-1 text-sm text-slate-600">

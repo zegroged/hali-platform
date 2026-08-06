@@ -71,7 +71,35 @@ export async function sendEmail(
   }
   const from =
     process.env.EMAIL_FROM ?? "En Yakın Halı Yıkama <no-reply@enyakinhaliyikamaservisi.com>";
-  await transport().sendMail({ from, to, subject, text, html });
+  await transport().sendMail({
+    from,
+    to,
+    subject,
+    text,
+    html,
+    // TESLİMAT BAŞLIKLARI (2026-08-06 — kullanıcı: "spama düşüyoruz").
+    //
+    // Gmail/Yahoo, Şubat 2024'ten beri toplu gönderenlerden TEK TIKLA
+    // abonelikten çıkma istiyor. Başlık yokken gönderen "spam şüphelisi"
+    // sayılıyor. Bizim postamızın çoğu işlemsel (sipariş alındı, teslim
+    // edildi) ama sezon hatırlatması PAZARLAMA — Gmail ikisini ayırmıyor,
+    // alan adının tamamına puan veriyor.
+    //
+    // `mailto:` yolu bilerek seçildi: tek tıkla çıkışın HTTP ucu, kimliği
+    // doğrulanmamış bir POST ile abonelik kapatabildiği için ayrı bir jeton
+    // altyapısı ister. Destek kutusuna düşen mailto hem politikayı karşılıyor
+    // hem yanlış kapatmaya kapalı.
+    //
+    // ⚠️ ASIL SORUN BU DEĞİL: gönderen alan adında (…servisim.com) DMARC
+    // kaydı YOK — SPF ✓ DKIM ✓ ama üçüncüsü eksik. O kayıt eklenmeden
+    // buradaki başlıklar tek başına spam sorununu bitirmez (DEVIR §5-C/11).
+    headers: {
+      "List-Unsubscribe": `<mailto:${
+        process.env.SMTP_USER ?? "destek@enyakinhaliyikamaservisim.com"
+      }?subject=Abonelikten%20cikar>`,
+      "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+    },
+  });
 }
 
 /**

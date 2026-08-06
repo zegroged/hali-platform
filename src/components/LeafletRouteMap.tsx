@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { durakEtiketi } from "@/lib/durak";
 import {
   MapContainer,
   TileLayer,
@@ -17,6 +18,9 @@ type Stop = {
   lng: number;
   durationMin: number;
   address: string | null;
+  /** Durağın başlangıç anı (ISO). Haritada "ne zaman" sorusunun cevabı —
+   *  2026-08-06'ya kadar yalnız listede vardı, işaretçide yoktu. */
+  startedAt?: string;
 };
 
 function pinIcon(color: string, emoji: string, size = 30) {
@@ -144,10 +148,7 @@ export default function LeafletRouteMap({
       )}
       {stops.map((s, i) => (
         <Marker key={i} position={[s.lat, s.lng]} icon={pinIcon("#dc2626", "⏸", 26)}>
-          <Popup>
-            {s.durationMin} dk durdu
-            {s.address ? ` · ${s.address}` : ""}
-          </Popup>
+          <Popup>{durakEtiketi(s)}</Popup>
         </Marker>
       ))}
       <Mover points={points} playing={playing} onDone={onDone} />

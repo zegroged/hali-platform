@@ -1,3 +1,4 @@
+import { HataSeridi } from "@/components/HataSeridi";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import MoneyInput from "@/components/MoneyInput";
@@ -29,7 +30,12 @@ export const dynamic = "force-dynamic";
 const inp =
   "w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:border-brand";
 
-export default async function SoforPage() {
+export default async function SoforPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ hata?: string }>;
+}) {
+  const { hata } = await searchParams;
   const u = await getSessionUser();
   if (!u) return null;
   // Telefonla giriş kaldırıldı: kimliği eksik şoför önce kullanıcı adı belirler.
@@ -59,6 +65,8 @@ export default async function SoforPage() {
   return (
     <div className="space-y-4">
       <DriverShift initialOnShift={driver.isOnShift} />
+
+      <HataSeridi mesaj={hata} />
 
       <h1 className="text-lg font-semibold text-slate-900">
         İşlerim ({orders.length}){" "}

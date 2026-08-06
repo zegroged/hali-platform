@@ -108,7 +108,14 @@ export async function startTracking(): Promise<string | null> {
     // 5 dk sonra panelde "çevrimdışı" görünüyordu. 0 + 15 sn: sistem düzenli
     // güncelleme verir, gönderimi yukarıdaki süzgeç (25 m / 60 sn) kısar.
     distanceInterval: 0,
-    timeInterval: 15000,
+    // ÖRNEKLEME SIKLIĞI 15 sn → 5 sn (2026-08-06, kullanıcı kararı).
+    // Hareket hâlinde çözünürlük artar: 50 km/sa'te 200 m yerine ~70 m'de bir
+    // nokta. Sık örnek, sivri ayıklamanın (lib/konumFiltre.ts) doğru
+    // çalışması için de gerekli — seyrek veride aykırı nokta ile gerçek
+    // hareket ayırt edilemiyor.
+    // ⚠️ DURAN şoför yine 60 sn'de bir gönderiyor (aşağıdaki 25 m / 60 sn
+    // freni) — boşuna veri ve pil yakılmıyor.
+    timeInterval: 5000,
     pausesUpdatesAutomatically: false,
     showsBackgroundLocationIndicator: true,
     foregroundService: {

@@ -85,8 +85,16 @@ export default async function PanelLayout({
         </div>
         <PanelNav rol={erisim.rol} />
       </header>
-      {/* pb-24 (mobil): sabit alt çubuk son satırı kapatmasın. */}
-      <main className="mx-auto max-w-3xl px-4 pb-24 pt-6 md:pb-6 lg:max-w-5xl">
+      {/* 🔴 ALT ÇUBUK REZERVİ (2026-08-06 düzeltildi — kullanıcı ekran görüntüsü:
+          /panel/kasa'nın son paragrafı çubuğun altında kalıyordu).
+          ESKİSİ `pb-24` = 96px SABİTTİ. Ama çubuğun yüksekliği DEĞİŞKEN:
+            min-h-[56px] + py-1 (8px) + border-t (1px)
+            + pb-[env(safe-area-inset-bottom)]  ← cihaza göre 24-48px
+          = 89-113px. Sistem gezinme çubuğu olan telefonda safe-area büyüyor,
+          96px yetmiyor ve içerik kapanıyordu.
+          Rezerv artık AYNI değişkeni içeriyor → hangi cihazda olursa olsun
+          çubuk kadar boşluk kalıyor. 6rem = eski 96px'in tabanı. */}
+      <main className="mx-auto max-w-3xl px-4 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-6 md:pb-6 lg:max-w-5xl">
         {children}
       </main>
     </div>

@@ -1,3 +1,4 @@
+import { HataSeridi } from "@/components/HataSeridi";
 import Link from "next/link";
 import MoneyInput from "@/components/MoneyInput";
 import { notFound, redirect } from "next/navigation";
@@ -56,9 +57,12 @@ function fmt(dt: Date) {
 
 export default async function OrderManagePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ hata?: string }>;
 }) {
+  const { hata } = await searchParams;
   // HAFİF sorgu: bu sayfa yalnız işletme id'si + şoför listesi kullanıyor.
   // getPanelBusiness tüm işletme grafiğini (fiyat/bölge/foto...) çekiyordu ve
   // her form işleminden sonraki yeniden-render'ı yavaşlatıyordu (B: hız).
@@ -126,6 +130,8 @@ export default async function OrderManagePage({
       >
         ← Siparişler
       </Link>
+
+      <HataSeridi mesaj={hata} />
 
       {/* Başlık: müşteri + durum */}
       <div className={card}>

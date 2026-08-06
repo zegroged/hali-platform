@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { IconMapPin, IconWallet, IconCheck } from "@/components/icons";
 import { LocationPicker } from "@/components/LocationPicker";
+import { ilkHataliAlanaGit } from "@/lib/formOdak";
 
 /** Alan bazlı doğrulama hataları (alan adı → mesaj). */
 type FieldErrors = Partial<
@@ -115,16 +116,34 @@ export function OrderForm({
       errs.pickupAddress = "Lütfen açık adresi yaz (mahalle, sokak, no).";
     if (form.approxM2 && parseM2(form.approxM2) === null)
       errs.approxM2 = "Geçerli bir m² değeri gir (ör. 12,5).";
-    // E-posta ZORUNLU: SMS henüz yokken takip kodunun kalıcı kanalı bu —
-    // müşteri sekmeyi kapatınca kodunu kaybetmesin.
-    if (!/^\S+@\S+\.\S+$/.test(form.customerEmail.trim()))
-      errs.customerEmail =
-        "Takip linkinin gönderilmesi için geçerli bir e-posta adresi gir.";
+    // E-POSTA ARTIK OPSİYONEL (2026-08-06). WhatsApp açıldığından takip linki
+    // oradan da gidiyor (siparis_alindi_link şablonu jetonu taşıyor). Girildiyse
+    // biçimi doğrulanır; boş bırakmak serbest.
+    if (
+      form.customerEmail.trim() &&
+      !/^\S+@\S+\.\S+$/.test(form.customerEmail.trim())
+    )
+      errs.customerEmail = "E-posta adresi hatalı görünüyor (ornek@site.com).";
     if (!consent)
       errs.consent = "Devam etmek için onay kutusunu işaretleyin.";
     setFieldErrors(errs);
     if (Object.keys(errs).length > 0) {
-      setError("Lütfen işaretli alanları düzelt.");
+      setError("Eksik veya hatalı alan var — aşağıda işaretledim.");
+      // EKSİK ALANA GÖTÜR (2026-08-06): işaretlemek yetmiyordu; telefonda alan
+      // ekran dışında kalınca kullanıcı hatayı görüp yerini bulamıyordu.
+      // Sıra FORMDAKİ doğal sıra (yukarıdan aşağı), hata nesnesinin sırası değil.
+      ilkHataliAlanaGit(
+        [
+          "customerName",
+          "customerPhone",
+          "customerEmail",
+          "pickupAddress",
+          "approxM2",
+          "consent",
+        ],
+        errs,
+        (e.currentTarget as HTMLFormElement) ?? null,
+      );
       return;
     }
 
@@ -242,9 +261,20 @@ export function OrderForm({
               <p className={fieldErrCls}>{fieldErrors.customerPhone}</p>
             )}
           </div>
+          {/* E-posta artık opsiyonel; bildirimlerin TEK kanalı telefon olabiliyor.
+              Kullanıcı isteği (2026-08-06): "telefon numaranızı doğru
+              girdiğinizden emin olun diye bildiri verelim". */}
+          {!form.customerEmail.trim() && (
+            <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+              <strong>Numaranı kontrol et.</strong> E-posta yazmazsan sipariş
+              bildirimlerin ve takip linkin{" "}
+              <strong>WhatsApp&apos;tan yukarıdaki numaraya</strong> gidecek.
+            </div>
+          )}
           <div>
             <label htmlFor="siparis-eposta" className={labelCls}>
               E-posta
+              {optionalBadge}
             </label>
             <input
               id="siparis-eposta"
@@ -258,7 +288,8 @@ export function OrderForm({
               onChange={(e) => set("customerEmail", e.target.value)}
             />
             <p className="mt-1 text-xs text-slate-500">
-              Takip kodun ve takip linkin bu adrese gönderilir.
+              Yazarsan takip linkin buraya da gelir. Boş bırakırsan tüm
+              bildirimler WhatsApp&apos;tan gider.
             </p>
             {fieldErrors.customerEmail && (
               <p className={fieldErrCls}>{fieldErrors.customerEmail}</p>

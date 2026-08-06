@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getPanelBusiness } from "@/lib/panel";
 import { STOP_MIN_SEC } from "@/lib/tracking";
 import { trDayBoundsUTC } from "@/lib/time";
+import { izHazirla } from "@/lib/konumFiltre";
 
 function downsample<T>(arr: T[], max: number): T[] {
   if (arr.length <= max) return arr;
@@ -75,10 +76,14 @@ export async function GET(req: NextRequest) {
     };
   }
 
-  const points = downsample(
-    pings.map((p) => [p.lat, p.lng] as [number, number]),
-    500,
-  );
+  // 🔴 SİVRİ AYIKLAMA (2026-08-06). Ham ping'ler DEĞİŞMEDEN saklanıyor;
+  // yalnız haritaya çizilen dizi süzülüyor. Tek sapmış fix "gidip gelmiş"
+  // gibi koca bir yol üretiyordu (kullanıcı: "şoför evden hiç çıkmadı ama
+  // harita yol çizdi"). Şoför gerçekten dar bir kümede kaldıysa çizgi HİÇ
+  // çizilmez — gürültü "gezinti" gibi görünmesin (bkz. lib/konumFiltre.ts).
+  const hamNoktalar = pings.map((p) => [p.lat, p.lng] as [number, number]);
+  const { cizgi, duruyor } = izHazirla(hamNoktalar);
+  const points = downsample(cizgi, 500);
   const stopRows = stops.map((s) => ({
     lat: s.lat,
     lng: s.lng,
@@ -90,6 +95,9 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({
     points,
+    // Şoför gün boyu tek noktada kaldıysa arayüz "yol yok" yerine bunu
+    // açıklayabilsin; boş `points` tek başına "veri yok" gibi okunuyordu.
+    duruyor,
     stops: stopRows,
     tani,
     summary: {

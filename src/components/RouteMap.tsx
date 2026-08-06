@@ -9,6 +9,9 @@ type Stop = {
   lng: number;
   durationMin: number;
   address: string | null;
+  /** Durağın başlangıç anı (ISO). Haritada "ne zaman" sorusunun cevabı —
+   *  2026-08-06'ya kadar yalnız listede vardı, işaretçide yoktu. */
+  startedAt?: string;
 };
 type Props = {
   points: [number, number][];

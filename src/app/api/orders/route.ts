@@ -1,3 +1,4 @@
+import { normalizePhone, isRealMobilePhone } from "@/lib/phone";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
@@ -16,9 +17,23 @@ const Body = z.object({
   businessId: z.string().min(1).max(40),
   customerName: z.string().min(2).max(100),
   customerPhone: z.string().min(10).max(20),
-  // ZORUNLU: takip kodu/linki e-postayla gider (SMS ertelendi — misafirin
-  // linki kaybetmemesi + md.9 kalıcı-ortam teyidinin garantili kanalı).
-  customerEmail: z.string().trim().email().max(120),
+  // OPSİYONEL (2026-08-06, kullanıcı kararı: "WhatsApp'ta var ya şimdi").
+  //
+  // 19 Temmuz'da ZORUNLU yapılmıştı çünkü SMS mock'tu ve takip kodunun tek
+  // kalıcı kanalı e-postaydı. 28 Temmuz'da WhatsApp açıldı: `waSiparisAlindi`
+  // → `siparis_alindi_link` şablonu takip JETONUNU taşıyor, yani müşteri
+  // tıklanabilir takip linkini WhatsApp'tan alıyor (şablon onaysızsa kodlu
+  // sürüme düşüyor; ikisi de APPROVED). Zorunluluğun gerekçesi böylece düştü.
+  //
+  // Boş string de kabul edilir (form boş gönderir) → null'a çevrilir.
+  customerEmail: z
+    .string()
+    .trim()
+    .max(120)
+    .refine((v) => v === "" || /^\S+@\S+\.\S+$/.test(v), {
+      message: "Geçerli bir e-posta adresi girin ya da boş bırakın.",
+    })
+    .optional(),
   pickupAddress: z.string().min(5).max(300),
   pickupLat: z.number().min(-90).max(90).optional(),
   pickupLng: z.number().min(-180).max(180).optional(),
@@ -35,9 +50,30 @@ const Body = z.object({
 export async function POST(req: NextRequest) {
   const parsed = Body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) {
-    return NextResponse.json({ error: "Geçersiz veri" }, { status: 400 });
+    // Zod'un kendi mesajını göster — "Geçersiz veri" kullanıcıya hangi alanın
+    // sorunlu olduğunu söylemiyordu (2026-08-06).
+    const ilk = parsed.error.issues[0];
+    return NextResponse.json(
+      { error: ilk?.message ?? "Geçersiz veri" },
+      { status: 400 },
+    );
   }
   const d = parsed.data;
+
+  // 🔴 E-POSTA OPSİYONEL OLUNCA TELEFON TEK KANAL KALIYOR (2026-08-06).
+  // Bildirimler (sipariş alındı, kesin fiyat, yolda, teslim) WhatsApp'tan
+  // gidiyor; numara gerçek bir cep değilse müşteri HİÇBİR ŞEY almaz.
+  // `isRealMobilePhone` tahsisli operatör kodlarını da doğrular (0500 gibi
+  // uydurma kodlar reddedilir — iyzico için yazılmıştı, burada da doğru araç).
+  if (!d.customerEmail && !isRealMobilePhone(normalizePhone(d.customerPhone))) {
+    return NextResponse.json(
+      {
+        error:
+          "E-posta girmediysen telefon numarası doğru olmalı — bildirimler ve takip linki WhatsApp'tan gidecek. 05xx ile başlayan geçerli bir cep numarası gir ya da e-posta ekle.",
+      },
+      { status: 400 },
+    );
+  }
 
   // SMS bombing / spam koruması: kimlik doğrulamasız uç → IP + telefon limiti.
   const ip = clientIp(req);
@@ -116,7 +152,7 @@ export async function POST(req: NextRequest) {
         customerId: session?.role === "CUSTOMER" ? session.id : undefined,
         customerName: d.customerName,
         customerPhone: d.customerPhone,
-        customerEmail: d.customerEmail?.toLowerCase() ?? null,
+        customerEmail: d.customerEmail?.trim().toLowerCase() || null,
         pickupAddress: adres,
         pickupLat: d.pickupLat,
         pickupLng: d.pickupLng,

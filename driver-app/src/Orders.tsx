@@ -35,21 +35,74 @@ const ADVANCE_LABEL: Record<string, string> = {
   WASHING: "Teslime çıktım",
 };
 
-async function takePhoto(): Promise<string | null> {
-  const perm = await ImagePicker.requestCameraPermissionsAsync();
-  if (!perm.granted) {
-    Alert.alert(
-      "Kamera izni gerekli",
-      "Halının fotoğrafını çekmek için kamera iznine izin ver.",
-    );
-    return null;
+/**
+ * Halı fotoğrafı çek.
+ *
+ * 🔴 SESSİZ BAŞARISIZLIK KAPATILDI (2026-08-06). Kullanıcı canlıda
+ * *"halıyı aldım deyince fotoğraf yüklenmiyor"* dedi. Sunucu tarafı curl ile
+ * RN'in gönderdiği multipart biçimiyle sınandı: **200 `{ok:true}`** — yani
+ * sunucu sağlam, hata çekim adımındaydı. Ama eski kod her başarısızlıkta
+ * `return null` yapıyor, çağıran da `if (!uri) return` ile SESSİZCE çıkıyordu:
+ * şoför butona basıyor, kamera açılıp kapanıyor, **hiçbir şey olmuyor** ve
+ * neyin ters gittiğini ne o ne biz öğrenebiliyorduk.
+ *
+ * Artık her dal konuşuyor. `iptal` ayrı işaretleniyor çünkü kullanıcının
+ * kendi vazgeçmesi hata değildir — onda uyarı gösterilmez.
+ */
+type FotoSonuc =
+  | { ok: true; uri: string }
+  | { ok: false; iptal: true }
+  | { ok: false; iptal?: false; hata: string };
+
+async function takePhoto(): Promise<FotoSonuc> {
+  let perm;
+  try {
+    perm = await ImagePicker.requestCameraPermissionsAsync();
+  } catch (e) {
+    return {
+      ok: false,
+      hata:
+        "Kamera açılamadı: " +
+        (e instanceof Error ? e.message : "bilinmeyen hata") +
+        "\n\nTelefon ayarlarından uygulamaya kamera izni verip tekrar dene.",
+    };
   }
-  const res = await ImagePicker.launchCameraAsync({
-    quality: 0.6,
-    allowsEditing: false,
-  });
-  if (res.canceled || !res.assets?.[0]?.uri) return null;
-  return res.assets[0].uri;
+  if (!perm.granted) {
+    return {
+      ok: false,
+      hata: perm.canAskAgain
+        ? "Kamera izni gerekli. Halının fotoğrafı hasar/kayıp kanıtıdır; izin vermeden alım yapılamıyor."
+        : "Kamera izni KAPALI ve uygulama tekrar soramıyor. Telefon Ayarlar → Uygulamalar → Halı Şoför → İzinler → Kamera'yı aç.",
+    };
+  }
+
+  let res;
+  try {
+    res = await ImagePicker.launchCameraAsync({
+      quality: 0.6,
+      allowsEditing: false,
+    });
+  } catch (e) {
+    return {
+      ok: false,
+      hata:
+        "Kamera uygulaması açılamadı: " +
+        (e instanceof Error ? e.message : "bilinmeyen hata"),
+    };
+  }
+
+  if (res.canceled) return { ok: false, iptal: true };
+  const uri = res.assets?.[0]?.uri;
+  if (!uri) {
+    // Buraya düşmek NADİR ama sessiz kalırsa teşhis edilemez: bazı cihazlarda
+    // kamera fotoğrafı kaydedemeyip boş sonuç döndürüyor (depolama dolu vb.).
+    return {
+      ok: false,
+      hata:
+        "Kamera fotoğrafı döndürmedi. Telefonun depolaması dolu olabilir; yer açıp tekrar dene.",
+    };
+  }
+  return { ok: true, uri };
 }
 
 export function Orders({ onSessionExpired }: { onSessionExpired: () => void }) {
@@ -141,6 +194,18 @@ export function Orders({ onSessionExpired }: { onSessionExpired: () => void }) {
     ]);
   }
 
+  /**
+   * Fotoğraf çek ve sonucu KULLANICIYA ANLAT. Eskiden `if (!uri) return` ile
+   * sessizce çıkılıyordu — şoför butona basıyor, hiçbir şey olmuyordu.
+   * İptalde uyarı YOK (kullanıcı bilerek vazgeçti).
+   */
+  async function fotoAl(): Promise<string | null> {
+    const r = await takePhoto();
+    if (r.ok) return r.uri;
+    if (!r.iptal) Alert.alert("Fotoğraf çekilemedi", r.hata);
+    return null;
+  }
+
   async function doPickup(o: DriverOrder) {
     // Kutuda GÖRÜNEN değerle GÖNDERİLEN değer aynı olmalı (teslim tutarında
     // yaşanan hatanın aynısına düşmemek için): boşsa undefined gider.
@@ -150,7 +215,7 @@ export function Orders({ onSessionExpired }: { onSessionExpired: () => void }) {
       Alert.alert("Halı sayısı", "1 ile 100 arasında bir sayı gir.");
       return;
     }
-    const uri = await takePhoto();
+    const uri = await fotoAl();
     if (!uri) return;
     run(o.id, () => pickupOrder(o.id, uri, sayi));
   }
@@ -165,7 +230,7 @@ export function Orders({ onSessionExpired }: { onSessionExpired: () => void }) {
       Alert.alert("Tutar gerekli", "Tahsil edilen tutarı gir (0'dan büyük).");
       return;
     }
-    const uri = await takePhoto();
+    const uri = await fotoAl();
     if (!uri) return;
     run(o.id, () => deliverOrder(o.id, price, uri));
   }
