@@ -14,6 +14,7 @@ import { getCurrentBusiness } from "@/lib/panel";
 import { hashPassword } from "@/lib/auth";
 import { normalizePhone, isMobilePhone } from "@/lib/phone";
 import { normalizeUsername, validateUsername } from "@/lib/username";
+import { hataylaDon } from "@/lib/hata";
 
 /**
  * SAHİBE ÖZEL bağlam. `getCurrentBusiness()` yalnız CLEANER kabul eder →
@@ -33,23 +34,25 @@ export async function addStaff(formData: FormData) {
   const chosen = String(formData.get("password") || "");
   const username = normalizeUsername(String(formData.get("username") || ""));
 
-  if (!name) throw new Error("Ad soyad girin.");
+  if (!name) hataylaDon("/panel/calisanlar", "Ad soyad girin.");
   if (!isMobilePhone(phone)) {
-    throw new Error("Telefon 05xx ile başlayan 11 hane olmalı.");
+    hataylaDon("/panel/calisanlar", "Telefon 05xx ile başlayan 11 haneli cep numarası olmalı.");
   }
   const usernameError = validateUsername(username);
-  if (usernameError) throw new Error(usernameError);
-  if (chosen.length < 8) throw new Error("Şifre en az 8 karakter olmalı.");
+  if (usernameError) hataylaDon("/panel/calisanlar", usernameError);
+  if (chosen.length < 8)
+    hataylaDon("/panel/calisanlar", "Şifre en az 8 karakter olmalı (çalışana sen ileteceksin).");
 
   const exists = await prisma.user.findFirst({
     where: { OR: [{ phone }, { username }] },
     select: { username: true },
   });
   if (exists) {
-    throw new Error(
+    hataylaDon(
+      "/panel/calisanlar",
       exists.username === username
-        ? "Bu kullanıcı adı alınmış. Başka bir tane seçin."
-        : "Bu telefon numarası başka bir hesapta zaten kayıtlı.",
+        ? `"${username}" kullanıcı adı başkası tarafından alınmış. Başka bir ad deneyin.`
+        : `${phone} numarası platformda başka bir hesapta kayıtlı (çalışan daha önce müşteri olarak sipariş vermiş olabilir). Farklı bir numara girin.`,
     );
   }
 
@@ -83,7 +86,7 @@ export async function setStaffPassword(formData: FormData) {
   const b = await biz();
   const id = String(formData.get("id"));
   const pw = String(formData.get("password") || "");
-  if (pw.length < 8) throw new Error("Şifre en az 8 karakter olmalı.");
+  if (pw.length < 8) hataylaDon("/panel/calisanlar", "Şifre en az 8 karakter olmalı.");
   const s = await prisma.staff.findFirst({
     where: { id, businessId: b.id },
     select: { userId: true },
@@ -107,7 +110,7 @@ export async function setStaffUsername(formData: FormData) {
   const id = String(formData.get("id"));
   const username = normalizeUsername(String(formData.get("username") || ""));
   const err = validateUsername(username);
-  if (err) throw new Error(err);
+  if (err) hataylaDon("/panel/calisanlar", err);
   const s = await prisma.staff.findFirst({
     where: { id, businessId: b.id },
     select: { userId: true },
@@ -118,7 +121,7 @@ export async function setStaffUsername(formData: FormData) {
     select: { id: true },
   });
   if (taken && taken.id !== s.userId) {
-    throw new Error("Bu kullanıcı adı alınmış. Başka bir tane seçin.");
+    hataylaDon("/panel/calisanlar", `"${username}" kullanıcı adı başkası tarafından alınmış. Başka bir ad deneyin.`);
   }
   await prisma.user.update({ where: { id: s.userId }, data: { username } });
   revalidatePath("/panel/calisanlar");
