@@ -38,9 +38,19 @@ export async function generateMetadata({
   const kapsam = await seoKapsam().catch(() => null);
   const bosSayfa =
     kapsam != null && !kapsam.ilceler.has(ilceAnahtar(city.name, district));
+
+  // SAYFAYA ÖZGÜ AÇIKLAMA (2026-08-06) — şehir sayfasıyla aynı gerekçe:
+  // 973 ilçenin açıklaması tek kalıptan üretiliyordu, Google şablon metni
+  // kendi parçasıyla değiştiriyordu. Artık o ilçeye ait gerçek sayı geçiyor.
+  const adet = kapsam?.ilceSayaci.get(ilceAnahtar(city.name, district)) ?? 0;
+  const description =
+    adet > 0
+      ? `${locative(district)} (${city.name}) hizmet veren ${adet} halı yıkamacısını fiyat, puan ve teslim süresine göre karşılaştır. Halın kapından alınır, yıkanır, kapına teslim edilir — ön ödeme yok, ödeme teslimde.`
+      : `${locative(district)} (${city.name}) halı yıkama servisi: halın kapından alınsın, adım adım takip et, ödemeyi teslimde yap. İlçende hizmet açıldığında haber vermemiz için e-postanı bırakabilirsin.`;
+
   return {
     title: `${district} Halı Yıkama (${city.name}) — Kapıdan Alma, Teslimat`,
-    description: `${locative(district)} halı yıkama servisi: yakınındaki halı yıkamacıları karşılaştır, halın kapından alınsın, adım adım takip et. Ön ödeme yok, ödeme teslimde.`,
+    description,
     alternates: { canonical: `/hali-yikama/${city.slug}/${ilce}` },
     ...(bosSayfa ? { robots: { index: false, follow: true } } : {}),
   };

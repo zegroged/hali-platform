@@ -1,4 +1,4 @@
-import { getCurrentBusiness } from "@/lib/panel";
+import { getPanelBusiness } from "@/lib/panel";
 import { RouteHistory } from "@/components/RouteHistory";
 import EmptyState from "@/components/EmptyState";
 import { IconMapPin } from "@/components/icons";
@@ -6,7 +6,7 @@ import { IconMapPin } from "@/components/icons";
 export const dynamic = "force-dynamic";
 
 export default async function RotaPage() {
-  const b = await getCurrentBusiness();
+  const b = await getPanelBusiness();
   if (!b) return null;
 
   const drivers = b.drivers.map((d) => ({ id: d.id, name: d.user.name }));

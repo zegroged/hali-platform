@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { getSessionUser } from "@/lib/auth";
+import { getPanelErisim } from "@/lib/panelYetki";
 import { notifyCityLeadsIfOpen } from "@/lib/cityLeads";
 
 export async function getCurrentBusiness() {
@@ -35,6 +36,43 @@ export async function getCurrentBusiness() {
 export type CurrentBusiness = NonNullable<
   Awaited<ReturnType<typeof getCurrentBusiness>>
 >;
+
+// ÇALIŞAN PANELİ (2026-08-06) — SAHİP **veya** ÇALIŞAN.
+//
+// `getCurrentBusiness()` bilerek DEĞİŞTİRİLMEDİ: hâlâ yalnız CLEANER kabul
+// ediyor, yani onu çağıran her yer sahibe özel KALDI (fail-closed). Çalışanın
+// girebildiği sayfalar tek tek bu fonksiyona geçirilir. Dönen şekil birebir
+// aynı — çağıran taraf değiştirmek zorunda kalmasın.
+//
+// ⚠️ Bunu para/kimlik/fiyat ekranında KULLANMA. Oralarda kapı `sadeceSahip()`.
+export async function getPanelBusiness() {
+  const e = await getPanelErisim();
+  if (!e) return null;
+  return prisma.cleanerBusiness.findUnique({
+    where: { id: e.businessId },
+    include: {
+      owner: {
+        select: {
+          name: true,
+          phoneVerified: true,
+          emailVerified: true,
+          phone: true,
+          email: true,
+        },
+      },
+      subscription: true,
+      badges: true,
+      drivers: {
+        include: {
+          user: { select: { name: true, phone: true, username: true } },
+        },
+      },
+      pricing: { orderBy: { createdAt: "asc" } },
+      serviceAreas: true,
+      photos: true,
+    },
+  });
+}
 
 // Yapısal tip — hem getCurrentBusiness sonucu hem admin onayındaki include uyar.
 type ProfileCheckable = {

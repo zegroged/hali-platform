@@ -60,7 +60,7 @@ export default async function OrderManagePage({
   params: Promise<{ id: string }>;
 }) {
   // HAFİF sorgu: bu sayfa yalnız işletme id'si + şoför listesi kullanıyor.
-  // getCurrentBusiness tüm işletme grafiğini (fiyat/bölge/foto...) çekiyordu ve
+  // getPanelBusiness tüm işletme grafiğini (fiyat/bölge/foto...) çekiyordu ve
   // her form işleminden sonraki yeniden-render'ı yavaşlatıyordu (B: hız).
   const u = await getSessionUser();
   if (!u || u.role !== "CLEANER") redirect("/giris");
@@ -289,6 +289,35 @@ export default async function OrderManagePage({
             className="mt-4 border-t border-slate-100 pt-4"
           >
             <input type="hidden" name="orderId" value={o.id} />
+            {/* HALI SAYISI — ALIM ANINDA (2026-08-06). Numaralar (1..N) burada
+                doğar; öncesinde numara FOTOĞRAFTAN doğuyordu, yani fotoğrafı
+                çekilmeyen halı sistemde hiç yoktu (bkz. lib/carpet.ts).
+                Şoför web ve şoför uygulamasıyla İKİZ. */}
+            {step.next === "PICKED_UP" && (
+              <div className="mb-3">
+                <label
+                  htmlFor="hali-sayisi"
+                  className="block text-xs font-medium text-slate-500"
+                >
+                  Kaç halı alındı?
+                </label>
+                <input
+                  id="hali-sayisi"
+                  name="carpetCount"
+                  type="number"
+                  min={1}
+                  max={100}
+                  inputMode="numeric"
+                  defaultValue={o.carpetCount ?? ""}
+                  placeholder="örn. 5"
+                  className="mt-1 w-32 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand"
+                />
+                <p className="mt-1 text-xs text-slate-500">
+                  Numaralar buradan doğar — &quot;5 geldi, 5 gitti mi?&quot;
+                  sorusunun cevabı. Boş bırakılabilir.
+                </p>
+              </div>
+            )}
             {/* md.15/1-h: dijital fiyat onayı yoksa yıkamaya geçiş, işletmenin
                 sözlü onay BEYANINA bağlı — beyan zaman damgalı kayda geçer. */}
             {o.status === "PICKED_UP" && !o.priceApprovedAt && (
@@ -552,6 +581,7 @@ export default async function OrderManagePage({
               createdAt: p.createdAt.toISOString(),
             }))}
             uploadStage={o.status === "WASHING" ? "YIKAMA" : undefined}
+            carpetCount={o.carpetCount}
           />
         </div>
         {/* "Hazır" haberi (2026-07-31): siparis_hazir şablonu onaylıydı ama

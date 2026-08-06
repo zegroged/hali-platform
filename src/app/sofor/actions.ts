@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { normalizeCarpetCount, CARPET_COUNT_HATA } from "@/lib/carpet";
 import {
   bildirAraAdim,
   bildirTeslimEdildi,
@@ -102,11 +103,21 @@ export async function savePickup(formData: FormData) {
   // fotoğraf olmadan halı PICKED_UP olmaz.
   if (!photoUrl) redirect("/sofor");
 
+  // HALI SAYISI — ALIM ANINDA (2026-08-06, driverOrders.ts ile İKİZ).
+  // Numaralar buradan doğar; öncesinde fotoğraftan doğuyordu ve fotoğrafı
+  // çekilmeyen halı sistemde hiç yoktu (bkz. lib/carpet.ts).
+  const sayi = normalizeCarpetCount(formData.get("carpetCount"));
+  if (sayi === "gecersiz") throw new Error(CARPET_COUNT_HATA);
+
   // CAS (denetim bulgusu): koşulsuz yazım, eşzamanlı panel iptali/reddini
   // (ACCEPTED→CANCELED/REJECTED) ezip siparişi PICKED_UP'a diriltiyordu.
   const picked = await prisma.order.updateMany({
     where: { id, driverId: d.id, status: "ACCEPTED" },
-    data: { status: "PICKED_UP", pickupPhotoUrl: photoUrl },
+    data: {
+      status: "PICKED_UP",
+      pickupPhotoUrl: photoUrl,
+      ...(sayi != null ? { carpetCount: sayi } : {}),
+    },
   });
   if (picked.count === 0) return; // yarış: durum değişti → yazma, yan etki yok
   await prisma.orderEvent.create({

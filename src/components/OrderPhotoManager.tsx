@@ -18,14 +18,20 @@ export function OrderPhotoManager({
   orderId,
   photos: initialPhotos,
   uploadStage,
+  carpetCount,
 }: {
   orderId: string;
   photos: GalleryPhoto[];
   uploadStage?: PhotoStage;
+  /** Alımda girilen halı sayısı (2026-08-06) — verilirse hangi halıya
+   *  yüklendiği seçilebilir. Boş bırakılırsa sunucu fotoğrafı olmayan İLK
+   *  halıya bağlar; hiçbiri boş değilse numara vermez (yeni halı UYDURMAZ). */
+  carpetCount?: number | null;
 }) {
   const [photos, setPhotos] = useState<GalleryPhoto[]>(initialPhotos);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [carpetNo, setCarpetNo] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
   const yikama = uploadStage === "YIKAMA";
 
@@ -41,6 +47,7 @@ export function OrderPhotoManager({
       const fd = new FormData();
       for (const f of Array.from(files)) fd.append("files", f);
       if (uploadStage) fd.append("stage", uploadStage);
+      if (carpetNo) fd.append("carpetNo", carpetNo);
       const res = await fetch(`/api/panel/orders/${orderId}/photos`, {
         method: "POST",
         body: fd,
@@ -102,6 +109,24 @@ export function OrderPhotoManager({
           aria-label={yikama ? "Yıkama fotoğrafı seç" : "Fotoğraf seç"}
           className="min-w-0 flex-1 text-sm text-slate-600 file:mr-2 file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-sm"
         />
+        {/* HANGİ HALI (2026-08-06): fotoğraf artık YENİ halı yaratmıyor, VAR
+            OLAN bir halıya bağlanıyor. Boş bırakılırsa sunucu fotoğrafı
+            olmayan ilk halıya koyar — en sık yapılacak şey bu. */}
+        {carpetCount != null && carpetCount > 0 && (
+          <select
+            value={carpetNo}
+            onChange={(e) => setCarpetNo(e.target.value)}
+            aria-label="Hangi halı"
+            className="rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-700 focus:border-brand"
+          >
+            <option value="">Sıradaki halı</option>
+            {Array.from({ length: carpetCount }, (_, i) => i + 1).map((n) => (
+              <option key={n} value={n}>
+                Halı #{n}
+              </option>
+            ))}
+          </select>
+        )}
         <button
           onClick={upload}
           disabled={loading}

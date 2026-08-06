@@ -6,12 +6,18 @@
 // Bu dosya İSTEMCİDE de import edilir (galeri etiketleri) — bu yüzden içinde
 // prisma/sharp gibi sunucu bağımlılığı OLMAMALI.
 
-export const PHOTO_STAGES = ["ALIM", "YIKAMA", "TESLIM"] as const;
+// MUSTERI (2026-08-06): müşterinin sipariş verirken kendi eklediği kare.
+// Kanıt zincirinin PARÇASI DEĞİLDİR — bilgi amaçlıdır (işletme işi görmeden
+// fiyat/süre tahmini yapabilsin). Bu yüzden akışın EN BAŞINDA gelir ve
+// "Alım"dan önce sıralanır; ayrı etiketle gösterilir ki şoförün çektiği
+// zorunlu alım fotoğrafıyla karıştırılmasın.
+export const PHOTO_STAGES = ["MUSTERI", "ALIM", "YIKAMA", "TESLIM"] as const;
 
 export type PhotoStage = (typeof PHOTO_STAGES)[number];
 
 // Müşteriye ve halıcıya gösterilen Türkçe etiketler.
 export const PHOTO_STAGE_LABEL: Record<PhotoStage, string> = {
+  MUSTERI: "Müşteri",
   ALIM: "Alım",
   YIKAMA: "Yıkama",
   TESLIM: "Teslim",

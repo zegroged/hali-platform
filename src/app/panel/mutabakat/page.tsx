@@ -1,3 +1,4 @@
+import { sadeceSahip } from "@/lib/panelYetki";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
@@ -39,6 +40,11 @@ export default async function MutabakatSayfasi({
 }: {
   searchParams: Promise<{ gun?: string; hata?: string; ok?: string }>;
 }) {
+  // 🔴 SAHİBE ÖZEL SAYFA (2026-08-06). Kapı PRISMA'DAN ÖNCE: App Router'da
+  // layout ile page paralel render edilir, layout yönlendirse bile buradaki
+  // sorgu çalışır ve veri RSC yükünde sızabilir.
+  await sadeceSahip();
+
   // 🔴 YETKİ PRISMA'DAN ÖNCE: layout'un yönlendirmesine güvenmek YETMEZ —
   // bu depoda RSC verisinin sayfa kaynağından okunabildiği gerçek bir sızıntı
   // yaşandı (bkz. DEVIR, app-router yetki sızıntısı).

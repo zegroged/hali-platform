@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import { getCurrentBusiness } from "@/lib/panel";
+import { getPanelBusiness } from "@/lib/panel";
 import { ORDER_STATUS_META, REJECT_REASONS } from "@/lib/orderStatus";
 import {
   OrderStatusIcon,
@@ -29,7 +29,7 @@ const STATUS_CLS: Record<string, string> = {
 };
 
 export default async function PanelOrders() {
-  const b = await getCurrentBusiness();
+  const b = await getPanelBusiness();
   if (!b) return null;
 
   const orders = await prisma.order.findMany({

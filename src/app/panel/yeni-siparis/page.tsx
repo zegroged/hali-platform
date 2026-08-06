@@ -1,10 +1,10 @@
-import { getCurrentBusiness } from "@/lib/panel";
+import { getPanelBusiness } from "@/lib/panel";
 import { ManualOrderForm } from "@/components/ManualOrderForm";
 
 export const dynamic = "force-dynamic";
 
 export default async function YeniSiparisPage() {
-  const b = await getCurrentBusiness();
+  const b = await getPanelBusiness();
   if (!b) return null;
   const drivers = b.drivers.map((d) => ({ id: d.id, name: d.user.name }));
   // m² birim fiyatı (ana kalemlerin en düşüğü) — dükkânda ölçünce tutarı

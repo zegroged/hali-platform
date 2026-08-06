@@ -194,7 +194,30 @@ export default async function SoforPage() {
                       Ödeme teslimde alınır.
                     </p>
                   }
-                />
+                >
+                  {/* HALI SAYISI — ALIM ANINDA (2026-08-06). Numaralar (1..N)
+                      burada doğar; öncesinde fotoğraftan doğuyordu, yani
+                      fotoğrafı çekilmeyen halı sistemde hiç yoktu.
+                      Panel + şoför uygulamasıyla İKİZ (bkz. lib/carpet.ts). */}
+                  <div>
+                    <label
+                      htmlFor={`hali-${o.id}`}
+                      className="block text-xs font-medium text-slate-600"
+                    >
+                      Kaç halı aldın?
+                    </label>
+                    <input
+                      id={`hali-${o.id}`}
+                      name="carpetCount"
+                      type="number"
+                      min={1}
+                      max={100}
+                      inputMode="numeric"
+                      placeholder="örn. 5"
+                      className="mt-1 w-32 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand"
+                    />
+                  </div>
+                </PhotoForm>
               )}
 
               {/* PICKED_UP / WASHING: ara adımlar (para yok) */}

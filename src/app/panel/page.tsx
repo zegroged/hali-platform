@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import {
-  getCurrentBusiness,
+  getPanelBusiness,
   completenessChecklist,
   verificationReady,
 } from "@/lib/panel";
+import { getPanelErisim } from "@/lib/panelYetki";
 import { subscriptionActive } from "@/lib/subscription";
 import { effectiveSubscriptionGross } from "@/lib/discount";
 import { paymentsLive } from "@/lib/config";
@@ -45,11 +46,24 @@ function fmtGun(dt: Date) {
 export default async function PanelHome({
   searchParams,
 }: {
-  searchParams: Promise<{ odeme?: string; hata?: string; kaydedildi?: string }>;
+  searchParams: Promise<{
+    odeme?: string;
+    hata?: string;
+    kaydedildi?: string;
+    yetki?: string;
+  }>;
 }) {
-  const b = await getCurrentBusiness();
+  const b = await getPanelBusiness();
   if (!b) return null;
-  const { odeme, hata, kaydedildi } = await searchParams;
+  const { odeme, hata, kaydedildi, yetki } = await searchParams;
+
+  // ÇALIŞAN GÖRÜNÜMÜ (2026-08-06): Özet sayfasının alt yarısı tamamen SAHİP
+  // işidir — abonelik ve ödeme butonu, tatil modu, yayın koşulları, e-posta
+  // doğrulama, sözleşme onayı, profil düzenleme, rozet başvurusu. Çalışan
+  // bunları görmez; gördüğü kısım günün işi: sayaçlar, sayfa ızgarası ve
+  // son teslimatlar.
+  const erisim = await getPanelErisim();
+  const calisan = erisim?.rol === "STAFF";
 
   const [pendingOrders, activeOrders, delivered] = await Promise.all([
     prisma.order.count({ where: { businessId: b.id, status: "CREATED" } }),
@@ -139,6 +153,18 @@ export default async function PanelHome({
 
   return (
     <div className="space-y-6">
+      {/* Çalışan, sahibe özel bir adrese elle gitmeye çalıştı (sadeceSahip
+          kapısı buraya yolladı). Sessizce yönlendirmek "tıkladım, hiçbir şey
+          olmadı" hissi veriyordu — sebebi yazılıyor. */}
+      {yetki === "yok" && (
+        <p
+          role="alert"
+          className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800"
+        >
+          O sayfa yalnız işletme sahibine açık. Gerekiyorsa işletme sahibinden
+          iste.
+        </p>
+      )}
       {/* Aksiyonlardan (örn. tatil modu) dönen hata/başarı mesajları */}
       {hata && (
         <p
@@ -169,8 +195,20 @@ export default async function PanelHome({
           </Link>
         </h1>
         <div className="mt-2 flex flex-wrap items-center gap-2">
-          {/* Yayın durumu — tek bakışta: yayında / ödeme bekliyor / eksik var */}
-          {b.verification === "REJECTED" ? (
+          {/* Yayın durumu — tek bakışta: yayında / ödeme bekliyor / eksik var.
+              ÇALIŞAN: yalnız "yayında mı" görür; abonelik/eksik sayısı gibi
+              sahibe ait bilgiler ona gösterilmez. */}
+          {calisan ? (
+            b.isVisible && subOk ? (
+              <span className="rounded-full bg-green-100 px-3 py-1 text-sm font-medium text-green-700">
+                İşletme yayında ✓
+              </span>
+            ) : (
+              <span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-medium text-slate-600">
+                İşletme şu an yayında değil — sahibine bildir
+              </span>
+            )
+          ) : b.verification === "REJECTED" ? (
             <span className="rounded-full bg-red-100 px-3 py-1 text-sm font-medium text-red-700">
               Hesap yayından kaldırıldı — bizimle iletişime geçin
             </span>
@@ -287,292 +325,299 @@ export default async function PanelHome({
         </div>
       )}
 
-      {/* Sözleşme sürümü uyarısı (doğrulanmış işletmeler): aşağıdaki profil
-          kartı yalnız doğrulanmamışlara görünür — sözleşme güncellenince
-          MEVCUT işletmelerden yeniden onay buradan alınır (Geçici md.1/2). */}
-      {b.verification === "VERIFIED" && !contractCurrent && (
-        <div className="rounded-xl border border-amber-300 bg-amber-50 p-4">
-          <p className="font-medium text-amber-900">
-            Platform sözleşmesi güncellendi
-          </p>
-          <p className="mt-1 text-sm text-amber-800">
-            {b.contractAcceptedAt
-              ? `Onayınız eski bir sürüme ait (Onaylanan sürüm: ${
-                  b.contractVersion ?? "kayıtlı değil"
-                } · Tarih: ${fmtGun(b.contractAcceptedAt)}). Aracılık hizmetinin kesintisiz sürmesi için güncel sürümü onaylayın.`
-              : "Platform sözleşmesi henüz onaylanmadı. Devam etmek için güncel sürümü onaylayın."}
-          </p>
-          <div className="mt-2 flex items-center gap-3">
-            <form action={acceptContractVersioned}>
-              <PendingButton className="rounded-lg bg-brand px-3 py-2 text-sm font-semibold text-white transition hover:bg-brand-dark">
-                Güncel sözleşmeyi onayla
-              </PendingButton>
-            </form>
-            <Link
-              href="/isletme-sozlesmesi"
-              target="_blank"
-              className="text-sm font-medium text-amber-900 underline"
-            >
-              Sözleşme metnini oku
-            </Link>
-          </div>
-        </div>
-      )}
-
-      {/* Abonelik */}
-      <div className="rounded-xl border border-slate-200 bg-white p-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="font-medium text-slate-900">Abonelik</p>
-            <p className="text-sm text-slate-500">
-              {subOk ? "Aktif" : "Yok"} · 2.000 TL + KDV/ay
+      {/* 🔒 BURADAN AŞAĞISI SAHİBE ÖZEL (2026-08-06): abonelik + ödeme,
+          tatil modu, yayın koşulları, e-posta doğrulama, sözleşme onayı,
+          profil düzenleme, rozet başvurusu. Çalışan hiçbirini görmez. */}
+      {!calisan && (
+        <>
+        {/* Sözleşme sürümü uyarısı (doğrulanmış işletmeler): aşağıdaki profil
+            kartı yalnız doğrulanmamışlara görünür — sözleşme güncellenince
+            MEVCUT işletmelerden yeniden onay buradan alınır (Geçici md.1/2). */}
+        {b.verification === "VERIFIED" && !contractCurrent && (
+          <div className="rounded-xl border border-amber-300 bg-amber-50 p-4">
+            <p className="font-medium text-amber-900">
+              Platform sözleşmesi güncellendi
             </p>
-            {subOk && b.subscription?.currentPeriodEnd && (
-              <p className="mt-1 text-xs text-slate-500">
-                Dönem sonu: {fmtGun(b.subscription.currentPeriodEnd)}
+            <p className="mt-1 text-sm text-amber-800">
+              {b.contractAcceptedAt
+                ? `Onayınız eski bir sürüme ait (Onaylanan sürüm: ${
+                    b.contractVersion ?? "kayıtlı değil"
+                  } · Tarih: ${fmtGun(b.contractAcceptedAt)}). Aracılık hizmetinin kesintisiz sürmesi için güncel sürümü onaylayın.`
+                : "Platform sözleşmesi henüz onaylanmadı. Devam etmek için güncel sürümü onaylayın."}
+            </p>
+            <div className="mt-2 flex items-center gap-3">
+              <form action={acceptContractVersioned}>
+                <PendingButton className="rounded-lg bg-brand px-3 py-2 text-sm font-semibold text-white transition hover:bg-brand-dark">
+                  Güncel sözleşmeyi onayla
+                </PendingButton>
+              </form>
+              <Link
+                href="/isletme-sozlesmesi"
+                target="_blank"
+                className="text-sm font-medium text-amber-900 underline"
+              >
+                Sözleşme metnini oku
+              </Link>
+            </div>
+          </div>
+        )}
+
+        {/* Abonelik */}
+        <div className="rounded-xl border border-slate-200 bg-white p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="font-medium text-slate-900">Abonelik</p>
+              <p className="text-sm text-slate-500">
+                {subOk ? "Aktif" : "Yok"} · 2.000 TL + KDV/ay
+              </p>
+              {subOk && b.subscription?.currentPeriodEnd && (
+                <p className="mt-1 text-xs text-slate-500">
+                  Dönem sonu: {fmtGun(b.subscription.currentPeriodEnd)}
+                </p>
+              )}
+            </div>
+            <IconWallet size={26} className="text-brand-dark" />
+          </div>
+          {/* iyzico kartlı ödeme yalnız PAYMENTS_MODE=live iken; ödeme başarılı
+              olunca hesap OTOMATİK yayına girer (callback). Kart bilgisi iyzico'nun
+              güvenli sayfasında. Canlı değilken havale/EFT + admin aktivasyonu. */}
+          {paymentsLive ? (
+            indirimliErkenYasak ? (
+              <p className="mt-2 text-xs text-amber-700">
+                İndirimli dönemin aktif — yenileme, dönem sonuna 3 gün kala
+                /panel/abonelik&apos;ten açılır.
+              </p>
+            ) : (
+            <>
+              <form action={startSubscriptionPayment} className="mt-3">
+                <PendingButton className="w-full rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark active:scale-[0.99]">
+                  {indirimGross <= 0
+                    ? "Dönemini ücretsiz başlat (%100 indirim)"
+                    : indirimPct != null
+                      ? `Aboneliğini öde — ${indirimGross.toLocaleString("tr-TR", { minimumFractionDigits: 2 })} TL (indirimli, iyzico ile)`
+                      : subOk
+                        ? "Aboneliği yenile — 2.400 TL (iyzico ile güvenli ödeme)"
+                        : "Aboneliğini öde — 2.400 TL (iyzico ile güvenli ödeme)"}
+                </PendingButton>
+              </form>
+              <p className="mt-1.5 text-xs text-slate-400">
+                Ödeme, iyzico&apos;nun güvenli sayfasında yapılır; kart bilgilerin
+                bize hiç ulaşmaz.{" "}
+                {indirimPct != null
+                  ? `İndirimli tutar KDV dahildir (normal bedel 2.400 TL).`
+                  : "2.000 TL + %20 KDV = 2.400 TL."}
+              </p>
+            </>
+            )
+          ) : (
+            !subOk && (
+              <p className="mt-2 text-xs text-amber-700">
+                Ödemen alındığında hesabın yayına girer — ödeme bilgileri e-posta
+                adresine gönderilir.
+              </p>
+            )
+          )}
+          <Link
+            href="/panel/abonelik"
+            className="mt-3 inline-block text-sm font-medium text-brand-dark hover:underline"
+          >
+            Aboneliği yönet (geçmiş, iptal) →
+          </Link>
+        </div>
+
+        {/* Tatil modu — yeni kamu siparişini geçici kapat; profil yayında kalır,
+            panelden manuel kayıt etkilenmez. */}
+        <div
+          className={`rounded-xl border p-4 ${
+            isPaused ? "border-amber-300 bg-amber-50" : "border-slate-200 bg-white"
+          }`}
+        >
+          <p className="font-medium text-slate-900">Tatil modu</p>
+          {isPaused ? (
+            <>
+              <p className="mt-1 text-sm text-amber-800">
+                Siparişler <strong>{fmtGun(b.pausedUntil!)}</strong> tarihine
+                kadar duraklatıldı — profilin yayında ama müşteriler yeni sipariş
+                veremiyor. Panelden manuel sipariş açmaya devam edebilirsin.
+              </p>
+              <form action={setPauseMode} className="mt-3">
+                <PendingButton className="rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark active:scale-[0.99] disabled:opacity-60">
+                  Duraklatmayı kaldır — siparişleri aç
+                </PendingButton>
+              </form>
+            </>
+          ) : (
+            <>
+              <p className="mt-1 text-sm text-slate-500">
+                Bayram, tadilat gibi dönemlerde yeni siparişleri geçici kapat.
+                Profilin yayında ve aramalarda kalır; seçtiğin günün sonunda
+                siparişler otomatik açılır.
+              </p>
+              {/* 2026-07-30: tarih alanı ETİKETSİZDİ. Android Chrome boş bir
+                  `type="date"` alanını yazısız gri kutu + ok olarak çiziyor;
+                  telefondan bakan halıcı orada ne istendiğini anlamıyordu
+                  (kullanıcının ekran görüntüsüyle tespit edildi). Etiket eklendi
+                  ve alan telefonda tam genişliğe alındı. */}
+              <form action={setPauseMode} className="mt-3 space-y-2">
+                <label className="block">
+                  <span className="block text-sm font-medium text-slate-700">
+                    Hangi tarihe kadar kapalı kalsın?
+                  </span>
+                  <input
+                    type="date"
+                    name="pausedUntil"
+                    required
+                    min={pauseMin}
+                    max={pauseMax}
+                    className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:border-brand sm:w-auto"
+                  />
+                </label>
+                <PendingButton className="w-full rounded-lg border border-amber-400 bg-white px-4 py-2.5 text-sm font-semibold text-amber-700 transition hover:bg-amber-50 active:scale-[0.99] disabled:opacity-60 sm:w-auto">
+                  Bu tarihe kadar duraklat
+                </PendingButton>
+              </form>
+            </>
+          )}
+        </div>
+
+        {/* Yayın koşulları — eksik varsa "burayı doldur" listesi. Tümü dolunca
+            hesap OTOMATİK yayına alınır (onay beklemez); yayında kalmak için
+            abonelik ödemesi gerekir. */}
+        {(missingCount > 0 || b.verification !== "VERIFIED") && (
+          <div className="rounded-xl border border-slate-200 bg-white p-4">
+            <p className="font-medium text-slate-900">
+              {missingCount > 0 ? "Yayına girmek için doldur" : "Doğrulanmış İşletme rozeti"}
+            </p>
+            {missingCount > 0 && (
+              <p className="mt-1 text-sm text-slate-500">
+                Aşağıdakilerin tümü tamamlanınca hesabın{" "}
+                <strong>otomatik yayına alınır</strong> — onay beklemezsin.
+                Eksik maddeye tıkla, ilgili sayfaya git.
               </p>
             )}
-          </div>
-          <IconWallet size={26} className="text-brand-dark" />
-        </div>
-        {/* iyzico kartlı ödeme yalnız PAYMENTS_MODE=live iken; ödeme başarılı
-            olunca hesap OTOMATİK yayına girer (callback). Kart bilgisi iyzico'nun
-            güvenli sayfasında. Canlı değilken havale/EFT + admin aktivasyonu. */}
-        {paymentsLive ? (
-          indirimliErkenYasak ? (
-            <p className="mt-2 text-xs text-amber-700">
-              İndirimli dönemin aktif — yenileme, dönem sonuna 3 gün kala
-              /panel/abonelik&apos;ten açılır.
-            </p>
-          ) : (
-          <>
-            <form action={startSubscriptionPayment} className="mt-3">
-              <PendingButton className="w-full rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark active:scale-[0.99]">
-                {indirimGross <= 0
-                  ? "Dönemini ücretsiz başlat (%100 indirim)"
-                  : indirimPct != null
-                    ? `Aboneliğini öde — ${indirimGross.toLocaleString("tr-TR", { minimumFractionDigits: 2 })} TL (indirimli, iyzico ile)`
-                    : subOk
-                      ? "Aboneliği yenile — 2.400 TL (iyzico ile güvenli ödeme)"
-                      : "Aboneliğini öde — 2.400 TL (iyzico ile güvenli ödeme)"}
-              </PendingButton>
-            </form>
-            <p className="mt-1.5 text-xs text-slate-400">
-              Ödeme, iyzico&apos;nun güvenli sayfasında yapılır; kart bilgilerin
-              bize hiç ulaşmaz.{" "}
-              {indirimPct != null
-                ? `İndirimli tutar KDV dahildir (normal bedel 2.400 TL).`
-                : "2.000 TL + %20 KDV = 2.400 TL."}
-            </p>
-          </>
-          )
-        ) : (
-          !subOk && (
-            <p className="mt-2 text-xs text-amber-700">
-              Ödemen alındığında hesabın yayına girer — ödeme bilgileri e-posta
-              adresine gönderilir.
-            </p>
-          )
-        )}
-        <Link
-          href="/panel/abonelik"
-          className="mt-3 inline-block text-sm font-medium text-brand-dark hover:underline"
-        >
-          Aboneliği yönet (geçmiş, iptal) →
-        </Link>
-      </div>
-
-      {/* Tatil modu — yeni kamu siparişini geçici kapat; profil yayında kalır,
-          panelden manuel kayıt etkilenmez. */}
-      <div
-        className={`rounded-xl border p-4 ${
-          isPaused ? "border-amber-300 bg-amber-50" : "border-slate-200 bg-white"
-        }`}
-      >
-        <p className="font-medium text-slate-900">Tatil modu</p>
-        {isPaused ? (
-          <>
-            <p className="mt-1 text-sm text-amber-800">
-              Siparişler <strong>{fmtGun(b.pausedUntil!)}</strong> tarihine
-              kadar duraklatıldı — profilin yayında ama müşteriler yeni sipariş
-              veremiyor. Panelden manuel sipariş açmaya devam edebilirsin.
-            </p>
-            <form action={setPauseMode} className="mt-3">
-              <PendingButton className="rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark active:scale-[0.99] disabled:opacity-60">
-                Duraklatmayı kaldır — siparişleri aç
-              </PendingButton>
-            </form>
-          </>
-        ) : (
-          <>
-            <p className="mt-1 text-sm text-slate-500">
-              Bayram, tadilat gibi dönemlerde yeni siparişleri geçici kapat.
-              Profilin yayında ve aramalarda kalır; seçtiğin günün sonunda
-              siparişler otomatik açılır.
-            </p>
-            {/* 2026-07-30: tarih alanı ETİKETSİZDİ. Android Chrome boş bir
-                `type="date"` alanını yazısız gri kutu + ok olarak çiziyor;
-                telefondan bakan halıcı orada ne istendiğini anlamıyordu
-                (kullanıcının ekran görüntüsüyle tespit edildi). Etiket eklendi
-                ve alan telefonda tam genişliğe alındı. */}
-            <form action={setPauseMode} className="mt-3 space-y-2">
-              <label className="block">
-                <span className="block text-sm font-medium text-slate-700">
-                  Hangi tarihe kadar kapalı kalsın?
-                </span>
-                <input
-                  type="date"
-                  name="pausedUntil"
-                  required
-                  min={pauseMin}
-                  max={pauseMax}
-                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:border-brand sm:w-auto"
-                />
-              </label>
-              <PendingButton className="w-full rounded-lg border border-amber-400 bg-white px-4 py-2.5 text-sm font-semibold text-amber-700 transition hover:bg-amber-50 active:scale-[0.99] disabled:opacity-60 sm:w-auto">
-                Bu tarihe kadar duraklat
-              </PendingButton>
-            </form>
-          </>
-        )}
-      </div>
-
-      {/* Yayın koşulları — eksik varsa "burayı doldur" listesi. Tümü dolunca
-          hesap OTOMATİK yayına alınır (onay beklemez); yayında kalmak için
-          abonelik ödemesi gerekir. */}
-      {(missingCount > 0 || b.verification !== "VERIFIED") && (
-        <div className="rounded-xl border border-slate-200 bg-white p-4">
-          <p className="font-medium text-slate-900">
-            {missingCount > 0 ? "Yayına girmek için doldur" : "Doğrulanmış İşletme rozeti"}
-          </p>
-          {missingCount > 0 && (
-            <p className="mt-1 text-sm text-slate-500">
-              Aşağıdakilerin tümü tamamlanınca hesabın{" "}
-              <strong>otomatik yayına alınır</strong> — onay beklemezsin.
-              Eksik maddeye tıkla, ilgili sayfaya git.
-            </p>
-          )}
-          <ul className="mt-3 space-y-1.5">
-            {checklist.map((c) => (
-              <li key={c.label} className="flex items-center gap-2 text-sm">
-                <span
-                  className={`flex h-4 w-4 items-center justify-center rounded-full ${
-                    c.done
-                      ? "bg-green-100 text-green-600"
-                      : "border border-amber-400"
-                  }`}
-                >
-                  {c.done && <IconCheck size={11} />}
-                </span>
-                {c.done ? (
-                  <span className="text-slate-700">{c.label}</span>
-                ) : (
-                  <Link
-                    href={c.href}
-                    className="font-medium text-amber-700 hover:underline"
+            <ul className="mt-3 space-y-1.5">
+              {checklist.map((c) => (
+                <li key={c.label} className="flex items-center gap-2 text-sm">
+                  <span
+                    className={`flex h-4 w-4 items-center justify-center rounded-full ${
+                      c.done
+                        ? "bg-green-100 text-green-600"
+                        : "border border-amber-400"
+                    }`}
                   >
-                    {c.label} — burayı doldur →
+                    {c.done && <IconCheck size={11} />}
+                  </span>
+                  {c.done ? (
+                    <span className="text-slate-700">{c.label}</span>
+                  ) : (
+                    <Link
+                      href={c.href}
+                      className="font-medium text-amber-700 hover:underline"
+                    >
+                      {c.label} — burayı doldur →
+                    </Link>
+                  )}
+                </li>
+              ))}
+            </ul>
+
+            {/* E-posta doğrulama */}
+            <div className="mt-4 border-t border-slate-100 pt-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-slate-700">
+                  E-posta doğrulama
+                </span>
+                {b.owner.emailVerified && (
+                  <span className="inline-flex items-center gap-1 text-sm font-medium text-green-600">
+                    <IconCheck size={15} /> Doğrulandı
+                  </span>
+                )}
+              </div>
+              {!b.owner.emailVerified && (
+                <div className="mt-2">
+                  <EmailVerify initialEmail={b.owner.email} />
+                </div>
+              )}
+            </div>
+
+            {/* Sözleşme onayı — sürümlü kayıt: onay tarihi + onaylanan sürüm
+                (ETAHS Yön. md.11/2-c ispatı; eski/boş sürümde yeniden onay). */}
+            <div className="mt-3 border-t border-slate-100 pt-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="block text-sm font-medium text-slate-700">
+                    Platform sözleşmesi
+                  </span>
+                  <Link
+                    href="/isletme-sozlesmesi"
+                    target="_blank"
+                    className="text-sm text-brand-dark hover:underline"
+                  >
+                    Sözleşme metnini oku
                   </Link>
+                  {b.contractAcceptedAt && (
+                    <p className="mt-0.5 text-xs text-slate-500">
+                      Onaylanan sürüm: {b.contractVersion ?? "kayıtlı değil"} ·
+                      Tarih: {fmtGun(b.contractAcceptedAt)}
+                    </p>
+                  )}
+                </div>
+                {contractCurrent && (
+                  <span className="inline-flex items-center gap-1 text-sm font-medium text-green-600">
+                    <IconCheck size={15} /> Onaylandı
+                  </span>
                 )}
-              </li>
-            ))}
-          </ul>
-
-          {/* E-posta doğrulama */}
-          <div className="mt-4 border-t border-slate-100 pt-3">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-slate-700">
-                E-posta doğrulama
-              </span>
-              {b.owner.emailVerified && (
-                <span className="inline-flex items-center gap-1 text-sm font-medium text-green-600">
-                  <IconCheck size={15} /> Doğrulandı
-                </span>
-              )}
-            </div>
-            {!b.owner.emailVerified && (
-              <div className="mt-2">
-                <EmailVerify initialEmail={b.owner.email} />
               </div>
-            )}
-          </div>
-
-          {/* Sözleşme onayı — sürümlü kayıt: onay tarihi + onaylanan sürüm
-              (ETAHS Yön. md.11/2-c ispatı; eski/boş sürümde yeniden onay). */}
-          <div className="mt-3 border-t border-slate-100 pt-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <span className="block text-sm font-medium text-slate-700">
-                  Platform sözleşmesi
-                </span>
-                <Link
-                  href="/isletme-sozlesmesi"
-                  target="_blank"
-                  className="text-sm text-brand-dark hover:underline"
-                >
-                  Sözleşme metnini oku
-                </Link>
-                {b.contractAcceptedAt && (
-                  <p className="mt-0.5 text-xs text-slate-500">
-                    Onaylanan sürüm: {b.contractVersion ?? "kayıtlı değil"} ·
-                    Tarih: {fmtGun(b.contractAcceptedAt)}
+              {!contractCurrent && (
+                <div className="mt-2 rounded-lg border border-amber-300 bg-amber-50 p-3">
+                  <p className="text-sm text-amber-800">
+                    {b.contractAcceptedAt
+                      ? "Sözleşme güncellendi: onayınız eski bir sürüme ait. Aracılık hizmetinin kesintisiz sürmesi için güncel sürümü onaylayın."
+                      : "Platform sözleşmesi henüz onaylanmadı."}
                   </p>
-                )}
-              </div>
-              {contractCurrent && (
-                <span className="inline-flex items-center gap-1 text-sm font-medium text-green-600">
-                  <IconCheck size={15} /> Onaylandı
+                  <form action={acceptContractVersioned} className="mt-2">
+                    <PendingButton className="rounded-lg border border-brand bg-white px-3 py-2 text-sm font-medium text-brand-dark transition hover:bg-brand-light">
+                      Güncel sözleşmeyi onayla
+                    </PendingButton>
+                  </form>
+                </div>
+              )}
+            </div>
+
+            {/* 2026-07-30: `flex` + uzun yan metin, "Profili düzenle" butonunu
+                360px'te iki satıra kırıyordu. Telefonda alt alta, sm'den itibaren
+                yan yana. */}
+            <div className="mt-4 flex flex-col items-start gap-3 border-t border-slate-100 pt-3 sm:flex-row sm:items-center">
+              <Link
+                href="/panel/profil"
+                className="whitespace-nowrap rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              >
+                Profili düzenle
+              </Link>
+              {/* Rozet başvurusu — yayın için ZORUNLU DEĞİL; vergi kaydının
+                  incelendiğini gösteren güven işareti. */}
+              {b.verification === "VERIFIED" ? null : ready &&
+                b.verification !== "PENDING" ? (
+                <form action={submitForVerification}>
+                  <button className="rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark active:scale-[0.99]">
+                    Doğrulanmış rozeti için başvur
+                  </button>
+                </form>
+              ) : b.verification === "PENDING" ? (
+                <span className="text-xs text-slate-500">
+                  Rozet başvurun incelemede — yayına girmek için beklemene gerek
+                  yok.
+                </span>
+              ) : (
+                <span className="text-xs text-slate-500">
+                  Eksikleri tamamlayınca &quot;Doğrulanmış&quot; rozetine
+                  başvurabilirsin (yayın için zorunlu değil).
                 </span>
               )}
             </div>
-            {!contractCurrent && (
-              <div className="mt-2 rounded-lg border border-amber-300 bg-amber-50 p-3">
-                <p className="text-sm text-amber-800">
-                  {b.contractAcceptedAt
-                    ? "Sözleşme güncellendi: onayınız eski bir sürüme ait. Aracılık hizmetinin kesintisiz sürmesi için güncel sürümü onaylayın."
-                    : "Platform sözleşmesi henüz onaylanmadı."}
-                </p>
-                <form action={acceptContractVersioned} className="mt-2">
-                  <PendingButton className="rounded-lg border border-brand bg-white px-3 py-2 text-sm font-medium text-brand-dark transition hover:bg-brand-light">
-                    Güncel sözleşmeyi onayla
-                  </PendingButton>
-                </form>
-              </div>
-            )}
           </div>
-
-          {/* 2026-07-30: `flex` + uzun yan metin, "Profili düzenle" butonunu
-              360px'te iki satıra kırıyordu. Telefonda alt alta, sm'den itibaren
-              yan yana. */}
-          <div className="mt-4 flex flex-col items-start gap-3 border-t border-slate-100 pt-3 sm:flex-row sm:items-center">
-            <Link
-              href="/panel/profil"
-              className="whitespace-nowrap rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
-            >
-              Profili düzenle
-            </Link>
-            {/* Rozet başvurusu — yayın için ZORUNLU DEĞİL; vergi kaydının
-                incelendiğini gösteren güven işareti. */}
-            {b.verification === "VERIFIED" ? null : ready &&
-              b.verification !== "PENDING" ? (
-              <form action={submitForVerification}>
-                <button className="rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark active:scale-[0.99]">
-                  Doğrulanmış rozeti için başvur
-                </button>
-              </form>
-            ) : b.verification === "PENDING" ? (
-              <span className="text-xs text-slate-500">
-                Rozet başvurun incelemede — yayına girmek için beklemene gerek
-                yok.
-              </span>
-            ) : (
-              <span className="text-xs text-slate-500">
-                Eksikleri tamamlayınca &quot;Doğrulanmış&quot; rozetine
-                başvurabilirsin (yayın için zorunlu değil).
-              </span>
-            )}
-          </div>
-        </div>
+        )}
+        </>
       )}
     </div>
   );

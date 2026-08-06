@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getCurrentBusiness } from "@/lib/panel";
+import { getPanelBusiness } from "@/lib/panel";
 import { trDayBoundsUTC } from "@/lib/time";
 
 // Halıcının kendi şoförlerinin canlı konumu + bugünkü rota izi (breadcrumb)
 export async function GET() {
-  const b = await getCurrentBusiness();
+  const b = await getPanelBusiness();
   if (!b) {
     return NextResponse.json({ error: "Yetkisiz" }, { status: 401 });
   }

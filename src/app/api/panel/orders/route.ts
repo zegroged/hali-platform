@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { getCurrentBusiness } from "@/lib/panel";
+import { getPanelBusiness } from "@/lib/panel";
 import { createOrderWithCode } from "@/lib/ordercode";
 import { sendTrackingSms, trackingLink } from "@/lib/sms";
 import { subscriptionActive } from "@/lib/subscription";
@@ -35,7 +35,7 @@ const Body = z.object({
 
 // Halıcının kendi (dükkâna gelen) müşterisi için manuel sipariş/kayıt oluşturma.
 export async function POST(req: NextRequest) {
-  const b = await getCurrentBusiness();
+  const b = await getPanelBusiness();
   if (!b) {
     return NextResponse.json({ error: "Yetkisiz" }, { status: 401 });
   }

@@ -52,12 +52,21 @@ export function BusinessCard({ b }: { b: BusinessSummary }) {
       {/* Gövde */}
       <div className="flex flex-1 flex-col p-3.5">
         <div className="flex items-start justify-between gap-2">
+          {/* TİPOGRAFİ HİYERARŞİSİ (2026-08-06).
+              Önceki hâlde işletme adı (16px/600) ile alt satır (14px/400)
+              arasındaki fark zayıftı; kart "tek blok gri metin" gibi
+              okunuyordu, göz nereye bakacağını bilmiyordu. Kullanıcı kitlesi
+              50-65 yaş — ilk okunması gereken şey İŞLETME ADI.
+              Üç kademe: ad 17px/700 sıkı satır · konum 14px/500 · mesafe
+              renkle ayrılır. Boyutlar küçük tutuldu, kart yüksekliği değişmesin. */}
           <div className="min-w-0">
-            <h3 className="truncate font-semibold text-slate-900">{b.name}</h3>
-            <p className="truncate text-sm text-slate-500">
+            <h3 className="truncate text-[17px] font-bold leading-tight tracking-[-0.01em] text-slate-900">
+              {b.name}
+            </h3>
+            <p className="mt-0.5 truncate text-sm font-medium text-slate-500">
               {b.district}, {b.city}
               {dist && (
-                <span className="font-medium text-brand-dark"> · {dist}</span>
+                <span className="font-semibold text-brand-dark"> · {dist}</span>
               )}
             </p>
           </div>

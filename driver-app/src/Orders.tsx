@@ -58,6 +58,8 @@ export function Orders({ onSessionExpired }: { onSessionExpired: () => void }) {
   const [refreshing, setRefreshing] = useState(false);
   const [actingId, setActingId] = useState<string | null>(null);
   const [prices, setPrices] = useState<Record<string, string>>({});
+  // Alım anında girilen halı sayısı (2026-08-06) — sipariş kimliği başına.
+  const [carpetCounts, setCarpetCounts] = useState<Record<string, string>>({});
 
   const fetchOrders = useCallback(async () => {
     try {
@@ -140,9 +142,17 @@ export function Orders({ onSessionExpired }: { onSessionExpired: () => void }) {
   }
 
   async function doPickup(o: DriverOrder) {
+    // Kutuda GÖRÜNEN değerle GÖNDERİLEN değer aynı olmalı (teslim tutarında
+    // yaşanan hatanın aynısına düşmemek için): boşsa undefined gider.
+    const ham = (carpetCounts[o.id] ?? "").trim();
+    const sayi = ham ? Number(ham) : undefined;
+    if (sayi != null && (!Number.isInteger(sayi) || sayi < 1 || sayi > 100)) {
+      Alert.alert("Halı sayısı", "1 ile 100 arasında bir sayı gir.");
+      return;
+    }
     const uri = await takePhoto();
     if (!uri) return;
-    run(o.id, () => pickupOrder(o.id, uri));
+    run(o.id, () => pickupOrder(o.id, uri, sayi));
   }
 
   async function doDeliver(o: DriverOrder) {
@@ -189,13 +199,29 @@ export function Orders({ onSessionExpired }: { onSessionExpired: () => void }) {
       );
     if (o.status === "ACCEPTED")
       return (
-        <TouchableOpacity
-          style={[s.btn, busy && s.off]}
-          disabled={busy}
-          onPress={() => doPickup(o)}
-        >
-          <Text style={s.btnText}>📷 Halıyı Aldım (fotoğraf zorunlu)</Text>
-        </TouchableOpacity>
+        <View style={{ gap: 8 }}>
+          {/* HALI SAYISI — ALIM ANINDA (2026-08-06, panel + şoför web ile İKİZ).
+              Numaralar (1..N) buradan doğuyor. Öncesinde numara fotoğraftan
+              doğuyordu: fotoğrafı çekilmeyen halı sistemde hiç yoktu ve
+              "5 geldi, 5 gitti mi?" sorusu cevaplanamıyordu. Boş bırakılabilir
+              (sunucu opsiyonel kabul eder) ama doldurmak asıl amaç. */}
+          <TextInput
+            style={s.input}
+            placeholder="Kaç halı aldın? (örn. 5)"
+            keyboardType="number-pad"
+            value={carpetCounts[o.id] ?? ""}
+            onChangeText={(v) =>
+              setCarpetCounts((p) => ({ ...p, [o.id]: v.replace(/\D/g, "") }))
+            }
+          />
+          <TouchableOpacity
+            style={[s.btn, busy && s.off]}
+            disabled={busy}
+            onPress={() => doPickup(o)}
+          >
+            <Text style={s.btnText}>📷 Halıyı Aldım (fotoğraf zorunlu)</Text>
+          </TouchableOpacity>
+        </View>
       );
     if (o.status === "PICKED_UP" || o.status === "WASHING")
       return (

@@ -7,6 +7,9 @@
 // okuyor.
 export const ROLE_HOME: Record<string, string> = {
   CLEANER: "/panel",
+  // Dükkân çalışanı sahiple AYNI panele girer; farkı yetkisidir, adresi değil
+  // (sahibe özel sayfalar hem gezinmede gizli hem sayfa kapısıyla kapalı).
+  STAFF: "/panel",
   DRIVER: "/sofor",
   ADMIN: "/admin",
   SUPPORT: "/destek",

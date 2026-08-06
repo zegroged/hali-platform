@@ -49,14 +49,28 @@ export default function FotoKapak({
             decoding="async"
             className="absolute inset-0 h-full w-full scale-125 object-cover blur-lg saturate-[1.35] brightness-95"
           />
-          {/* Gerçek görsel: kırpılmadan, ortalanmış. */}
+          {/* Gerçek görsel: kırpılmadan, ortalanmış.
+              PARLAKLIK/KONTRAST NORMALİZASYONU (2026-08-06): halıcıların
+              gönderdiği fotoğraflar aynı listede yan yana çok farklı pozlarda
+              duruyor — biri flaşla patlamış, öteki loş dükkânda çekilmiş. Kart
+              ızgarası bu yüzden "derme çatma" görünüyordu. Hafif bir kontrast
+              artışı + doygunluk, ucu kaçmış pozları birbirine YAKLAŞTIRIR
+              (düzeltmez — kaynak neyse odur, bkz. yukarıdaki uyarı).
+              Değerler bilerek küçük: fotoğrafı sahtelemeden, ızgarayı tek
+              elden çıkmış gibi göstermeye yetecek kadar. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={url}
             alt={alt}
             loading="lazy"
             decoding="async"
-            className="relative h-full w-full object-contain transition duration-300 group-hover:scale-[1.03]"
+            className="relative h-full w-full object-contain contrast-[1.06] saturate-[1.08] transition duration-300 group-hover:scale-[1.03]"
+          />
+          {/* Alt kenara çok hafif koyu geçiş: farklı parlaklıktaki kapakların
+              altındaki başlık şeridi aynı ağırlıkta okunsun. */}
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-slate-900/10 to-transparent"
           />
         </>
       ) : (

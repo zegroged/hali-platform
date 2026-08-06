@@ -15,6 +15,7 @@ import { sendSms, trackingLink } from "@/lib/sms";
 import { waSiparisYolda, waGonderVeKaydet } from "@/lib/whatsapp";
 import { DRIVER_NEXT, ORDER_STATUS_META } from "@/lib/orderStatus";
 import { getAppBaseUrl } from "@/lib/config";
+import { normalizeCarpetCount, CARPET_COUNT_HATA } from "@/lib/carpet";
 
 /** Bearer (native) VEYA çerez ile giriş yapmış ŞOFÖRÜN driver.id'si; yoksa null. */
 export async function currentDriverId(): Promise<string | null> {
@@ -121,6 +122,12 @@ export async function driverPickup(
   driverId: string,
   orderId: string,
   photo: unknown,
+  // HALI SAYISI — ALIM ANINDA (2026-08-06). Şoför kaç halı aldığını burada
+  // girer; numaralar (1..N) bu andan itibaren VAR olur. Öncesinde numara
+  // fotoğraftan doğuyordu, yani fotoğrafı çekilmeyen halı sistemde yoktu ve
+  // "5 geldi, 5 gitti mi?" sorusu cevaplanamıyordu.
+  // Opsiyonel: girilmezse eski davranış sürer (null → numara fotoğraftan).
+  carpetCount?: unknown,
 ): Promise<DriverActionResult> {
   const o = await prisma.order.findFirst({
     where: { id: orderId, driverId, status: "ACCEPTED" },
@@ -135,9 +142,17 @@ export async function driverPickup(
       error: "Halının fotoğrafı zorunlu (hasar/kayıp kanıtı).",
       code: 400,
     };
+  const sayi = normalizeCarpetCount(carpetCount);
+  if (sayi === "gecersiz") {
+    return { ok: false, error: CARPET_COUNT_HATA, code: 400 };
+  }
   const r = await prisma.order.updateMany({
     where: { id: orderId, driverId, status: "ACCEPTED" },
-    data: { status: "PICKED_UP", pickupPhotoUrl: photoUrl },
+    data: {
+      status: "PICKED_UP",
+      pickupPhotoUrl: photoUrl,
+      ...(sayi != null ? { carpetCount: sayi } : {}),
+    },
   });
   if (r.count === 0)
     return { ok: false, error: "Bu sipariş şu an alınamıyor.", code: 409 };

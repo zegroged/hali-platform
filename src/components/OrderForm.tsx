@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { IconMapPin, IconWallet, IconCheck } from "@/components/icons";
@@ -71,6 +71,11 @@ export function OrderForm({
   // Mesafeli Sözleşmeler Yönetmeliği md.7: ön bilgilendirmenin TEYİDİ —
   // işaretlenmemiş zorunlu onay kutusu; sunucu tarafında consentAt olarak loglanır.
   const [consent, setConsent] = useState(false);
+  // İSTEĞE BAĞLI HALI FOTOĞRAFI (2026-08-06). Sipariş JSON ile açılıyor;
+  // fotoğraf, sipariş oluştuktan SONRA takip jetonuyla ayrı uca yüklenir.
+  // Yükleme başarısız olursa sipariş İPTAL EDİLMEZ — fotoğraf opsiyoneldir,
+  // müşteriyi takip sayfasına yine götürürüz.
+  const fotoRef = useRef<HTMLInputElement>(null);
 
   function set<K extends keyof typeof form>(k: K, v: (typeof form)[K]) {
     setForm((f) => ({ ...f, [k]: v }));
@@ -154,6 +159,24 @@ export function OrderForm({
         return;
       }
       const data = await res.json();
+
+      // Fotoğraf(lar) — sipariş açıldıktan sonra, takip jetonuyla. Best-effort:
+      // hata sipariş akışını BOZMAZ (fotoğraf isteğe bağlı, müşteri takip
+      // sayfasından da ekleyebilir).
+      const dosyalar = fotoRef.current?.files;
+      if (dosyalar && dosyalar.length > 0) {
+        try {
+          const fd = new FormData();
+          for (const f of Array.from(dosyalar).slice(0, 5)) fd.append("files", f);
+          await fetch(`/api/orders/${data.trackingToken}/photos`, {
+            method: "POST",
+            body: fd,
+          });
+        } catch (e) {
+          console.error("sipariş fotoğrafı yüklenemedi:", e);
+        }
+      }
+
       // ?yeni=1 → takip sayfası ilk açılışta onay bandı gösterir.
       router.push(`/takip/${data.trackingToken}?yeni=1`);
     } catch {
@@ -354,6 +377,28 @@ export function OrderForm({
               value={form.note}
               onChange={(e) => set("note", e.target.value)}
             />
+          </div>
+          {/* HALI FOTOĞRAFI — İSTEĞE BAĞLI (2026-08-06).
+              Halıcı işi görmeden daha isabetli fiyat/süre söyleyebilsin diye.
+              Zorunlu değil: yükleme başarısız olsa bile sipariş oluşur ve
+              müşteri takip sayfasına gider. */}
+          <div>
+            <label htmlFor="siparis-foto" className={labelCls}>
+              Halının fotoğrafı
+              {optionalBadge}
+            </label>
+            <input
+              id="siparis-foto"
+              ref={fotoRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              multiple
+              className="mt-1 w-full text-sm text-slate-600 file:mr-2 file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-sm"
+            />
+            <p className="mt-1 text-xs text-slate-500">
+              Halının hâlini gösteren bir kare eklersen işletme daha isabetli
+              fiyat ve süre söyleyebilir. En fazla 5 fotoğraf (jpg/png/webp).
+            </p>
           </div>
         </div>
       </section>

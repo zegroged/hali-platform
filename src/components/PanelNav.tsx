@@ -18,18 +18,20 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  PANEL_SAYFALAR,
-  MOBIL_ANA,
-  aktifMi,
-} from "@/components/panelSayfalar";
+import { MOBIL_ANA, aktifMi, sayfalarIcin } from "@/components/panelSayfalar";
 
-export default function PanelNav() {
+export default function PanelNav({
+  rol = "OWNER",
+}: {
+  /** Çalışan sahibe özel sayfaları listede görmez (2026-08-06). */
+  rol?: "OWNER" | "STAFF";
+}) {
   const pathname = usePathname() ?? "";
   const [acik, setAcik] = useState(false);
 
-  const ana = PANEL_SAYFALAR.filter((n) => MOBIL_ANA.includes(n.href));
-  const digerleri = PANEL_SAYFALAR.filter((n) => !MOBIL_ANA.includes(n.href));
+  const sayfalar = sayfalarIcin(rol);
+  const ana = sayfalar.filter((n) => MOBIL_ANA.includes(n.href));
+  const digerleri = sayfalar.filter((n) => !MOBIL_ANA.includes(n.href));
   const digerAktif = digerleri.some((n) => aktifMi(pathname, n.href));
 
   return (
@@ -37,7 +39,7 @@ export default function PanelNav() {
       {/* MASAÜSTÜ sekmeleri */}
       <div className="relative mx-auto hidden max-w-3xl md:block lg:max-w-5xl">
         <nav className="flex flex-wrap gap-1 px-2 pb-2">
-          {PANEL_SAYFALAR.map((n) => {
+          {sayfalar.map((n) => {
             const active = aktifMi(pathname, n.href);
             return (
               <Link

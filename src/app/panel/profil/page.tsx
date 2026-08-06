@@ -1,3 +1,5 @@
+import { WhatsAppVerify } from "@/components/WhatsAppVerify";
+import { sadeceSahip } from "@/lib/panelYetki";
 import { getCurrentBusiness, completenessChecklist } from "@/lib/panel";
 import {
   updateProfileBasics,
@@ -44,6 +46,10 @@ export default async function PanelProfile({
     odeme?: string;
   }>;
 }) {
+  // 🔴 SAHİBE ÖZEL SAYFA (2026-08-06). Kapı PRISMA'DAN ÖNCE: App Router'da
+  // layout ile page paralel render edilir, layout yönlendirse bile buradaki
+  // sorgu çalışır ve veri RSC yükünde sızabilir.
+  await sadeceSahip();
   const b = await getCurrentBusiness();
   if (!b) return null;
   const { hata, kaydedildi, odeme } = await searchParams;
@@ -212,6 +218,21 @@ export default async function PanelProfile({
                 />
               </div>
             </div>
+          </div>
+          {/* WHATSAPP DOĞRULAMA (arayüz 2026-08-06'da bağlandı). Arka uç uçları
+              26 Temmuz'dan beri canlıydı ama hiçbir ekrandan çağrılmıyordu —
+              özellik kodda vardı, kullanıcı için yoktu.
+              ⚠️ Kod AUTHENTICATION şablonuyla gider; o şablon Meta işletme
+              doğrulaması bitene kadar alınamıyor, yani bugün "gönderilemedi"
+              demesi beklenen davranış (bileşen gerçek hatayı gösterir). */}
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <p className="mb-2 text-sm font-medium text-slate-800">
+              WhatsApp numarası doğrulama
+            </p>
+            <WhatsAppVerify
+              phone={b.phone}
+              verified={b.whatsappVerifiedAt != null}
+            />
           </div>
           {/* 2026-07-30: bu alan İKİ KOLONLUK ızgaranın içinde TEK ÇOCUKTU —
               alan yarım genişlikte kalıyor, yanı boş duruyor ve "11 hane T.C.

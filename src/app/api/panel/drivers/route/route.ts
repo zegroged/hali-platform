@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getCurrentBusiness } from "@/lib/panel";
+import { getPanelBusiness } from "@/lib/panel";
 import { STOP_MIN_SEC } from "@/lib/tracking";
 import { trDayBoundsUTC } from "@/lib/time";
 
@@ -12,7 +12,7 @@ function downsample<T>(arr: T[], max: number): T[] {
 
 // Bir şoförün belirli bir güne ait kayıtlı rotası (çizgi + duraklar + dakika)
 export async function GET(req: NextRequest) {
-  const b = await getCurrentBusiness();
+  const b = await getPanelBusiness();
   if (!b) {
     return NextResponse.json({ error: "Yetkisiz" }, { status: 401 });
   }

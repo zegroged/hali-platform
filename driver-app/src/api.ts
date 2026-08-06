@@ -23,6 +23,10 @@ const ROLE_KEY = "hali_rol";
 export type Rol =
   | "DRIVER"
   | "CLEANER"
+  // Dükkân çalışanı (2026-08-06): sahiple AYNI paneli WebView'de açar, sunucu
+  // tarafında sahibe özel sayfaları görmez. Uygulama tarafında ekstra iş yok —
+  // yalnız rolün tanınması yeter, aksi hâlde şerit etiketi boş kalırdı.
+  | "STAFF"
   | "AGENT"
   | "ADMIN"
   | "SUPPORT"
@@ -273,8 +277,22 @@ async function photoPost(
   }
 }
 
-export const pickupOrder = (id: string, photoUri: string) =>
-  photoPost(`/api/driver/orders/${id}/pickup`, photoUri);
+/**
+ * HALI ALINDI. `carpetCount` = kaç halı alındı (2026-08-06).
+ * Numaralar (1..N) bu andan itibaren var olur; öncesinde numara fotoğraftan
+ * doğuyordu, yani fotoğrafı çekilmeyen halı sistemde hiç görünmüyordu.
+ * Boş geçilebilir — sunucu opsiyonel kabul eder (eski davranışa düşer).
+ */
+export const pickupOrder = (
+  id: string,
+  photoUri: string,
+  carpetCount?: number,
+) =>
+  photoPost(
+    `/api/driver/orders/${id}/pickup`,
+    photoUri,
+    carpetCount != null ? { carpetCount: String(carpetCount) } : undefined,
+  );
 export const deliverOrder = (id: string, price: number, photoUri: string) =>
   photoPost(`/api/driver/orders/${id}/deliver`, photoUri, {
     price: String(price),

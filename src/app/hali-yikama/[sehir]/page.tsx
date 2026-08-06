@@ -41,9 +41,26 @@ export async function generateMetadata({
   // kendiliğinden indexlenebilir olur. `follow`: iç linkler yine gezilsin.
   const kapsam = await seoKapsam().catch(() => null);
   const bosSayfa = kapsam != null && !kapsam.iller.has(city.name);
+
+  // SAYFAYA ÖZGÜ AÇIKLAMA (2026-08-06). Öncesinde 81 ilin açıklaması tek
+  // kalıptan üretiliyordu; yalnız il adı değişiyordu. Google şablon
+  // description'ı kendi ürettiği bir parçayla DEĞİŞTİRİR — yani yazdığımız
+  // metin arama sonucunda hiç görünmüyordu. Artık o sayfaya ait GERÇEK veri
+  // (kaç halıcı, hangi ilçeler) açıklamaya giriyor.
+  const adet = kapsam?.ilSayaci.get(city.name) ?? 0;
+  const ilceler = [...(kapsam?.ilIlceleri.get(city.name) ?? [])].sort();
+  const ilceMetni =
+    ilceler.length > 0
+      ? ` ${ilceler.slice(0, 4).join(", ")}${ilceler.length > 4 ? " ve diğer ilçelerde" : ""} hizmet var.`
+      : "";
+  const description =
+    adet > 0
+      ? `${locative(city.name)} ${adet} halı yıkamacısını fiyat, puan ve teslim süresine göre karşılaştır.${ilceMetni} Halın kapından alınır, yıkanır, kapına teslim edilir — ön ödeme yok, ödeme teslimde.`
+      : `${locative(city.name)} halı yıkama servisi: halın kapından alınsın, adım adım takip et, ödemeyi teslimde yap. Şehrinde hizmet açıldığında haber vermemiz için e-postanı bırakabilirsin.`;
+
   return {
     title: `${city.name} Halı Yıkama — Kapıdan Alma, Yıkama, Teslimat`,
-    description: `${locative(city.name)} halı yıkama servisi: yakınındaki halı yıkamacıları karşılaştır, halın kapından alınsın, adım adım takip et. Ön ödeme yok, ödeme teslimde.`,
+    description,
     alternates: { canonical: `/hali-yikama/${city.slug}` },
     ...(bosSayfa ? { robots: { index: false, follow: true } } : {}),
   };

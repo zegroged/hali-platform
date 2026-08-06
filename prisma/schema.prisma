@@ -21,6 +21,18 @@ enum UserRole {
   SUPPORT // müşteri hizmetleri — TEK yetkisi: doğrulamasız işletme açmak (/destek)
   ACCOUNTANT // mali müşavir — YALNIZ /muhasebe: fatura bilgileri + ödemeleri görür
   AGENT // komisyoncu — YALNIZ /komisyoncu: getirdiği işletmeler + komisyon kazançları
+  // DÜKKÂN ÇALIŞANI (2026-08-06) — sınırlı yetkili panel.
+  //
+  // NEDEN: işletmenin tek hesabı vardı, patronunki. Dükkândaki çalışan sipariş
+  // kaydetmek için PATRONUN ŞİFRESİYLE giriyor ve kasayı, ciroyu, IBAN'ı,
+  // aboneliği, fiyat listesini görüyor + DEĞİŞTİREBİLİYORDU. Şoför rolü sahada,
+  // dükkânda değil. Bu bir güvenlik açığıydı, iyileştirme değil.
+  //
+  // GÖRÜR: siparişler, yeni kayıt, Halı Bul, fotoğraf, kesin fiyat, mesajlar,
+  //        canlı takip, rota geçmişi.
+  // GÖRMEZ: kasa/ciro, abonelik/ödeme/IBAN, fiyat listesi, şoför yönetimi,
+  //        profil, raporlar, mutabakat, çalışan yönetimi.
+  STAFF
 }
 
 enum VerificationStatus {
@@ -108,6 +120,23 @@ model User {
   notifications Notification[]
   pushTokens    PushToken[]
   passwordResets PasswordReset[]
+  staffProfile  Staff?
+}
+
+// DÜKKÂN ÇALIŞANI (2026-08-06). Driver ile AYNI desen: kullanıcı ↔ işletme
+// bağı ayrı tabloda. Böylece `getCurrentBusiness` (ownerId üzerinden çalışır)
+// hiç değişmeden SAHİBE ÖZEL kalır — yani yeni rol varsayılan olarak hiçbir
+// sahip ekranına giremez (fail-closed). Çalışanın erişebildiği yerler tek tek
+// `getPanelBusiness()` ile açılır.
+model Staff {
+  id         String          @id @default(cuid())
+  user       User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId     String          @unique
+  business   CleanerBusiness @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  businessId String
+  createdAt  DateTime        @default(now())
+
+  @@index([businessId])
 }
 
 // Uygulama-içi bildirim (halıcı paneli + şoför + admin). SMS mock olduğundan
@@ -221,6 +250,7 @@ model CleanerBusiness {
   photos       BusinessPhoto[]
   pricing      PricingItem[]
   drivers      Driver[]
+  staff        Staff[]
   orders       Order[]
   reviews      Review[]
   badges       Badge[]
@@ -480,6 +510,21 @@ model Order {
   // kayardı (muhasebe hatası). Eski kayıtlarda null → updatedAt'e düşülür.
   deliveredAt     DateTime?
   estimatedDays   Int? // halıcının verdiği tahmini teslim süresi (gün)
+
+  // HALI SAYISI — ALIM ANINDA GİRİLİR (2026-08-06).
+  //
+  // ÖNCEKİ TASARIM YANLIŞTI: numara `OrderPhoto.carpetNo` üzerinden, fotoğraf
+  // yüklendikçe `max(carpetNo)+1` ile doğuyordu. Yani sistem "kaç halı var"
+  // değil "kaç fotoğraf yüklendi" biliyordu:
+  //   · aynı halının 2 fotoğrafı = 2 AYRI halı (#1, #2 — oysa tek halı),
+  //   · fotoğrafı çekilmeyen halı sistemde HİÇ YOK,
+  //   · "5 geldi, 5 gitti mi?" sorusu cevaplanamıyordu.
+  // Artık halı sayısı alımda (PICKED_UP) girilir, numaralar 1..carpetCount
+  // olarak ORADA doğar, fotoğraf VAR OLAN bir halıya bağlanır.
+  //
+  // null = eski sipariş (geriye dönük): o kayıtlarda numara yine fotoğraftan
+  // okunur, ekranlar ikisini de gösterebilir.
+  carpetCount     Int?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import sharp from "sharp";
 import { prisma } from "@/lib/prisma";
-import { getCurrentBusiness } from "@/lib/panel";
+import { getPanelBusiness } from "@/lib/panel";
 import { saveObject } from "@/lib/storage";
 
 const MAX = 5 * 1024 * 1024; // 5 MB
@@ -37,29 +37,79 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const b = await getCurrentBusiness();
+  const b = await getPanelBusiness();
   if (!b) return NextResponse.json({ error: "Yetkisiz" }, { status: 401 });
 
   const { id } = await params;
   const order = await prisma.order.findFirst({
     where: { id, businessId: b.id },
-    select: { id: true, _count: { select: { photos: true } } },
+    select: {
+      id: true,
+      carpetCount: true,
+      _count: { select: { photos: true } },
+    },
   });
   if (!order) {
     return NextResponse.json({ error: "Sipariş bulunamadı" }, { status: 404 });
   }
 
-  // HALI NUMARASI (2026-08-02): panelden yüklenen her fotoğraf BİR HALI sayılır
-  // ve sipariş içinde 1'den başlayarak numaralanır. Depoda "bu kimin halısı"
-  // sorusu /panel/halilar ekranında bu numara + fotoğraf + müşteri adıyla
-  // cevaplanıyor. Şoförün alım/teslim kanıt fotoğrafları numaralanmaz.
-  const sonNo = await prisma.orderPhoto.aggregate({
-    where: { orderId: order.id },
-    _max: { carpetNo: true },
-  });
-  let siradakiNo = (sonNo._max.carpetNo ?? 0) + 1;
-
   const form = await req.formData();
+
+  // 🔴 HALI NUMARASI — İLİŞKİ DÜZELTİLDİ (2026-08-06).
+  //
+  // ESKİSİ: her yüklenen fotoğraf `max(carpetNo)+1` alıyordu. Yani numara
+  // FOTOĞRAFTAN doğuyordu; sistem "kaç halı var" değil "kaç fotoğraf yüklendi"
+  // biliyordu. Aynı halının 2 fotoğrafı 2 AYRI halı görünüyor, fotoğrafı
+  // çekilmeyen halı ise hiç var olmuyordu.
+  //
+  // YENİSİ: halı sayısı ALIMDA girilir (`Order.carpetCount`), numaralar
+  // 1..carpetCount olarak orada doğar. Fotoğraf VAR OLAN bir halıya bağlanır:
+  //   · `carpetNo` gönderildiyse o halıya (1..carpetCount aralığında),
+  //   · gönderilmediyse fotoğrafı OLMAYAN ilk halıya,
+  //   · hepsinde fotoğraf varsa numara verilmez (aynı halının ek fotoğrafı) —
+  //     bu ARTIK yeni bir halı uydurmuyor.
+  //
+  // GERİYE DÖNÜK: `carpetCount` null olan eski siparişlerde eski davranış
+  // (max+1) aynen sürer; o kayıtların tek numara kaynağı hâlâ fotoğraf.
+  const dolular = await prisma.orderPhoto.findMany({
+    where: { orderId: order.id, carpetNo: { not: null } },
+    select: { carpetNo: true },
+  });
+  const doluSet = new Set(dolular.map((p) => p.carpetNo as number));
+
+  // Yerel sabit: aşağıdaki fonksiyon bildirimi hoisted olduğu için TS `order`
+  // daralmasını içeride koruyamıyor.
+  const haliSayisi = order.carpetCount;
+
+  const istenenHam = Number(form.get("carpetNo"));
+  const istenen =
+    Number.isInteger(istenenHam) &&
+    istenenHam >= 1 &&
+    (haliSayisi == null || istenenHam <= haliSayisi)
+      ? istenenHam
+      : null;
+
+  /** Sıradaki numara: istenen varsa o, yoksa fotoğrafsız ilk halı, yoksa null. */
+  function sonrakiNo(): number | null {
+    if (haliSayisi == null) {
+      // Eski sipariş: numara kaynağı fotoğraf (eski davranış korunur).
+      let n = 1;
+      while (doluSet.has(n)) n++;
+      doluSet.add(n);
+      return n;
+    }
+    if (istenen != null && !doluSet.has(istenen)) {
+      doluSet.add(istenen);
+      return istenen;
+    }
+    for (let n = 1; n <= haliSayisi; n++) {
+      if (!doluSet.has(n)) {
+        doluSet.add(n);
+        return n;
+      }
+    }
+    return null; // hepsinin fotoğrafı var → ek fotoğraf, YENİ HALI DEĞİL
+  }
   // AŞAMA (2026-07-30): panelden YALNIZ "YIKAMA" etiketlenebilir. Alım/teslim
   // fotoğrafı şoför akışında zorunlu çekilen KANIT'tır; panelden o etiketin
   // uydurulabilmesi kanıt zincirini değersizleştirirdi. Tanınmayan değer → null.
@@ -98,7 +148,7 @@ export async function POST(
         img.contentType,
       );
       const row = await prisma.orderPhoto.create({
-        data: { orderId: order.id, url, stage, carpetNo: siradakiNo++ },
+        data: { orderId: order.id, url, stage, carpetNo: sonrakiNo() },
         select: {
           id: true,
           url: true,
@@ -132,7 +182,7 @@ export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const b = await getCurrentBusiness();
+  const b = await getPanelBusiness();
   if (!b) return NextResponse.json({ error: "Yetkisiz" }, { status: 401 });
 
   const { id } = await params;

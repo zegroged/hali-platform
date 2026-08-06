@@ -1,3 +1,4 @@
+import { sadeceSahip } from "@/lib/panelYetki";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { getCurrentBusiness } from "@/lib/panel";
@@ -79,6 +80,11 @@ export default async function AbonelikYonetim({
 }: {
   searchParams: Promise<{ durum?: string }>;
 }) {
+  // 🔴 SAHİBE ÖZEL SAYFA (2026-08-06). Kapı PRISMA'DAN ÖNCE: App Router'da
+  // layout ile page paralel render edilir, layout yönlendirse bile buradaki
+  // sorgu çalışır ve veri RSC yükünde sızabilir.
+  await sadeceSahip();
+
   const b = await getCurrentBusiness();
   if (!b) return null;
   const { durum } = await searchParams;

@@ -1,3 +1,4 @@
+import { sadeceSahip } from "@/lib/panelYetki";
 import { getCurrentBusiness } from "@/lib/panel";
 import {
   addDriver,
@@ -15,6 +16,10 @@ const inp =
 const lbl = "mb-1 block text-sm font-medium text-slate-700";
 
 export default async function PanelDrivers() {
+  // 🔴 SAHİBE ÖZEL SAYFA (2026-08-06). Kapı PRISMA'DAN ÖNCE: App Router'da
+  // layout ile page paralel render edilir, layout yönlendirse bile buradaki
+  // sorgu çalışır ve veri RSC yükünde sızabilir.
+  await sadeceSahip();
   const b = await getCurrentBusiness();
   if (!b) return null;
 

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import { getCurrentBusiness } from "@/lib/panel";
+import { getPanelBusiness } from "@/lib/panel";
 import EmptyState from "@/components/EmptyState";
 import { IconWhatsApp } from "@/components/icons";
 import WhatsAppReply from "@/components/WhatsAppReply";
@@ -15,7 +15,7 @@ import { demoWaBaglaAction, demoWaCozAction } from "./actions";
 // penceresi açıkken cevap yazmayı sağlar.
 //
 // 🔴 İZOLASYON: bütün sorgular businessId ile daraltılır. Oturum + rol kontrolü
-// getCurrentBusiness içinde prisma'ya GİTMEDEN ÖNCE yapılır (rol CLEANER değilse
+// getPanelBusiness içinde prisma'ya GİTMEDEN ÖNCE yapılır (rol CLEANER değilse
 // null döner); layout'un redirect'ine güvenilmez — daha önce bu yüzden RSC
 // verisi sayfa kaynağından okunabilmişti.
 
@@ -66,7 +66,7 @@ export default async function MesajlarSayfasi({
   searchParams: Promise<{ tel?: string; hata?: string; kaydedildi?: string }>;
 }) {
   // 🔴 Oturum + rol + işletme — mesaj sorgusundan ÖNCE.
-  const b = await getCurrentBusiness();
+  const b = await getPanelBusiness();
   if (!b) return null;
   const { tel, hata, kaydedildi } = await searchParams;
 

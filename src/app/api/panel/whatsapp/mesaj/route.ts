@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { getCurrentBusiness } from "@/lib/panel";
+import { getPanelBusiness } from "@/lib/panel";
 import { rateLimit, tooMany } from "@/lib/ratelimit";
 import { sendText, waTelefonAdaylari, whatsappEnabled } from "@/lib/whatsapp";
 
@@ -40,10 +40,10 @@ const saat = (d: Date) =>
 
 export async function POST(req: NextRequest) {
   // 🔴 SIRA ÖNEMLİ: prisma'ya gitmeden ÖNCE oturum + rol + işletme.
-  // getCurrentBusiness kendi içinde oturumu doğrular ve rolü CLEANER değilse
+  // getPanelBusiness kendi içinde oturumu doğrular ve rolü CLEANER değilse
   // null döner — layout/redirect korumasına GÜVENİLMEZ (bu depoda korumalı
   // sayfa verisi bir kez bu yüzden sızmıştı).
-  const b = await getCurrentBusiness();
+  const b = await getPanelBusiness();
   if (!b) return NextResponse.json({ error: "Yetkisiz" }, { status: 401 });
 
   // HIZ SINIRI: her mesaj Meta'da faturalanabilir. Elle yazan bir halıcı 10

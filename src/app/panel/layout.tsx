@@ -6,6 +6,7 @@ import { LogoutButton } from "@/components/LogoutButton";
 import { NotificationBell } from "@/components/NotificationBell";
 import PanelNav from "@/components/PanelNav";
 import { demoBiletiVarMi } from "@/lib/auth";
+import { getPanelErisim } from "@/lib/panelYetki";
 import { demodanDon } from "@/app/komisyoncu/demo-actions";
 import { demoGunuTazele } from "@/lib/demoPanel";
 import { PendingButton } from "@/components/PendingButton";
@@ -23,14 +24,21 @@ export default async function PanelLayout({
   if (!u) redirect("/giris");
   if (!u.username) redirect("/kullanici-adi");
 
+  // ÇALIŞAN PANELİ (2026-08-06): panele artık İKİ rol girebiliyor — işletme
+  // sahibi (CLEANER) ve dükkân çalışanı (STAFF). İşletme kimliği role göre
+  // farklı yoldan bulunur; ötesi aynı panel.
+  const erisim = await getPanelErisim();
+  if (!erisim) redirect("/giris");
+
   // HAFİF: layout yalnız işletme adına ihtiyaç duyar; getCurrentBusiness'in tüm
   // grafiğini (şoför/fiyat/bölge/foto) çekmesi her panel işleminde yeniden-render'ı
   // yavaşlatıyordu. Yalnız ad + varlık kontrolü çek.
   const business = await prisma.cleanerBusiness.findUnique({
-    where: { ownerId: u.id },
+    where: { id: erisim.businessId },
     select: { id: true, name: true, isDemo: true },
   });
   if (!business) redirect("/giris");
+  const calisan = erisim.rol === "STAFF";
 
   // DEMO TAZELEME (2026-08-03): demo verisi kurulduğu ana çakılıydı; ertesi gün
   // Canlı Takip "konum yok", Rota Geçmişi boş, Mesajlar'da cevap kutusu kapalı
@@ -61,16 +69,21 @@ export default async function PanelLayout({
       )}
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-3 lg:max-w-5xl">
-          <div>
-            <p className="text-xs text-slate-500">Halıcı Paneli</p>
-            <p className="font-semibold text-slate-900">{business.name}</p>
+          <div className="min-w-0">
+            {/* Çalışan hangi hesapla girdiğini BİLMELİ: patronun hesabı sanıp
+                "kasa nerede" diye aramasın, ayrıca ortak telefonda kimin açık
+                olduğu görünsün. */}
+            <p className="truncate text-xs text-slate-500">
+              {calisan ? `Çalışan · ${erisim.kullaniciAdi}` : "Halıcı Paneli"}
+            </p>
+            <p className="truncate font-semibold text-slate-900">{business.name}</p>
           </div>
           <div className="flex items-center gap-1">
             <NotificationBell />
             <LogoutButton />
           </div>
         </div>
-        <PanelNav />
+        <PanelNav rol={erisim.rol} />
       </header>
       {/* pb-24 (mobil): sabit alt çubuk son satırı kapatmasın. */}
       <main className="mx-auto max-w-3xl px-4 pb-24 pt-6 md:pb-6 lg:max-w-5xl">

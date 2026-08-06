@@ -19,7 +19,20 @@ import { normalizeCityName, normalizeDistrictName } from "@/lib/cities";
 // Buradaki filtre keşifle (lib/businesses.ts getBusinesses) AYNI olmalı; yoksa
 // "sitemap'te var ama sayfa boş" çelişkisi doğar.
 
-export type Kapsam = { iller: Set<string>; ilceler: Set<string> };
+export type Kapsam = {
+  iller: Set<string>;
+  ilceler: Set<string>;
+  // SAYFAYA ÖZGÜ META AÇIKLAMA İÇİN (2026-08-06). Her il/ilçe sayfasının
+  // description'ı aynı kalıptan üretiliyordu ("<il>'de halı yıkama servisi:
+  // yakınındaki halıcıları karşılaştır…"). Google bunu şablon içerik sayar ve
+  // kendi ürettiği bir parçayla DEĞİŞTİRİR — yani yazdığımız metin boşa gider.
+  // Bu sayaçlar açıklamaya o sayfaya AİT gerçek bir bilgi koymayı sağlıyor
+  // ("3 halı yıkamacı, 7 ilçede hizmet").
+  ilSayaci: Map<string, number>;
+  ilceSayaci: Map<string, number>;
+  /** İl → o ilde hizmet verilen ilçe adları (açıklamada ilk birkaçı geçer). */
+  ilIlceleri: Map<string, Set<string>>;
+};
 
 /** "İl|İlçe" — küme anahtarı (normalize edilmiş adlarla). */
 export function ilceAnahtar(il: string, ilce: string): string {
@@ -30,12 +43,33 @@ export function ilceAnahtar(il: string, ilce: string): string {
 export async function seoKapsam(): Promise<Kapsam> {
   const iller = new Set<string>();
   const ilceler = new Set<string>();
+  const ilSayaci = new Map<string, number>();
+  const ilceSayaci = new Map<string, number>();
+  const ilIlceleri = new Map<string, Set<string>>();
+  // Sayaç İŞLETME başına artar (hizmet bölgesi başına DEĞİL): bir işletme aynı
+  // ilde 10 ilçeye hizmet veriyorsa il sayacı 1 artmalı, 10 değil.
+  const ilGoruldu = new Set<string>();
+  const ilceGoruldu = new Set<string>();
   const ekle = (ilRaw: string | null, ilceRaw: string | null) => {
     const il = normalizeCityName(ilRaw ?? "");
     if (!il) return;
     iller.add(il);
+    if (!ilGoruldu.has(il)) {
+      ilGoruldu.add(il);
+      ilSayaci.set(il, (ilSayaci.get(il) ?? 0) + 1);
+    }
     const ilce = normalizeDistrictName(il, ilceRaw ?? "");
-    if (ilce) ilceler.add(ilceAnahtar(il, ilce));
+    if (ilce) {
+      const anahtar = ilceAnahtar(il, ilce);
+      ilceler.add(anahtar);
+      if (!ilceGoruldu.has(anahtar)) {
+        ilceGoruldu.add(anahtar);
+        ilceSayaci.set(anahtar, (ilceSayaci.get(anahtar) ?? 0) + 1);
+      }
+      const set = ilIlceleri.get(il) ?? new Set<string>();
+      set.add(ilce);
+      ilIlceleri.set(il, set);
+    }
   };
 
   const isletmeler = await prisma.cleanerBusiness.findMany({
@@ -52,10 +86,13 @@ export async function seoKapsam(): Promise<Kapsam> {
     },
   });
   for (const b of isletmeler) {
+    // Her işletme için "görüldü" kümeleri sıfırlanır → sayaçlar işletme başına.
+    ilGoruldu.clear();
+    ilceGoruldu.clear();
     ekle(b.city, b.district);
     for (const sa of b.serviceAreas) ekle(sa.city, sa.district);
   }
-  return { iller, ilceler };
+  return { iller, ilceler, ilSayaci, ilceSayaci, ilIlceleri };
 }
 
 /** Aramaya kapatılan işletmeler (test/demo kaydı). Virgüllü kimlik listesi. */

@@ -20,6 +20,7 @@ import {
   IconSearch,
   IconStore,
   IconTruck,
+  IconUsers,
   IconWallet,
   IconWhatsApp,
 } from "@/components/icons";
@@ -38,6 +39,12 @@ export type PanelSayfa = {
   /** Izgarada başlığın altında görünen tek satırlık açıklama. */
   aciklama: string;
   Icon: IconBileseni;
+  /**
+   * SAHİBE ÖZEL (2026-08-06): dükkân çalışanı bu sayfayı listede GÖRMEZ ve
+   * adrese elle yazsa da giremez (sayfanın ilk satırında `sadeceSahip()`).
+   * Para, kimlik ve fiyat kararı içeren her ekran buraya girer.
+   */
+  sahipOzel?: boolean;
 };
 
 export const PANEL_SAYFALAR: PanelSayfa[] = [
@@ -80,24 +87,36 @@ export const PANEL_SAYFALAR: PanelSayfa[] = [
     label: "Kasa",
     aciklama: "Gelir gider defteri",
     Icon: IconWallet,
+    sahipOzel: true,
   },
   {
     href: "/panel/mutabakat",
     label: "Mutabakat",
     aciklama: "Şoförde bekleyen para",
     Icon: IconReceipt,
+    sahipOzel: true,
   },
   {
     href: "/panel/profil",
     label: "Profil & Fiyat",
     aciklama: "Fotoğraf, m² fiyatın",
     Icon: IconStore,
+    sahipOzel: true,
   },
   {
     href: "/panel/soforler",
     label: "Şoförler",
     aciklama: "Ekle, mesai aç kapa",
     Icon: IconTruck,
+    sahipOzel: true,
+  },
+  {
+    href: "/panel/calisanlar",
+    label: "Çalışanlar",
+    kisa: "Çalışan",
+    aciklama: "Dükkân hesabı aç, kapat",
+    Icon: IconUsers,
+    sahipOzel: true,
   },
   {
     href: "/panel/rota",
@@ -110,8 +129,20 @@ export const PANEL_SAYFALAR: PanelSayfa[] = [
     label: "Raporlar",
     aciklama: "Aylık ciro, teslim, durak",
     Icon: IconChart,
+    sahipOzel: true,
   },
 ];
+
+/**
+ * Role göre görünen sayfalar. Çalışan sahibe özel sayfaları LİSTEDE görmez;
+ * adrese elle yazarsa da sayfanın kendi kapısı (`sadeceSahip()`) durdurur.
+ * İki katman bilinçli: liste kozmetik, kapı güvenlik.
+ */
+export function sayfalarIcin(rol: "OWNER" | "STAFF"): PanelSayfa[] {
+  return rol === "OWNER"
+    ? PANEL_SAYFALAR
+    : PANEL_SAYFALAR.filter((s) => !s.sahipOzel);
+}
 
 /** Mobil alt çubukta duracak sayfalar; kalanı "Daha fazla" içinde. */
 export const MOBIL_ANA = [

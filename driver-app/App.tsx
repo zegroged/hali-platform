@@ -35,6 +35,7 @@ const NAME_KEY = "hali_driver_name";
 /** Panel şeridinde gösterilecek rol adı. */
 const ROL_ADI: Record<string, string> = {
   CLEANER: "İşletme paneli",
+  STAFF: "Çalışan paneli",
   AGENT: "Komisyoncu paneli",
   ADMIN: "Yönetim",
   SUPPORT: "Müşteri hizmetleri",

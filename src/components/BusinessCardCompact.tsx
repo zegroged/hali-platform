@@ -52,10 +52,13 @@ export function BusinessCardCompact({ b }: { b: BusinessSummary }) {
           </span>
         )}
       </div>
-      <h3 className="mt-1 truncate text-sm font-medium text-slate-900">
+      {/* TİPOGRAFİ HİYERARŞİSİ (2026-08-06, BusinessCard ile aynı kural):
+          ad kalın ve bir tık büyük, konum ikinci kademede. Öncesinde ad (14px
+          /500) ile konum (12px/400) neredeyse aynı ağırlıktaydı. */}
+      <h3 className="mt-1 truncate text-[15px] font-bold leading-tight tracking-[-0.01em] text-slate-900">
         {b.name}
       </h3>
-      <p className="truncate text-xs text-slate-500">
+      <p className="mt-0.5 truncate text-xs font-medium text-slate-500">
         {b.district}
         {dist ? ` · ${dist}` : ""}
       </p>

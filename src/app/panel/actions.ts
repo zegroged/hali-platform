@@ -11,7 +11,12 @@ import {
   bildirMusteriyeEposta,
 } from "@/lib/orderNotify";
 import { parseTutar } from "@/lib/money";
-import { getCurrentBusiness, profileComplete, syncVisibility } from "@/lib/panel";
+import {
+  getCurrentBusiness,
+  getPanelBusiness,
+  profileComplete,
+  syncVisibility,
+} from "@/lib/panel";
 import { hashPassword } from "@/lib/auth";
 import { sendSms, trackingLink } from "@/lib/sms";
 import { waSiparisYolda, waFiyatOnayi, waSiparisHazir, waGonderVeKaydet } from "@/lib/whatsapp";
@@ -19,6 +24,7 @@ import { sendAdminEmail, sendEmail } from "@/lib/email";
 import { notify, notifyAdmins } from "@/lib/notify";
 import { getAppBaseUrl } from "@/lib/config";
 import { ORDER_STATUS_META, PANEL_NEXT } from "@/lib/orderStatus";
+import { normalizeCarpetCount, CARPET_COUNT_HATA } from "@/lib/carpet";
 import { taxIdError } from "@/lib/taxId";
 import { normalizePhone, isMobilePhone, isLandlinePhone } from "@/lib/phone";
 import { normalizeGoogleProfileUrl } from "@/lib/googleUrl";
@@ -32,8 +38,28 @@ import {
   normalizeAddress,
 } from "@/lib/text";
 
+/**
+ * SAHİBE ÖZEL işletme bağlamı. `getCurrentBusiness()` yalnız CLEANER kabul
+ * ettiği için bu fonksiyonu kullanan HER aksiyon otomatik olarak sahibe
+ * özeldir — çalışan çağırırsa /giris'e düşer. Profil, fiyat, şoför, sözleşme,
+ * abonelik ve tatil modu aksiyonları bilerek burada kalır (fail-closed).
+ */
 async function biz() {
   const b = await getCurrentBusiness();
+  if (!b) redirect("/giris");
+  return b;
+}
+
+/**
+ * PAYLAŞILAN işletme bağlamı — SAHİP **veya** ÇALIŞAN (2026-08-06).
+ * Yalnız günlük sipariş işleri için: kabul, red, fiyat bildirme, aşama
+ * ilerletme, teslim, ETA, şoför devri, "hazır" haberi.
+ *
+ * ⚠️ Yeni bir aksiyon yazarken varsayılanın `biz()` olduğunu unutma; buraya
+ * ancak dükkândaki çalışanın yapması GEREKEN işler taşınır.
+ */
+async function bizPaylasilan() {
+  const b = await getPanelBusiness();
   if (!b) redirect("/giris");
   return b;
 }
@@ -455,7 +481,7 @@ export async function submitForVerification() {
 }
 
 export async function reassignOrder(formData: FormData) {
-  const b = await biz();
+  const b = await bizPaylasilan();
   const orderId = String(formData.get("orderId"));
   const driverId = String(formData.get("driverId")) || null;
   const order = await prisma.order.findFirst({
@@ -500,7 +526,7 @@ export async function reassignOrder(formData: FormData) {
 }
 
 export async function cancelOrder(formData: FormData) {
-  const b = await biz();
+  const b = await bizPaylasilan();
   const orderId = String(formData.get("orderId"));
   const order = await prisma.order.findFirst({
     where: { id: orderId, businessId: b.id },
@@ -547,7 +573,7 @@ export async function cancelOrder(formData: FormData) {
 
 // Halıcı, talebi sebep yazarak reddeder; müşteriye bildirim gider.
 export async function rejectOrder(formData: FormData) {
-  const b = await biz();
+  const b = await bizPaylasilan();
   const orderId = String(formData.get("orderId"));
   const preset = String(formData.get("reason") || "").trim();
   const note = String(formData.get("note") || "").trim();
@@ -589,7 +615,7 @@ export async function rejectOrder(formData: FormData) {
 
 /** CREATED → ACCEPTED. Şoför kabulünün panel muadili. */
 export async function acceptOrderPanel(formData: FormData) {
-  const b = await biz();
+  const b = await bizPaylasilan();
   const orderId = String(formData.get("orderId"));
   const accepted = await prisma.order.updateMany({
     where: { id: orderId, businessId: b.id, status: "CREATED" },
@@ -610,7 +636,7 @@ export async function acceptOrderPanel(formData: FormData) {
  * onayladıktan (priceApprovedAt) sonra değiştirilemez.
  */
 export async function quoteOrderPrice(formData: FormData) {
-  const b = await biz();
+  const b = await bizPaylasilan();
   const orderId = String(formData.get("orderId"));
   const price = parseTutar(formData.get("price"));
   if (!Number.isFinite(price) || price <= 0) {
@@ -677,7 +703,7 @@ export async function quoteOrderPrice(formData: FormData) {
 
 /** Ara adımlar: ACCEPTED→PICKED_UP→WASHING→OUT_FOR_DELIVERY (PANEL_NEXT). */
 export async function advanceOrderPanel(formData: FormData) {
-  const b = await biz();
+  const b = await bizPaylasilan();
   const orderId = String(formData.get("orderId"));
   const order = await prisma.order.findFirst({
     where: { id: orderId, businessId: b.id },
@@ -710,9 +736,20 @@ export async function advanceOrderPanel(formData: FormData) {
     );
   }
 
+  // HALI SAYISI — ALIM ANINDA (2026-08-06, şoför web + şoför uygulamasıyla İKİZ).
+  // Numaralar 1..N olarak buradan doğar; öncesinde fotoğraftan doğuyordu, yani
+  // fotoğrafı çekilmeyen halı sistemde hiç yoktu (bkz. lib/carpet.ts).
+  const sayi = normalizeCarpetCount(formData.get("carpetCount"));
+  if (sayi === "gecersiz") throw new Error(CARPET_COUNT_HATA);
+
   const updated = await prisma.order.updateMany({
     where: { id: orderId, businessId: b.id, status: order.status },
-    data: { status: step.next },
+    data: {
+      status: step.next,
+      ...(step.next === "PICKED_UP" && sayi != null
+        ? { carpetCount: sayi }
+        : {}),
+    },
   });
   if (updated.count === 0) return;
   await prisma.orderEvent.create({
@@ -801,7 +838,7 @@ export async function advanceOrderPanel(formData: FormData) {
 
 /** OUT_FOR_DELIVERY → DELIVERED + tahsilat tutarı (şoför deliverOrder muadili). */
 export async function deliverOrderPanel(formData: FormData) {
-  const b = await biz();
+  const b = await bizPaylasilan();
   const orderId = String(formData.get("orderId"));
   const price = parseTutar(formData.get("price"));
   if (!Number.isFinite(price) || price <= 0) {
@@ -886,7 +923,7 @@ export async function deliverOrderPanel(formData: FormData) {
 
 /** Tahmini teslim süresi (gün) — müşteri takip sayfasında görür. */
 export async function setOrderEta(formData: FormData) {
-  const b = await biz();
+  const b = await bizPaylasilan();
   const orderId = String(formData.get("orderId"));
   const days = Math.round(Number(formData.get("days")));
   if (!Number.isFinite(days) || days < 1 || days > 60) return;
@@ -965,7 +1002,7 @@ export async function setPauseMode(formData: FormData) {
  * hem işaret hem geçmiş satırı).
  */
 export async function notifyOrderReady(formData: FormData) {
-  const b = await getCurrentBusiness();
+  const b = await getPanelBusiness(); // dükkândaki çalışan da haber verebilmeli
   if (!b) return;
   const orderId = String(formData.get("orderId") ?? "");
   const order = await prisma.order.findFirst({

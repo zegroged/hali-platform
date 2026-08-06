@@ -1,7 +1,8 @@
+import { haliSlotlari, fotografsizHalilar } from "@/lib/carpet";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { getCurrentBusiness } from "@/lib/panel";
+import { getPanelBusiness } from "@/lib/panel";
 import { prisma } from "@/lib/prisma";
 import { ORDER_STATUS_META } from "@/lib/orderStatus";
 import { photoStageLabel } from "@/lib/photoStage";
@@ -38,7 +39,7 @@ export default async function HalilarSayfasi({
 }: {
   searchParams: Promise<{ q?: string }>;
 }) {
-  const b = await getCurrentBusiness();
+  const b = await getPanelBusiness();
   if (!b) redirect("/giris");
   const { q } = await searchParams;
   const arama = (q ?? "").trim();
@@ -69,6 +70,7 @@ export default async function HalilarSayfasi({
       customerName: true,
       customerPhone: true,
       createdAt: true,
+      carpetCount: true,
       photos: {
         orderBy: [{ carpetNo: "asc" }, { createdAt: "asc" }],
         select: { id: true, url: true, stage: true, carpetNo: true },
@@ -99,6 +101,47 @@ export default async function HalilarSayfasi({
       kod: o.code ?? "",
       durum: o.status as (typeof AKTIF)[number],
     };
+    // 🔴 HALI SAYISI ALIMDAN GELİYOR (2026-08-06). Sipariş alınırken kaç halı
+    // olduğu girildiyse (`carpetCount`), FOTOĞRAFI OLMAYAN halılar da burada
+    // kart olarak görünür — "5 geldi, 5 gitti mi?" sorusunun cevabı bu.
+    // Öncesinde numara fotoğraftan doğduğu için fotoğrafsız halı bu ekranda
+    // hiç yoktu; sistem "kaç halı var" değil "kaç fotoğraf yüklendi" biliyordu.
+    if (o.carpetCount != null) {
+      for (const slot of haliSlotlari(o.carpetCount, o.photos)) {
+        if (slot.fotograflar.length === 0) {
+          kartlar.push({
+            key: `${o.id}-no${slot.no}`,
+            url: null,
+            no: slot.no,
+            stage: null,
+            ...ortak,
+          });
+          continue;
+        }
+        for (const p of slot.fotograflar) {
+          kartlar.push({
+            key: p.id,
+            url: p.url,
+            no: p.carpetNo,
+            stage: p.stage,
+            ...ortak,
+          });
+        }
+      }
+      // Numarasız fotoğraflar (aynı halının ek fotoğrafı / şoför kanıtı).
+      for (const p of o.photos.filter((x) => x.carpetNo == null)) {
+        kartlar.push({
+          key: p.id,
+          url: p.url,
+          no: null,
+          stage: p.stage,
+          ...ortak,
+        });
+      }
+      continue;
+    }
+
+    // Eski sipariş (halı sayısı girilmemiş): davranış aynen korunur.
     if (o.photos.length === 0) {
       kartlar.push({ key: `${o.id}-yok`, url: null, no: null, stage: null, ...ortak });
       continue;
@@ -115,6 +158,17 @@ export default async function HalilarSayfasi({
   }
 
   const fotografsiz = kartlar.filter((k) => !k.url).length;
+
+  // Sayım uyumsuzluğu: alımda N halı girildi ama N'in fotoğrafı yok.
+  // Depoda halı sayarken bakılacak asıl satır bu.
+  const eksikFotograf = siparisler
+    .map((o) => ({
+      kod: o.code ?? "",
+      ad: o.customerName,
+      sayi: o.carpetCount,
+      eksik: fotografsizHalilar(o.carpetCount, o.photos),
+    }))
+    .filter((x) => x.eksik.length > 0);
 
   return (
     <div className="space-y-4 py-4">
@@ -151,6 +205,31 @@ export default async function HalilarSayfasi({
           </Link>
         )}
       </form>
+
+      {/* SAYIM UYUMSUZLUĞU (2026-08-06): alımda "5 halı" girilmiş ama 3'ünün
+          fotoğrafı var → 2'si kayıt dışı. Bu satır, ekranın asıl vaadini
+          ("dükkândaki her halı burada") ölçülebilir hâle getiriyor. */}
+      {eksikFotograf.length > 0 && (
+        <div className="rounded-xl border border-amber-300 bg-amber-50 p-4">
+          <p className="text-sm font-semibold text-amber-900">
+            Fotoğrafı çekilmemiş halı var
+          </p>
+          <ul className="mt-2 space-y-1 text-sm text-amber-800">
+            {eksikFotograf.slice(0, 8).map((x) => (
+              <li key={x.kod + x.ad}>
+                <span className="font-mono">{x.kod || "—"}</span> · {x.ad} —{" "}
+                {x.sayi} halının {x.eksik.length}&apos;i eksik (
+                {x.eksik.map((n) => `#${n}`).join(", ")})
+              </li>
+            ))}
+          </ul>
+          {eksikFotograf.length > 8 && (
+            <p className="mt-1 text-xs text-amber-700">
+              …ve {eksikFotograf.length - 8} sipariş daha.
+            </p>
+          )}
+        </div>
+      )}
 
       {fotografsiz > 0 && (
         <p className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">

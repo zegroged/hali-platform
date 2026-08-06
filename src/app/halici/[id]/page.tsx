@@ -61,11 +61,20 @@ export async function generateMetadata({
       select: { isDemo: true },
     }),
   ]);
+  // AÇIKLAMA UZUNLUĞU (2026-08-06): işletmenin kendi metni sınırsızdı; Google
+  // ~155 karakterde kesiyor ve puan/konum gibi ASIL tıklatan bilgi kesilen
+  // kısımda kalıyordu. Artık işletme metni kırpılıp sonuna konum + puan
+  // ekleniyor — her sayfa kendi verisiyle ayrışıyor.
+  const kuyruk = `${b.district}, ${b.city} — kapıdan alma ve teslim.${ratingPart}`;
+  const ozet = b.description?.trim().replace(/\s+/g, " ") ?? "";
+  const kalan = Math.max(0, 155 - kuyruk.length - 1);
+  const description = ozet
+    ? `${ozet.length > kalan ? ozet.slice(0, Math.max(0, kalan - 1)).trimEnd() + "…" : ozet} ${kuyruk}`
+    : `${b.district}, ${b.city} bölgesinde kapıdan halı yıkama servisi. Halın kapından alınır, yıkanır, teslim edilir.${ratingPart}`;
+
   return {
     title: `${b.name} — ${b.district} Halı Yıkama`,
-    description:
-      b.description ??
-      `${b.district}, ${b.city} bölgesinde kapıdan halı yıkama servisi. Halın kapından alınır, yıkanır, teslim edilir.${ratingPart}`,
+    description,
     openGraph: b.photos.length > 0 ? { images: [b.photos[0].url] } : undefined,
     // TEST/DEMO işletmesi aramaya kapalı (2026-07-27): kayıt canlıda duruyor
     // (Play incelemesi için ŞART, kullanıcı kararı) ama sahte bir işletmenin

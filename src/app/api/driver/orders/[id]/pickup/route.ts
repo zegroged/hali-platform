@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { currentDriverId, driverPickup } from "@/lib/driverOrders";
 
-// multipart/form-data: photo (zorunlu). Halı alım fotoğrafı.
+// multipart/form-data: photo (zorunlu) + carpetCount (opsiyonel, kaç halı alındı).
 export async function POST(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -12,7 +12,8 @@ export async function POST(
   const { id } = await params;
   const form = await req.formData().catch(() => null);
   const photo = form?.get("photo");
-  const r = await driverPickup(driverId, id, photo);
+  // Eski sürüm uygulama bu alanı göndermez → null → eski davranış (2026-08-06).
+  const r = await driverPickup(driverId, id, photo, form?.get("carpetCount"));
   if (!r.ok)
     return NextResponse.json({ error: r.error }, { status: r.code ?? 409 });
   return NextResponse.json({ ok: true });
