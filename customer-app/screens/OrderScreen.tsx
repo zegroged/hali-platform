@@ -92,12 +92,18 @@ export function OrderScreen({
       Alert.alert("Eksik bilgi", "Halının alınacağı adresi biraz daha ayrıntılı yaz.");
       return;
     }
-    // E-posta ZORUNLU (weble aynı kural): takip kodu/linki bu adrese gider.
+    // E-POSTA OPSİYONEL (2026-08-06 — WEB İLE AYNI KURAL, §4.62/e-4).
+    //
+    // 19 Temmuz'da zorunluydu çünkü SMS mock'tu ve takip kodunun tek kalıcı
+    // kanalı e-postaydı. 28 Temmuz'da WhatsApp açıldı: `siparis_alindi_link`
+    // şablonu takip JETONUNU taşıyor, müşteri tıklanabilir linki oradan alıyor.
+    // ⚠️ Web'de kaldırılıp burada bırakılırsa uygulama webden KATI olur ve
+    // "web paritesi" (4.11) bozulur — bu depoda ikiz mantık tam böyle ayrışıyor.
     const email = form.customerEmail.trim();
-    if (!/^\S+@\S+\.\S+$/.test(email)) {
+    if (email && !/^\S+@\S+\.\S+$/.test(email)) {
       Alert.alert(
-        "E-posta gerekli",
-        "Takip linkinin gönderilmesi için geçerli bir e-posta adresi gir.",
+        "E-posta hatalı",
+        "E-posta adresi geçersiz görünüyor (ornek@site.com). Boş da bırakabilirsin.",
       );
       return;
     }
@@ -181,7 +187,7 @@ export function OrderScreen({
         />
         <TextInput
           style={s.input}
-          placeholder="E-posta (takip linkin buraya gönderilir)"
+          placeholder="E-posta (isteğe bağlı)"
           keyboardType="email-address"
           autoCapitalize="none"
           autoCorrect={false}
@@ -189,6 +195,14 @@ export function OrderScreen({
           value={form.customerEmail}
           onChangeText={(v) => set("customerEmail", v)}
         />
+        {/* E-posta boşsa bildirimlerin TEK kanalı telefon oluyor — web ile
+            aynı uyarı (§4.62/e-4). */}
+        {!form.customerEmail.trim() && (
+          <Text style={s.telUyari}>
+            Numaranı kontrol et: e-posta yazmazsan sipariş bildirimlerin ve
+            takip linkin WhatsApp&apos;tan yukarıdaki numaraya gidecek.
+          </Text>
+        )}
         <TextInput
           style={[s.input, { height: 70 }]}
           placeholder="Halının alınacağı adres"
@@ -384,6 +398,19 @@ const s = StyleSheet.create({
   consentText: { flex: 1, color: C.sub, fontSize: 13, lineHeight: 19 },
   legalLinks: { marginTop: 16, gap: 6 },
   link: { color: C.brandDark, fontWeight: "600", fontSize: 13 },
+  telUyari: {
+    backgroundColor: "#fffbeb",
+    borderColor: "#fcd34d",
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginTop: -4,
+    marginBottom: 4,
+    color: "#78350f",
+    fontSize: 12,
+    lineHeight: 17,
+  },
   submit: {
     backgroundColor: C.brand,
     borderRadius: 12,
