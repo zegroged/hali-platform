@@ -253,7 +253,13 @@ export default async function PanelHome({
           <div className="text-2xl font-bold text-slate-900">{activeOrders}</div>
           <div className="text-xs text-slate-500">Süren iş</div>
         </Link>
-        <Link href="/panel/soforler" className={statCard}>
+        {/* ÇALIŞAN (2026-08-06): şoför YÖNETİMİ ona kapalı ama şoförün NEREDE
+            olduğunu görmesi işinin parçası — kart canlı takibe gider. Kapalı
+            bir sayfaya link vermek "tıkladım, geri attı" hissi yaratıyordu. */}
+        <Link
+          href={calisan ? "/panel/takip" : "/panel/soforler"}
+          className={statCard}
+        >
           <IconChevronRight
             size={16}
             className="absolute right-2.5 top-2.5 text-slate-400"
@@ -267,7 +273,7 @@ export default async function PanelHome({
 
       {/* MOBİL ana-ekran ızgarası: panelin 7 sayfası "Daha fazla" menüsünde
           gizliydi ve kullanıcı onları hiç açmıyordu (bkz. PanelAnaEkran). */}
-      <PanelAnaEkran />
+      <PanelAnaEkran rol={calisan ? "STAFF" : "OWNER"} />
 
       {/* Son teslimatlar — tutar + adres + teslim fotoğrafı (şoför çeker) */}
       {delivered.length > 0 && (

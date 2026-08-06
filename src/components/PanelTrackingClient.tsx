@@ -31,7 +31,13 @@ type DriverLoc = {
   recentPath: [number, number][];
 };
 
-export function PanelTrackingClient() {
+export function PanelTrackingClient({
+  calisanMi = false,
+}: {
+  /** Çalışan şoför yönetemez → boş durumda "Şoför ekle" butonu gösterilmez. */
+  calisanMi?: boolean;
+}) {
+
   const [drivers, setDrivers] = useState<DriverLoc[]>([]);
 
   useEffect(() => {
@@ -95,8 +101,9 @@ export function PanelTrackingClient() {
                 ? "Şoförlerinin hiçbiri şu an mesaide değil. Şoför kendi telefonundan giriş yapıp “Mesaiyi başlat” demeli."
                 : "Şoför mesaide ama konum gelmiyor. Telefonu kilitli olabilir, tarayıcı kapanmış olabilir ya da konum izni verilmemiş olabilir."
           }
-          actionHref={drivers.length === 0 ? "/panel/soforler" : undefined}
-          actionLabel={drivers.length === 0 ? "Şoför ekle" : undefined}
+          {...(drivers.length === 0 && !calisanMi
+            ? { actionHref: "/panel/soforler", actionLabel: "Şoför ekle" }
+            : {})}
         />
       )}
 

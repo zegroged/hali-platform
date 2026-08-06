@@ -11,11 +11,23 @@
 
 import Link from "next/link";
 import { IconChevronRight } from "@/components/icons";
-import { PANEL_SAYFALAR } from "@/components/panelSayfalar";
+import { sayfalarIcin } from "@/components/panelSayfalar";
 
-export default function PanelAnaEkran() {
+export default function PanelAnaEkran({
+  rol = "OWNER",
+}: {
+  /**
+   * ÇALIŞAN (2026-08-06): bu ızgara da PanelNav ile AYNI listeden beslenmeli.
+   * İlk turda yalnız PanelNav filtrelenmişti; canlı doğrulamada çalışanın
+   * ızgarada hâlâ "Kasa"/"Profil & Fiyat" kartlarını gördüğü ÖLÇÜLDÜ. Veri
+   * sızmıyordu (sayfa kapısı geri yolluyor) ama kullanıcıya açılmayan kapı
+   * göstermek "bozuk" hissi veriyor — tam da bu dosyanın başındaki keşif
+   * sorununun tersi.
+   */
+  rol?: "OWNER" | "STAFF";
+}) {
   // Özet'in kendisi listede yok — kullanıcı zaten o sayfada.
-  const sayfalar = PANEL_SAYFALAR.filter((s) => s.href !== "/panel");
+  const sayfalar = sayfalarIcin(rol).filter((s) => s.href !== "/panel");
 
   return (
     <section className="md:hidden" aria-labelledby="panel-sayfalar-baslik">

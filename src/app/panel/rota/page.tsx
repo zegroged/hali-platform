@@ -1,3 +1,4 @@
+import { getPanelErisim } from "@/lib/panelYetki";
 import { getPanelBusiness } from "@/lib/panel";
 import { RouteHistory } from "@/components/RouteHistory";
 import EmptyState from "@/components/EmptyState";
@@ -13,6 +14,9 @@ export default async function RotaPage() {
   const now = new Date();
   const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 
+  // Çalışan şoför YÖNETEMEZ: ona kapalı sayfaya buton gösterme (2026-08-06).
+  const calisanMi = (await getPanelErisim())?.rol === "STAFF";
+
   if (drivers.length === 0) {
     return (
       <div className="space-y-4">
@@ -20,9 +24,14 @@ export default async function RotaPage() {
         <EmptyState
           icon={<IconMapPin size={22} />}
           title="Henüz şoför yok"
-          description="Rota geçmişi, şoförlerin mesaideyken kaydettiği konumlardan oluşur. Önce bir şoför ekle."
-          actionHref="/panel/soforler"
-          actionLabel="Şoför ekle"
+          description={
+            calisanMi
+              ? "Rota geçmişi, şoförlerin mesaideyken kaydettiği konumlardan oluşur. İşletmede henüz şoför yok — sahibine bildir."
+              : "Rota geçmişi, şoförlerin mesaideyken kaydettiği konumlardan oluşur. Önce bir şoför ekle."
+          }
+          {...(calisanMi
+            ? {}
+            : { actionHref: "/panel/soforler", actionLabel: "Şoför ekle" })}
         />
       </div>
     );
