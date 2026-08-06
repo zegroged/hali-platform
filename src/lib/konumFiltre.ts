@@ -74,9 +74,12 @@ export function sivrileriAyikla(
 }
 
 /**
- * DURUYOR MU? Tüm iz dar bir kümedeyse şoför hareket etmemiştir.
- * Böyle bir izde YOL ÇİZİLMEMELİ — tek nokta gösterilmeli, yoksa gürültü
- * "gezinti" gibi görünür (kullanıcının bildirdiği tam durum).
+ * DURUYOR MU? — TÜM iz dar bir kümede mi.
+ *
+ * ⚠️ Bu YALNIZ "gün boyu hiç kıpırdamadı" durumunu yakalar. Gün içinde hem
+ * duran hem gezen normal bir şoförde ASLA tetiklenmez. Asıl iş
+ * `duruslariTopla`'da (aşağıda) — bu fonksiyon yalnız canlı takipteki
+ * "hiç hareket yok" özel durumu için duruyor.
  */
 export function duruyorMu(noktalar: [number, number][]): boolean {
   if (noktalar.length < 2) return true;
@@ -90,10 +93,73 @@ export function duruyorMu(noktalar: [number, number][]): boolean {
   return true;
 }
 
+/** Bir duruş kümesi sayılmak için gereken en az ardışık nokta. */
+const DURUS_MIN_NOKTA = 3;
+
+/**
+ * 🔴 DURUŞ KÜMELERİNİ TEK NOKTAYA İNDİR — ASIL DÜZELTME (2026-08-07).
+ *
+ * NEDEN YENİDEN YAZILDI: ilk sürüm duruşu **tüm ize** bakarak arıyordu ve
+ * gerçek veriyle sınanınca çuvalladı. Canlı ölçüm (ahmet, 10 saat, 325 nokta):
+ *   · 5063 m / 825 sn = 22 km/sa   ← GERÇEK sürüş
+ *   · 2533 m / 163 sn = 56 km/sa   ← GERÇEK sürüş
+ *   · 128 atlama 0-10 m arasında   ← park hâlinde GPS titremesi
+ * Yani iz hem sürüş hem duruş içeriyor; "tümü dar mı" sorusu hiç tutmuyordu
+ * ve 325 noktanın yalnız 9'u eleniyordu.
+ *
+ * DOĞRU SORU: "şu ANDA duruyor mu?" Şoför park edip 20 dakika beklerse
+ * 20 ping dar bir daire içinde titrer; harita bunları düz çizgilerle bağlayınca
+ * park yerinde bir "gezinti" çizer — kullanıcının bildirdiği tam durum.
+ *
+ * ÇÖZÜM: ardışık noktalar `DURUS_YARICAP_M` içinde kaldığı sürece aynı kümeye
+ * konur; küme `DURUS_MIN_NOKTA`'ya ulaşırsa TEK temsilci noktaya indirilir
+ * (kümenin ortalaması). Gerçek sürüş etkilenmez: ilerleyen araçta ardışık
+ * noktalar yarıçapı hemen aşar, küme oluşmaz.
+ */
+export function duruslariTopla(
+  noktalar: [number, number][],
+): [number, number][] {
+  if (noktalar.length < DURUS_MIN_NOKTA) return noktalar;
+  const cikti: [number, number][] = [];
+  let kume: [number, number][] = [noktalar[0]];
+
+  const kumeyiBosalt = () => {
+    if (kume.length >= DURUS_MIN_NOKTA) {
+      // Temsilci = kümenin ortalaması (tek bir sapmış fix merkezi az kaydırır;
+      // medyan daha sağlam olurdu ama iki eksende medyan noktayı küme dışına
+      // düşürebiliyor — ortalama burada yeterli ve öngörülebilir).
+      const n = kume.length;
+      const lat = kume.reduce((a, p) => a + p[0], 0) / n;
+      const lng = kume.reduce((a, p) => a + p[1], 0) / n;
+      cikti.push([lat, lng]);
+    } else {
+      cikti.push(...kume);
+    }
+    kume = [];
+  };
+
+  for (let i = 1; i < noktalar.length; i++) {
+    // Kümenin İLK noktasına göre ölç: aksi hâlde yavaş sürüklenme (drift)
+    // adım adım yarıçapı hiç aşmadan kilometrelerce "duruş" sayılabilir.
+    if (metre(kume[0], noktalar[i]) <= DURUS_YARICAP_M) {
+      kume.push(noktalar[i]);
+    } else {
+      kumeyiBosalt();
+      kume = [noktalar[i]];
+    }
+  }
+  kumeyiBosalt();
+  return cikti;
+}
+
 /**
  * Haritaya çizilecek izi hazırla.
- * @returns `cizgi` boşsa yol çizilmez (şoför duruyor); `merkez` her hâlükârda
- *          gösterilecek nokta.
+ *
+ * Sıra önemli: ÖNCE duruş kümeleri toplanır (park titremesi yok olur), SONRA
+ * kalan izde sivri ayıklanır. Ters sırada, duruş içindeki sivriler kümeyi
+ * bölüp yapay hareket üretebilir.
+ *
+ * @returns `cizgi` boşsa yol çizilmez; `merkez` her hâlükârda gösterilecek nokta.
  */
 export function izHazirla(noktalar: [number, number][]): {
   cizgi: [number, number][];
@@ -101,12 +167,13 @@ export function izHazirla(noktalar: [number, number][]): {
   duruyor: boolean;
 } {
   if (noktalar.length === 0) return { cizgi: [], merkez: null, duruyor: true };
-  const temiz = sivrileriAyikla(noktalar);
+  const toplanmis = duruslariTopla(noktalar);
+  const temiz = sivrileriAyikla(toplanmis);
   const duruyor = duruyorMu(temiz);
   return {
     cizgi: duruyor ? [] : temiz,
     // Duruyorsa EN SON nokta gösterilir (şoför şu an orada).
-    merkez: temiz[temiz.length - 1],
+    merkez: temiz[temiz.length - 1] ?? noktalar[noktalar.length - 1],
     duruyor,
   };
 }

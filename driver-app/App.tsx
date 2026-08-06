@@ -243,7 +243,23 @@ function Driver() {
   // (Gerekçe ve sınırlar src/Panel.tsx başında yazılı.)
   if (role && role !== "DRIVER") {
     return (
-      <SafeAreaView style={s.screenTop}>
+      // 🔴 ALT KENAR HARİÇ (2026-08-07) — kullanıcı: "alttaki bölme çok
+      // yukarıda, aşağıdaki yazılar okunmuyor."
+      //
+      // SEBEP: SafeAreaView alt kenara da boşluk koyuyordu; WebView sistem
+      // gezinme çubuğunun ÜSTÜNDE bitiyor ve altta kalan şerit `screenTop`ün
+      // açık gri zeminiyle (#f8fafc) doluyordu. Panelin kendi alt sekme çubuğu
+      // (`fixed bottom-0`) o şeridin üstünde asılı kalıyor, ekranın dibine
+      // oturmuyordu — "çubuk havada duruyor" görüntüsü buydu.
+      //
+      // ⚠️ ÇİFT GÜVENLİ ALAN: panel CSS'i zaten `env(safe-area-inset-bottom)`
+      // uyguluyor. İki katman birden uygularsa boşluk İKİ KEZ ekleniyor.
+      // Kural: güvenli alanı TEK katman sahiplenir. Web (tarayıcıda da açılıyor)
+      // kendi işini zaten doğru yapıyor → burada alt kenarı bırakıyoruz.
+      //
+      // Şoför NATIVE ekranı (aşağıdaki dal) alt kenarı KULLANMAYA devam ediyor:
+      // orada web yok, çıkış çubuğunu sistem çubuğuna yapıştırmamak gerekiyor.
+      <SafeAreaView style={s.screenTop} edges={["top", "left", "right"]}>
         <Panel
           onLogout={doLogout}
           onSessionLost={() => {
