@@ -161,6 +161,29 @@ export function TrackingClient({ token }: { token: string }) {
   // Kesin fiyat onayı (md.15/1-h) + cayma/iptal (md.11/5) aksiyon durumları
   const [approvePending, setApprovePending] = useState(false);
   const [approveError, setApproveError] = useState<string | null>(null);
+  // Kısa kodla gelen müşteri için "bağlantıyı bana gönder" (2026-08-07 gecesi).
+  const [linkDurum, setLinkDurum] = useState<
+    "bos" | "gonderiliyor" | "gonderildi" | "hata"
+  >("bos");
+  const [linkHata, setLinkHata] = useState<string | null>(null);
+
+  async function onayLinkiIste() {
+    setLinkDurum("gonderiliyor");
+    setLinkHata(null);
+    try {
+      const r = await fetch(`/api/orders/${token}/onay-linki`, { method: "POST" });
+      if (r.ok) {
+        setLinkDurum("gonderildi");
+        return;
+      }
+      const d = (await r.json().catch(() => null)) as { error?: string } | null;
+      setLinkHata(d?.error ?? "Gönderilemedi. Biraz sonra tekrar deneyin.");
+      setLinkDurum("hata");
+    } catch {
+      setLinkHata("Bağlantı kurulamadı. İnternetinizi kontrol edin.");
+      setLinkDurum("hata");
+    }
+  }
   const [cancelPending, setCancelPending] = useState(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
   const [cancelDone, setCancelDone] = useState(false);
@@ -633,11 +656,41 @@ export function TrackingClient({ token }: { token: string }) {
                 {/* Onay yalnız müşteriye özel uzun bağlantıyla yapılır (kısa
                     kod işletme/şoförde görünür → taklidi önlenir). */}
                 {data.fullAccess === false ? (
-                  <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
-                    Fiyatı onaylamak için size <strong>SMS/e-posta ile
-                    gönderilen takip bağlantısını</strong> açın. Güvenliğiniz
-                    için kısa takip kodu bu işlemde kullanılamaz.
-                  </p>
+                  // ÇIKMAZ DEĞİL, TEK DOKUNUŞ (2026-08-07 gecesi): eskiden
+                  // burada yalnız "size gönderilen bağlantıyı açın" yazıyordu —
+                  // müşteri o bağlantıyı bulamayınca tıkanıyordu. Artık
+                  // bağlantı, siparişte KAYITLI numaraya/e-postaya yeniden
+                  // gönderilebiliyor (isteyene değil — bkz. uç dosyası).
+                  <div className="mt-3 rounded-lg bg-amber-50 px-3 py-3 text-sm text-amber-900">
+                    <p>
+                      Fiyatı onaylamak için size <strong>WhatsApp/e-posta ile
+                      gönderilen kendi takip bağlantınızı</strong> açın.
+                      Güvenliğiniz için kısa takip kodu bu işlemde kullanılamaz —
+                      bu kod işletmede de görünüyor.
+                    </p>
+                    {linkDurum === "gonderildi" ? (
+                      <p className="mt-2 font-semibold text-emerald-800">
+                        ✓ Bağlantı yeniden gönderildi — WhatsApp mesajlarınıza
+                        (ve varsa e-postanıza) bakın.
+                      </p>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={onayLinkiIste}
+                        disabled={linkDurum === "gonderiliyor"}
+                        className="mt-2 w-full rounded-lg bg-amber-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-amber-700 disabled:opacity-60 sm:w-auto"
+                      >
+                        {linkDurum === "gonderiliyor"
+                          ? "Gönderiliyor…"
+                          : "Onay bağlantısını bana gönder"}
+                      </button>
+                    )}
+                    {linkHata && (
+                      <p className="mt-2 text-red-700" role="alert">
+                        {linkHata}
+                      </p>
+                    )}
+                  </div>
                 ) : (
                   <button
                     type="button"

@@ -183,16 +183,23 @@ export async function POST(req: NextRequest) {
   if (foto) {
     try {
       const orijinal = Buffer.from(await foto.arrayBuffer());
-      // sharp: küçült + WebP + EXIF temizliği (konum sızmasın).
+      // 🔴 JPEG — WEBP DEĞİL (2026-08-07 gecesi, canlıda yakalandı).
+      // İlk sürüm WebP'ye çeviriyordu (gelen medyada öyle yapıyoruz, tarayıcı
+      // için doğru). Ama Meta GİDEN görselde WebP KABUL ETMİYOR:
+      //   "WebP image uploads are not currently supported. (kod 131053)"
+      // WhatsApp'ın kabul ettiği görsel türleri JPEG ve PNG. Kayıt da JPEG
+      // olarak duruyor — panelde gösterim zaten sorunsuz.
+      // ⚠️ DERS: dış servise dosya verirken O SERVİSİN kabul ettiği biçimi
+      // doğrula; kendi depomuzda doğru olan biçim orada geçerli olmayabilir.
       const govde = await sharp(orijinal, { limitInputPixels: 50_000_000 })
         .rotate()
         .resize(2000, 2000, { fit: "inside", withoutEnlargement: true })
-        .webp({ quality: 85 })
+        .jpeg({ quality: 85, mozjpeg: true })
         .toBuffer();
       const ay = new Date().toISOString().slice(0, 7);
-      const ad = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}.webp`;
-      medyaUrl = await saveObject(`uploads/wa/${ay}/${ad}`, govde, "image/webp");
-      medyaTur = "image/webp";
+      const ad = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}.jpg`;
+      medyaUrl = await saveObject(`uploads/wa/${ay}/${ad}`, govde, "image/jpeg");
+      medyaTur = "image/jpeg";
     } catch (e) {
       console.error("[wa-cevap] fotoğraf işlenemedi:", e);
       return NextResponse.json(
