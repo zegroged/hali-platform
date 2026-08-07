@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { LogoutButton } from "@/components/LogoutButton";
 import { NotificationBell } from "@/components/NotificationBell";
 import PanelNav from "@/components/PanelNav";
+import OturumTazele from "@/components/OturumTazele";
 import { demoBiletiVarMi } from "@/lib/auth";
 import { getPanelErisim } from "@/lib/panelYetki";
 import { demodanDon } from "@/app/komisyoncu/demo-actions";
@@ -53,6 +54,9 @@ export default async function PanelLayout({
 
   return (
     <div className="min-h-screen bg-slate-50">
+      {/* Oturum kaysın: panel kullanıldıkça çerez 30 güne döner — halıcı bir
+          daha şifre sormasın (2026-08-07 akşam). */}
+      <OturumTazele />
       {demodaMi && (
         <div className="sticky top-0 z-30 bg-violet-600 px-4 py-2 text-white">
           <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-2 lg:max-w-5xl">

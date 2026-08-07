@@ -80,13 +80,51 @@ export async function createSession(userId: string): Promise<void> {
   // (IBAN, kazanç, ekip). Artık oturum açan HER yol bileti siler; demoyaGec
   // bileti bu çağrıdan SONRA bırakır (sıra önemli).
   c.delete(DEMO_GERI_COOKIE);
-  c.set(COOKIE, makeToken(userId), {
-    httpOnly: true,
-    sameSite: "strict", // server action'lara CSRF yüzeyini kapatır
-    secure: process.env.NODE_ENV === "production", // canlıda yalnız HTTPS
-    path: "/",
-    maxAge: TOKEN_TTL_MS / 1000,
-  });
+  c.set(COOKIE, makeToken(userId), OTURUM_CEREZ_AYARI);
+}
+
+/**
+ * 🔴 `sameSite` NEDEN "strict" DEĞİL "lax" (2026-08-07 akşam — işletme
+ * sahibinin şikâyetinin ÖLÇÜLEN sebebi):
+ *
+ * *"İşletme sahipleri kendi paneline girerken sürekli kullanıcı adı şifre
+ * girmek zorunda."* Oturum ömrü 30 gündü ve çerez kalıcıydı; sorun süre
+ * DEĞİLDİ. `strict` çerez, **başka bir siteden gelen bağlantıda tarayıcı
+ * tarafından GÖNDERİLMEZ.** Halıcı paneli genelde dışarıdan bir bağlantıyla
+ * açılıyor: bizim bildirim e-postamızdaki `/panel/siparisler/...` linki,
+ * WhatsApp'tan gönderilen adres, Google sonucu, kaydedilmiş bir mesaj…
+ * Bu tıklamada çerez gitmediği için panel "oturum yok" deyip giriş ekranı
+ * açıyordu. Kullanıcı şifre giriyor, çalışıyor — ta ki bir daha dışarıdan
+ * bir bağlantıya tıklayana kadar. "Sürekli giriş" hissinin kaynağı buydu.
+ *
+ * `lax` çerezi ÜST DÜZEY GET gezinmelerinde (bağlantıya tıklama) gönderir,
+ * ama çapraz siteden gelen POST / iframe / XHR isteklerinde GÖNDERMEZ —
+ * yani server action'lara karşı CSRF koruması aynen durur. Next.js server
+ * action'ları POST'tur; çapraz siteden gelen POST çereze erişemez.
+ */
+const OTURUM_CEREZ_AYARI = {
+  httpOnly: true,
+  sameSite: "lax" as const,
+  secure: process.env.NODE_ENV === "production", // canlıda yalnız HTTPS
+  path: "/",
+  maxAge: TOKEN_TTL_MS / 1000,
+};
+
+/**
+ * KAYAN OTURUM (2026-08-07 akşam): çerezi tazeler, BAŞKA HİÇBİR ŞEYE
+ * DOKUNMAZ.
+ *
+ * ⚠️ Bilerek `createSession` çağırmıyoruz: o fonksiyon demo dönüş biletini
+ * SİLİYOR (§7'deki kritik sıra kuralı). Panel her açılışta tazeleme yaparken
+ * createSession çağırsaydı, demo panelindeki komisyoncunun "kendi hesabıma
+ * dön" bileti sessizce yok olurdu.
+ *
+ * Aktif kullanan hiç çıkmaz; 30 gün boyunca HİÇ girmeyen çıkar (kayıp telefon
+ * oturumu sonsuza kadar yaşamasın).
+ */
+export async function oturumCereziniTazele(userId: string): Promise<void> {
+  const c = await cookies();
+  c.set(COOKIE, makeToken(userId), OTURUM_CEREZ_AYARI);
 }
 
 // DEMO GİRİŞİ DÖNÜŞ BİLETİ (2026-08-02) — komisyoncu dükkânda tek tıkla kendi

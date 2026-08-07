@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getAuthedUser, signSession } from "@/lib/auth";
+import { getAuthedUser, signSession, oturumCereziniTazele } from "@/lib/auth";
 import { rateLimit, tooMany } from "@/lib/ratelimit";
 
 // OTURUM YENİLEME (2026-08-06, kullanıcı: "bir kere girdiğinde çıkış yapıncaya
@@ -27,6 +27,13 @@ export async function POST() {
   // Bozuk bir istemci döngüsü jeton üretim makinesine dönüşmesin.
   const rl = rateLimit(`oturum-yenile:${u.id}`, 60, 60 * 60 * 1000);
   if (!rl.ok) return tooMany(rl.retryAfterSec);
+
+  // TARAYICI ÇEREZİ DE KAYSIN (2026-08-07 akşam): bu uç bugüne kadar yalnız
+  // MOBİL jetonu tazeliyordu; panelde oturan halıcının çerezi 30. günde
+  // sessizce ölüyordu. Artık panel de bu ucu çağırıyor (OturumTazele) ve
+  // çerez her çağrıda 30 güne dönüyor.
+  // ⚠️ createSession DEĞİL — o, demo dönüş biletini siler (§7).
+  await oturumCereziniTazele(u.id);
 
   return NextResponse.json({
     token: signSession(u.id),

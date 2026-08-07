@@ -95,6 +95,21 @@ export function Panel({ onLogout, onSessionLost }: Props) {
           // WebView yazılım katmanında çizer; uzun listelerde kaydırma takılır.
           // `hardware` GPU'ya alır — panelin sipariş/mesaj listeleri akıcılaşır.
           androidLayerType="hardware"
+          // 🔴 YAKINLAŞTIRMA KİLİDİ (2026-08-07 akşam — ekran görüntüsüyle
+          // teşhis edildi). İşletme sahibi: *"WhatsApp panelinin boyutları
+          // yanlış, yazılar sağa kayıyor."* İki ekran görüntüsü yan yana
+          // konunca görüldü ki DÜZEN BOZUK DEĞİL: sayfa YAKINLAŞTIRILMIŞ
+          // durumda kalmış — yazılar büyük, sağ kenar (tarihler) kesilmiş,
+          // alt sekme çubuğu ekran dışında. Web tarafında 375 px'te ölçüm
+          // yapıldı, taşma YOKTU; sebep buymuş.
+          // Android WebView'de kıstırma-yakınlaştırma VARSAYILAN AÇIK; kaydırma
+          // sırasında kazara iki parmak değince sayfa yakınlaşıyor ve o hâlde
+          // KALIYOR. Panel zaten telefon ölçüsüne göre yapıldığı için
+          // yakınlaştırmanın bir faydası yok, tek etkisi bu arıza.
+          // ⚠️ ERİŞİLEBİLİRLİK KAYBI YOK: WebView sistem yazı boyutu ölçeğini
+          // uygulamaya devam eder — büyük yazı isteyen telefon ayarından büyütür.
+          setBuiltInZoomControls={false}
+          setDisplayZoomControls={false}
           cacheEnabled
           // Sayfa sonunda zıplama efekti mobil web'de "bozuk" hissi veriyordu.
           overScrollMode="never"

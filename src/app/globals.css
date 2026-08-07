@@ -15,6 +15,27 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* 🔴 ÇİFT DOKUNMA GECİKMESİ (2026-08-07 akşam, işletme sahibi: "bazen iki kez
+   basmam gerekiyor").
+   SEBEP: mobil tarayıcı, bir dokunuşun ARDINDAN ikinci dokunuş gelip
+   "çift dokunup yakınlaştırma" olacak mı diye ~300 ms bekler. O sırada
+   basılan buton tepkisiz görünür; kullanıcı ikinci kez basar ve bu kez ilk
+   dokunuş çift-dokunma sayılıp bazen HİÇ tetiklenmez.
+   `touch-action: manipulation` çift-dokunma yakınlaştırmasını kapatır →
+   dokunuş ANINDA işlenir. Kaydırma ve tek parmakla kaydırma etkilenmez.
+   ⚠️ Yalnız dokunulabilir ögelerde: sayfanın tamamında kapatmak, iki parmakla
+   yakınlaştırmayı da (erişilebilirlik) etkileyebilir. */
+a,
+button,
+[role="button"],
+label,
+summary,
+input[type="checkbox"],
+input[type="radio"],
+select {
+  touch-action: manipulation;
+}
+
 /* Klavye erişilebilirliği: interaktif ögelere görünür focus halkası (fare tıklamasında değil). */
 @layer base {
   a:focus-visible,
