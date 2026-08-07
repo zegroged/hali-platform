@@ -71,10 +71,11 @@ type Gelen = {
   sticker?: Medya;
   audio?: { voice?: boolean } & Medya;
   location?: { latitude?: number; longitude?: number; name?: string };
-  button?: { text?: string };
+  button?: { text?: string; payload?: string };
   interactive?: {
-    button_reply?: { title?: string };
-    list_reply?: { title?: string };
+    type?: string;
+    button_reply?: { id?: string; title?: string };
+    list_reply?: { id?: string; title?: string };
   };
 };
 
@@ -140,6 +141,145 @@ async function medyayiIsle(waId: string, mediaId: string): Promise<void> {
     data: { mediaUrl: medya.url, mediaType: medya.tur },
   });
   console.log(`[whatsapp-webhook] medya kaydedildi waId=${waId} tur=${medya.tur}`);
+}
+
+/** Düğme yanıtının kimliği (interactive reply ya da şablon quick-reply). */
+function dugmeKimligi(m: Gelen): string | null {
+  return m.interactive?.button_reply?.id ?? m.button?.payload ?? null;
+}
+
+/**
+ * 🔴 WHATSAPP'TAN KESİN FİYAT ONAYI (2026-08-07 akşam, kullanıcı kararı).
+ *
+ * NEDEN GEREKTİ: canlıda yaşandı — kesin fiyat bildirimi gitti, müşteri
+ * düğmeye basmak yerine sohbete *"tmm"* yazdı. Yazılı "tamam" hukuken
+ * onay yerine geçmiyor (Mesafeli Söz. Yön. md.15/1-h ifaya başlama izni),
+ * halıcı da elle "sözlü onay" beyanı işaretlemek zorunda kalıyordu.
+ *
+ * ÇÖZÜM: müşteri onay bekleyen bir siparişle ilgili herhangi bir şey
+ * yazdığı ANDA (bu yazı 24 saatlik pencereyi de açar) ona TUTARI GÖSTEREN
+ * düğmeli bir mesaj gönderiyoruz: "Kesin fiyat: 850 TL — onaylıyor musunuz?"
+ *
+ * ⚠️ NEDEN ŞABLON DEĞİL, OTURUM MESAJI: Meta tutar içeren ŞABLONU pazarlama
+ * sayıp reddediyor (§4.20). Oturum içi interactive mesajda böyle bir kısıt
+ * yok — ve hukuken onayın tutarın GÖRÜLDÜĞÜ yerde alınması şart.
+ *
+ * ⚠️ TEK SEFER: aynı sipariş için 6 saatte bir defadan fazla sorulmaz;
+ * müşteri üç mesaj yazdı diye üç kez rahatsız edilmesin (her mesaj ücretli).
+ */
+async function fiyatOnayiSor(
+  orderId: string,
+  telefon: string,
+): Promise<void> {
+  const { prisma } = await import("@/lib/prisma");
+  const { sendInteractiveButtons } = await import("@/lib/whatsapp");
+
+  const o = await prisma.order.findUnique({
+    where: { id: orderId },
+    select: {
+      id: true,
+      code: true,
+      status: true,
+      quotedPrice: true,
+      priceApprovedAt: true,
+      business: { select: { name: true, isDemo: true } },
+    },
+  });
+  if (!o || o.business?.isDemo) return; // demo hesap gerçek mesaj göndermez
+  if (o.status !== "PICKED_UP" || o.quotedPrice == null || o.priceApprovedAt) return;
+
+  // 6 saatlik sessizlik freni (AppState: tek satır, ucuz).
+  const anahtar = `wa-fiyat-sor-${o.id}`;
+  const simdi = Date.now();
+  const kayit = await prisma.appState.findUnique({ where: { key: anahtar } });
+  if (kayit && simdi - Number(kayit.value) < 6 * 60 * 60 * 1000) return;
+
+  const tutar = Number(o.quotedPrice);
+  const r = await sendInteractiveButtons(
+    telefon,
+    `${o.business?.name ?? "İşletme"} halınızın ölçümünü tamamladı.
+
+` +
+      `Kesin fiyat: *${tutar} TL*${o.code ? ` (${o.code})` : ""}
+
+` +
+      `Onaylarsanız yıkamaya hemen başlanır. Onaylamazsanız halınız ` +
+      `yıkanmadan ücretsiz iade edilir.`,
+    [
+      { id: `fiyat_onay:${o.id}`, baslik: "Onaylıyorum" },
+      { id: `fiyat_ret:${o.id}`, baslik: "Onaylamıyorum" },
+    ],
+  );
+  if (!r.ok) {
+    console.error(`[whatsapp-webhook] fiyat onay sorusu gitmedi ${o.id}: ${r.error}`);
+    return;
+  }
+  await prisma.appState.upsert({
+    where: { key: anahtar },
+    update: { value: String(simdi) },
+    create: { key: anahtar, value: String(simdi) },
+  });
+}
+
+/**
+ * Müşteri düğmeye bastı: onayla ya da reddi kaydet.
+ *
+ * GÜVENLİK: düğme kimliği bizim ürettiğimiz mesajdan geliyor ve sipariş
+ * kimliğini taşıyor; yine de gelen numaranın O SİPARİŞİN müşterisi olduğu
+ * doğrulanır — kimlik tahmin edilse bile başkasının siparişi onaylanamaz.
+ */
+async function dugmeyiIsle(m: Gelen, waId: string): Promise<void> {
+  const kimlik = dugmeKimligi(m);
+  if (!kimlik || !m.from) return;
+  const onay = kimlik.startsWith("fiyat_onay:");
+  const ret = kimlik.startsWith("fiyat_ret:");
+  if (!onay && !ret) return;
+  const orderId = kimlik.slice(kimlik.indexOf(":") + 1);
+  const { prisma } = await import("@/lib/prisma");
+  const { waTelefonAdaylari } = await import("@/lib/whatsapp");
+
+  const o = await prisma.order.findUnique({
+    where: { id: orderId },
+    select: { id: true, customerPhone: true, business: { select: { ownerId: true } } },
+  });
+  if (!o) return;
+  const adaylar = waTelefonAdaylari(m.from);
+  if (!adaylar.includes(o.customerPhone)) {
+    console.error(
+      `[whatsapp-webhook] düğme SAHİBİ DEĞİL: gonderen=${m.from} siparis=${orderId}`,
+    );
+    return;
+  }
+
+  if (onay) {
+    const { fiyatiOnayla } = await import("@/lib/fiyatOnay");
+    const r = await fiyatiOnayla(o.id, "WhatsApp onay düğmesi", waId);
+    console.log(
+      `[whatsapp-webhook] WhatsApp'tan fiyat onayı siparis=${o.id} sonuc=${JSON.stringify(r)}`,
+    );
+    return;
+  }
+
+  // RET: durumu değiştirmiyoruz (iptal kararı halıcı/müşteri akışında) ama
+  // kayda geçiyor ve halıcıya haber veriyoruz — sessiz kalırsa halıcı
+  // müşterinin onaylamasını boşuna bekler.
+  const { notify } = await import("@/lib/notify");
+  await prisma.orderEvent.create({
+    data: {
+      orderId: o.id,
+      status: "PICKED_UP",
+      note: `Müşteri kesin fiyatı ONAYLAMADI (WhatsApp düğmesi, kayıt: ${waId}) — halı yıkanmadan iade edilmeli`,
+    },
+  });
+  if (o.business?.ownerId) {
+    await notify({
+      userId: o.business.ownerId,
+      type: "genel",
+      title: "Müşteri fiyatı onaylamadı",
+      body: "Müşteri WhatsApp'tan fiyatı reddetti — halı yıkanmadan ücretsiz iade edilmeli.",
+      href: `/panel/siparisler/${o.id}`,
+    });
+  }
 }
 
 /** GELEN MESAJI KAYDET + İŞLETMEYE EŞLE + SAHİBİNE ZİL ÇAL (2026-07-29).
@@ -229,6 +369,9 @@ async function gelenMesajiKaydet(m: Gelen, ad: string | null): Promise<void> {
         body: mesajMetni(m),
         businessId: siparis?.businessId ?? null,
         orderId: siparis?.id ?? null,
+        // Kimliği ŞİMDİ yaz: indirme başarısız olursa tek yeniden deneme
+        // şansımız bu (Meta dosyayı 30 gün tutuyor — lib/retention.ts).
+        mediaId: medyaKimligi(m),
       },
     ],
     skipDuplicates: true,
@@ -243,11 +386,29 @@ async function gelenMesajiKaydet(m: Gelen, ad: string | null): Promise<void> {
     );
   }
 
+  // DÜĞME YANITI: sipariş eşleşmesinden bağımsız çalışır (kimlik mesajın
+  // kendisinde). Onay/ret buradan kayda geçer.
+  if (dugmeKimligi(m)) {
+    try {
+      await dugmeyiIsle(m, m.id);
+    } catch (e) {
+      console.error(`[whatsapp-webhook] düğme işlenemedi waId=${m.id}:`, e);
+    }
+  }
+
   if (!siparis) {
     console.log(
       `[whatsapp-webhook] GELEN MESAJ EŞLEŞMEDİ gonderen=${m.from} — hiçbir siparişin müşteri numarasıyla tutmuyor, mesaj yalnız admin'de görünür`,
     );
     return;
+  }
+
+  // MÜŞTERİ YAZDI VE O SİPARİŞ ONAY BEKLİYOR → tutarı gösterip düğmeyle sor.
+  // (Düğmeye basarak geldiyse tekrar sorma.)
+  if (!dugmeKimligi(m)) {
+    void fiyatOnayiSor(siparis.id, m.from).catch((e) =>
+      console.error(`[whatsapp-webhook] fiyat onay sorusu hatası ${siparis.id}:`, e),
+    );
   }
   if (siparis.business?.ownerId) {
     const onizleme = mesajMetni(m).slice(0, 140);

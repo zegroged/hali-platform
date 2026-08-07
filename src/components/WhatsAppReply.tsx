@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 // WHATSAPP CEVAP KUTUSU (2026-07-29).
@@ -42,11 +42,16 @@ export default function WhatsAppReply({
   const [metin, setMetin] = useState("");
   const [gonderiliyor, setGonderiliyor] = useState(false);
   const [hata, setHata] = useState<string | null>(null);
+  // FOTOĞRAF (2026-08-07 akşam): müşteri bize gönderebiliyordu, biz ona
+  // gönderemiyorduk. "Lekeyi çıkardık, bakar mısınız" anı satışın kendisi.
+  const [foto, setFoto] = useState<File | null>(null);
+  const fotoRef = useRef<HTMLInputElement>(null);
 
   // Başka bir sohbete geçilince sunucudan gelen yeni süreyi al.
   useEffect(() => {
     setKalan(kalanDk);
     setMetin("");
+    setFoto(null);
     setHata(null);
   }, [kalanDk, phone]);
 
@@ -67,16 +72,25 @@ export default function WhatsAppReply({
 
   async function gonder() {
     const govde = metin.trim();
-    if (!govde || gonderiliyor) return;
+    if ((!govde && !foto) || gonderiliyor) return;
     setHata(null);
     setGonderiliyor(true);
     let res: Response;
     try {
-      res = await fetch(endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone, body: govde }),
-      });
+      if (foto) {
+        // Fotoğraflı gönderim multipart; metin isteğe bağlı alt yazı olur.
+        const form = new FormData();
+        form.append("phone", phone);
+        form.append("body", govde);
+        form.append("photo", foto);
+        res = await fetch(endpoint, { method: "POST", body: form });
+      } else {
+        res = await fetch(endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ phone, body: govde }),
+        });
+      }
     } catch {
       setGonderiliyor(false);
       setHata("Bağlantı kurulamadı. İnterneti kontrol edip tekrar dene.");
@@ -85,6 +99,8 @@ export default function WhatsAppReply({
     setGonderiliyor(false);
     if (res.ok) {
       setMetin("");
+      setFoto(null);
+      if (fotoRef.current) fotoRef.current.value = "";
       router.refresh(); // gönderilen mesaj listeye düşsün
       return;
     }
@@ -144,14 +160,59 @@ export default function WhatsAppReply({
         className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
       />
 
+      {/* Seçilen fotoğrafın adı + kaldırma — "gönderdim sandım" olmasın. */}
+      {foto && (
+        <p className="flex items-center justify-between gap-2 rounded-lg bg-slate-100 px-3 py-2 text-xs text-slate-700">
+          <span className="min-w-0 truncate">📷 {foto.name}</span>
+          <button
+            type="button"
+            onClick={() => {
+              setFoto(null);
+              if (fotoRef.current) fotoRef.current.value = "";
+            }}
+            className="shrink-0 font-medium text-red-600 hover:underline"
+          >
+            kaldır
+          </button>
+        </p>
+      )}
+
       <div className="flex items-center justify-between gap-2">
-        <span className="text-xs text-slate-400">
-          {acik ? `${metin.trim().length}/1000` : ""}
-        </span>
+        <div className="flex items-center gap-2">
+          <input
+            ref={fotoRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0] ?? null;
+              setHata(null);
+              if (f && f.size > 8 * 1024 * 1024) {
+                setHata("Fotoğraf 8 MB'ı geçemez.");
+                e.target.value = "";
+                return;
+              }
+              setFoto(f);
+            }}
+          />
+          <button
+            type="button"
+            onClick={() => fotoRef.current?.click()}
+            disabled={!acik || gonderiliyor}
+            className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+          >
+            📷 Fotoğraf
+          </button>
+          <span className="text-xs text-slate-400">
+            {acik ? `${metin.trim().length}/1000` : ""}
+          </span>
+        </div>
         <button
           type="button"
           onClick={gonder}
-          disabled={!acik || gonderiliyor || metin.trim().length === 0}
+          disabled={
+            !acik || gonderiliyor || (metin.trim().length === 0 && !foto)
+          }
           className="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-50"
         >
           {gonderiliyor ? "Gönderiliyor…" : "Gönder"}

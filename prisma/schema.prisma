@@ -975,6 +975,11 @@ model WhatsAppMessage {
   // buna bakarak karar verir.
   mediaUrl  String?
   mediaType String?
+  // Meta'daki medya kimliği. İNDİRME BAŞARISIZ OLURSA TEK UMUT BUDUR:
+  // dosya Meta'da 30 gün duruyor, kimlikle saatlik yeniden denenir
+  // (lib/retention.ts). Kimliği saklamadığımız için 2026-08-07 öncesi
+  // başarısız indirmeler kalıcı olarak kayıptı.
+  mediaId   String?
   // Gönderim başarısızsa Meta'nın sebebi (yalnız OUT).
   error     String?
   readAt    DateTime?

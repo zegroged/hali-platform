@@ -111,3 +111,91 @@ export async function purgeExpiredLocationData(): Promise<{
   }
   return { stops, pings };
 }
+
+// ---------------------------------------------------------------------------
+// WHATSAPP MEDYASI — 1 AY SAKLAMA (2026-08-07 akşam, işletme sahibinin kararı:
+// *"1 ay kâfi ya, dahasına gerek yok"*).
+//
+// NEDEN SÜRE GEREK: gelen fotoğraf/ses/video artık kendi diskimizde duruyor
+// (4.66). Süresiz saklamak hem KVKK'da "gerekli olan süre" ilkesine aykırı
+// hem de disk sonsuz değil. 1 ay, hasar/leke tartışmasının çıkacağı pencereyi
+// fazlasıyla kapsıyor (sipariş genelde günler içinde kapanıyor).
+//
+// SATIR SİLİNMEZ, DOSYA SİLİNİR: mesajın kendisi yazışma geçmişinde kalır
+// (halıcı "ne konuşmuştuk"u görebilsin), yalnız medya düşer ve gövdeye
+// açıklama eklenir — sessizce kaybolup "bozuk mu?" dedirtmesin.
+// ---------------------------------------------------------------------------
+
+const WA_MEDYA_GUN = 30;
+
+export async function purgeWhatsAppMedia(): Promise<void> {
+  const { unlink } = await import("node:fs/promises");
+  const path = await import("node:path");
+  const kesim = new Date(Date.now() - WA_MEDYA_GUN * 24 * 60 * 60 * 1000);
+  try {
+    const eskiler = await prisma.whatsAppMessage.findMany({
+      where: { mediaUrl: { not: null }, createdAt: { lt: kesim } },
+      select: { id: true, mediaUrl: true, body: true },
+      take: 500, // parça parça: tek dev işlem tabloyu kilitlemesin
+    });
+    for (const m of eskiler) {
+      // Yerel diskteki dosya (S3'e geçilirse burada da silinmeli).
+      if (m.mediaUrl?.startsWith("/uploads/")) {
+        const tam = path.join(process.cwd(), "public", m.mediaUrl.slice(1));
+        await unlink(tam).catch(() => {}); // yoksa sorun değil
+      }
+      await prisma.whatsAppMessage.update({
+        where: { id: m.id },
+        data: {
+          mediaUrl: null,
+          mediaType: null,
+          mediaId: null, // kimlik de gitsin: Meta'da zaten 30 günde siliniyor
+          body: m.body.includes("(dosya süresi doldu)")
+            ? m.body
+            : `${m.body} (dosya süresi doldu — 1 ay saklanır)`,
+        },
+      });
+    }
+    if (eskiler.length) {
+      console.log(`[wa-medya] ${eskiler.length} eski dosya silindi (1 ay)`);
+    }
+  } catch (e) {
+    console.error("wa medya temizliği hatası:", e);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// BAŞARISIZ MEDYA İNDİRMESİNİ YENİDEN DENE (2026-08-07 akşam)
+//
+// NEDEN: indirme mesajın geldiği AN yapılıyor. Tam o saniyede ağ koparsa
+// fotoğraf kaybolurdu — oysa Meta dosyayı 30 gün tutuyor. Artık medya kimliği
+// satırda saklandığı için (schema `mediaId`) saatlik tik yeniden deniyor.
+// ---------------------------------------------------------------------------
+
+export async function retryWhatsAppMedia(): Promise<void> {
+  const kesim = new Date(Date.now() - 29 * 24 * 60 * 60 * 1000); // Meta 30 gün
+  try {
+    const eksikler = await prisma.whatsAppMessage.findMany({
+      where: { mediaId: { not: null }, mediaUrl: null, createdAt: { gt: kesim } },
+      select: { id: true, mediaId: true },
+      take: 20, // tur başına az: her deneme Meta'ya istek demek
+    });
+    if (!eksikler.length) return;
+    const { waMedyayiIndir } = await import("@/lib/whatsappMedya");
+    let basarili = 0;
+    for (const m of eksikler) {
+      const medya = await waMedyayiIndir(m.mediaId!);
+      if (!medya) continue;
+      await prisma.whatsAppMessage.update({
+        where: { id: m.id },
+        data: { mediaUrl: medya.url, mediaType: medya.tur },
+      });
+      basarili++;
+    }
+    console.log(
+      `[wa-medya] yeniden deneme: ${eksikler.length} eksik, ${basarili} kurtarıldı`,
+    );
+  } catch (e) {
+    console.error("wa medya yeniden deneme hatası:", e);
+  }
+}

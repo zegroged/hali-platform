@@ -4,7 +4,9 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getPanelBusiness } from "@/lib/panel";
 import { rateLimit, tooMany } from "@/lib/ratelimit";
-import { sendText, waTelefonAdaylari, whatsappEnabled } from "@/lib/whatsapp";
+import { sendText, sendImage, waTelefonAdaylari, whatsappEnabled } from "@/lib/whatsapp";
+import { saveObject } from "@/lib/storage";
+import sharp from "sharp";
 
 // PANEL GELEN KUTUSU — CEVAP GÖNDERME UCU (2026-07-29).
 //
@@ -58,7 +60,24 @@ export async function POST(req: NextRequest) {
 
   // Gövde demo kalkanından ÖNCE ayrıştırılıyor: kalkanın hangi numaraya
   // yazıldığını bilmesi gerekiyor (istek gövdesi bir kez okunabilir).
-  const parsed = Body.safeParse(await req.json().catch(() => null));
+  // GÖVDE: JSON (yalnız metin) ya da multipart (fotoğraf + isteğe bağlı not).
+  // Fotoğraf 2026-08-07 akşam eklendi: müşteri bize fotoğraf gönderebiliyordu
+  // ama halıcı ona gönderemiyordu — "şu lekeyi çıkardık, bakar mısınız" anı
+  // satışın kendisi.
+  const ct = req.headers.get("content-type") ?? "";
+  let ham: { phone?: unknown; body?: unknown } = {};
+  let foto: File | null = null;
+  if (ct.includes("multipart/form-data")) {
+    const form = await req.formData().catch(() => null);
+    if (!form)
+      return NextResponse.json({ error: "Geçersiz veri" }, { status: 400 });
+    ham = { phone: form.get("phone"), body: form.get("body") ?? "" };
+    const f = form.get("photo");
+    foto = f instanceof File && f.size > 0 ? f : null;
+  } else {
+    ham = (await req.json().catch(() => null)) ?? {};
+  }
+  const parsed = Body.safeParse(ham);
   if (!parsed.success) {
     const first = parsed.error.issues[0];
     return NextResponse.json(
@@ -89,8 +108,17 @@ export async function POST(req: NextRequest) {
     }
   }
   const metin = parsed.data.body.trim();
-  if (!metin)
+  if (!metin && !foto)
     return NextResponse.json({ error: "Mesaj boş olamaz." }, { status: 400 });
+
+  // FOTOĞRAF DOĞRULAMA — sipariş fotoğrafıyla aynı kurallar (lib/orderPhoto.ts).
+  const FOTO_TUR = new Set(["image/jpeg", "image/png", "image/webp"]);
+  if (foto && (!FOTO_TUR.has(foto.type) || foto.size > 8 * 1024 * 1024)) {
+    return NextResponse.json(
+      { error: "Fotoğraf JPEG/PNG/WebP olmalı ve 8 MB'ı geçmemeli." },
+      { status: 400 },
+    );
+  }
 
   if (!whatsappEnabled)
     return NextResponse.json(
@@ -147,7 +175,37 @@ export async function POST(req: NextRequest) {
 
   // Gönderimi kayıttaki numaraya yapıyoruz (halıcının yazdığı biçime değil) —
   // sohbet dizisi tek numara altında toplanır.
-  const r = await sendText(sonGelen.phone, metin);
+  // FOTOĞRAFI ÖNCE KENDİ DEPOMUZA YAZ: Meta görseli LİNKTEN çeker (bizim
+  // jetonumuzla değil), yani adresin herkese açık olması gerekir. `/uploads`
+  // zaten öyle (dosya adı tahmin edilemez) — sipariş fotoğraflarıyla aynı model.
+  let medyaUrl: string | null = null;
+  let medyaTur: string | null = null;
+  if (foto) {
+    try {
+      const orijinal = Buffer.from(await foto.arrayBuffer());
+      // sharp: küçült + WebP + EXIF temizliği (konum sızmasın).
+      const govde = await sharp(orijinal, { limitInputPixels: 50_000_000 })
+        .rotate()
+        .resize(2000, 2000, { fit: "inside", withoutEnlargement: true })
+        .webp({ quality: 85 })
+        .toBuffer();
+      const ay = new Date().toISOString().slice(0, 7);
+      const ad = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}.webp`;
+      medyaUrl = await saveObject(`uploads/wa/${ay}/${ad}`, govde, "image/webp");
+      medyaTur = "image/webp";
+    } catch (e) {
+      console.error("[wa-cevap] fotoğraf işlenemedi:", e);
+      return NextResponse.json(
+        { error: "Fotoğraf işlenemedi. Başka bir görsel deneyin." },
+        { status: 400 },
+      );
+    }
+  }
+
+  const taban = process.env.APP_BASE_URL ?? "https://enyakinhaliyikamaservisi.com";
+  const r = medyaUrl
+    ? await sendImage(sonGelen.phone, `${taban}${medyaUrl}`, metin || undefined)
+    : await sendText(sonGelen.phone, metin);
   if (!r.ok) {
     console.error(`[wa-cevap] gönderilemedi isletme=${b.id}: ${r.error ?? "-"}`);
     return NextResponse.json(
@@ -166,9 +224,11 @@ export async function POST(req: NextRequest) {
         waId: r.id ?? `yerel-${randomUUID()}`,
         direction: "OUT",
         phone: sonGelen.phone,
-        body: metin,
+        body: metin || "[fotoğraf]",
         businessId: b.id,
         orderId: sonGelen.orderId ?? undefined,
+        mediaUrl: medyaUrl,
+        mediaType: medyaTur,
       },
       select: { id: true, createdAt: true },
     });

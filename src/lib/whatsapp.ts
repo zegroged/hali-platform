@@ -177,6 +177,110 @@ async function sendTemplateLinkli(
   return sendTemplate(to, eskiSablon, eskiParams);
 }
 
+/** Oturum penceresi içinde JSON gövdesi gönderen ortak yol (metin/görsel/düğme).
+ *  Hata çevirisi tek yerde: 131047 = pencere kapandı. */
+async function sendSession(
+  govde: Record<string, unknown>,
+): Promise<SonucKaydi> {
+  if (!whatsappEnabled) return { ok: false, error: "whatsapp kapalı" };
+  if (!(await kotaVarMi()))
+    return { ok: false, error: "günlük gönderim tavanı aşıldı" };
+  try {
+    const res = await fetch(`${GRAPH}/${process.env.WHATSAPP_PHONE_ID}/messages`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${process.env.WHATSAPP_TOKEN}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ messaging_product: "whatsapp", ...govde }),
+      signal: AbortSignal.timeout(15000),
+    });
+    const data = (await res.json()) as {
+      messages?: { id: string }[];
+      error?: { message?: string; code?: number };
+    };
+    if (!res.ok || data.error) {
+      const kod = data.error?.code;
+      if (kod === 131047)
+        return {
+          ok: false,
+          error:
+            "24 saatlik yanıt penceresi kapandı — serbest mesaj gönderilemez (Meta 131047).",
+        };
+      const msg = data.error?.message;
+      return {
+        ok: false,
+        error: msg ? (kod ? `${msg} (kod ${kod})` : msg) : `HTTP ${res.status}`,
+      };
+    }
+    return { ok: true, id: data.messages?.[0]?.id };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "bilinmeyen hata" };
+  }
+}
+
+/**
+ * GÖRSEL GÖNDER — yalnız 24 saatlik pencere içinde (2026-08-07 akşam).
+ *
+ * NEDEN: müşteri artık bize fotoğraf gönderebiliyor (4.66) ama halıcı ona
+ * gönderemiyordu — tek yönlü kalmıştı. "Şu lekeyi çıkardık, bakar mısınız"
+ * satışın ve güvenin kendisi.
+ *
+ * ⚠️ `link` PUBLIC olmalı: Meta görseli KENDİ sunucusuna çeker, bizim
+ * jetonumuzla değil. `/uploads/...` adresimiz zaten herkese açık (dosya adı
+ * tahmin edilemez) — sipariş fotoğraflarıyla aynı model.
+ */
+export async function sendImage(
+  to: string,
+  link: string,
+  caption?: string,
+): Promise<SonucKaydi> {
+  const num = waNumber(to);
+  if (!num) return { ok: false, error: "geçersiz numara" };
+  const alt = caption?.trim().slice(0, 900);
+  return sendSession({
+    to: num,
+    type: "image",
+    image: { link, ...(alt ? { caption: alt } : {}) },
+  });
+}
+
+/**
+ * DÜĞMELİ MESAJ — yalnız 24 saatlik pencere içinde (2026-08-07 akşam).
+ *
+ * NEDEN ŞABLON DEĞİL: Meta, TUTAR içeren şablonu "pazarlama" sayıp reddediyor
+ * (§4.20'de üç şablon bu yüzden reddedildi). Oysa kesin fiyat onayı hukuken
+ * tutarın GÖRÜLDÜĞÜ yerde alınmalı (Mesafeli Söz. Yön. md.15/1-h). Oturum
+ * içi "interactive" mesajda böyle bir kısıt YOK: tutarı yazıp hemen altına
+ * onay düğmesini koyabiliyoruz.
+ *
+ * Meta sınırı: en fazla 3 düğme, başlık 20 karakter, id 256 karakter.
+ */
+export async function sendInteractiveButtons(
+  to: string,
+  body: string,
+  butonlar: { id: string; baslik: string }[],
+): Promise<SonucKaydi> {
+  const num = waNumber(to);
+  if (!num) return { ok: false, error: "geçersiz numara" };
+  const metin = body.trim();
+  if (!metin) return { ok: false, error: "boş mesaj" };
+  return sendSession({
+    to: num,
+    type: "interactive",
+    interactive: {
+      type: "button",
+      body: { text: metin.slice(0, 1024) },
+      action: {
+        buttons: butonlar.slice(0, 3).map((b) => ({
+          type: "reply",
+          reply: { id: b.id.slice(0, 256), title: b.baslik.slice(0, 20) },
+        })),
+      },
+    },
+  });
+}
+
 /** SERBEST METİN — YALNIZ 24 SAATLİK PENCERE İÇİNDE (2026-07-29).
  *  Şablondan farkı: metni biz yazarız. Meta bunu ancak müşteri son 24 saatte
  *  BİZE yazdıysa kabul eder; pencere kapalıysa 131047 döner. Pencereyi asıl

@@ -10,6 +10,16 @@ async function purgeOldLocationData() {
   // çağrılır: bu dosya zamanlayıcı kalsın, iş mantığı kütüphanede dursun.
   // Dinamik import: prisma instrumentation edge bundle'ına sızmasın.
   await (await import("@/lib/retention")).purgeExpiredLocationData();
+
+  // WhatsApp medyası: 1 ay saklama + başarısız indirmelerin yeniden denenmesi
+  // (2026-08-07 akşam). Saatlik tikte; ikisi de parça parça çalışır.
+  try {
+    const r = await import("@/lib/retention");
+    await r.purgeWhatsAppMedia();
+    await r.retryWhatsAppMedia();
+  } catch (e) {
+    console.error("[tik] wa medya bakımı hatası:", e);
+  }
 }
 
 async function hourlyTick() {

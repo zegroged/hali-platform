@@ -4,9 +4,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { rateLimit, clientIp, tooMany } from "@/lib/ratelimit";
-import { sendSms } from "@/lib/sms";
-import { notify } from "@/lib/notify";
 import { getAuthedUser } from "@/lib/auth";
+// 🔑 ONAY MANTIĞI TEK KAYNAKTA (2026-08-07 akşam): aynı onay artık WhatsApp
+// düğmesinden de gelebiliyor. İki kopya tutmak bu depodaki en pahalı hata
+// deseni — bkz. lib/fiyatOnay.ts başlığı.
+import { fiyatiOnayla } from "@/lib/fiyatOnay";
 
 export async function POST(
   req: NextRequest,
@@ -60,57 +62,8 @@ export async function POST(
     );
   }
 
-  // CAS: yalnız PICKED_UP + fiyat bildirilmiş + henüz onaylanmamışken yaz —
-  // çift tık / yarış durumunda ikinci istek koşula takılır.
-  const approved = await prisma.order.updateMany({
-    where: {
-      id: order.id,
-      status: "PICKED_UP",
-      quotedPrice: { not: null },
-      priceApprovedAt: null,
-    },
-    data: { priceApprovedAt: new Date() },
-  });
-  if (approved.count === 0) {
-    // Çift tık: zaten onaylanmışsa idempotent başarı döndür.
-    if (order.priceApprovedAt != null) return NextResponse.json({ ok: true });
-    return NextResponse.json(
-      { error: "Fiyat onayı şu anda yapılamıyor. Sayfayı yenileyip tekrar deneyin." },
-      { status: 409 },
-    );
-  }
-
-  // İspat kaydındaki tutar, onay ANINDA kilitlenen fiyat olsun (fetch ile CAS
-  // arasında işletme fiyatı güncellemiş olabilir) → taze oku.
-  const locked = await prisma.order.findUnique({
-    where: { id: order.id },
-    select: { quotedPrice: true },
-  });
-  await prisma.orderEvent.create({
-    data: {
-      orderId: order.id,
-      status: "PICKED_UP", // durum değişmez; onay kaydı düşülür
-      note: `Müşteri kesin fiyatı onayladı: ${Number(locked?.quotedPrice ?? order.quotedPrice)} TL — yıkamaya başlama izni verildi`,
-    },
-  });
-
-  // İşletme onayı beklemeden yıkamaya başlayamıyor — panel yenilemesine
-  // muhtaç bırakma, haber ver. Uygulama-içi asıl kanal (SMS mock).
-  await notify({
-    userId: order.business.ownerId,
-    type: "fiyat-onay",
-    title: "Müşteri kesin fiyatı onayladı",
-    body: `${order.code ?? ""} · ${Number(locked?.quotedPrice ?? order.quotedPrice)} TL — yıkamaya başlayabilirsiniz`,
-    href: "/panel/siparisler",
-  });
-  try {
-    await sendSms(
-      order.business.phone,
-      `Musteri kesin fiyati ONAYLADI (${order.code ?? ""}, ${Number(locked?.quotedPrice ?? order.quotedPrice)} TL). Yikamaya baslayabilirsiniz.`,
-    );
-  } catch (e) {
-    console.error("approve-price işletme SMS hatası:", e);
-  }
+  const r = await fiyatiOnayla(order.id, "takip sayfası");
+  if (!r.ok) return NextResponse.json({ error: r.hata }, { status: r.durum });
 
   return NextResponse.json({ ok: true });
 }
