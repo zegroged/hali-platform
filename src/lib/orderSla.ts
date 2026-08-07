@@ -139,3 +139,108 @@ export async function checkStaleOrders(): Promise<void> {
     );
   }
 }
+
+// ---------------------------------------------------------------------------
+// KESİN FİYAT ONAYI BEKLEYEN SİPARİŞLER — TEK SEFERLİK HATIRLATMA
+// (2026-08-07 akşam, işletme sahibinin sorusu: *"ya müşteri yazmazsa?"*)
+//
+// DURUM: halı ALINMIŞ, dükkânda duruyor, kesin fiyat bildirilmiş — ama müşteri
+// ne linke bastı ne bir şey yazdı. Bu hâlde:
+//   · yıkamaya başlanamaz (md.15/1-h: ifaya başlama izni yok)
+//   · halıcı yer ve zaman kaybeder
+//   · müşteri çoğu zaman mesajı görmemiştir, kötü niyet değil unutmadır
+//
+// NE YAPILIYOR: bildirimin AYNISI bir kez daha gönderiliyor — o mesajın
+// içinde zaten "Fiyatı gör ve onayla" düğmesi var. **"Lütfen cevap verin"
+// gibi yeni bir şablon YAZILMADI:** müşteriden yazmasını istemek fazladan bir
+// adım; asıl istediğimiz onaylaması ve düğme bunu tek dokunuşla yapıyor.
+// (Müşteri yazarsa da tutar + onay düğmesi otomatik gidiyor — 4.70b.)
+//
+// AYNI ANDA HALICIYA: "müşteri onaylamadı, arayabilirsin" zili. Kararı o
+// versin — belki müşteri telefonda zaten onay vermiştir.
+//
+// TEK SEFER: `priceRemindedAt` işareti. İkinci, üçüncü hatırlatma taciz olur
+// ve her mesaj Meta'da ücretlidir.
+// ---------------------------------------------------------------------------
+
+/** Fiyat bildiriminden sonra bu kadar sessizlik geçerse hatırlat. */
+export const PRICE_REMIND_AFTER_MS = 3 * HOUR_MS;
+
+export async function remindUnapprovedPrices(): Promise<void> {
+  const simdi = Date.now();
+  const adaylar = await prisma.order.findMany({
+    where: {
+      status: "PICKED_UP",
+      quotedPrice: { not: null },
+      priceApprovedAt: null,
+      priceRemindedAt: null,
+      isManual: false, // panelden elle açılan kayıtta müşteri akışı yok
+      business: { isDemo: false }, // demo uydurma numaraya gerçek mesaj atmasın
+    },
+    select: {
+      id: true,
+      code: true,
+      trackingToken: true,
+      customerName: true,
+      customerPhone: true,
+      quotedPrice: true,
+      business: { select: { name: true, ownerId: true } },
+    },
+    take: 50,
+  });
+  if (!adaylar.length) return;
+
+  const { waFiyatOnayi, waGonderVeKaydet } = await import("@/lib/whatsapp");
+  const { bildirMusteriyeEposta } = await import("@/lib/orderNotify");
+
+  for (const o of adaylar) {
+    // Fiyat NE ZAMAN bildirildi? Ayrı kolon açmak yerine hukuki kaydın
+    // kendisine bakıyoruz — zaten o an yazılıyor (panel/actions.ts).
+    const bildirim = await prisma.orderEvent.findFirst({
+      where: { orderId: o.id, note: { startsWith: "Kesin fiyat bildirildi" } },
+      orderBy: { createdAt: "desc" },
+      select: { createdAt: true },
+    });
+    if (!bildirim) continue; // fiyat panel dışı bir yoldan girilmiş; karışma
+    if (simdi - bildirim.createdAt.getTime() < PRICE_REMIND_AFTER_MS) continue;
+
+    // Önce işaretle: bildirim yavaş/hatalı olsa da ikinci tur mükerrer atmasın.
+    await prisma.order.update({
+      where: { id: o.id },
+      data: { priceRemindedAt: new Date() },
+    });
+
+    // 1) Müşteriye: aynı onaylı şablon (içinde onay düğmesi var).
+    void waGonderVeKaydet({
+      orderId: o.id,
+      status: "PICKED_UP",
+      ownerUserId: o.business?.ownerId,
+      etiket: "Fiyat onayı hatırlatması",
+      metin: "Kesin fiyat onayınız hâlâ bekleniyor.",
+      gonder: () =>
+        waFiyatOnayi(
+          o.customerPhone,
+          o.customerName,
+          o.business?.name ?? "İşletme",
+          o.code ?? "",
+          o.trackingToken,
+        ),
+    });
+    // 2) E-posta da gitsin — WhatsApp'ı olmayan/görmeyen müşteri için.
+    await bildirMusteriyeEposta(o.id, "fiyat-onayi").catch((e) =>
+      console.error("[fiyat-hatirlatma] e-posta hatası:", e),
+    );
+
+    // 3) Halıcıya: kararı o versin (telefonda çoktan onaylamış olabilir).
+    if (o.business?.ownerId) {
+      await notify({
+        userId: o.business.ownerId,
+        type: "genel",
+        title: "Müşteri kesin fiyatı hâlâ onaylamadı",
+        body: `${o.code ?? ""} · ${Number(o.quotedPrice)} TL — 3 saattir onay yok. Müşteriye hatırlatma gönderildi; istersen telefonla ara.`,
+        href: `/panel/siparisler/${o.id}`,
+      });
+    }
+    console.log(`[fiyat-hatirlatma] gonderildi siparis=${o.id}`);
+  }
+}

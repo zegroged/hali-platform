@@ -30,8 +30,13 @@ async function hourlyTick() {
     console.error("[haftalik-ozet] hata:", e);
   }
   try {
-    const { checkStaleOrders } = await import("@/lib/orderSla");
+    const { checkStaleOrders, remindUnapprovedPrices } = await import(
+      "@/lib/orderSla"
+    );
     await checkStaleOrders();
+    // Kesin fiyatı onaylanmayan siparişler: 3 saat sessizlikte tek hatırlatma
+    // (2026-08-07 akşam — "ya müşteri yazmazsa?").
+    await remindUnapprovedPrices();
   } catch (e) {
     console.error("[siparis-sla] hata:", e);
   }

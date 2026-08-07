@@ -455,6 +455,9 @@ model Order {
   isManual         Boolean     @default(false)
   // SLA bekçisi: CREATED'da bekleyen sipariş için işletmeye hatırlatma atıldıysa
   // (sipariş başına bir kez; saatlik tik src/lib/orderSla.ts)
+  // Kesin fiyat bildirildi ama müşteri ONAYLAMADI → tek seferlik hatırlatma
+  // işareti (2026-08-07 akşam). Halı dükkânda bekliyor; sessizlik iş kaybı.
+  priceRemindedAt  DateTime?
   staleRemindedAt  DateTime?
   // 24 saat kademesi: üye müşteriye e-posta + adminlere zil atıldıysa (bir kez)
   staleEscalatedAt DateTime?
