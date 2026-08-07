@@ -56,16 +56,20 @@ type Durum = {
   pricing?: { billable?: boolean; category?: string };
 };
 
-/** Meta'nın gelen mesaj gövdesi (kullandığımız alanlar). */
+/** Meta'nın gelen mesaj gövdesi (kullandığımız alanlar).
+ *  ⚠️ `id` alanları (medya kimliği) 2026-08-07 akşam eklendi — onlar olmadan
+ *  dosyanın kendisine ulaşmanın YOLU YOK. */
+type Medya = { id?: string; mime_type?: string };
 type Gelen = {
   id?: string;
   from?: string;
   type?: string;
   text?: { body?: string };
-  image?: { caption?: string };
-  video?: { caption?: string };
-  document?: { caption?: string; filename?: string };
-  audio?: { voice?: boolean };
+  image?: { caption?: string } & Medya;
+  video?: { caption?: string } & Medya;
+  document?: { caption?: string; filename?: string } & Medya;
+  sticker?: Medya;
+  audio?: { voice?: boolean } & Medya;
   location?: { latitude?: number; longitude?: number; name?: string };
   button?: { text?: string };
   interactive?: {
@@ -109,6 +113,33 @@ function mesajMetni(m: Gelen): string {
     default:
       return `[${m.type ?? "bilinmeyen mesaj"}]`;
   }
+}
+
+/** Mesajın medya kimliği (varsa). Fotoğraf/ses/video/belge/çıkartma. */
+function medyaKimligi(m: Gelen): string | null {
+  return (
+    m.image?.id ?? m.video?.id ?? m.audio?.id ?? m.document?.id ?? m.sticker?.id ?? null
+  );
+}
+
+/**
+ * MEDYAYI ARKA PLANDA İNDİR VE SATIRA İŞLE (2026-08-07 akşam).
+ *
+ * ⚠️ `await` EDİLMEZ, bilerek: Meta bu uçtan HIZLI 200 bekler, gecikirse aynı
+ * olayı tekrar tekrar gönderir. Mesajın metin satırı zaten yazılmış oldu;
+ * dosya birkaç saniye içinde satıra eklenir, panel bir sonraki açılışta gösterir.
+ * İndirme başarısız olursa satır olduğu gibi kalır — mesaj kaybolmaz.
+ */
+async function medyayiIsle(waId: string, mediaId: string): Promise<void> {
+  const { waMedyayiIndir } = await import("@/lib/whatsappMedya");
+  const { prisma } = await import("@/lib/prisma");
+  const medya = await waMedyayiIndir(mediaId);
+  if (!medya) return;
+  await prisma.whatsAppMessage.updateMany({
+    where: { waId },
+    data: { mediaUrl: medya.url, mediaType: medya.tur },
+  });
+  console.log(`[whatsapp-webhook] medya kaydedildi waId=${waId} tur=${medya.tur}`);
 }
 
 /** GELEN MESAJI KAYDET + İŞLETMEYE EŞLE + SAHİBİNE ZİL ÇAL (2026-07-29).
@@ -203,6 +234,14 @@ async function gelenMesajiKaydet(m: Gelen, ad: string | null): Promise<void> {
     skipDuplicates: true,
   });
   if (yazilan.count === 0) return; // yarış: aynı olay eşzamanlı yazıldı
+
+  // MEDYA: satır yazıldı, şimdi dosyanın kendisini getir (bkz. medyayiIsle).
+  const mediaId = medyaKimligi(m);
+  if (mediaId) {
+    void medyayiIsle(m.id, mediaId).catch((e) =>
+      console.error(`[whatsapp-webhook] medya işlenemedi waId=${m.id}:`, e),
+    );
+  }
 
   if (!siparis) {
     console.log(

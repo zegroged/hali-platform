@@ -114,6 +114,15 @@ export default function WhatsAppReply({
             Müşteri 24 saatten uzun süre önce yazdı; yeni mesaj ancak sipariş
             bildirimleriyle gönderilebilir.
           </p>
+          {/* 2026-08-07 akşam: işletme sahibi "tek seferlik bir konuşma mı
+              olabiliyor?" diye sordu. Kural tek seferlik DEĞİL — müşteri her
+              yazdığında pencere yeniden 24 saate döner. Bunu burada açıkça
+              söylüyoruz, yoksa kapalı kutu "bir daha yazamam" gibi okunuyor. */}
+          <p className="mt-1 leading-relaxed">
+            <strong>Tek seferlik değildir:</strong> müşteri sana her yazdığında
+            pencere yeniden 24 saate döner ve bu ekran kendiliğinden açılır —
+            sayfayı yenilemene gerek yok.
+          </p>
           <p className="mt-1 text-xs text-amber-800">
             WhatsApp kuralıdır, bizim kısıtımız değil. Acil bir durum varsa
             müşteriyi telefonla ara.

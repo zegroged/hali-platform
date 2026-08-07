@@ -15,6 +15,9 @@ type Stop = {
 };
 type Props = {
   points: [number, number][];
+  /** Veri boşluklarında koparılmış iz. Verilirse ÇİZGİ bundan çizilir;
+   *  `points` yalnız çerçeveleme ve oynatma için kullanılır (2026-08-07 akşam). */
+  parcalar?: [number, number][][];
   stops: Stop[];
   playing: boolean;
   onDone: () => void;

@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import WhatsAppReply from "@/components/WhatsAppReply";
+import { WaMedya } from "@/components/WaMedya";
 
 export const dynamic = "force-dynamic";
 
@@ -151,6 +152,7 @@ export default async function AdminWaMesajlar() {
                         }`}
                       >
                         <p className="whitespace-pre-wrap break-words">{m.body}</p>
+                        {m.mediaUrl && <WaMedya url={m.mediaUrl} tur={m.mediaType} />}
                         <p className="mt-0.5 text-right text-[11px] text-slate-500">
                           {m.direction === "OUT" ? "Sen · " : ""}
                           {zaman(m.createdAt)}

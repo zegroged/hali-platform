@@ -968,6 +968,13 @@ model WhatsAppMessage {
   businessId String?
   order      Order?           @relation(fields: [orderId], references: [id], onDelete: SetNull)
   orderId    String?
+  // GELEN MEDYA (2026-08-07 akşam): fotoğraf/ses/video/belge kendi depomuza
+  // indirilir ve adresi buraya yazılır. Meta'daki kopya 30 günde silinir,
+  // indirme adresi ~5 dakikada ölür — saklamazsak leke/hasar kanıtı kaybolur.
+  // `mediaType` MIME (image/webp, audio/ogg…): arayüz neyi nasıl göstereceğine
+  // buna bakarak karar verir.
+  mediaUrl  String?
+  mediaType String?
   // Gönderim başarısızsa Meta'nın sebebi (yalnız OUT).
   error     String?
   readAt    DateTime?

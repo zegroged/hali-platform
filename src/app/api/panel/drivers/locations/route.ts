@@ -4,6 +4,26 @@ import { getPanelBusiness } from "@/lib/panel";
 import { trDayBoundsUTC } from "@/lib/time";
 import { izHazirla } from "@/lib/konumFiltre";
 
+/**
+ * Canlı iz için SON `enFazla` noktayı, parça kopukluklarını BOZMADAN al.
+ * Düz diziyi kırpmak kopukluğu yok ederdi: son 40 nokta iki ayrı parçadan
+ * geliyorsa harita onları birleştirip olmayan bir yol çizerdi.
+ */
+function sonParcalar(
+  parcalar: [number, number][][],
+  enFazla: number,
+): [number, number][][] {
+  const cikti: [number, number][][] = [];
+  let kalan = enFazla;
+  for (let i = parcalar.length - 1; i >= 0 && kalan > 0; i--) {
+    const p = parcalar[i];
+    const dilim = p.length > kalan ? p.slice(p.length - kalan) : p;
+    if (dilim.length >= 2) cikti.unshift(dilim);
+    kalan -= dilim.length;
+  }
+  return cikti;
+}
+
 // Halıcının kendi şoförlerinin canlı konumu + bugünkü rota izi (breadcrumb)
 export async function GET() {
   const b = await getPanelBusiness();
@@ -37,7 +57,7 @@ export async function GET() {
       // Canlı Takip atlanmıştı. Yani "şoför evden çıkmadı, harita yol çizdi"
       // sorunu canlı ekranda AYNEN duruyordu.
       // (DEVIR §"pahalı dersler"/5: tek kaynağın İKİ tüketicisi olabilir.)
-      const { cizgi, merkez } = izHazirla(byDriver.get(d.id) ?? []);
+      const { cizgi, parcalar, merkez } = izHazirla(byDriver.get(d.id) ?? []);
       return {
         id: d.id,
         name: d.user.name,
@@ -50,6 +70,11 @@ export async function GET() {
         lastSeenAt: d.lastSeenAt,
         // son ~40 nokta — canlı iz (süzülmüş)
         recentPath: cizgi.slice(-40),
+        // Veri boşluğunda KOPARILMIŞ hâli: harita bilmediği yeri çizmesin
+        // ("bir anda sitenin içinden geçen çizgi" — 2026-08-07 akşam ölçümü).
+        // Son 40 noktaya karşılık gelen parçalar: baştan kırpmak yerine son
+        // parçalardan 40 nokta toplanır, böylece kopukluk korunur.
+        parcalar: sonParcalar(parcalar, 40),
       };
     }),
   });

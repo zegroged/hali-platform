@@ -29,6 +29,8 @@ type DriverLoc = {
   lng: number | null;
   lastSeenAt: string | null;
   recentPath: [number, number][];
+  /** Veri boşluklarında koparılmış iz — çizgi BUNDAN çizilir (2026-08-07 akşam). */
+  parcalar?: [number, number][][];
 };
 
 export function PanelTrackingClient({
@@ -73,9 +75,16 @@ export function PanelTrackingClient({
     label: d.name,
     kind: "driver",
   }));
-  const paths = located
-    .filter((d) => d.recentPath && d.recentPath.length > 1)
-    .map((d) => ({ points: d.recentPath, color: "#0d9488" }));
+  // ÇİZGİ PARÇALARDAN ÇİZİLİR: iki ping arasında dakikalarca veri yoksa aradan
+  // nasıl geçildiğini bilmiyoruz; düz çizgi çekmek şoförü hiç girmediği
+  // sokaklardan/sitelerden geçirir (ölçüm: bir günde 47 boşluk). Eski sunucular
+  // `parcalar` göndermezse tek parça gibi davran (geri uyum).
+  const paths = located.flatMap((d) => {
+    const p = d.parcalar ?? (d.recentPath?.length > 1 ? [d.recentPath] : []);
+    return p
+      .filter((par) => par.length > 1)
+      .map((par) => ({ points: par, color: "#0d9488" }));
+  });
 
   return (
     <div className="space-y-4">

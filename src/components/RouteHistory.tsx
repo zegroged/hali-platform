@@ -36,6 +36,8 @@ type Tani = {
 };
 type RouteData = {
   points: [number, number][];
+  /** Veri boşluklarında koparılmış iz — çizgi bundan çizilir (2026-08-07 akşam). */
+  parcalar?: [number, number][][];
   stops: Stop[];
   tani: Tani | null;
   summary: { pingCount: number; stopCount: number; totalStopMin: number };
@@ -184,6 +186,7 @@ export function RouteHistory({
                 <RouteMap
                   key={`${driverId}-${date}`}
                   points={data.points}
+                  parcalar={data.parcalar}
                   stops={data.stops}
                   playing={playing}
                   onDone={stopPlaying}

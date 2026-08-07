@@ -4,6 +4,8 @@ import { getPanelBusiness } from "@/lib/panel";
 import EmptyState from "@/components/EmptyState";
 import { IconWhatsApp } from "@/components/icons";
 import WhatsAppReply from "@/components/WhatsAppReply";
+import { WaMedya } from "@/components/WaMedya";
+import MesajTazele from "@/components/MesajTazele";
 import { waTelefonAdaylari } from "@/lib/whatsapp";
 import { demoWaOku, DEMO_WA_SURE_SAAT } from "@/lib/demoWa";
 import { PendingButton } from "@/components/PendingButton";
@@ -242,6 +244,9 @@ export default async function MesajlarSayfasi({
 
   return (
     <div className="space-y-4">
+      {/* Müşteri yazdığı an ekran kendini yenilesin — yoksa "yanıt penceresi
+          kapalı" yazısı bayat kalıyor ve kural bozukmuş gibi görünüyordu. */}
+      <MesajTazele />
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-lg font-semibold text-slate-900">Mesajlar</h1>
         <span className="text-xs text-slate-500">
@@ -443,7 +448,10 @@ export default async function MesajlarSayfasi({
 
               <div className={`${kutu} p-4`}>
                 <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div>
+                  {/* min-w-0 + break-words: WhatsApp profil adı uzun ve
+                      boşluksuz olabiliyor; esnek kutu içerik genişliğinin
+                      altına inemeyince satır sağa taşıyordu. */}
+                  <div className="min-w-0 flex-1 break-words">
                     <p className="font-semibold text-slate-900">
                       {seciliKimlik?.musteriAdi ?? seciliAd ?? telGoster(seciliTel)}
                     </p>
@@ -513,6 +521,10 @@ export default async function MesajlarSayfasi({
                             <p className="whitespace-pre-wrap break-words">
                               {m.body}
                             </p>
+                            {/* Fotoğraf/ses/video/belge (2026-08-07 akşam) */}
+                            {m.mediaUrl && (
+                              <WaMedya url={m.mediaUrl} tur={m.mediaType} />
+                            )}
                             <p
                               className={`mt-0.5 text-[11px] ${
                                 gelen ? "text-slate-400" : "text-brand-dark/60"

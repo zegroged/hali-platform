@@ -113,12 +113,14 @@ function Mover({
 
 export default function LeafletRouteMap({
   points,
+  parcalar,
   stops,
   playing,
   onDone,
   height = 360,
 }: {
   points: [number, number][];
+  parcalar?: [number, number][][];
   stops: Stop[];
   playing: boolean;
   onDone: () => void;
@@ -140,11 +142,16 @@ export default function LeafletRouteMap({
         detectRetina
       />
       <FitBounds points={points} />
-      {points.length >= 2 && (
-        <Polyline
-          positions={points}
-          pathOptions={{ color: "#0d9488", weight: 4, opacity: 0.7 }}
-        />
+      {/* Veri boşluğunda çizgi YOK: aradan nasıl geçildiğini bilmiyoruz,
+          düz çizgi şoförü hiç girmediği yerden geçirirdi (2026-08-07 akşam). */}
+      {(parcalar ?? (points.length >= 2 ? [points] : [])).map((par, i) =>
+        par.length >= 2 ? (
+          <Polyline
+            key={i}
+            positions={par}
+            pathOptions={{ color: "#0d9488", weight: 4, opacity: 0.7 }}
+          />
+        ) : null,
       )}
       {stops.map((s, i) => (
         <Marker key={i} position={[s.lat, s.lng]} icon={pinIcon("#dc2626", "⏸", 26)}>

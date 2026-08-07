@@ -88,8 +88,12 @@ export async function GET(req: NextRequest) {
     lng: p.lng,
     t: p.recordedAt.getTime(),
   }));
-  const { cizgi, duruyor } = izHazirla(hamNoktalar);
+  const { cizgi, parcalar, duruyor } = izHazirla(hamNoktalar);
   const points = downsample(cizgi, 500);
+  // KOPUK PARÇALAR (2026-08-07 akşam): harita boşlukta çizgi çizmesin.
+  // `points` (düz dizi) oynatma ve çerçeveleme için duruyor; ÇİZGİ bundan
+  // çiziliyor. Ölçüm: tek şoförün tek gününde 3 dk'dan uzun 47 boşluk vardı.
+  const parcalarKucuk = parcalar.map((p) => downsample(p, 500));
   const stopRows = stops.map((s) => ({
     lat: s.lat,
     lng: s.lng,
@@ -101,6 +105,7 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({
     points,
+    parcalar: parcalarKucuk,
     // Şoför gün boyu tek noktada kaldıysa arayüz "yol yok" yerine bunu
     // açıklayabilsin; boş `points` tek başına "veri yok" gibi okunuyordu.
     duruyor,

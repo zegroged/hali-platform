@@ -296,6 +296,56 @@ export function dugumleriTopla(noktalar: IzNoktasi[]): IzNoktasi[] {
   return cikti;
 }
 
+/** Bu süreden uzun sessizlik = veri boşluğu (uygulama uyudu / ağ koptu). */
+const BOSLUK_SN = 180;
+/** …ve arada bu kadar yol varsa, aradan nasıl geçildiğini BİLMİYORUZ. */
+const BOSLUK_M = 200;
+
+/**
+ * 🔴 KOPUK YERDE ÇİZGİ ÇİZME (2026-08-07 akşam) — "bir anda sitenin içinden
+ * geçen çizgi" sorununun ÖLÇÜLEN sebebi.
+ *
+ * İşletme sahibi sordu: *"bir anda sitenin içinden geçen bir görüntü
+ * olmayacak?"* Ölçüm (prod, 10 saatlik gerçek sürüş günü):
+ *   · ping aralığı medyan **64 sn**, p90 **270 sn**, en uzun **19 dakika**
+ *   · **47 kez** 3 dakikadan uzun sessizlik
+ *   · çizilen düz parçaların medyanı 150 m, en uzunu **5 km**
+ * Yani harita, arasında hiçbir veri olmayan iki noktayı düz çizgiyle bağlayıp
+ * şoförü hiç girmediği yerlerden (site, park, bina) geçiriyordu.
+ *
+ * SEBEP GPS SAPMASI DEĞİL, **VERİ SEYREKLİĞİ**: web şoför ekranı tarayıcıda
+ * çalışıyor ve telefon arka planda tarayıcıyı kısıyor. Sapma süzgeci bunu
+ * düzeltemez — düzeltmesi de gerekmez, çünkü noktalar DOĞRU; yanlış olan
+ * aralarını doldurma iddiası.
+ *
+ * ÇÖZÜM (dürüst olan): bilmediğimiz yeri çizmeyiz. İz parçalara ayrılır;
+ * harita her parçayı ayrı çizer, boşlukta çizgi yoktur.
+ *
+ * ⚠️ YOLLARA OTURTMA (map matching) BUNU ÇÖZMEZ, SAKLAR: 19 dakikalık boşluğu
+ * sokaklara oturtan bir rota "gerçekten oradan gitti" gibi görünür. Önce
+ * bilmediğimizi söylemek, sonra oturtmak (DEVIR §5-B/3).
+ */
+export function parcalaraAyir(noktalar: IzNoktasi[]): IzNoktasi[][] {
+  if (noktalar.length === 0) return [];
+  const parcalar: IzNoktasi[][] = [];
+  let simdiki: IzNoktasi[] = [noktalar[0]];
+  for (let i = 1; i < noktalar.length; i++) {
+    const onceki = noktalar[i - 1];
+    const bu = noktalar[i];
+    const sn = (bu.t - (onceki.t ?? bu.t)) / 1000;
+    const m = metre(onceki, bu);
+    if (sn > BOSLUK_SN && m > BOSLUK_M) {
+      parcalar.push(simdiki);
+      simdiki = [bu];
+    } else {
+      simdiki.push(bu);
+    }
+  }
+  parcalar.push(simdiki);
+  // Tek noktalık parça çizgi üretmez; ayıklayalım ki arayüz boşuna uğraşmasın.
+  return parcalar.filter((p) => p.length >= 2);
+}
+
 /**
  * Haritaya çizilecek izi hazırla.
  *
@@ -312,15 +362,23 @@ export function dugumleriTopla(noktalar: IzNoktasi[]): IzNoktasi[] {
  */
 export function izHazirla(noktalar: IzNoktasi[]): {
   cizgi: [number, number][];
+  /** Veri boşluklarında KOPARILMIŞ hâli — harita bunu çizmeli (parcalaraAyir). */
+  parcalar: [number, number][][];
   merkez: [number, number] | null;
   duruyor: boolean;
 } {
-  if (noktalar.length === 0) return { cizgi: [], merkez: null, duruyor: true };
+  if (noktalar.length === 0)
+    return { cizgi: [], parcalar: [], merkez: null, duruyor: true };
   const temiz = sivrileriAyikla(dugumleriTopla(duruslariTopla(noktalar)));
   const duruyor = duruyorMu(temiz);
   const son = temiz[temiz.length - 1] ?? noktalar[noktalar.length - 1];
   return {
     cizgi: duruyor ? [] : temiz.map((p) => [p.lat, p.lng] as [number, number]),
+    parcalar: duruyor
+      ? []
+      : parcalaraAyir(temiz).map((p) =>
+          p.map((q) => [q.lat, q.lng] as [number, number]),
+        ),
     // Duruyorsa EN SON nokta gösterilir (şoför şu an orada). Bu nokta duruş
     // kümesinin ORTALAMASIDIR — yani ham son ping sapmış olsa bile işaretçi
     // şoförü gerçekte durduğu yerde gösterir.

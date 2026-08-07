@@ -20,6 +20,10 @@
 import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { izHazirla, metre, type IzNoktasi } from "@/lib/konumFiltre";
+// 🔑 DEMO ROTASI GERÇEK ÜRETEÇTEN OKUNUR (kopya DEĞİL): üreteç değişince test
+// kendiliğinden yeni veriyi sınar. Önceden fixture'a kopyalanmıştı ve
+// "ikiz mantık" tuzağıydı — biri değişince öteki sessizce bayatlardı.
+import { demoRotaNoktalari } from "@/lib/demoRota";
 
 let hata = 0;
 function bekle(ad: string, kosul: boolean, ayrinti: string) {
@@ -173,7 +177,57 @@ console.log("\nKONUM SÜZGECİ — sentetik senaryolar\n");
   );
 }
 
-// ── 8) GERÇEK PROD İZİ (varsa) ─────────────────────────────────────────────
+// ── 8) VERİ BOŞLUĞUNDA ÇİZGİ KOPMALI ──────────────────────────────────────
+// "Bir anda sitenin içinden geçen çizgi" sorunu: iki ping arasında dakikalarca
+// veri yoksa aradan nasıl geçildiğini BİLMİYORUZ, düz çizgi çekmek yalandır.
+{
+  const ham: IzNoktasi[] = [];
+  for (let i = 0; i < 10; i++) ham.push(nokta(i * 40, 0, i * 5)); // sürüş
+  // 12 dakika sessizlik, sonra 3 km ötede devam
+  for (let i = 0; i < 10; i++) ham.push(nokta(3000 + i * 40, 500, 720 + i * 5));
+  const { cizgi, parcalar } = izHazirla(ham);
+  const parcaUzunluklari = parcalar.map((p) => cizgiUzunlugu(p));
+  bekle(
+    "12 dk boşluk çizgiyi KOPARIR (tek düz çizgi çizilmez)",
+    parcalar.length === 2 && parcaUzunluklari.every((u) => u < 500),
+    `${parcalar.length} parça, uzunluklar ${parcaUzunluklari.join("+")} m ` +
+      `(düz dizi ${cizgiUzunlugu(cizgi)} m — kopmasaydı bu çizilirdi)`,
+  );
+}
+
+// ── 9) KESİNTİSİZ SÜRÜŞ KOPMAZ ────────────────────────────────────────────
+{
+  const ham: IzNoktasi[] = [];
+  for (let i = 0; i < 40; i++) ham.push(nokta(i * 60, 0, i * 10)); // 6 m/sn
+  const { parcalar } = izHazirla(ham);
+  bekle(
+    "kesintisiz sürüş TEK parça kalır",
+    parcalar.length === 1,
+    `${parcalar.length} parçaya bölündü — 1 bekleniyordu`,
+  );
+}
+
+// ── 10) DEMO ROTASI — GERÇEK ÜRETEÇTEN (Play incelemesi bu ekranı görür) ───
+// Süzgeç demo izini yiyip haritayı boşaltırsa Play incelemesi ve komisyoncu
+// tanıtımı boş harita görür. 2026-08-07 akşam: eski üreteç 4 saate 26 nokta
+// yazıyordu (1,3 km/sa) ve iz TEK NOKTAYA iniyordu — bu test onu yakaladı.
+{
+  const T0 = Date.UTC(2026, 0, 1, 6, 0, 0);
+  const ham: IzNoktasi[] = demoRotaNoktalari(37.8746, 32.4932).map((n) => ({
+    lat: n.lat,
+    lng: n.lng,
+    t: T0 + n.ms,
+  }));
+  const { parcalar } = izHazirla(ham);
+  const cizilen = parcalar.reduce((a, p) => a + cizgiUzunlugu(p), 0);
+  bekle(
+    "demo rotası haritada GERÇEKTEN çiziliyor",
+    parcalar.length >= 1 && cizilen >= 4500,
+    `${parcalar.length} parça · çizilen ${cizilen} m — tek parça ~8 km bekleniyordu`,
+  );
+}
+
+// ── 11) GERÇEK PROD İZİ (varsa) ────────────────────────────────────────────
 // ⚠️ `new URL(...).pathname` Windows'ta "/C:/..." verir ve existsSync sessizce
 // false döner — test "geçti" görünürken gerçek veri HİÇ koşmaz. fileURLToPath
 // iki platformda da doğru yolu üretir.
@@ -190,11 +244,14 @@ if (existsSync(ornekYolu)) {
     const hamUzunluk = cizgiUzunlugu(
       ham.map((p) => [p.lat, p.lng] as [number, number]),
     );
-    const { cizgi, duruyor } = izHazirla(ham);
+    const { cizgi, parcalar, duruyor } = izHazirla(ham);
     const uzunluk = cizgiUzunlugu(cizgi);
+    const parcaToplam = parcalar.reduce((a, p) => a + cizgiUzunlugu(p), 0);
     console.log(
       `  ${k.ad}: ${ham.length} nokta · ham ${hamUzunluk} m → çizilen ${uzunluk} m ` +
-        `(${cizgi.length} nokta, duruyor=${duruyor})`,
+        `(${cizgi.length} nokta, duruyor=${duruyor})` +
+        `\n     kopukluk sonrası: ${parcalar.length} parça · GERÇEKTEN çizilen ${parcaToplam} m ` +
+        `(${uzunluk - parcaToplam} m'lik uydurma düz çizgi silindi)`,
     );
     if (k.beklenen?.enFazlaMetre != null) {
       bekle(
@@ -204,10 +261,13 @@ if (existsSync(ornekYolu)) {
       );
     }
     if (k.beklenen?.enAzMetre != null) {
+      // 🔴 PARÇALAR üzerinden ölçülür: haritada GERÇEKTEN çizilen budur.
+      // Düz dizi üzerinden ölçmek demo rotasının kopuk çıktığını gizlemişti
+      // (2026-08-07 akşam: 7.872 m sanılan izin yalnız 394 m'si çiziliyordu).
       bekle(
-        `${k.ad} ≥ ${k.beklenen.enAzMetre} m`,
-        uzunluk >= k.beklenen.enAzMetre,
-        `çizilen ${uzunluk} m`,
+        `${k.ad} ≥ ${k.beklenen.enAzMetre} m (parçalar)`,
+        parcaToplam >= k.beklenen.enAzMetre,
+        `parçalarda çizilen ${parcaToplam} m`,
       );
     }
   }

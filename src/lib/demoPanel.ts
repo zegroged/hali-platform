@@ -10,6 +10,12 @@ import { districtsOfCity } from "@/lib/cities";
 import { genOrderCode } from "@/lib/ordercode";
 import { waNumber } from "@/lib/whatsapp";
 import { trDayBoundsUTC } from "@/lib/time";
+import {
+  demoRotaNoktalari,
+  demoHalka,
+  DEMO_DURAKLAR,
+  SURUS_TOPLAM_DK,
+} from "@/lib/demoRota";
 import { geocodeDistrict } from "@/lib/geocodeDistrict";
 
 // KOMİSYONCU DEMO PANELİ (2026-07-30).
@@ -1116,18 +1122,6 @@ function trGunu(): string {
 }
 
 /** Dükkândan çıkıp dönen kapalı tur — kurulum ve tazeleme AYNI şekli üretir. */
-function demoRotaNoktalari(lat: number, lng: number, adim: number) {
-  return Array.from({ length: adim }, (_, i) => {
-    const t = i / (adim - 1);
-    const aci = 2 * Math.PI * t;
-    return {
-      t,
-      lat: lat + 0.014 * Math.sin(aci) + 0.002 * Math.sin(3 * aci),
-      lng: lng + 0.018 * (1 - Math.cos(aci)) * 0.6,
-    };
-  });
-}
-
 export async function demoGunuTazele(businessId: string): Promise<void> {
   try {
     const b = await prisma.cleanerBusiness.findUnique({
@@ -1164,7 +1158,7 @@ export async function demoGunuTazele(businessId: string): Promise<void> {
     // ---- 1) ŞOFÖR CANLILIĞI (her çağrıda, tek UPDATE) ----
     // Panel haritası 5 dakikadan eski konumu "bayat" sayıp basmıyor.
     if (sofor) {
-      const nokta = demoRotaNoktalari(b.lat, b.lng, 26).at(-4)!;
+      const nokta = demoRotaNoktalari(b.lat, b.lng).at(-4)!;
       await prisma.driver.update({
         where: { id: sofor.id },
         data: {
@@ -1208,11 +1202,13 @@ export async function demoGunuTazele(businessId: string): Promise<void> {
       }
     }
 
+    const noktalar = demoRotaNoktalari(b.lat, b.lng);
+    // İz "6 dk önce" biter; başlangıcı üretilen sürenin kendisi belirler
+    // (eski kod izi 4 saate YAYIYORDU — bkz. demoRotaNoktalari'ndaki not).
     const { start: gunBasi } = trDayBoundsUTC();
     const bitis = simdi - 6 * 60 * 1000;
-    const baslangic = Math.max(gunBasi.getTime() + 5 * 60 * 1000, bitis - 4 * SAAT);
-    const sure = Math.max(30 * 60 * 1000, bitis - baslangic);
-    const noktalar = demoRotaNoktalari(b.lat, b.lng, 26);
+    const toplamMs = noktalar[noktalar.length - 1].ms;
+    const baslangic = Math.max(gunBasi.getTime() + 5 * 60 * 1000, bitis - toplamMs);
 
     // Eski günlerin izleri birikmesin: demo şoförün tüm kaydı yenilenir.
     await prisma.driverLocationPing.deleteMany({ where: { driverId: sofor.id } });
@@ -1222,32 +1218,34 @@ export async function demoGunuTazele(businessId: string): Promise<void> {
         driverId: sofor.id,
         lat: n.lat,
         lng: n.lng,
-        recordedAt: new Date(baslangic + sure * n.t),
+        recordedAt: new Date(baslangic + n.ms),
       })),
     });
 
+    // Duraklar: izdeki GERÇEK bekleme anlarına oturur (eskiden bağımsız
+    // oranlardan hesaplanıyordu ve haritadaki izle tutmuyordu).
     const trAy = new Date(baslangic);
-    const duraklar = [
-      { oran: 0.22, dk: 12, adres: MUSTERILER[0].adres },
-      { oran: 0.55, dk: 47, adres: MUSTERILER[4].adres },
-      { oran: 0.82, dk: 8, adres: MUSTERILER[5].adres },
-    ];
-    await prisma.driverStop.createMany({
-      data: duraklar.map((d) => {
-        const bas = new Date(baslangic + sure * d.oran);
-        return {
-          driverId: sofor.id,
-          lat: b.lat + 0.014 * Math.sin(2 * Math.PI * d.oran),
-          lng: b.lng + 0.018 * (1 - Math.cos(2 * Math.PI * d.oran)) * 0.6,
-          address: `${d.adres}, ${b.district}/${b.city}`,
-          startedAt: bas,
-          endedAt: new Date(bas.getTime() + d.dk * 60 * 1000),
-          durationSec: d.dk * 60,
-          periodYear: trAy.getUTCFullYear(),
-          periodMonth: trAy.getUTCMonth() + 1,
-        };
-      }),
+    const durakAdresleri = [MUSTERILER[0].adres, MUSTERILER[4].adres, MUSTERILER[5].adres];
+    const bacakMs = (SURUS_TOPLAM_DK / (DEMO_DURAKLAR.length + 1)) * 60 * 1000;
+    let imlec = 0;
+    const durakSatirlari = DEMO_DURAKLAR.map((d, i) => {
+      imlec += bacakMs; // o durağa kadar sürülen bacak
+      const bas = new Date(baslangic + imlec);
+      imlec += d.dk * 60 * 1000; // durakta geçen süre
+      const k = demoHalka(b.lat, b.lng, d.oran);
+      return {
+        driverId: sofor.id,
+        lat: k.lat,
+        lng: k.lng,
+        address: `${durakAdresleri[i]}, ${b.district}/${b.city}`,
+        startedAt: bas,
+        endedAt: new Date(bas.getTime() + d.dk * 60 * 1000),
+        durationSec: d.dk * 60,
+        periodYear: trAy.getUTCFullYear(),
+        periodMonth: trAy.getUTCMonth() + 1,
+      };
     });
+    await prisma.driverStop.createMany({ data: durakSatirlari });
   } catch (e) {
     // Tazeleme hiçbir zaman paneli bozmaz — demo eskisi gibi görünür, o kadar.
     console.error("[demo-tazele] hata:", e);

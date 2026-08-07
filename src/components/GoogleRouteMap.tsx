@@ -23,6 +23,8 @@ type Stop = {
 };
 type Props = {
   points: [number, number][];
+  /** Veri boşluklarında koparılmış iz (2026-08-07 akşam) — İKİZ: LeafletRouteMap. */
+  parcalar?: [number, number][][];
   stops: Stop[];
   playing: boolean;
   onDone: () => void;
@@ -60,6 +62,7 @@ function posAt(points: [number, number][], t: number) {
 
 export default function GoogleRouteMap({
   points,
+  parcalar,
   stops,
   playing,
   onDone,
@@ -181,11 +184,15 @@ export default function GoogleRouteMap({
         gestureHandling: "greedy",
       }}
     >
-      {points.length >= 2 && (
-        <PolylineF
-          path={points.map(([la, ln]) => ({ lat: la, lng: ln }))}
-          options={{ strokeColor: "#0d9488", strokeWeight: 4, strokeOpacity: 0.8 }}
-        />
+      {/* Veri boşluğunda çizgi YOK — gerekçe LeafletRouteMap'te (İKİZ). */}
+      {(parcalar ?? (points.length >= 2 ? [points] : [])).map((par, i) =>
+        par.length >= 2 ? (
+          <PolylineF
+            key={i}
+            path={par.map(([la, ln]) => ({ lat: la, lng: ln }))}
+            options={{ strokeColor: "#0d9488", strokeWeight: 4, strokeOpacity: 0.8 }}
+          />
+        ) : null,
       )}
       {/* 🔴 `title` FARE İPUCUDUR — mobilde fare yok, dokununca hiçbir şey
           görünmüyordu (kullanıcı bildirdi 2026-08-06). Artık işaretçiye

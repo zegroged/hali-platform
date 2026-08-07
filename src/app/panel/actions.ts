@@ -653,6 +653,33 @@ export async function quoteOrderPrice(formData: FormData) {
   });
   if (!order) return;
 
+  // 🔴 ÇİFT BİLDİRİM FRENİ (2026-08-07 akşam — canlı veride yakalandı).
+  // Prod kaydı: aynı müşteriye 14:21:00 ve 14:21:03'te AYNI fiyat mesajı iki
+  // kez gitti. Sebep: buton iki kez gönderilebiliyor ve CAS koşulu (durum
+  // PICKED_UP + onaysız) ikinci istekte de sağlandığı için mesaj tekrar
+  // gidiyordu. Müşteriye üst üste iki bildirim gitmesi hem güven kırıyor hem
+  // her mesaj Meta'da ücretli.
+  // FREN: aynı fiyat son 5 dakikada zaten bildirildiyse yeniden GÖNDERME.
+  // Fiyat DEĞİŞTİYSE serbest — halıcı düzeltme yapabilmeli.
+  // Decimal → number (Prisma Decimal ile === çalışmaz, sessizce false döner).
+  if (order.quotedPrice != null && Number(order.quotedPrice) === price) {
+    const yakinBildirim = await prisma.orderEvent.findFirst({
+      where: {
+        orderId,
+        note: { startsWith: "Kesin fiyat bildirildi" },
+        createdAt: { gte: new Date(Date.now() - 5 * 60 * 1000) },
+      },
+      select: { id: true },
+    });
+    if (yakinBildirim) {
+      revalidatePath(`/panel/siparisler/${orderId}`);
+      hataylaDon(
+        `/panel/siparisler/${orderId}`,
+        `${price} TL zaten az önce bildirildi — müşteriye ikinci mesaj gönderilmedi. Fiyatı değiştirirsen yeni bildirim gider.`,
+      );
+    }
+  }
+
   // CAS: yalnız PICKED_UP'ta ve müşteri henüz onaylamamışken bildir/güncelle.
   const updated = await prisma.order.updateMany({
     where: {

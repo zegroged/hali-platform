@@ -8,11 +8,24 @@ import path from "node:path";
 // yüklenen fotoğraf anında servis edilir. (Açılışta bilinen dosyaları Next'in
 // statik sunucusu karşılamaya devam eder; buraya hiç düşmezler.)
 
+// ⚠️ BU LİSTE BİR GÜVENLİK KAPISIDIR, kolaylık listesi değil: burada olmayan
+// uzantı 404 döner. `svg` ve `html` BİLEREK YOK — kullanıcıdan gelen bir dosya
+// kendi alan adımızda çalıştırılabilir içerik olursa XSS'e dönüşür.
+// Ses/video/pdf 2026-08-07 akşam eklendi: müşterinin WhatsApp'tan gönderdiği
+// sesli mesaj ve belgeler de panelde açılabilsin (bkz. lib/whatsappMedya.ts).
 const MIME: Record<string, string> = {
   webp: "image/webp",
   jpg: "image/jpeg",
   jpeg: "image/jpeg",
   png: "image/png",
+  ogg: "audio/ogg",
+  mp3: "audio/mpeg",
+  m4a: "audio/mp4",
+  aac: "audio/aac",
+  amr: "audio/amr",
+  mp4: "video/mp4",
+  "3gp": "video/3gpp",
+  pdf: "application/pdf",
 };
 
 export async function GET(
@@ -35,6 +48,9 @@ export async function GET(
     return new NextResponse(new Uint8Array(buf), {
       headers: {
         "Content-Type": mime,
+        // Tarayıcı türü KENDİ TAHMİN ETMESİN: yukarıdaki beyaz liste ancak
+        // sniffing kapalıyken gerçek bir kapıdır.
+        "X-Content-Type-Options": "nosniff",
         // Dosya adları benzersiz (timestamp+rastgele) → güvenle kalıcı önbellek.
         "Cache-Control": "public, max-age=31536000, immutable",
       },
