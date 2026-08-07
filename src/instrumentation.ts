@@ -76,6 +76,24 @@ async function hourlyTick() {
   }
 }
 
+/**
+ * KONUM BEKÇİSİ TİKİ — saatlik tik bu iş için ÇOK YAVAŞ.
+ *
+ * Sahada ölçülen ölüm süresi ~6,5 dakika (2026-08-08); saatte bir bakan bir
+ * bekçi şoförü 50+ dakika kör bırakırdı. 5 dakika, 10 dakikalık sessizlik
+ * eşiğiyle birlikte en geç ~15 dakikada haber verir.
+ *
+ * Maliyeti düşük: mesaide şoför yoksa tek sorguda çıkar.
+ */
+async function konumTick() {
+  try {
+    const { konumsuzMesaiKontrol } = await import("@/lib/konumBekcisi");
+    await konumsuzMesaiKontrol();
+  } catch (e) {
+    console.error("[konum-bekcisi] hata:", e);
+  }
+}
+
 const DAILY_STATE_KEY = "dailyTickDay";
 
 /**
@@ -166,4 +184,12 @@ export async function register() {
   // taraması bir saat beklemesin.
   setTimeout(hourlyTick, 30_000);
   if (typeof hourlyTimer.unref === "function") hourlyTimer.unref();
+
+  // Konum bekçisi: 5 dakikada bir (gerekçe konumTick'in başında).
+  // Açılıştan 60 sn sonra da bir kez: interval sayacı her yeniden başlatmada
+  // sıfırlanır, yoğun deploy günlerinde (bu projede 12 deploy'luk gün oldu)
+  // kontrol hiç çalışmadan konteyner yenilenebilirdi.
+  setTimeout(konumTick, 60_000);
+  const konumTimer = setInterval(konumTick, 5 * 60 * 1000);
+  if (typeof konumTimer.unref === "function") konumTimer.unref();
 }

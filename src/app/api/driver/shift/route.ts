@@ -17,8 +17,19 @@ export async function POST(req: NextRequest) {
 
   await prisma.driver.update({
     where: { id: driver.id },
-    data: { isOnShift: on, ...(on ? { lastSeenAt: new Date() } : {}) },
+    data: {
+      isOnShift: on,
+      // Mesai AÇILIŞ anı — konum bekçisinin referansı (lib/konumBekcisi.ts).
+      // Kapanışta null: kapalı mesai için sessizlik ölçmenin anlamı yok.
+      shiftStartedAt: on ? new Date() : null,
+      ...(on ? { lastSeenAt: new Date() } : {}),
+    },
   });
+
+  // Yeni mesai (ya da kapanış) = temiz sayfa: önceki mesaiden kalan "konum
+  // gelmiyor" işareti taşınmasın, yoksa akış sağlıklı başlasa bile bekçi
+  // "düzeldi" bildirimi göndermeye çalışır.
+  await (await import("@/lib/konumBekcisi")).konumUyariIsaretiniSil(driver.id);
 
   // mesai biterken açık durağı kapat
   if (!on) {

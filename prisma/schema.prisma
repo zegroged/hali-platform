@@ -392,6 +392,11 @@ model Driver {
   lastLat    Float? // en güncel canlı konum
   lastLng    Float?
   lastSeenAt DateTime?
+  // Mesainin AÇILDIĞI an. `lastSeenAt` bunu karşılamıyor: mesai ucu da, ping de
+  // ona yazıyor — yani "hiç ping gelmedi" ile "ping geliyordu, kesildi" ayırt
+  // edilemiyor. Konum bekçisi (lib/konumBekcisi.ts) bu ikisini ayırmak için
+  // buna bakar; mesai kapanınca null'lanır.
+  shiftStartedAt DateTime?
 
   createdAt DateTime @default(now())
 
