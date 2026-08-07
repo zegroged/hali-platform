@@ -26,6 +26,11 @@ const MIME: Record<string, string> = {
   mp4: "video/mp4",
   "3gp": "video/3gpp",
   pdf: "application/pdf",
+  // APK (2026-08-07 akşam): işletme sahibi Expo'nun indirme linkinden APK'yı
+  // indiremiyordu — "50 MB'da takılıyor". Sunucudan ölçüldü: dosya sağlam,
+  // 3 saniyede tam iniyor (59,6 MB) → sorun Expo CDN'inin oraya giden yolunda.
+  // Artık build'ler kendi alan adımızdan (Cloudflare arkasında) veriliyor.
+  apk: "application/vnd.android.package-archive",
 };
 
 export async function GET(
@@ -45,8 +50,15 @@ export async function GET(
 
   try {
     const buf = await readFile(full);
+    // APK tarayıcıda açılmaya çalışılmasın, DOSYA olarak insin ve doğru adla
+    // kaydedilsin (Android "bilinmeyen dosya" demesin).
+    const indir: Record<string, string> =
+      mime === "application/vnd.android.package-archive"
+        ? { "Content-Disposition": `attachment; filename="${path.basename(full)}"` }
+        : {};
     return new NextResponse(new Uint8Array(buf), {
       headers: {
+        ...indir,
         "Content-Type": mime,
         // Tarayıcı türü KENDİ TAHMİN ETMESİN: yukarıdaki beyaz liste ancak
         // sniffing kapalıyken gerçek bir kapıdır.

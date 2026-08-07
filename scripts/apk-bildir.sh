@@ -67,6 +67,28 @@ for ((i=1; i<=MAX_TUR; i++)); do
       MB=$((TOPLAM / 1024 / 1024))
       log "sinama: HTTP=$KOD boyut=${MB}MB ilk-parca=${BOYUT}B"
 
+      # 🔴 KENDİ ALAN ADIMIZDAN VER (2026-08-07 akşam): işletme sahibi Expo'nun
+      # linkinden indiremiyordu ("50 MB'da takılıyor"). Sunucudan ölçüldü:
+      # dosya sağlam, 3 sn'de tam iniyor → sorun Expo CDN'inin oraya giden
+      # yolunda. Artık APK'yı sunucuya çekip kendi adresimizden veriyoruz
+      # (Cloudflare arkasında). Başarısız olursa Expo linki yedek olarak kalır.
+      BIZIM=""
+      if [ "$KOD" = "200" ] && [ "$TOPLAM" -gt 20971520 ]; then
+        RASGELE=$(head -c 8 /dev/urandom | od -An -tx1 | tr -dc "a-f0-9")
+        DOSYA="hali-sofor-v${SURUM}-vc${VC}.apk"
+        HEDEF="/app/public/uploads/apk/$RASGELE"
+        if curl -sL --max-time 600 -o "/tmp/$DOSYA" "$URL"            && [ "$(stat -c %s "/tmp/$DOSYA")" -gt 20971520 ]; then
+          docker exec hali-app-1 mkdir -p "$HEDEF"             && docker cp "/tmp/$DOSYA" "hali-app-1:$HEDEF/$DOSYA"             && BIZIM="https://enyakinhaliyikamaservisi.com/uploads/apk/$RASGELE/$DOSYA"
+          rm -f "/tmp/$DOSYA"
+          # Kendi linkimizi de SINA — mail atmadan önce gerçekten iniyor mu?
+          if [ -n "$BIZIM" ]; then
+            BKOD=$(curl -s -o /dev/null -L -w "%{http_code}" --max-time 60 -I "$BIZIM")
+            [ "$BKOD" = "200" ] || { log "kendi link sinamayi gecemedi ($BKOD)"; BIZIM=""; }
+          fi
+        fi
+        log "kendi link: ${BIZIM:-uretilemedi}"
+      fi
+
       if [ "$KOD" = "200" ] && [ "$TOPLAM" -gt 20971520 ]; then
         mail_at "Hali Sofor $SURUM (vc$VC) APK hazir — link dogrulandi" \
 "APK derlendi ve indirme linki SINANDI.
@@ -76,7 +98,9 @@ for ((i=1; i<=MAX_TUR; i++)); do
   Kontrol: HTTP $KOD, dosya erisilebilir  [TAMAM]
 
 INDIRME LINKI (telefondan ac):
-$URL
+${BIZIM:-$URL}
+
+${BIZIM:+Yedek link (Expo, yavas olabilir): $URL}
 
 Kurulum: linke telefondan tikla, indir, ac. Android 'bilinmeyen kaynak'
 uyarisi verirse bu tarayiciya izin ver.
