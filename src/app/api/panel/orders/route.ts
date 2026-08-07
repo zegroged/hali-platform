@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getPanelBusiness } from "@/lib/panel";
 import { createOrderWithCode } from "@/lib/ordercode";
+import { waSiparisAlindi, waGonderVeKaydet } from "@/lib/whatsapp";
 import { sendTrackingSms, trackingLink } from "@/lib/sms";
 import { subscriptionActive } from "@/lib/subscription";
 import { notify } from "@/lib/notify";
@@ -119,6 +120,30 @@ export async function POST(req: NextRequest) {
   } catch (e) {
     console.error("panel order SMS hatası:", e);
   }
+
+  // 🔴 WHATSAPP DA GİTSİN (2026-08-07 denetimi, madde 19b).
+  // Elle açılan kayıtta müşteriye giden TEK kanal mock SMS'ti — yani hiçbir
+  // şey. Kamu sipariş ucu (api/orders) burada `waSiparisAlindi` gönderiyor;
+  // panel ucu göndermiyordu.
+  // ⚠️ İKİNCİ İŞLEVİ DAHA ÖNEMLİ: bu OUT satırı, o numaranın BU işletmeyle
+  // gerçekten temas ettiğinin kanıtıdır. Gelen mesaj eşleştirmesi artık bu
+  // kanıta bakıyor (webhook route.ts) — kanıt üretilmezse müşterinin cevabı
+  // sahipsiz kalır.
+  void waGonderVeKaydet({
+    orderId: order.id,
+    status: "CREATED",
+    ownerUserId: b.ownerId,
+    etiket: "Sipariş alındı",
+    metin: "Siparişiniz alındı — takip kodunuzla durumu izleyebilirsiniz.",
+    gonder: () =>
+      waSiparisAlindi(
+        d.customerPhone,
+        d.customerName,
+        b.name,
+        order.code ?? "",
+        order.trackingToken,
+      ),
+  });
 
   return NextResponse.json({
     code: order.code,

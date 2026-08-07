@@ -213,10 +213,30 @@ export async function getSessionUser(): Promise<SessionUser | null> {
       name: true,
       username: true,
       bannedAt: true,
+      // 🔴 2026-08-07 DENETİMİ (madde 1, KRİTİK): bu alan burada YOKTU.
+      sessionsValidFrom: true,
     },
   });
   // Engellenen kullanıcının MEVCUT oturumu da geçersizdir (yalnız yeni giriş değil).
   if (!u || u.bannedAt) return null;
+
+  // 🔴 ŞİFRE DEĞİŞİNCE ÇEREZ DE ÖLMELİ (2026-08-07 denetimi, madde 1).
+  //
+  // AÇIK: `sessionsValidFrom` damgasını beş yol yazıyor (çalışan şifresi,
+  // şoför şifresi, admin sıfırlaması ×2, "şifremi unuttum") ve `getBearerUser`
+  // bu damgayı kontrol ediyordu — ama `getSessionUser` ETMİYORDU.
+  // `getAuthedUser` önce çerezi denediği için Bearer dalındaki kontrol hiç
+  // çalışmıyordu. Sonuç: hesabı ele geçiren biri açık oturumdayken kurban
+  // şifresini değiştirse bile SALDIRGAN İÇERİDE KALIYORDU — üstelik panel
+  // 12 saatte bir `/api/auth/yenile` çağırıp o çerezi 30 güne tazelediği için
+  // süresiz. Kurbanın elindeki tek araç ("şifremi unuttum") işe yaramıyordu.
+  //
+  // Damgadan ÖNCE üretilmiş jeton reddedilir; kendi şifresini değiştiren
+  // kullanıcı atılmasın diye o yolda yeni oturum açılır (sifre/actions.ts).
+  if (u.sessionsValidFrom) {
+    const uretim = tokenUretimAni(token);
+    if (uretim == null || uretim < u.sessionsValidFrom.getTime()) return null;
+  }
   return { id: u.id, role: u.role, name: u.name, username: u.username };
 }
 

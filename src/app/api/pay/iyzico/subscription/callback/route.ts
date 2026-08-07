@@ -14,11 +14,23 @@ export async function POST(req: NextRequest) {
   const base = getAppBaseUrl();
   const ok = () =>
     NextResponse.redirect(new URL(`/panel?odeme=basarili`, base), 303);
-  const fail = () =>
-    NextResponse.redirect(new URL(`/panel?odeme=hata`, base), 303);
+  // 🔴 SESSİZ DÜŞÜŞ KAPATILDI (2026-08-07 denetimi, madde 4).
+  // Bu fonksiyon parametresizdi ve HİÇBİR ŞEY LOGLAMIYORDU; altı ayrı daldan
+  // dönülüyordu. Yani "para çekildi ama dönem açılmadı" hâli yaşandığında
+  // sunucuda tek satır iz kalmıyor, kayıt sonsuza kadar PENDING kalıyordu.
+  // İkiz uç (recurring-callback) bu düzeltmeyi almış, bu uç almamıştı —
+  // oysa panelde CANLI olan düğme bu uca gidiyor.
+  // ⚠️ Para akan hiçbir yolda sessiz düşüş bırakma (DEVIR §7).
+  const fail = (sebep: string, ek?: Record<string, unknown>) => {
+    console.error(
+      `[iyzico-callback] BAŞARISIZ sebep=${sebep}` +
+        (ek ? ` ${JSON.stringify(ek)}` : ""),
+    );
+    return NextResponse.redirect(new URL(`/panel?odeme=hata`, base), 303);
+  };
 
   // Gerçek callback yalnız canlı modda anlamlı; mock modda dönem açma (para yok).
-  if (!paymentsLive) return fail();
+  if (!paymentsLive) return fail("odeme-modu-canli-degil");
 
   let token = "";
   try {
@@ -28,16 +40,24 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => ({}));
     token = String(body?.token ?? "");
   }
-  if (!token) return fail();
+  if (!token) return fail("token-yok");
 
   const r = await retrieveCheckout(token);
-  if (!r.ok || !r.paid || !r.orderId) return fail();
+  if (!r.ok || !r.paid || !r.orderId)
+    return fail("iyzico-sonuc-olumsuz", {
+      token: token.slice(0, 12),
+      ok: r.ok,
+      paid: r.paid,
+      orderId: r.orderId ?? null,
+      hata: r.error ?? null,
+    });
 
   // orderId = basketId = SubscriptionPayment.id (iyzico'dan gelir, client'a güvenilmez).
   const payment = await prisma.subscriptionPayment.findUnique({
     where: { id: r.orderId },
   });
-  if (!payment) return fail();
+  if (!payment)
+    return fail("kayit-bulunamadi", { orderId: r.orderId, token: token.slice(0, 12) });
 
   // TUTAR DOĞRULAMASI: tahsil edilen, beklenen abonelik bedeline eşit olmalı.
   const expected = Number(payment.amount);
@@ -47,7 +67,11 @@ export async function POST(req: NextRequest) {
     r.paidPrice == null ||
     Math.abs(r.paidPrice - expected) > 0.01
   ) {
-    return fail();
+    return fail("tutar-uyusmuyor", {
+      paymentId: payment.id,
+      beklenen: expected,
+      gelen: r.paidPrice,
+    });
   }
 
   // ATOMİK claim + efekt (2026-07-09 güvenlik incelemesi): PAID işaretleme,
@@ -74,7 +98,8 @@ export async function POST(req: NextRequest) {
       processed = true;
     });
   } catch {
-    return fail(); // transaction geri alındı → PENDING kaldı → retry işleyebilir
+    // Transaction geri alındı → PENDING kaldı → iyzico retry'si işleyebilir.
+    return fail("transaction-patladi", { paymentId: payment.id });
   }
 
   // Görünürlük idempotent; commit'ten SONRA, transaction dışında (yalnız bu

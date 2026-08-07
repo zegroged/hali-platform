@@ -4,6 +4,15 @@ import { getPanelBusiness } from "@/lib/panel";
 import { STOP_MIN_SEC } from "@/lib/tracking";
 import { trDayBoundsUTC } from "@/lib/time";
 import { izHazirla } from "@/lib/konumFiltre";
+import { yollaraOturt } from "@/lib/yolaOturt";
+
+// YOLLARA OTURTMA ÖNBELLEĞİ (2026-08-07 gecesi).
+// Aynı şoför-gün her sayfa açılışında yeniden oturtulmasın: iz DEĞİŞMEDİĞİ
+// sürece (nokta sayısı aynı) sonuç aynıdır. Bellek içi, tek instance için
+// yeterli — geocode önbelleğiyle aynı desen (lib/geocode).
+const oturtmaOnbellek = new Map<string, { veri: [number, number][][]; zaman: number }>();
+const ONBELLEK_TTL_MS = 30 * 60 * 1000;
+const ONBELLEK_MAX = 200;
 
 function downsample<T>(arr: T[], max: number): T[] {
   if (arr.length <= max) return arr;
@@ -93,7 +102,23 @@ export async function GET(req: NextRequest) {
   // KOPUK PARÇALAR (2026-08-07 akşam): harita boşlukta çizgi çizmesin.
   // `points` (düz dizi) oynatma ve çerçeveleme için duruyor; ÇİZGİ bundan
   // çiziliyor. Ölçüm: tek şoförün tek gününde 3 dk'dan uzun 47 boşluk vardı.
-  const parcalarKucuk = parcalar.map((p) => downsample(p, 500));
+  let parcalarKucuk = parcalar.map((p) => downsample(p, 500));
+
+  // 🔴 YOLLARA OTURT — "şoförün nereye gittiği belli mi?" sorusunun cevabı.
+  // Yalnız PARÇA İÇİNDE; kopukluk üzerinden yol uydurulmaz (lib/yolaOturt.ts).
+  // OSRM kapalıysa/yavaşsa ham iz çizilir — harita boş kalmaz.
+  const anahtar = `${driverId}|${dateStr ?? "bugun"}|${pings.length}`;
+  const vurus = oturtmaOnbellek.get(anahtar);
+  if (vurus && Date.now() - vurus.zaman < ONBELLEK_TTL_MS) {
+    parcalarKucuk = vurus.veri;
+  } else if (parcalarKucuk.length) {
+    parcalarKucuk = await yollaraOturt(parcalarKucuk);
+    if (oturtmaOnbellek.size >= ONBELLEK_MAX) {
+      const ilk = oturtmaOnbellek.keys().next().value;
+      if (ilk !== undefined) oturtmaOnbellek.delete(ilk);
+    }
+    oturtmaOnbellek.set(anahtar, { veri: parcalarKucuk, zaman: Date.now() });
+  }
   const stopRows = stops.map((s) => ({
     lat: s.lat,
     lng: s.lng,

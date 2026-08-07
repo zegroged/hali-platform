@@ -325,12 +325,41 @@ async function gelenMesajiKaydet(m: Gelen, ad: string | null): Promise<void> {
   //    devreder; saldırı durumunda ise sessizce el değiştirmez.
   const adaylar = waTelefonAdaylari(m.from);
   const OTUZ_GUN = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-  const aday = adaylar.length
+
+  // 🔴 4. KATMAN — TEMAS KANITI (2026-08-07 denetimi, madde 2: ÇAPRAZ İŞLETME
+  // MÜŞTERİ SIZINTISI).
+  //
+  // AÇIK: eşleşme "bu numaranın EN SON siparişi hangi işletmedeyse oraya"
+  // diyordu. Aşağıdaki el-değiştirme savunması ancak numara DAHA ÖNCE bir
+  // işletmeye bağlanmışsa çalışıyor — yani **ilk temasta hiç çalışmıyor.**
+  // Kötü niyetli bir halıcı, rakibinin müşterisinin numarasıyla panelden
+  // elle kayıt açar; müşteri WhatsApp'a yazdığı an mesajı O okur ve 24 saatlik
+  // cevap penceresi de ona açılır. customerPhone doğrulanmıyor.
+  //
+  // KURAL: bir sipariş ancak o numaraya O İŞLETMEDEN gerçekten mesaj GİTMİŞSE
+  // eşleşmeye aday olur. Meşru akışta bu satır zaten var (sipariş alındı
+  // bildirimi — hem kamu ucu hem panel ucu gönderiyor). Kanıtı olmayan mesaj
+  // SAHİPSİZ kalır ve admin elle devreder; veri sızmaz.
+  const temasEdilenIsletmeler = adaylar.length
+    ? (
+        await prisma.whatsAppMessage.findMany({
+          where: { phone: { in: adaylar }, direction: "OUT", businessId: { not: null } },
+          select: { businessId: true },
+          distinct: ["businessId"],
+          take: 20,
+        })
+      )
+        .map((x) => x.businessId)
+        .filter((x): x is string => x != null)
+    : [];
+
+  const aday = adaylar.length && temasEdilenIsletmeler.length
     ? await prisma.order.findFirst({
         where: {
           customerPhone: { in: adaylar },
           createdAt: { gte: OTUZ_GUN },
           status: { notIn: ["CANCELED", "REJECTED"] },
+          businessId: { in: temasEdilenIsletmeler },
         },
         orderBy: { createdAt: "desc" },
         select: {
@@ -341,6 +370,11 @@ async function gelenMesajiKaydet(m: Gelen, ad: string | null): Promise<void> {
         },
       })
     : null;
+  if (adaylar.length && !temasEdilenIsletmeler.length) {
+    console.log(
+      `[whatsapp-webhook] TEMAS KANITI YOK gonderen=${m.from} — bu numaraya hiçbir işletmeden mesaj gitmemiş, mesaj sahipsiz bırakıldı`,
+    );
+  }
 
   // Bu numara daha önce hangi işletmeye bağlanmıştı?
   const onceki = aday

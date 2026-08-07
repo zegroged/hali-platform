@@ -6,6 +6,7 @@ import {
   hashPassword,
   verifyPassword,
   demoBiletiVarMi,
+  createSession,
 } from "@/lib/auth";
 import crypto from "node:crypto";
 import { prisma } from "@/lib/prisma";
@@ -15,9 +16,12 @@ import { rateLimit } from "@/lib/ratelimit";
 // KENDİ ŞİFRESİNİ DEĞİŞTİRME — TÜM ROLLER (2026-08-02).
 // Şifre tek yerde (User.password) yaşadığı için bu tek action komisyoncu,
 // işletme sahibi, şoför, mali müşavir, admin ve müşteriyi birden kapsar.
-// sessionsValidFrom damgası mobil Bearer token'ları düşürür; web çerezi
-// kontrol edilmediğinden (auth.ts getSessionUser) kullanıcı bu oturumda
-// içeride kalır — yeniden giriş gerekmez, mobilde gerekir.
+// sessionsValidFrom damgası ARTIK ÇEREZİ DE düşürüyor (2026-08-07 denetimi,
+// madde 1: eskiden yalnız mobil Bearer düşüyordu, çerez içeride kalıyordu —
+// hesabı ele geçiren biri şifre değişse bile oturumda kalabiliyordu).
+// Bu yüzden kendi şifresini değiştiren kullanıcıya HEMEN yeni oturum
+// veriliyor: damgadan SONRA üretilen jeton geçerlidir, kullanıcı atılmaz.
+// Onun DİĞER cihazlarındaki oturumlar ise (doğru biçimde) düşer.
 export async function changeOwnPassword(formData: FormData) {
   const u = await getSessionUser();
   if (!u) redirect("/giris");
@@ -68,6 +72,10 @@ export async function changeOwnPassword(formData: FormData) {
     where: { id: u.id },
     data: { password: await hashPassword(yeni), sessionsValidFrom: new Date() },
   });
+  // Damga şimdi ÇEREZİ de geçersiz kılıyor → kendini atmamak için tazele.
+  // (createSession demo biletini de siler; şifre değişiminde bu zaten istenen
+  // davranış — bkz. demoBiletiTemizle çağrıları.)
+  await createSession(u.id);
   redirect("/sifre?ok=1");
 }
 

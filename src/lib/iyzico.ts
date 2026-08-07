@@ -215,6 +215,9 @@ export type RetrieveResult = {
   orderId?: string; // basketId — iyzico'nun döndürdüğü değer (client'a güvenilmez)
   paidPrice?: number; // gerçekten tahsil edilen tutar (tutar doğrulaması için)
   paymentId?: string; // iyzico ödeme kimliği — idempotency
+  /** iyzico'nun kendi hata metni/kodu — SESSİZ DÜŞÜŞ OLMASIN (2026-08-07
+   *  denetimi, madde 4): callback bunu loglayabilsin diye taşınıyor. */
+  error?: string;
 };
 
 /* ============================================================================
@@ -472,13 +475,22 @@ export async function retrieveCheckout(token: string): Promise<RetrieveResult> {
     // SDK callback'i hiç dönmezse (ağ/servis takılması) worker sonsuza dek
     // asılı kalmasın — 25 sn sonra hata olarak çöz (denetim bulgusu).
     const _to = setTimeout(
-      () => resolve({ ok: false, error: "iyzico zaman aşımı" } as any),
+      () => resolve({ ok: false, paid: false, error: "iyzico zaman aşımı" }),
       25000,
     );
     void _to;
     client.checkoutForm.retrieve({ locale: "tr", token }, (err: any, result: any) => {
       if (err || result?.status !== "success" || !signatureValid(result)) {
-        resolve({ ok: false, paid: false });
+        // 🔴 SEBEBİ TAŞI (2026-08-07 denetimi, madde 4): buradaki sessizlik
+        // yüzünden "para çekildi, dönem açılmadı" hâli ancak iyzico panelinden
+        // fark edilebiliyordu. Üç ayrı sebep var, hangisi olduğu artık yazılıyor:
+        // SDK hatası · status != success · imza doğrulanamadı (sahte/bozuk yanıt).
+        const sebep = err
+          ? `sdk: ${result?.errorCode ?? ""} ${result?.errorMessage ?? String(err)}`.trim()
+          : result?.status !== "success"
+            ? `status=${result?.status} kod=${result?.errorCode ?? "-"} mesaj=${result?.errorMessage ?? "-"}`
+            : "imza dogrulanamadi";
+        resolve({ ok: false, paid: false, error: sebep });
       } else {
         resolve({
           ok: true,
