@@ -110,6 +110,19 @@ export function Panel({ onLogout, onSessionLost }: Props) {
           // uygulamaya devam eder — büyük yazı isteyen telefon ayarından büyütür.
           setBuiltInZoomControls={false}
           setDisplayZoomControls={false}
+          // 🔴 SİSTEM YAZI ÖLÇEĞİNİ UYGULAMA (2026-08-07 gecesi).
+          // İşletme sahibi 1.1.8'den sonra da *"kartlar büyük, çıkış yazısına
+          // oranlasana"* dedi. Yakınlaştırma kilidi kıstırmayı kapatıyor ama
+          // Android WebView ayrıca **sistem yazı boyutu ölçeğini** uyguluyor
+          // (Ayarlar → Ekran → Yazı tipi boyutu). Telefonda büyük yazı seçiliyse
+          // panelin YAZILARI büyüyor, kutu ölçüleri büyümüyor → kartlar şişiyor
+          // ve satırlar taşıyor. Web'de 360 px'te ölçüldü: taşma YOK, yani
+          // sorun sayfada değil bu ölçekte.
+          // `textZoom={100}` paneli tasarlandığı ölçekte çizer.
+          // ⚠️ Erişilebilirlik: yazıyı büyütmek isteyen için telefonun kendi
+          // yakınlaştırma (büyüteç) özelliği duruyor; panelin kendi ölçüsü
+          // zaten telefon için tasarlandı.
+          textZoom={100}
           cacheEnabled
           // Sayfa sonunda zıplama efekti mobil web'de "bozuk" hissi veriyordu.
           overScrollMode="never"

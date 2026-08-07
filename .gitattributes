@@ -1,4 +1,6 @@
-# Sunucuya scp/tar ile giden dosyalar Windows'ta da LF kalmalı
-# (CRLF'li bash betiği sunucuda kırılır)
+# KABUK BETIKLERI DAIMA LF (2026-08-07 gecesi — canlida yasandi).
+#
+# Windows'ta düzenlenen bir .sh dosyası CRLF ile kaydedilirse Linux sunucuda
+# `$'': command not found` verip ANINDA çıkar. APK bildirim izleyicisi tam
+# bunun yüzünden sessizce ölmüştü: build bitti, mail hiç gitmedi.
 *.sh text eol=lf
-*.conf text eol=lf

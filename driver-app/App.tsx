@@ -25,6 +25,7 @@ import {
   stopTracking,
   isTracking,
   konumIzniVarMi,
+  sonKonumGonderimi,
 } from "./src/tracking";
 import { ensureNotifPermission, pushKaydet, pushSil } from "./src/notify";
 import { Orders } from "./src/Orders";
@@ -75,6 +76,13 @@ function Driver() {
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [onShift, setOnShift] = useState(false);
+  /**
+   * 🔴 KONUM AKIŞI GÖSTERGESİ (2026-08-07 gecesi).
+   * Konum gönderiminin ölmesi bugüne kadar HİÇBİR YERDE görünmüyordu: şoför
+   * "mesaideyim" sanıyor, halıcı boş harita görüyordu (canlıda yaşandı —
+   * 2 saatte 33 sipariş isteği, SIFIR konum). Artık ekran söylüyor.
+   */
+  const [konumYasiSn, setKonumYasiSn] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -118,6 +126,21 @@ function Driver() {
       setBusy(false);
     }
   }
+
+  // Mesai açıkken 15 sn'de bir "en son ne zaman konum gitti" hesapla.
+  useEffect(() => {
+    if (!onShift) {
+      setKonumYasiSn(null);
+      return;
+    }
+    const hesapla = () => {
+      const t = sonKonumGonderimi();
+      setKonumYasiSn(t === 0 ? -1 : Math.round((Date.now() - t) / 1000));
+    };
+    hesapla();
+    const id = setInterval(hesapla, 15000);
+    return () => clearInterval(id);
+  }, [onShift]);
 
   async function toggleShift() {
     setBusy(true);
@@ -279,6 +302,26 @@ function Driver() {
           <Text style={[s.statusSmall, onShift ? s.on : s.off]}>
             {onShift ? "🟢 Mesaidesin — konum paylaşılıyor" : "Mesai dışısın"}
           </Text>
+          {/* Sessiz arıza görünür olsun: 3 dakikadır konum gitmiyorsa bu
+              satır kırmızıya döner ve ne yapılacağını söyler. */}
+          <Text
+            style={[
+              s.konumDurum,
+              konumYasiSn != null && (konumYasiSn < 0 || konumYasiSn > 180)
+                ? s.konumKotu
+                : s.konumIyi,
+            ]}
+          >
+            {!onShift
+              ? ""
+              : konumYasiSn == null
+                ? ""
+                : konumYasiSn < 0
+                  ? "⚠️ Henüz konum gönderilemedi — açık alana çık, konum iznini “Her zaman izin ver” yap."
+                  : konumYasiSn > 180
+                    ? `⚠️ ${Math.round(konumYasiSn / 60)} dk'dır konum gitmiyor — mesaiyi kapatıp yeniden aç.`
+                    : `Son konum: ${konumYasiSn} sn önce`}
+          </Text>
         </View>
         <TouchableOpacity
           style={[s.shiftBtn, onShift && s.btnStop]}
@@ -331,6 +374,9 @@ const s = StyleSheet.create({
   },
   titleSmall: { fontSize: 18, fontWeight: "700", color: "#0f172a" },
   statusSmall: { fontSize: 13, fontWeight: "600", marginTop: 1 },
+  konumDurum: { fontSize: 12, marginTop: 4, textAlign: "center" },
+  konumIyi: { color: "#64748b" },
+  konumKotu: { color: "#b91c1c", fontWeight: "600" },
   shiftBtn: {
     backgroundColor: "#0d9488",
     borderRadius: 10,

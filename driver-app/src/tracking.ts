@@ -10,6 +10,17 @@ export const LOCATION_TASK = "hali-driver-location";
 // "buradayım" der — panelde çevrimdışı düşmez, durak tespiti beslenir.
 let lastSent: { lat: number; lng: number; t: number } | null = null;
 
+/**
+ * SON BAŞARILI GÖNDERİM ANI — ekranda gösterilir (2026-08-07 gecesi).
+ * Konum akışının ölü olması bugüne kadar HİÇBİR YERDE görünmüyordu; şoför
+ * "mesaideyim" sanıyor, halıcı boş harita görüyordu. Artık uygulama
+ * "konum gönderilemiyor" diyebiliyor (App.tsx).
+ */
+let sonGonderimAt = 0;
+export function sonKonumGonderimi(): number {
+  return sonGonderimAt;
+}
+
 function movedMeters(a: { lat: number; lng: number }, lat: number, lng: number) {
   const R = 6371000;
   const dLat = ((lat - a.lat) * Math.PI) / 180;
@@ -133,6 +144,7 @@ TaskManager.defineTask(LOCATION_TASK, async ({ data, error }) => {
   lastSent = { lat: gonderLat, lng: gonderLng, t: now };
   try {
     const result = await postLocation(gonderLat, gonderLng, accuracy ?? undefined);
+    if (result === "ok") sonGonderimAt = Date.now();
     // Oturum düştüyse izlemeyi durdur — "Mesaidesin" bildirimi asılı kalmasın,
     // boşuna GPS/pil yakmasın (şoför açınca tekrar giriş yapar).
     if (result === "unauthorized") await stopTracking();
@@ -176,8 +188,35 @@ export async function startTracking(): Promise<string | null> {
     return "Arka plan için 'Her zaman izin ver' seçilmeli (Ayarlar > Konum).";
   }
 
-  const already = await TaskManager.isTaskRegisteredAsync(LOCATION_TASK);
-  if (already) return null;
+  // 🔴 EN PAHALI HATA (2026-08-07 gecesi — canlıda ölçülerek bulundu).
+  //
+  // BURADA ŞU VARDI:
+  //   const already = await TaskManager.isTaskRegisteredAsync(LOCATION_TASK);
+  //   if (already) return null;
+  //
+  // `isTaskRegisteredAsync` görevin TANIMLI olduğunu söyler; konum
+  // güncellemelerinin AKTIĞINI söylemez. Telefon yeniden başlatıldığında,
+  // uygulama zorla kapatıldığında ya da sistem servisi geri aldığında görev
+  // "kayıtlı" kalır ama akış ölür. O hâlde şoför mesaiyi açar, bu satır
+  // `return null` der, `startLocationUpdatesAsync` HİÇ ÇAĞRILMAZ ve TEK BİR
+  // KONUM GİTMEZ — üstelik hiçbir hata görünmez.
+  //
+  // ÖLÇÜM (canlı, 2026-08-07): uygulama çalışıyor ve sipariş çekiyordu
+  // (2 saatte 33 × GET /api/driver/orders, okhttp), `POST /api/driver/location`
+  // ise **SIFIR**. İşletme sahibi "1 saattir mesaideydim, gittiğim yol
+  // işletmeye gitmemiş" dedi — sebebi buydu.
+  //
+  // ÇÖZÜM: doğru soru "kayıtlı mı" değil, "AKIYOR MU" —
+  // `hasStartedLocationUpdatesAsync`. Akıyorsa bile mesai açılışında
+  // durdurup yeniden başlatıyoruz: seçenekler (sıklık/hassasiyet) tazelenir
+  // ve yarım kalmış bir akış varsa temizlenir. Bu çağrı ucuzdur, mesaide
+  // günde birkaç kez olur.
+  try {
+    const akiyor = await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK);
+    if (akiyor) await Location.stopLocationUpdatesAsync(LOCATION_TASK);
+  } catch {
+    // Okunamazsa yine de başlatmayı dene — sessiz kalmaktan iyidir.
+  }
 
   // Yeni mesai = temiz sayfa: dünkü çıpa bugüne taşınırsa şoför işe
   // başladığında ilk konumlar eski park yerine gönderilir.
