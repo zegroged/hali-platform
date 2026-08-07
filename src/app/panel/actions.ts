@@ -330,17 +330,19 @@ export async function addDriver(formData: FormData) {
   if (chosen && chosen.length < 8) {
     hataylaDon("/panel/soforler", "Şifre en az 8 karakter olmalı (şoföre sen ileteceksin).");
   }
+  // NUMARA ÇAKIŞMASI ARTIK ENGEL DEĞİL (2026-08-07 akşam — çalışan tarafıyla
+  // AYNI karar, gerekçesi prisma/schema.prisma `User.phone` notunda):
+  // telefon doğrulanmıyor ve girişte kullanılmıyor, yani kimlik değil.
+  // Daha önce müşteri olarak sipariş vermiş biri şoför olarak eklenebilmeli.
   const exists = await prisma.user.findFirst({
-    where: { OR: [{ phone }, { username }] },
-    select: { username: true },
+    where: { username },
+    select: { id: true },
   });
   if (exists) {
     // Sessiz başarısızlık yerine halıcıya neden eklenemediğini söyle.
     hataylaDon(
       "/panel/soforler",
-      exists.username === username
-        ? `"${username}" kullanıcı adı başkası tarafından alınmış. Başka bir ad deneyin.`
-        : `${phone} numarası platformda başka bir hesapta kayıtlı (şoför daha önce müşteri olarak sipariş vermiş olabilir). Farklı bir numara girin.`,
+      `"${username}" kullanıcı adı başkası tarafından alınmış. Başka bir ad deneyin.`,
     );
   }
   // Şifreyi halıcı belirleyebilir (SMS canlı olana kadar tek pratik yol).
@@ -782,6 +784,9 @@ export async function advanceOrderPanel(formData: FormData) {
     where: { id: orderId, businessId: b.id, status: order.status },
     data: {
       status: step.next,
+      // Alım anı: Halı Bul ekranı bunu gösterip arıyor (2026-08-07 akşam).
+      // İKİZ: lib/driverOrders.ts + app/sofor/actions.ts — üç alım yolu da yazar.
+      ...(step.next === "PICKED_UP" ? { pickedUpAt: new Date() } : {}),
       ...(step.next === "PICKED_UP" && sayi != null
         ? { carpetCount: sayi }
         : {}),

@@ -211,15 +211,28 @@ export default async function MesajlarSayfasi({
       })
     : [];
 
-  // Sohbet başlığı için: en son gelen mesajın profil adı, bağlı sipariş ve
-  // pencerenin dayandığı "müşteri en son ne zaman yazdı" bilgisi.
-  // Sorgu "desc" geldi: gösterim için eskiden yeniye çevir, "tersi" ise
-  // (en yeniden geriye) sorgunun kendi sırasıdır.
-  const tersi = mesajlar;
-  mesajlar.reverse();
-  const seciliAd = tersi.find((m) => m.name)?.name ?? null;
-  const seciliSiparis = tersi.find((m) => m.order)?.order ?? null;
-  const sonGelen = tersi.find((m) => m.direction === "IN")?.createdAt ?? null;
+  // 🔴 SIRA HATASI DÜZELTİLDİ (2026-08-07 akşam — işletme sahibi bildirdi:
+  // *"adam bana 3 saat önce yazmış, yanıt penceresi kapalı diyor"*).
+  //
+  // ESKİ KOD: `const tersi = mesajlar; mesajlar.reverse();`
+  // `tersi` bir KOPYA DEĞİL, aynı dizinin BAŞKA BİR ADIYDI. `reverse()`
+  // diziyi YERİNDE çevirdiği için `tersi` de çevrildi. Sonuç: "en son gelen
+  // mesaj" diye aranan şey aslında **EN ESKİ** gelen mesajdı. Müşteri iki ay
+  // önce ilk kez yazmışsa 24 saatlik pencere O TARİHTEN hesaplanıyor ve kutu
+  // "kapalı" diyordu — müşteri az önce yazmış olsa bile.
+  //
+  // ⚠️ Bu, 4.68a'daki "ekran bayattı" teşhisinin ALTINDAKİ ASIL sebeptir.
+  // Kendini yenileme doğru bir iyileştirmeydi ama tek başına yetmezdi:
+  // sayfa yenilense de pencere yanlış hesaplanıyordu. Ders: bir şikâyetin
+  // makul bir açıklaması bulununca aramayı bırakma — ölç.
+  //
+  // Artık pencere, sıra bozulmadan ÖNCE hesaplanıyor.
+  const enYeniden = [...mesajlar]; // desc: en yeni ilk
+  mesajlar.reverse(); // gösterim: eskiden yeniye
+  const seciliAd = enYeniden.find((m) => m.name)?.name ?? null;
+  const seciliSiparis = enYeniden.find((m) => m.order)?.order ?? null;
+  const sonGelen =
+    enYeniden.find((m) => m.direction === "IN")?.createdAt ?? null;
 
   const kapanis = sonGelen ? new Date(sonGelen.getTime() + PENCERE_MS) : null;
   const kalanDk = kapanis

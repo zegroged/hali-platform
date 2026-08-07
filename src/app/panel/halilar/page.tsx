@@ -6,6 +6,7 @@ import { getPanelBusiness } from "@/lib/panel";
 import { prisma } from "@/lib/prisma";
 import { ORDER_STATUS_META } from "@/lib/orderStatus";
 import { photoStageLabel } from "@/lib/photoStage";
+import { trDayBoundsUTC } from "@/lib/time";
 
 export const metadata: Metadata = {
   title: "Halı Bul",
@@ -34,15 +35,30 @@ const AKTIF = ["PICKED_UP", "WASHING", "OUT_FOR_DELIVERY"] as const;
 const inp =
   "w-full rounded-lg border border-slate-300 px-4 py-3 text-base focus:border-brand focus:outline-none";
 
+/** 07.08.2026 — TR saat dilimiyle (sunucu UTC'de çalışıyor). */
+function gunEtiketi(d: Date): string {
+  return d.toLocaleDateString("tr-TR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    timeZone: "Europe/Istanbul",
+  });
+}
+
 export default async function HalilarSayfasi({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string }>;
+  searchParams: Promise<{ q?: string; tarih?: string }>;
 }) {
   const b = await getPanelBusiness();
   if (!b) redirect("/giris");
-  const { q } = await searchParams;
+  const { q, tarih } = await searchParams;
   const arama = (q ?? "").trim();
+  // TARİH SÜZGECİ (2026-08-07 akşam, kullanıcı: "halının alındığı tarih olsun,
+  // onunla da arama yapılabilsin"). Gün TR takvimine göre — sunucu UTC'de
+  // çalışıyor, ham tarih karşılaştırması günü 3 saat kaydırırdı.
+  const tarihGecerli = tarih && /^\d{4}-\d{2}-\d{2}$/.test(tarih) ? tarih : null;
+  const gun = tarihGecerli ? trDayBoundsUTC(tarihGecerli) : null;
 
   // Arama sunucuda: 200 halılık dükkânda istemci tarafı filtre için tüm veriyi
   // telefona indirmek gerekirdi. Boş aramada da liste gelir (duvar görünümü).
@@ -50,6 +66,16 @@ export default async function HalilarSayfasi({
     where: {
       businessId: b.id,
       status: { in: [...AKTIF] },
+      // Alım tarihi: yeni siparişlerde `pickedUpAt`, henüz alınmamış ya da eski
+      // kayıtlarda `createdAt` (alan 2026-08-07'de eklendi, geriye dönük boş).
+      ...(gun
+        ? {
+            OR: [
+              { pickedUpAt: { gte: gun.start, lt: gun.end } },
+              { pickedUpAt: null, createdAt: { gte: gun.start, lt: gun.end } },
+            ],
+          }
+        : {}),
       ...(arama
         ? {
             OR: [
@@ -70,6 +96,7 @@ export default async function HalilarSayfasi({
       customerName: true,
       customerPhone: true,
       createdAt: true,
+      pickedUpAt: true,
       carpetCount: true,
       photos: {
         orderBy: [{ carpetNo: "asc" }, { createdAt: "asc" }],
@@ -91,6 +118,8 @@ export default async function HalilarSayfasi({
     tel: string;
     kod: string;
     durum: (typeof AKTIF)[number];
+    /** Halının alındığı gün (yoksa siparişin açıldığı gün). */
+    tarih: Date;
   };
   const kartlar: Kart[] = [];
   for (const o of siparisler) {
@@ -100,6 +129,7 @@ export default async function HalilarSayfasi({
       tel: o.customerPhone,
       kod: o.code ?? "",
       durum: o.status as (typeof AKTIF)[number],
+      tarih: o.pickedUpAt ?? o.createdAt,
     };
     // 🔴 HALI SAYISI ALIMDAN GELİYOR (2026-08-06). Sipariş alınırken kaç halı
     // olduğu girildiyse (`carpetCount`), FOTOĞRAFI OLMAYAN halılar da burada
@@ -178,8 +208,15 @@ export default async function HalilarSayfasi({
           Elindeki halı kimin? Fotoğrafından bul. Dükkânda ve yolda olan{" "}
           <strong>{siparisler.length}</strong> siparişin{" "}
           <strong>{kartlar.filter((k) => k.url).length}</strong> halı fotoğrafı
-          burada — her karenin altında müşterinin adı ve halı numarası yazıyor.
+          burada — her karenin altında müşterinin adı, halı numarası ve
+          <strong> alım tarihi</strong> yazıyor.
         </p>
+        {tarihGecerli && (
+          <p className="mt-1 text-sm font-medium text-brand-dark">
+            Süzgeç: {gunEtiketi(new Date(tarihGecerli + "T12:00:00"))} tarihinde
+            alınan halılar
+          </p>
+        )}
       </div>
 
       <form method="GET" className="flex flex-wrap gap-2">
@@ -190,13 +227,22 @@ export default async function HalilarSayfasi({
           aria-label="Halı ara"
           className={`${inp} sm:max-w-sm`}
         />
+        {/* ALIM TARİHİ SÜZGECİ (2026-08-07 akşam, kullanıcı isteği).
+            Metin aramasıyla BİRLİKTE çalışır: "o gün gelen Ayşe'nin halısı". */}
+        <input
+          type="date"
+          name="tarih"
+          defaultValue={tarihGecerli ?? ""}
+          aria-label="Alım tarihi"
+          className={inp}
+        />
         <button
           type="submit"
           className="rounded-lg bg-brand px-5 py-3 text-sm font-semibold text-white hover:bg-brand-dark"
         >
           Ara
         </button>
-        {arama && (
+        {(arama || tarihGecerli) && (
           <Link
             href="/panel/halilar"
             className="rounded-lg border border-slate-300 bg-white px-5 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
@@ -291,6 +337,11 @@ export default async function HalilarSayfasi({
                 <p className="truncate text-xs text-slate-500">
                   {k.kod ? `${k.kod} · ` : ""}
                   {k.tel}
+                </p>
+                {/* ALIM TARİHİ (2026-08-07 akşam, kullanıcı isteği): "bu halı
+                    ne zaman geldi" sorusu dükkânda en çok sorulan şey. */}
+                <p className="truncate text-xs text-slate-500">
+                  📅 {gunEtiketi(k.tarih)}
                 </p>
                 <span className="mt-1.5 inline-block rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700">
                   {ORDER_STATUS_META[k.durum].label}

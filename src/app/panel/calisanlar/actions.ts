@@ -43,16 +43,18 @@ export async function addStaff(formData: FormData) {
   if (chosen.length < 8)
     hataylaDon("/panel/calisanlar", "Şifre en az 8 karakter olmalı (çalışana sen ileteceksin).");
 
+  // NUMARA ÇAKIŞMASI ARTIK ENGEL DEĞİL (2026-08-07 akşam): telefon doğrulanan
+  // bir kimlik değil, iletişim alanı (girişte kullanılmıyor). Aynı numarayla
+  // daha önce müşteri olarak sipariş verilmiş olması çalışan hesabını
+  // engellemez. Kimlik `username`.
   const exists = await prisma.user.findFirst({
-    where: { OR: [{ phone }, { username }] },
-    select: { username: true },
+    where: { username },
+    select: { id: true },
   });
   if (exists) {
     hataylaDon(
       "/panel/calisanlar",
-      exists.username === username
-        ? `"${username}" kullanıcı adı başkası tarafından alınmış. Başka bir ad deneyin.`
-        : `${phone} numarası platformda başka bir hesapta kayıtlı (çalışan daha önce müşteri olarak sipariş vermiş olabilir). Farklı bir numara girin.`,
+      `"${username}" kullanıcı adı başkası tarafından alınmış. Başka bir ad deneyin.`,
     );
   }
 

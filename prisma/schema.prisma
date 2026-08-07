@@ -97,7 +97,14 @@ model User {
   sessionsValidFrom DateTime?
   role              UserRole
   name              String
-  phone             String    @unique
+  // 🔴 TEKİLLİK KALDIRILDI (2026-08-07 akşam, işletme sahibinin sorusu:
+  // *"müşteri olarak sipariş veren çalışanlar neden hesap açamıyor, numara
+  // doğrulaması yapmıyoruz zaten"*). Haklı: telefonla GİRİŞ 2026-07-09'da
+  // kaldırıldı, numara doğrulanmıyor (SMS mock) — yani `phone` bir KİMLİK
+  // değil, iletişim alanı. Tekil olması hiçbir şeyi korumuyor, yalnız
+  // gerçek bir durumu engelliyordu: daha önce müşteri olarak sipariş vermiş
+  // biri çalışan/şoför olarak eklenemiyordu. Kimlik `username`/`email`de.
+  phone             String
   username          String?   @unique // girişte telefon YERİNE kullanılabilen ad (admin/destek hesapları)
   email             String?   @unique
   password          String? // hash; müşteri için opsiyonel
@@ -511,6 +518,11 @@ model Order {
   // TESLİM ANI (2026-07-26): Kasa'daki aylık gelir bu tarihe göre sayılır.
   // updatedAt kullanılırsa sipariş sonradan güncellendiğinde gelir başka aya
   // kayardı (muhasebe hatası). Eski kayıtlarda null → updatedAt'e düşülür.
+  // ALIM ANI (2026-08-07 akşam, kullanıcı: "halının alındığı tarih olsun,
+  // onunla da arama yapılabilsin"). Öncesinde bu bilgi yalnız OrderEvent
+  // kaydında vardı; Halı Bul ekranında ne gösterilebiliyor ne aranabiliyordu.
+  // Eski siparişlerde boş kalır → ekran `createdAt`e düşer.
+  pickedUpAt      DateTime?
   deliveredAt     DateTime?
   estimatedDays   Int? // halıcının verdiği tahmini teslim süresi (gün)
 

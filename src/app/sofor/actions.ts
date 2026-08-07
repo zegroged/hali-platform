@@ -116,6 +116,7 @@ export async function savePickup(formData: FormData) {
     where: { id, driverId: d.id, status: "ACCEPTED" },
     data: {
       status: "PICKED_UP",
+      pickedUpAt: new Date(), // İKİZ: lib/driverOrders.ts (2026-08-07 akşam)
       pickupPhotoUrl: photoUrl,
       ...(sayi != null ? { carpetCount: sayi } : {}),
     },

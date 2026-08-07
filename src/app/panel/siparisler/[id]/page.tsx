@@ -3,7 +3,7 @@ import Link from "next/link";
 import MoneyInput from "@/components/MoneyInput";
 import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { getSessionUser } from "@/lib/auth";
+import { getPanelErisim } from "@/lib/panelYetki";
 import { getAppBaseUrl } from "@/lib/config";
 import {
   ORDER_STATUS_META,
@@ -66,10 +66,18 @@ export default async function OrderManagePage({
   // HAFİF sorgu: bu sayfa yalnız işletme id'si + şoför listesi kullanıyor.
   // getPanelBusiness tüm işletme grafiğini (fiyat/bölge/foto...) çekiyordu ve
   // her form işleminden sonraki yeniden-render'ı yavaşlatıyordu (B: hız).
-  const u = await getSessionUser();
-  if (!u || u.role !== "CLEANER") redirect("/giris");
+  // 🔴 ÇALIŞAN DA GİREBİLMELİ (2026-08-07 akşam — canlı hata).
+  // Burada `role !== "CLEANER"` yazıyordu: çalışan Siparişler listesini
+  // görüyor ama "Yönet"e basınca /giris'e atılıyordu — üstelik uygulamada
+  // WebView /giris'i "oturum düştü" sayıp kullanıcıyı UYGULAMADAN ATIYORDU.
+  // 4.61a çalışan paneli açılırken LİSTE açılmış, DETAY atlanmıştı; oysa
+  // siparişi yönetmek çalışanın ASIL işi ve buradaki aksiyonların hepsi
+  // (kabul/ilerlet/fiyat/teslim) zaten `bizPaylasilan()` ile çalışana açıktı.
+  // Yani yetki tasarımı doğruydu, yalnız BU sayfanın kapısı eski kalmıştı.
+  const erisim = await getPanelErisim();
+  if (!erisim) redirect("/giris");
   const b = await prisma.cleanerBusiness.findUnique({
-    where: { ownerId: u.id },
+    where: { id: erisim.businessId },
     select: {
       id: true,
       name: true, // WhatsApp mesajında işletme adı geçsin

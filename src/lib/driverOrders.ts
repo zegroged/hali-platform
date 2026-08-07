@@ -150,6 +150,7 @@ export async function driverPickup(
     where: { id: orderId, driverId, status: "ACCEPTED" },
     data: {
       status: "PICKED_UP",
+      pickedUpAt: new Date(), // Halı Bul ekranı bunu gösterip arıyor (2026-08-07 akşam)
       pickupPhotoUrl: photoUrl,
       ...(sayi != null ? { carpetCount: sayi } : {}),
     },

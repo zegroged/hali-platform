@@ -93,7 +93,8 @@ async function bosTelefon(tohum: string): Promise<string> {
     );
   }
   for (const aday of adaylar) {
-    const dolu = await prisma.user.findUnique({
+    // findFirst: `User.phone` artık tekil değil (2026-08-07 akşam).
+    const dolu = await prisma.user.findFirst({
       where: { phone: aday },
       select: { id: true },
     });
