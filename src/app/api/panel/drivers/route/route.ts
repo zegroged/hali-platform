@@ -81,7 +81,13 @@ export async function GET(req: NextRequest) {
   // gibi koca bir yol üretiyordu (kullanıcı: "şoför evden hiç çıkmadı ama
   // harita yol çizdi"). Şoför gerçekten dar bir kümede kaldıysa çizgi HİÇ
   // çizilmez — gürültü "gezinti" gibi görünmesin (bkz. lib/konumFiltre.ts).
-  const hamNoktalar = pings.map((p) => [p.lat, p.lng] as [number, number]);
+  // ⚠️ ZAMAN DAMGASI ŞART (2026-08-07 akşam): süzgeç artık hıza bakıyor; `t`
+  // verilmezse yavaş sürüklenme ile yavaş sürüş ayırt edilemez.
+  const hamNoktalar = pings.map((p) => ({
+    lat: p.lat,
+    lng: p.lng,
+    t: p.recordedAt.getTime(),
+  }));
   const { cizgi, duruyor } = izHazirla(hamNoktalar);
   const points = downsample(cizgi, 500);
   const stopRows = stops.map((s) => ({

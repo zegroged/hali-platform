@@ -15,7 +15,8 @@
     "db:studio": "prisma studio",
     "pretest:rehber": "node scripts/rehber-derle.mjs",
     "test:rehber": "tsx scripts/rehber-kontrol.ts",
-    "test:tahsilat": "tsc src/lib/tahsilat.ts --outDir .tmp-test --target es2022 --module esnext --moduleResolution bundler && node scripts/test-tahsilat.mjs"
+    "test:tahsilat": "tsc src/lib/tahsilat.ts --outDir .tmp-test --target es2022 --module esnext --moduleResolution bundler && node scripts/test-tahsilat.mjs",
+    "test:konum": "tsx scripts/test-konum.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1076.0",

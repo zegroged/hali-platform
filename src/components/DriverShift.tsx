@@ -4,6 +4,16 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { haversineKm } from "@/lib/geo";
 
+// 🔴 DEMİRLEME (2026-08-07 akşam) — İKİZ: `driver-app/src/tracking.ts`.
+// Gerekçe ve iki durumlu makinenin tam açıklaması orada; birini değiştiren
+// ötekini de değiştirmeli (DEVIR §7 "İKİZ mantıklar"). Özet: duruyorken
+// gönderilen konum FIX DEĞİL ÇIPADIR; çıpa ancak cihazın kendi hız ölçümü
+// ≥1,5 m/sn olunca ya da üst üste iki fix 60 m'yi aşınca bırakılır.
+const DEMIR_ESIK_M = 60;
+const HIZ_ESIK_MS = 1.5;
+const ONAY_ARDISIK = 2;
+const DURMA_SURESI_MS = 90_000;
+
 export function DriverShift({ initialOnShift }: { initialOnShift: boolean }) {
   const [on, setOn] = useState(initialOnShift);
   const [sent, setSent] = useState(0);
@@ -16,6 +26,11 @@ export function DriverShift({ initialOnShift }: { initialOnShift: boolean }) {
   const watchRef = useRef<number | null>(null);
   const wakeRef = useRef<{ release?: () => void } | null>(null);
   const lastPost = useRef<{ lat: number; lng: number; t: number } | null>(null);
+  // Demirleme durumu (yukarıdaki blok).
+  const durum = useRef<"DURUYOR" | "HAREKETTE">("DURUYOR");
+  const demir = useRef<{ lat: number; lng: number } | null>(null);
+  const uzakArdisik = useRef(0);
+  const sonHareketAt = useRef(0);
   const router = useRouter();
 
   async function toggle() {
@@ -42,6 +57,11 @@ export function DriverShift({ initialOnShift }: { initialOnShift: boolean }) {
         wakeRef.current = null;
       }
       lastPost.current = null;
+      // Mesai kapanınca demirleme sıfırlanır — yeni mesai dünkü çıpayla
+      // başlamasın (İKİZ: tracking.ts startTracking).
+      durum.current = "DURUYOR";
+      demir.current = null;
+      uzakArdisik.current = 0;
     }
 
     if (!on) {
@@ -53,7 +73,7 @@ export function DriverShift({ initialOnShift }: { initialOnShift: boolean }) {
     if ("geolocation" in navigator) {
       watchRef.current = navigator.geolocation.watchPosition(
         (pos) => {
-          const { latitude, longitude, accuracy } = pos.coords;
+          const { latitude, longitude, accuracy, speed } = pos.coords;
           // KAYMA SÜZGECİ: GPS oturmadan gelen kaba fix (Wi-Fi/baz, yüzlerce
           // metre sapar) HİÇ gönderilmez — haritada "gitmediği yere gitmiş"
           // izlerinin köküydü. GPS oturunca (≤150 m) gönderim başlar.
@@ -63,18 +83,60 @@ export function DriverShift({ initialOnShift }: { initialOnShift: boolean }) {
           }
           setLowAcc(null);
           const now = Date.now();
+
+          // DEMİRLEME — duruyorsak fix'i değil çıpayı bildir.
+          let gLat = latitude;
+          let gLng = longitude;
+          if (durum.current === "DURUYOR") {
+            if (!demir.current) demir.current = { lat: latitude, lng: longitude };
+            const uzaklik =
+              haversineKm(
+                demir.current.lat,
+                demir.current.lng,
+                latitude,
+                longitude,
+              ) * 1000;
+            uzakArdisik.current =
+              uzaklik > DEMIR_ESIK_M ? uzakArdisik.current + 1 : 0;
+            const hizVar = speed != null && speed >= HIZ_ESIK_MS;
+            if (hizVar || uzakArdisik.current >= ONAY_ARDISIK) {
+              durum.current = "HAREKETTE";
+              uzakArdisik.current = 0;
+              demir.current = null;
+              sonHareketAt.current = now;
+            } else {
+              gLat = demir.current.lat;
+              gLng = demir.current.lng;
+            }
+          }
+          if (durum.current === "HAREKETTE") {
+            const l = lastPost.current;
+            if (
+              !l ||
+              haversineKm(l.lat, l.lng, latitude, longitude) * 1000 >= 25
+            ) {
+              sonHareketAt.current = now;
+            } else if (now - sonHareketAt.current > DURMA_SURESI_MS) {
+              durum.current = "DURUYOR";
+              uzakArdisik.current = 0;
+              demir.current = { lat: latitude, lng: longitude };
+              gLat = latitude;
+              gLng = longitude;
+            }
+          }
+
           const last = lastPost.current;
           const movedM = last
-            ? haversineKm(last.lat, last.lng, latitude, longitude) * 1000
+            ? haversineKm(last.lat, last.lng, gLat, gLng) * 1000
             : Infinity;
           const dt = last ? now - last.t : Infinity;
           // Yükü azalt: 25 m'den az hareket VE 8 sn'den yeni ise gönderme
           if (movedM < 25 && dt < 8000) return;
-          lastPost.current = { lat: latitude, lng: longitude, t: now };
+          lastPost.current = { lat: gLat, lng: gLng, t: now };
           fetch("/api/driver/location", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ lat: latitude, lng: longitude, acc: accuracy }),
+            body: JSON.stringify({ lat: gLat, lng: gLng, acc: accuracy }),
           })
             .then(() => setSent((n) => n + 1))
             .catch(() => {

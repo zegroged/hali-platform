@@ -81,14 +81,18 @@ $URL
 Kurulum: linke telefondan tikla, indir, ac. Android 'bilinmeyen kaynak'
 uyarisi verirse bu tarayiciya izin ver.
 
-TEST EDILECEKLER (bu surumde yeni):
-1) Fotograf — 'Haliyi Aldim' derken hata olursa artik SEBEBINI yaziyor.
-   Ekranda ne yazdigini not al, teshis onunla yapilacak.
-2) Kac hali aldin? — alim ekranindaki yeni alan
-3) Calisan paneli — panelden hesap ac, o hesapla gir; kasa/profil gorunmemeli
-4) Kasma — sayfa gecislerinde iskelet cikmali
-5) Konum — durdugunda harita artik yol cizmemeli
-6) Push — uygulamayi TAMAMEN kapat, baska telefondan siparis olustur
+TEST EDILECEKLER (onem sirasiyla):
+1) FOTOGRAF (en onemlisi — tek acik is bu) — 'Haliyi Aldim' derken hata
+   olursa artik SEBEBINI yaziyor. Ekranda cikan yaziyi AYNEN not al ya da
+   ekran goruntusu al. Dort farkli mesajdan hangisi ciktigi, sorunun
+   nerede oldugunu tek basina soyluyor.
+2) KONUM — mesaiyi ac, telefonu masaya birak, 15-20 dk bekle. Panel >
+   Canli Takip'te harita HIC yol cizmemeli ('duruyor' demeli). Sonra
+   araca bin: yol normal cizilmeli.
+3) Push — uygulamayi TAMAMEN kapat, baska telefondan siparis olustur
+4) Kac hali aldin? — alim ekranindaki alan
+5) Calisan paneli — panelden hesap ac, o hesapla gir; kasa/profil gorunmemeli
+6) Kasma — sayfa gecislerinde iskelet cikmali
 
 Not: bu mail otomatik gonderildi."
       else
