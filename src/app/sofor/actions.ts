@@ -99,10 +99,17 @@ export async function savePickup(formData: FormData) {
     o.id,
     "ALIM",
   );
-  // Arayüz (PhotoForm) fotoğrafsız göndermeyi zaten alanın altında net uyarıyla
-  // engelliyor. Atlatılırsa TAM-EKRAN hata yerine sessizce /sofor'a dön —
-  // fotoğraf olmadan halı PICKED_UP olmaz.
-  if (!photoUrl) redirect("/sofor");
+  // 🔴 2026-08-08: burada SESSİZ `redirect("/sofor")` vardı. Arayüz yalnız
+  // "dosya seçildi mi"ye bakıyor; `saveOrderPhotoFile` bunun dışında da null
+  // dönebiliyor (8 MB üstü, HEIC/desteklenmeyen tür, sharp hatası). O
+  // durumlarda şoför aynı ekrana atılıyor ve NEDEN olmadığını hiç öğrenmiyordu.
+  // Mobil ikizi (`lib/driverOrders.ts`) sebebini yazıyor; beş satır aşağıdaki
+  // carpetCount dalı da `hataylaDon` kullanıyor — yalnız bu dal susuyordu.
+  if (!photoUrl)
+    hataylaDon(
+      "/sofor",
+      "Fotoğraf kaydedilemedi (jpg/png/webp, en fazla 8 MB). Tekrar çek ya da başka bir kare dene — fotoğraf olmadan halı alınmış sayılmaz.",
+    );
 
   // HALI SAYISI — ALIM ANINDA (2026-08-06, driverOrders.ts ile İKİZ).
   // Numaralar buradan doğar; öncesinde fotoğraftan doğuyordu ve fotoğrafı
@@ -256,9 +263,14 @@ export async function deliverOrder(formData: FormData) {
     id,
     "TESLIM",
   );
-  // Arayüz zaten engelliyor; atlatılırsa tam-ekran hata yerine sessizce dön —
-  // fotoğraf olmadan DELIVERED olmaz / para kaydı açılmaz.
-  if (!deliveryPhotoUrl) redirect("/sofor");
+  // 🔴 2026-08-08: alım dalıyla AYNI sessizlik buradaydı. Teslimde daha da
+  // kritik: fotoğraf yoksa DELIVERED olmaz, yani tahsilat kaydı da açılmaz —
+  // şoför parayı almış ama sistemde teslim görünmüyor olabilir.
+  if (!deliveryPhotoUrl)
+    hataylaDon(
+      "/sofor",
+      "Teslim fotoğrafı kaydedilemedi (jpg/png/webp, en fazla 8 MB). Tekrar çek — fotoğraf olmadan teslim ve tahsilat kaydı açılmaz.",
+    );
 
   const isCash = o.paymentMethod === "CASH";
   // Nakitte teslimde tahsil edilir; kartta ödeme iyzico callback'ine bırakılır.

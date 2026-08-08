@@ -50,10 +50,24 @@ export function useStuckAutoReload(pending: boolean, ms = 10_000): boolean {
  */
 export function PendingButton({
   children,
+  otoYenileme = true,
   ...rest
-}: ButtonHTMLAttributes<HTMLButtonElement>) {
+}: ButtonHTMLAttributes<HTMLButtonElement> & {
+  /** 🔴 DOSYA YÜKLEYEN FORMLARDA `false` VER (2026-08-08).
+   *
+   *  10 sn'lik oto-yenileme, yükleme SÜRERKEN de sayacı işletiyordu: yavaş
+   *  uplink'te fotoğraf gönderimi ortasında `window.location.reload()`
+   *  çalışıp POST'u iptal ediyor, sunucu aksiyonu HİÇ çalışmıyor ve şoföre
+   *  tek kelime hata görünmüyordu. 60 MB'lık APK değil, 8 MB'a kadar
+   *  fotoğraf — mobil şebekede 10 saniye çok kolay aşılıyor.
+   *
+   *  Bu bayrak yalnız "yanıt uygulanamadı" ağını kapatır; asıl kök neden
+   *  (deploy sonrası eski çalışma zamanı) VersionSkewGuard ile zaten
+   *  yakalanıyor. */
+  otoYenileme?: boolean;
+}) {
   const { pending } = useFormStatus();
-  const reloading = useStuckAutoReload(pending);
+  const reloading = useStuckAutoReload(pending && otoYenileme);
 
   return (
     <button type="submit" disabled={pending} aria-busy={pending} {...rest}>

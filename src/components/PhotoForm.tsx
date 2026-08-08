@@ -64,7 +64,12 @@ export function PhotoForm({
           {err}
         </p>
       )}
-      <PendingButton className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-brand py-2 text-sm font-semibold text-white hover:bg-brand-dark">
+      {/* otoYenileme=false ŞART: bu form dosya yüklüyor ve 10 sn'lik yenileme
+          yüklemeyi ortasında kesiyordu (2026-08-08). */}
+      <PendingButton
+        otoYenileme={false}
+        className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-brand py-2 text-sm font-semibold text-white hover:bg-brand-dark"
+      >
         {buttonLabel}
       </PendingButton>
       {footer}

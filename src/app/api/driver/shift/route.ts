@@ -22,7 +22,17 @@ export async function POST(req: NextRequest) {
       // Mesai AÇILIŞ anı — konum bekçisinin referansı (lib/konumBekcisi.ts).
       // Kapanışta null: kapalı mesai için sessizlik ölçmenin anlamı yok.
       shiftStartedAt: on ? new Date() : null,
-      ...(on ? { lastSeenAt: new Date() } : {}),
+      // 🔴 `lastSeenAt: new Date()` BURADAN KALDIRILDI (2026-08-08, DENETİM md.8d).
+      //
+      // Mesai açılışı `lastSeenAt`i tazeliyor ama `lastLat/lastLng`e
+      // DOKUNMUYORDU. Oysa bütün tazelik korumaları (panel 5 dk, müşteri
+      // takibi 10 dk) "lastSeenAt = son KONUMUN anı" varsayıyor. Sonuç:
+      // şoför mesaiyi kapatıp açtığı an, GÜNLER ÖNCEKİ koordinatı "canlı"
+      // sayılıp haritada işaretçi olarak çiziliyordu.
+      // Canlı kanıt: `osmansofor` — lastLat 22 Temmuz'dan, isOnShift=true.
+      //
+      // Artık `lastSeenAt`i YALNIZ gerçek ping yazıyor
+      // (`api/driver/location`), yani alan adı ne diyorsa onu tutuyor.
     },
   });
 
