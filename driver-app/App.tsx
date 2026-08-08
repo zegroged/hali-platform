@@ -28,10 +28,42 @@ import {
   sonKonumGonderimi,
 } from "./src/tracking";
 import { ensureNotifPermission, pushKaydet, pushSil } from "./src/notify";
+import {
+  pilMuafiyetiIste,
+  uygulamaAyarlariniAc,
+  pilUyarisiGosterildiMi,
+  pilUyarisiniIsaretle,
+} from "./src/pil";
 import { Orders } from "./src/Orders";
 import { Panel } from "./src/Panel";
 
 const NAME_KEY = "hali_driver_name";
+const PAKET = "com.enyakinhaliyikamaservisi.driver";
+
+/**
+ * PİL KISITLAMASI UYARISI — mesai ilk kez açıldığında bir kez.
+ *
+ * Gerekçe (2026-08-08 ölçümü): Tecno'da konum akışı mesai açıldıktan ~6,5 dk
+ * sonra ölüyordu; sebep telefonun ön plan servisini öldürmesiydi. Uygulamanın
+ * o güne kadar şoförü ayara GÖTÜREN hiçbir yolu yoktu — yalnız "Ayarlar'dan
+ * yap" yazıp bırakıyordu, sahada kimse yapmaz.
+ */
+function pilUyarisiniGoster(): Promise<"muafiyet" | "ayarlar" | "sonra"> {
+  return new Promise((resolve) => {
+    Alert.alert(
+      "Konumun kesintiye uğramasın",
+      "Bazı telefonlar ekran kapalıyken uygulamayı durdurur ve konumun " +
+        "işletmene GİTMEZ — sen mesaide sanırsın. Bunu önlemek için " +
+        "“Halı Şoför”ü pil kısıtlamasından çıkar.",
+      [
+        { text: "Sonra", style: "cancel", onPress: () => resolve("sonra") },
+        { text: "Diğer ayarlar", onPress: () => resolve("ayarlar") },
+        { text: "İzin ver", onPress: () => resolve("muafiyet") },
+      ],
+      { cancelable: true, onDismiss: () => resolve("sonra") },
+    );
+  });
+}
 
 /** Panel şeridinde gösterilecek rol adı. */
 const ROL_ADI: Record<string, string> = {
@@ -165,6 +197,21 @@ function Driver() {
         // Yeni-iş bildirimi izni (Android 13+): mesai bağlamında iste —
         // reddedilirse mesai yine açılır, yalnız bildirim düşmez.
         ensureNotifPermission().catch(() => {});
+        // Pil kısıtlaması: ilk mesaide bir kez. Mesai AÇILDIKTAN sonra —
+        // izin akışını bölmesin, ve mesai bu yüzden asla engellenmesin.
+        void (async () => {
+          try {
+            if (await pilUyarisiGosterildiMi()) return;
+            const secim = await pilUyarisiniGoster();
+            if (secim === "muafiyet") await pilMuafiyetiIste(PAKET);
+            else if (secim === "ayarlar") await uygulamaAyarlariniAc(PAKET);
+            // "Sonra" dense bile işaretle: her mesaide sormak eziyet olur.
+            // Şoför istediğinde alttaki kalıcı bağlantıdan ulaşabiliyor.
+            await pilUyarisiniIsaretle();
+          } catch {
+            // Pil akışı mesaiyi ASLA bozmamalı.
+          }
+        })();
       } else {
         await stopTracking();
       }
@@ -322,6 +369,14 @@ function Driver() {
                     ? `⚠️ ${Math.round(konumYasiSn / 60)} dk'dır konum gitmiyor — mesaiyi kapatıp yeniden aç.`
                     : `Son konum: ${konumYasiSn} sn önce`}
           </Text>
+          {/* Konum gitmiyorken şoförü ÇIKMAZDA bırakma: uyarı "ayarlardan
+              düzelt" diyorsa oraya götüren bir düğme de olmalı. Yalnız sorun
+              varken görünür — normalde ekranı kalabalıklaştırmasın. */}
+          {onShift && konumYasiSn != null && (konumYasiSn < 0 || konumYasiSn > 180) && (
+            <TouchableOpacity onPress={() => pilMuafiyetiIste(PAKET)}>
+              <Text style={s.pilLink}>🔋 Pil kısıtlamasını kaldır →</Text>
+            </TouchableOpacity>
+          )}
         </View>
         <TouchableOpacity
           style={[s.shiftBtn, onShift && s.btnStop]}
@@ -377,6 +432,12 @@ const s = StyleSheet.create({
   konumDurum: { fontSize: 12, marginTop: 4, textAlign: "center" },
   konumIyi: { color: "#64748b" },
   konumKotu: { color: "#b91c1c", fontWeight: "600" },
+  pilLink: {
+    color: "#0d9488",
+    fontWeight: "700",
+    fontSize: 13,
+    marginTop: 4,
+  },
   shiftBtn: {
     backgroundColor: "#0d9488",
     borderRadius: 10,

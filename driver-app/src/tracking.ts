@@ -257,6 +257,18 @@ export async function stopTracking() {
   }
 }
 
+/** Konum AKIYOR mu?
+ *
+ *  🔴 md.8(a) — 2026-08-08'de düzeltildi. Burada `isTaskRegisteredAsync` vardı:
+ *  görevin TANIMLI olduğunu söyler, aktığını söylemez (aynı tuzak 4.75a'da
+ *  `startTracking` içinde de vardı, düzeltme oraya konup buraya konmamıştı).
+ *  Sonucu: telefon görevi öldürdüğünde uygulama açılışta hâlâ "Mesaidesin —
+ *  konum paylaşılıyor" yazıyordu. Akış ölüyken YEŞİL gösteren bir ekran,
+ *  hiç göstergesi olmamasından kötüdür. */
 export async function isTracking() {
-  return TaskManager.isTaskRegisteredAsync(LOCATION_TASK);
+  try {
+    return await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK);
+  } catch {
+    return false;
+  }
 }

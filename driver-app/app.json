@@ -2,7 +2,7 @@
   "expo": {
     "name": "Halı Şoför",
     "slug": "hali-driver",
-    "version": "1.1.9",
+    "version": "1.2.0",
     "orientation": "portrait",
     "scheme": "halidriver",
     "userInterfaceStyle": "light",
@@ -54,7 +54,7 @@
     "android": {
       "package": "com.enyakinhaliyikamaservisi.driver",
       "googleServicesFile": "./google-services.json",
-      "versionCode": 13,
+      "versionCode": 14,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0d9488"
@@ -65,7 +65,8 @@
         "android.permission.ACCESS_BACKGROUND_LOCATION",
         "android.permission.FOREGROUND_SERVICE",
         "android.permission.FOREGROUND_SERVICE_LOCATION",
-        "android.permission.POST_NOTIFICATIONS"
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"
       ],
       "blockedPermissions": [
         "android.permission.RECORD_AUDIO",
