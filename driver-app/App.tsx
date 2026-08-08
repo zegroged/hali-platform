@@ -28,12 +28,8 @@ import {
   sonKonumGonderimi,
 } from "./src/tracking";
 import { ensureNotifPermission, pushKaydet, pushSil } from "./src/notify";
-import {
-  pilMuafiyetiIste,
-  uygulamaAyarlariniAc,
-  pilUyarisiGosterildiMi,
-  pilUyarisiniIsaretle,
-} from "./src/pil";
+import { pilUyarisiGosterildiMi, pilUyarisiniIsaretle } from "./src/pil";
+import { Kurulum } from "./src/Kurulum";
 import { Orders } from "./src/Orders";
 import { Panel } from "./src/Panel";
 
@@ -41,26 +37,29 @@ const NAME_KEY = "hali_driver_name";
 const PAKET = "com.enyakinhaliyikamaservisi.driver";
 
 /**
- * PİL KISITLAMASI UYARISI — mesai ilk kez açıldığında bir kez.
+ * KURULUM ekranına yönlendirme (2026-08-08 v2).
  *
- * Gerekçe (2026-08-08 ölçümü): Tecno'da konum akışı mesai açıldıktan ~6,5 dk
- * sonra ölüyordu; sebep telefonun ön plan servisini öldürmesiydi. Uygulamanın
- * o güne kadar şoförü ayara GÖTÜREN hiçbir yolu yoktu — yalnız "Ayarlar'dan
- * yap" yazıp bırakıyordu, sahada kimse yapmaz.
+ * ÖNCEKİ SÜRÜMDE BURADA bir Alert vardı ve "İzin ver" seçilince pil
+ * diyaloğunu açmaya çalışıyordu. İşletme sahibi sahada denedi: **hiçbir şey
+ * açılmadı** — Tecno/HiOS o pencereyi sessizce yutuyor, çağrı hata da
+ * atmıyor, yani kod "oldu" sanıp susuyordu. Bu projenin kronik hastalığının
+ * (sessiz başarısızlık) tam kendisiydi.
+ *
+ * Artık tek bir Alert değil, adım adım durumu GÖSTEREN bir Kurulum ekranı var
+ * ve her adım "açılmadıysa şunu yap" diyor.
  */
-function pilUyarisiniGoster(): Promise<"muafiyet" | "ayarlar" | "sonra"> {
+function kurulumaDavet(): Promise<boolean> {
   return new Promise((resolve) => {
     Alert.alert(
       "Konumun kesintiye uğramasın",
       "Bazı telefonlar ekran kapalıyken uygulamayı durdurur ve konumun " +
-        "işletmene GİTMEZ — sen mesaide sanırsın. Bunu önlemek için " +
-        "“Halı Şoför”ü pil kısıtlamasından çıkar.",
+        "işletmene GİTMEZ — sen mesaide sanırsın. Kurulum ekranında bunu " +
+        "birlikte kapatalım; bir kez yapılıyor.",
       [
-        { text: "Sonra", style: "cancel", onPress: () => resolve("sonra") },
-        { text: "Diğer ayarlar", onPress: () => resolve("ayarlar") },
-        { text: "İzin ver", onPress: () => resolve("muafiyet") },
+        { text: "Sonra", style: "cancel", onPress: () => resolve(false) },
+        { text: "Kuruluma git", onPress: () => resolve(true) },
       ],
-      { cancelable: true, onDismiss: () => resolve("sonra") },
+      { cancelable: true, onDismiss: () => resolve(false) },
     );
   });
 }
@@ -115,6 +114,7 @@ function Driver() {
    * 2 saatte 33 sipariş isteği, SIFIR konum). Artık ekran söylüyor.
    */
   const [konumYasiSn, setKonumYasiSn] = useState<number | null>(null);
+  const [kurulumGoster, setKurulumGoster] = useState(false);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -165,13 +165,21 @@ function Driver() {
       setKonumYasiSn(null);
       return;
     }
-    const hesapla = () => {
-      const t = sonKonumGonderimi();
+    // 2026-08-08: değer artık kalıcı depodan okunuyor (asenkron). Eskiden
+    // modül değişkeniydi; arka plan bağlamı yıkılınca 0'a düşüyor ve ekran
+    // konum GİDERKEN "henüz gönderilemedi" diyebiliyordu.
+    let iptal = false;
+    const hesapla = async () => {
+      const t = await sonKonumGonderimi();
+      if (iptal) return;
       setKonumYasiSn(t === 0 ? -1 : Math.round((Date.now() - t) / 1000));
     };
-    hesapla();
-    const id = setInterval(hesapla, 15000);
-    return () => clearInterval(id);
+    void hesapla();
+    const id = setInterval(() => void hesapla(), 15000);
+    return () => {
+      iptal = true;
+      clearInterval(id);
+    };
   }, [onShift]);
 
   async function toggleShift() {
@@ -197,19 +205,17 @@ function Driver() {
         // Yeni-iş bildirimi izni (Android 13+): mesai bağlamında iste —
         // reddedilirse mesai yine açılır, yalnız bildirim düşmez.
         ensureNotifPermission().catch(() => {});
-        // Pil kısıtlaması: ilk mesaide bir kez. Mesai AÇILDIKTAN sonra —
+        // Kurulum daveti: ilk mesaide bir kez. Mesai AÇILDIKTAN sonra —
         // izin akışını bölmesin, ve mesai bu yüzden asla engellenmesin.
         void (async () => {
           try {
             if (await pilUyarisiGosterildiMi()) return;
-            const secim = await pilUyarisiniGoster();
-            if (secim === "muafiyet") await pilMuafiyetiIste(PAKET);
-            else if (secim === "ayarlar") await uygulamaAyarlariniAc(PAKET);
+            if (await kurulumaDavet()) setKurulumGoster(true);
             // "Sonra" dense bile işaretle: her mesaide sormak eziyet olur.
-            // Şoför istediğinde alttaki kalıcı bağlantıdan ulaşabiliyor.
+            // Şoför istediğinde ekrandaki kalıcı bağlantıdan ulaşabiliyor.
             await pilUyarisiniIsaretle();
           } catch {
-            // Pil akışı mesaiyi ASLA bozmamalı.
+            // Kurulum akışı mesaiyi ASLA bozmamalı.
           }
         })();
       } else {
@@ -341,6 +347,16 @@ function Driver() {
     );
   }
 
+  // KURULUM — izinlerin tamamı tek akışta, bir kez. Mesai açıkken de
+  // açılabilir; ekrandan çıkınca izleme durumu değişmez.
+  if (kurulumGoster) {
+    return (
+      <SafeAreaView style={s.screenTop}>
+        <Kurulum paket={PAKET} onBitti={() => setKurulumGoster(false)} />
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={s.screenTop}>
       <View style={s.topBar}>
@@ -372,9 +388,13 @@ function Driver() {
           {/* Konum gitmiyorken şoförü ÇIKMAZDA bırakma: uyarı "ayarlardan
               düzelt" diyorsa oraya götüren bir düğme de olmalı. Yalnız sorun
               varken görünür — normalde ekranı kalabalıklaştırmasın. */}
+          {/* Sorun varken Kuruluma götür. ESKİDEN burada doğrudan pil
+              diyaloğunu açan bir çağrı vardı; Tecno onu sessizce yutunca
+              düğme "çalışmıyor" görünüyordu. Kurulum ekranı her adımda
+              "açılmadıysa şunu yap" diyor. */}
           {onShift && konumYasiSn != null && (konumYasiSn < 0 || konumYasiSn > 180) && (
-            <TouchableOpacity onPress={() => pilMuafiyetiIste(PAKET)}>
-              <Text style={s.pilLink}>🔋 Pil kısıtlamasını kaldır →</Text>
+            <TouchableOpacity onPress={() => setKurulumGoster(true)}>
+              <Text style={s.pilLink}>🔧 Konum ayarlarını düzelt →</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -398,6 +418,11 @@ function Driver() {
       <View style={s.bottomBar}>
         <TouchableOpacity onPress={doLogout}>
           <Text style={s.link}>Çıkış</Text>
+        </TouchableOpacity>
+        {/* Kurulum her zaman erişilebilir olmalı: izinler telefon güncellemesi
+            ya da "kullanılmayan uygulama" temizliğiyle sonradan da düşebilir. */}
+        <TouchableOpacity onPress={() => setKurulumGoster(true)}>
+          <Text style={s.link}>Kurulum</Text>
         </TouchableOpacity>
         {privacyLink}
       </View>

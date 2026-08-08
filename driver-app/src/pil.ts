@@ -22,8 +22,17 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 const GOSTERILDI = "pil-uyarisi-gosterildi";
 
 /** Android'de pil optimizasyonu muafiyeti diyaloğunu doğrudan açar.
- *  `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` izni manifestte olmalı, yoksa
- *  sistem isteği reddeder. */
+ *
+ *  ⚠️ 2026-08-08 — SESSİZ BAŞARISIZLIK BURADAYDI: bu çağrı Tecno/HiOS'ta
+ *  HATA ATMADAN dönüyor ama ekranda hiçbir şey açılmıyor. Eski sürüm bunu
+ *  "başarılı" sayıp susuyordu; işletme sahibi "düğme çalışmıyor" dedi ve
+ *  haklıydı. Artık ÇAĞIRAN, açılıp açılmadığını KULLANICIYA sormak zorunda
+ *  (bkz. App.tsx pil akışı) — çünkü Android bunu programatik olarak
+ *  söylemiyor: muafiyet durumunu okumanın Expo'da bir yolu yok.
+ *
+ *  🔑 Ve şunu bilerek yapmıyoruz: uygulamanın kendini muaf tutması Android'de
+ *  MÜMKÜN DEĞİL. Sistem diyaloğunu kullanıcı onaylamak zorunda; bu kasıtlı
+ *  bir platform kuralı. Otomatik kaldırma isteği bu yüzden karşılanamaz. */
 export async function pilMuafiyetiIste(paket: string): Promise<boolean> {
   if (Platform.OS !== "android") return false;
   try {
@@ -35,6 +44,21 @@ export async function pilMuafiyetiIste(paket: string): Promise<boolean> {
   } catch {
     // Bazı ROM'lar bu intent'i hiç taşımıyor → uygulama ayrıntı sayfasına düş.
     return uygulamaAyarlariniAc(paket);
+  }
+}
+
+/** Pil optimizasyonu AYARLAR LİSTESİ — "Kısıtlanmamış" seçeneğinin bulunduğu
+ *  ekran. Doğrudan diyalog açılmadığında güvenilir ikinci yol; bu intent
+ *  neredeyse tüm ROM'larda var. */
+export async function pilAyarListesiniAc(): Promise<boolean> {
+  if (Platform.OS !== "android") return false;
+  try {
+    await IntentLauncher.startActivityAsync(
+      "android.settings.IGNORE_BATTERY_OPTIMIZATION_SETTINGS",
+    );
+    return true;
+  } catch {
+    return false;
   }
 }
 

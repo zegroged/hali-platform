@@ -2,23 +2,36 @@ import * as Location from "expo-location";
 import * as TaskManager from "expo-task-manager";
 import { postLocation } from "./api";
 import { checkNewOrdersAndNotify } from "./notify";
+import {
+  durumuOku,
+  durumuYaz,
+  durumuSifirla,
+  sonGonderimiOku,
+} from "./izlemeDurumu";
 
 export const LOCATION_TASK = "hali-driver-location";
 
 // Web DriverShift ile AYNI gönderim süzgeci: 25 m'den az hareket VE son
 // gönderim 60 sn'den yeniyse atla. Duran şoför yine de dakikada bir
 // "buradayım" der — panelde çevrimdışı düşmez, durak tespiti beslenir.
-let lastSent: { lat: number; lng: number; t: number } | null = null;
+//
+// 🔴 2026-08-08: Bu süzgecin ve altındaki demirlemenin durumu artık BELLEKTE
+// DEĞİL, kalıcı depoda tutuluyor (src/izlemeDurumu.ts). Modül değişkenleri
+// arka plan görevinin headless bağlamı yıkılınca sıfırlanıyordu ve bütün
+// frenler devre dışı kalıyordu — gerekçe ve canlı ölçüm o dosyanın başında.
 
 /**
  * SON BAŞARILI GÖNDERİM ANI — ekranda gösterilir (2026-08-07 gecesi).
  * Konum akışının ölü olması bugüne kadar HİÇBİR YERDE görünmüyordu; şoför
  * "mesaideyim" sanıyor, halıcı boş harita görüyordu. Artık uygulama
  * "konum gönderilemiyor" diyebiliyor (App.tsx).
+ *
+ * ⚠️ 2026-08-08'de ASENKRON oldu: değer kalıcı depodan okunuyor. Eskiden
+ * modül değişkeniydi ve bağlam yıkılınca 0'a düşüyordu — ekran konum
+ * GİDERKEN "henüz gönderilemedi" diyebiliyordu (göstergenin kendisi yalan).
  */
-let sonGonderimAt = 0;
-export function sonKonumGonderimi(): number {
-  return sonGonderimAt;
+export async function sonKonumGonderimi(): Promise<number> {
+  return sonGonderimiOku();
 }
 
 function movedMeters(a: { lat: number; lng: number }, lat: number, lng: number) {
@@ -71,29 +84,32 @@ const HIZ_ESIK_MS = 1.5; // ≈5,4 km/sa — cihaz "gidiyorum" diyorsa anında i
 const ONAY_ARDISIK = 2; // hız yoksa: üst üste kaç uzak fix hareket sayılır
 const DURMA_SURESI_MS = 90_000; // hareketsiz geçen bu süre sonunda yeniden demirle
 
-type Durum = "DURUYOR" | "HAREKETTE";
-let durum: Durum = "DURUYOR";
-let demir: { lat: number; lng: number } | null = null;
-let uzakArdisik = 0;
-let sonHareketAt = 0;
-
 // Arka plan konum görevi — uygulama kapalı/kilitliyken bile çalışır (native).
-// Yeni-iş yoklaması için ayrı sayaç: konum 15 sn'de bir gelir ama sipariş
-// listesini her seferinde çekmek israf — 45 sn'de bir yeter.
-let lastOrderCheck = 0;
-
+//
+// ⚠️ BU GÖVDENİN TÜM DURUMU KALICI DEPODAN GELİR (izlemeDurumu.ts). Modül
+// değişkeni KULLANMA: bu görev headless bağlamda çalışır, bağlam çağrılar
+// arasında yıkılabilir ya da aynı anda birden fazla kopya koşabilir. Buraya
+// `let` bir fren koyan, 2026-08-08'de ölçülen hatayı geri getirir.
 TaskManager.defineTask(LOCATION_TASK, async ({ data, error }) => {
   if (error) return;
   const locs = (data as { locations?: Location.LocationObject[] })?.locations;
   const loc = locs?.[locs.length - 1];
   if (!loc) return;
+
+  const st = await durumuOku();
+
   // YENİ İŞ BİLDİRİMİ: konum süzgeçlerinden ÖNCE (duran/kaba-konumlu şoför de
   // yeni işten haberdar olmalı). Mesai açıkken ~45 sn'de bir yoklar.
   const simdi = Date.now();
-  if (simdi - lastOrderCheck > 45_000) {
-    lastOrderCheck = simdi;
+  if (simdi - st.lastOrderCheck > 45_000) {
+    st.lastOrderCheck = simdi;
+    // Yoklama İSTEĞİNDEN ÖNCE yaz: eşzamanlı ikinci bir çağrı aynı anda
+    // girip aynı bildirimi bir daha üretmesin (canlıda 2 saniyede 6 istek
+    // görüldü — hepsi aynı işi yapıyordu).
+    await durumuYaz(st);
     await checkNewOrdersAndNotify();
   }
+
   const { latitude, longitude, accuracy, speed } = loc.coords;
   // KAYMA SÜZGECİ (webdeki DriverShift ile aynı eşik): GPS oturmadan gelen
   // kaba fix yüzlerce metre sapar — hiç gönderme, sonraki fix'i bekle.
@@ -103,57 +119,64 @@ TaskManager.defineTask(LOCATION_TASK, async ({ data, error }) => {
   // DEMİRLEME (yukarıdaki blok): duruyorsak fix'i değil ÇIPAYI bildiririz.
   let gonderLat = latitude;
   let gonderLng = longitude;
-  if (durum === "DURUYOR") {
-    if (!demir) demir = { lat: latitude, lng: longitude };
-    const uzaklik = movedMeters(demir, latitude, longitude);
-    uzakArdisik = uzaklik > DEMIR_ESIK_M ? uzakArdisik + 1 : 0;
+  if (st.durum === "DURUYOR") {
+    if (!st.demir) st.demir = { lat: latitude, lng: longitude };
+    const uzaklik = movedMeters(st.demir, latitude, longitude);
+    st.uzakArdisik = uzaklik > DEMIR_ESIK_M ? st.uzakArdisik + 1 : 0;
     // Cihazın kendi hız ölçümü konumdan bağımsızdır: park hâlindeki telefonun
     // fix'i zıplasa da hız ~0 kalır. O yüzden hıza anında güveniyoruz.
     const hizVar = speed != null && speed >= HIZ_ESIK_MS;
-    if (hizVar || uzakArdisik >= ONAY_ARDISIK) {
-      durum = "HAREKETTE";
-      uzakArdisik = 0;
-      demir = null;
-      sonHareketAt = now;
+    if (hizVar || st.uzakArdisik >= ONAY_ARDISIK) {
+      st.durum = "HAREKETTE";
+      st.uzakArdisik = 0;
+      st.demir = null;
+      st.sonHareketAt = now;
     } else {
-      gonderLat = demir.lat;
-      gonderLng = demir.lng;
+      gonderLat = st.demir.lat;
+      gonderLng = st.demir.lng;
     }
   }
-  if (durum === "HAREKETTE") {
-    if (!lastSent || movedMeters(lastSent, latitude, longitude) >= 25) {
-      sonHareketAt = now;
-    } else if (now - sonHareketAt > DURMA_SURESI_MS) {
+  if (st.durum === "HAREKETTE") {
+    if (!st.lastSent || movedMeters(st.lastSent, latitude, longitude) >= 25) {
+      st.sonHareketAt = now;
+    } else if (now - st.sonHareketAt > DURMA_SURESI_MS) {
       // 90 sn'dir kıpırdamıyor → yeniden demirle. Bundan sonraki titremeler
       // ve yavaş sürüklenmeler gönderilmez.
-      durum = "DURUYOR";
-      uzakArdisik = 0;
-      demir = { lat: latitude, lng: longitude };
-      gonderLat = demir.lat;
-      gonderLng = demir.lng;
+      st.durum = "DURUYOR";
+      st.uzakArdisik = 0;
+      st.demir = { lat: latitude, lng: longitude };
+      gonderLat = st.demir.lat;
+      gonderLng = st.demir.lng;
     }
   }
 
   if (
-    lastSent &&
-    movedMeters(lastSent, gonderLat, gonderLng) < 25 &&
-    now - lastSent.t < 60_000
+    st.lastSent &&
+    movedMeters(st.lastSent, gonderLat, gonderLng) < 25 &&
+    now - st.lastSent.t < 60_000
   ) {
+    // Süzgeç tuttu: gönderme YOK ama demirleme/durum değişmiş olabilir — yaz.
+    await durumuYaz(st);
     return;
   }
-  lastSent = { lat: gonderLat, lng: gonderLng, t: now };
+  st.lastSent = { lat: gonderLat, lng: gonderLng, t: now };
+  // GÖNDERİMDEN ÖNCE yaz: istek uzun sürerse (yavaş şebeke) bu arada uyanan
+  // ikinci bir çağrı aynı noktayı bir daha göndermesin.
+  await durumuYaz(st);
   try {
     const result = await postLocation(gonderLat, gonderLng, accuracy ?? undefined);
-    if (result === "ok") sonGonderimAt = Date.now();
+    if (result === "ok") st.sonGonderimAt = Date.now();
     // Oturum düştüyse izlemeyi durdur — "Mesaidesin" bildirimi asılı kalmasın,
     // boşuna GPS/pil yakmasın (şoför açınca tekrar giriş yapar).
     if (result === "unauthorized") await stopTracking();
     // Baz istasyonu geçişi vb. anlık ağ kopmasında gönderim düştüyse, 60 sn
-    // süzgecini beklemeden bir SONRAKİ fix'te (≤15 sn) hemen yeniden dene.
-    if (result === "failed") lastSent = null;
+    // süzgecini beklemeden bir SONRAKİ fix'te hemen yeniden dene.
+    if (result === "failed") st.lastSent = null;
+    await durumuYaz(st);
   } catch {
     // ağ hatasında sessizce geç; sonraki konumda tekrar denenir
-    lastSent = null;
+    st.lastSent = null;
+    await durumuYaz(st);
   }
 });
 
@@ -220,10 +243,7 @@ export async function startTracking(): Promise<string | null> {
 
   // Yeni mesai = temiz sayfa: dünkü çıpa bugüne taşınırsa şoför işe
   // başladığında ilk konumlar eski park yerine gönderilir.
-  durum = "DURUYOR";
-  demir = null;
-  uzakArdisik = 0;
-  lastSent = null;
+  await durumuSifirla();
 
   await Location.startLocationUpdatesAsync(LOCATION_TASK, {
     // Balanced (~100 m, Wi-Fi/baz) sürüş takibi için kaba — haritada kayma
