@@ -18,6 +18,9 @@ import { saveObject } from "@/lib/storage";
 import { CONTRACT_VERSION } from "@/lib/legal";
 import { normalizeBusinessName } from "@/lib/text";
 import { ensureBillingCode } from "@/lib/billing";
+import { effectiveSubscriptionGross } from "@/lib/discount";
+import { accrueCommissionForPayment } from "@/lib/commission";
+import { notifySubscriptionPaid } from "@/lib/paymentNotify";
 import { findUsableCode, claimCode, attachCodeToBusiness } from "@/lib/referralCode";
 import {
   discountUntilFromMonths,
@@ -545,8 +548,74 @@ export async function activateSubscription(formData: FormData) {
         ),
     );
   }
-  await extendSubscription(prisma, id); // havale/EFT — kartlı ödeme callback'iyle aynı mantık
+  // 🔴 HAVALE PARASI ARTIK KAYDA GEÇİYOR (2026-08-09, DENETİM md.3).
+  //
+  // BUGÜNE KADAR: bu aksiyon yalnız dönemi uzatıyordu. `SubscriptionPayment`
+  // satırı hiç oluşmadığı için havale/EFT ile alınan para sistemde YOKTU:
+  //   · komisyoncuya tahakkuk çıkmıyordu (getiren kişi 0 TL alıyordu),
+  //   · /admin/muhasebe ekranı (status:PAID süzgeci) parayı görmüyordu,
+  //   · işletmeye makbuz/bildirim gitmiyordu, admin'e "FATURA KES" maili yok.
+  // İlk gerçek 2.400 TL bu yoldan gelmişti — yani gelirin kendisi görünmezdi.
+  //
+  // Kartlı ödeme callback'iyle AYNI zincir kuruluyor (ikiz mantık):
+  // PAID satır → dönem uzat → periodStart/End yaz → komisyon tahakkuku →
+  // makbuz/bildirim. Tutar `effectiveSubscriptionGross` ile hesaplanıyor,
+  // yani indirimli işletmede indirimli tutar kaydediliyor.
+  const ucretsiz = String(formData.get("ucretsiz") ?? "") === "1";
+
+  if (ucretsiz) {
+    // HEDİYE/DENEME UZATMASI: para geçmedi → ödeme satırı YAZILMAZ.
+    // Ayrı düğme olması şart: aksi hâlde her hediye dönem, komisyoncuya
+    // tahakkuk ve muhasebede gelir olarak görünürdü.
+    await extendSubscription(prisma, id);
+    await syncVisibility(id);
+    revalidatePath("/admin");
+    revalidatePath(`/admin/isletme/${id}`);
+    redirect(
+      `/admin/isletme/${id}?mesaj=` +
+        encodeURIComponent("Ücretsiz dönem eklendi (ödeme kaydı oluşturulmadı)."),
+    );
+  }
+
+  const isletme = await prisma.cleanerBusiness.findUnique({
+    where: { id },
+    select: { discountPercent: true, discountUntil: true },
+  });
+  const { gross } = effectiveSubscriptionGross({
+    discountPercent: isletme?.discountPercent ?? null,
+    discountUntil: isletme?.discountUntil ?? null,
+  });
+
+  const payment = await prisma.$transaction(async (tx) => {
+    const p = await tx.subscriptionPayment.create({
+      data: {
+        businessId: id,
+        amount: gross,
+        status: "PAID",
+        paidAt: new Date(),
+        // `iyzicoPaymentId` NULL kalır — havale/EFT ile kartlı ödemeyi
+        // ayıran işaret budur (şemada ayrı bir "yöntem" alanı yok).
+      },
+    });
+    const end = await extendSubscription(tx, id);
+    await tx.subscriptionPayment.update({
+      where: { id: p.id },
+      data: { periodStart: new Date(), periodEnd: end },
+    });
+    return { id: p.id, periodEnd: end };
+  });
+
+  // Komisyon tahakkuku transaction DIŞINDA (kartlı yolla aynı gerekçe:
+  // paymentId @unique olduğu için idempotent, tekrar çağrılması zararsız).
+  await accrueCommissionForPayment(payment.id);
   await syncVisibility(id); // ödeme sonrası profil tamsa yayına al
+  await notifySubscriptionPaid({
+    businessId: id,
+    amount: gross,
+    periodEnd: payment.periodEnd,
+    iyzicoPaymentId: null,
+    kind: "ilk-odeme",
+  });
   revalidatePath("/admin");
   revalidatePath(`/admin/isletme/${id}`);
 }
@@ -1011,6 +1080,48 @@ export async function setBusinessAgent(formData: FormData) {
         data: { usedByBusinessId: businessId },
       }),
     ]);
+    // 🔴 GERİYE DÖNÜK KOMİSYONU KAPAT (2026-08-09, DENETİM md.5).
+    //
+    // `backfillMissingCommissions` saatlik tikte şu filtreyle çalışıyor:
+    //   {PAID, paidAt ≥ 90 gün, commission: null, referredByAgentId ≠ null}
+    // Komisyoncu BUGÜN bağlandığında, işletmenin ÜÇ AY ÖNCEKİ ödemeleri de bu
+    // filtreye giriyor ve tahakkuk üretiyordu — komisyoncunun hiç ilgisi
+    // olmayan paralar üzerinden. Ay sonu `createScheduledPayoutRequests` bunu
+    // otomatik ödeme talebine alıyor: **31 Ağustos 2026'daki ilk toplu turda
+    // gerçek para çıkışı olurdu.**
+    //
+    // Çözüm, pasif-komisyoncu varyantının aynısı (lib/commission.ts:61-75):
+    // bağlanma ANINDAN ÖNCEKİ ödemelere 0 tutarlı "atlandı" satırı yaz.
+    // `paymentId @unique` kilidi dolar → backfill bir daha uğramaz.
+    // Kural: komisyoncu bağlanmadan ÖNCEKİ dönem kalıcı olarak onun değildir.
+    const oncekiOdemeler = await prisma.subscriptionPayment.findMany({
+      where: {
+        businessId,
+        status: "PAID",
+        paidAt: { gte: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000) },
+        commission: null,
+      },
+      select: { id: true, amount: true },
+    });
+    if (oncekiOdemeler.length) {
+      await prisma.commissionEntry.createMany({
+        data: oncekiOdemeler.map((p) => ({
+          agentId: bulunan!.agentId,
+          businessId,
+          paymentId: p.id,
+          grossAmount: p.amount,
+          netAmount: p.amount,
+          percent: 0,
+          amount: 0,
+          skipped: true,
+        })),
+        skipDuplicates: true,
+      });
+      console.log(
+        `[komisyon] geriye dönük tahakkuk engellendi: isletme=${businessId} komisyoncu=${bulunan!.agentId} kapatilan_odeme=${oncekiOdemeler.length}`,
+      );
+    }
+
     if (kodluIndirim && mevcutAktif) {
       revalidatePath(geri);
       redirect(

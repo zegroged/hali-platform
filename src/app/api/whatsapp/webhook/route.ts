@@ -292,7 +292,11 @@ async function dugmeyiIsle(m: Gelen, waId: string): Promise<void> {
  *  ikilenmiyor hem de (count===0) tekrar gelen olayda ZİL İKİNCİ KEZ ÇALMIYOR.
  *
  *  Tamamen best-effort: burada ne olursa olsun POST 200 döner. */
-async function gelenMesajiKaydet(m: Gelen, ad: string | null): Promise<void> {
+async function gelenMesajiKaydet(
+  m: Gelen,
+  ad: string | null,
+  imzaliMi: boolean,
+): Promise<void> {
   if (!m.id || !m.from) return;
   const { prisma } = await import("@/lib/prisma");
   const { notify } = await import("@/lib/notify");
@@ -422,11 +426,24 @@ async function gelenMesajiKaydet(m: Gelen, ad: string | null): Promise<void> {
 
   // DÜĞME YANITI: sipariş eşleşmesinden bağımsız çalışır (kimlik mesajın
   // kendisinde). Onay/ret buradan kayda geçer.
+  //
+  // 🔴 İMZA ŞARTI (2026-08-09, DENETİM md.16). Bu dal `priceApprovedAt`
+  // yazıyor — yani "müşteri kesin fiyatı onayladı" hukuki kaydını üretiyor.
+  // İmza doğrulanamıyorsa (META_APP_SECRET yok) bu yetki KAPALI: orderId ve
+  // müşteri telefonunu bilen biri, müşterinin rızası olmadan onay uydurabilir.
+  // Mesaj kaydı ve halıcıya bildirim imzasız da çalışmaya devam eder —
+  // onlar durum değiştirmiyor.
   if (dugmeKimligi(m)) {
-    try {
-      await dugmeyiIsle(m, m.id);
-    } catch (e) {
-      console.error(`[whatsapp-webhook] düğme işlenemedi waId=${m.id}:`, e);
+    if (!imzaliMi) {
+      console.error(
+        `[whatsapp-webhook] DÜĞME YOK SAYILDI (imza doğrulanamıyor) waId=${m.id} gonderen=${m.from} — META_APP_SECRET .env'e eklenmeli`,
+      );
+    } else {
+      try {
+        await dugmeyiIsle(m, m.id);
+      } catch (e) {
+        console.error(`[whatsapp-webhook] düğme işlenemedi waId=${m.id}:`, e);
+      }
     }
   }
 
@@ -484,16 +501,28 @@ async function durumuIsle(d: Durum): Promise<void> {
   }
 }
 
-async function imzaGecerliMi(req: NextRequest, ham: string): Promise<boolean> {
+/** İmza denetiminin ÜÇ ayrı sonucu var ve karıştırılmamalı (2026-08-09):
+ *  · "gecerli"   → Meta'dan geldiği KANITLI, her şey yapılabilir
+ *  · "anahtaryok" → doğrulayamıyoruz (META_APP_SECRET yok). İstek reddedilmez
+ *    ama YETKİ İSTEYEN işler yapılmaz — bkz. `dugmeyiIsle` kapısı.
+ *  · "gecersiz"  → imza var ama tutmuyor → istek tamamen yok sayılır.
+ *
+ *  Eskiden bu fonksiyon `boolean` dönüyordu ve anahtar yokken `true` diyordu;
+ *  yani "doğrulayamadım" ile "doğruladım" AYNI cevaba düşüyordu (fail-open).
+ *  Bu uç 2026-08-07'de mesaj yazmaktan `priceApprovedAt` yazmaya terfi edince
+ *  o eşitlik kabul edilemez oldu (DENETİM md.16, canlıda kanıtlandı). */
+type ImzaSonuc = "gecerli" | "anahtaryok" | "gecersiz";
+
+async function imzaDurumu(req: NextRequest, ham: string): Promise<ImzaSonuc> {
   const secret = process.env.META_APP_SECRET;
-  if (!secret) return true; // anahtar yoksa doğrulama atlanır (yukarıdaki nota bak)
+  if (!secret) return "anahtaryok";
   const imza = req.headers.get("x-hub-signature-256");
-  if (!imza?.startsWith("sha256=")) return false;
+  if (!imza?.startsWith("sha256=")) return "gecersiz";
   const { createHmac, timingSafeEqual } = await import("node:crypto");
   const beklenen = "sha256=" + createHmac("sha256", secret).update(ham).digest("hex");
   const a = Buffer.from(imza);
   const b = Buffer.from(beklenen);
-  return a.length === b.length && timingSafeEqual(a, b);
+  return a.length === b.length && timingSafeEqual(a, b) ? "gecerli" : "gecersiz";
 }
 
 /** Teslim edilemeyen mesajı sipariş geçmişine yaz + halıcıya zil çal.
@@ -539,10 +568,14 @@ export async function POST(req: NextRequest) {
   // Meta 200 ALMAZSA aynı olayı defalarca tekrar gönderir; bu yüzden hata
   // hâlinde bile 200 dönüyoruz, sorunu log'a yazıyoruz.
   const ham = await req.text();
-  if (!(await imzaGecerliMi(req, ham))) {
+  const imza = await imzaDurumu(req, ham);
+  if (imza === "gecersiz") {
     console.error("[whatsapp-webhook] imza doğrulanamadı — istek yok sayıldı");
     return NextResponse.json({ ok: true });
   }
+  // İmza doğrulanamıyorsa (anahtar yok) mesaj kaydı ve bildirim ÇALIŞIR ama
+  // durum değiştiren düğme işlemleri KAPALI — aşağıya `imza` taşınıyor.
+  const imzaliMi = imza === "gecerli";
   // İKİNCİ KAPI — İMZA YOKKEN TEK SAVUNMA (2026-07-29 denetim, KRİTİK).
   // Bu uç artık yalnız log yazmıyor: VERİTABANINA YAZIYOR ve halıcıya bildirim
   // gönderiyor. META_APP_SECRET prod'da tanımlı olmadığı için imza kontrolü
@@ -588,7 +621,7 @@ export async function POST(req: NextRequest) {
           // GELEN KUTUSU (2026-07-29): log'a yazmak yetmiyordu — kaydet, işletmeye
           // eşle, sahibine zil çal. Hata akışı bozmasın; Meta 200 ALMALI.
           try {
-            await gelenMesajiKaydet(m, ad);
+            await gelenMesajiKaydet(m, ad, imzaliMi);
           } catch (e) {
             console.error(
               `[whatsapp-webhook] gelen mesaj kaydedilemedi id=${m.id} gonderen=${m.from}:`,

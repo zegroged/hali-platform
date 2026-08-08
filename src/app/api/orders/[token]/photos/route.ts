@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { saveOrderPhotoFile } from "@/lib/orderPhoto";
 import { rateLimit, clientIp, tooMany } from "@/lib/ratelimit";
+import { getAuthedUser } from "@/lib/auth";
 
 // MÜŞTERİNİN SİPARİŞE FOTOĞRAF EKLEMESİ (2026-08-06, isteğe bağlı).
 //
@@ -35,11 +36,41 @@ export async function POST(
       id: true,
       businessId: true,
       status: true,
+      trackingToken: true,
+      customerId: true,
       photos: { where: { stage: "MUSTERI" }, select: { id: true } },
     },
   });
   if (!order) {
     return NextResponse.json({ error: "Sipariş bulunamadı" }, { status: 404 });
+  }
+
+  // 🔴 KISA KOD TEK BAŞINA YETMEZ (2026-08-09, DENETİM md.15 — canlıda
+  // kanıtlanmıştı).
+  //
+  // Bu uç, "MUSTERI" aşamalı fotoğraf üretmenin TEK yolu; panelden o etiketle
+  // fotoğraf yazılamıyor (bilinçli kural, api/panel/orders/[id]/photos).
+  // Kısa kod ise halıcının ve atanan şoförün ekranında görünüyor. İkisi bir
+  // araya gelince işletme, "müşteri alımdan ÖNCE bu fotoğrafı gönderdi"
+  // kaydını kendi eliyle üretebiliyordu — hasar tartışmasında müşterinin
+  // aleyhine kullanılabilecek sahte bir kanıt.
+  //
+  // Kardeş uç approve-price aynı kapıyı 2026-08'de kapatmıştı; burası
+  // atlanmıştı. Kural birebir aynı: UZUN takip bağlantısı ya da siparişi
+  // veren üyenin kendi oturumu.
+  const viewer = await getAuthedUser();
+  const isOwner =
+    viewer?.role === "CUSTOMER" &&
+    order.customerId != null &&
+    order.customerId === viewer.id;
+  if (order.trackingToken !== token && !isOwner) {
+    return NextResponse.json(
+      {
+        error:
+          "Fotoğraf eklemek için size SMS/e-posta ile gönderilen takip bağlantısını açın (veya siparişi veren hesapla giriş yapın). Kısa takip kodu tek başına kullanılamaz.",
+      },
+      { status: 403 },
+    );
   }
   if (order.status !== "CREATED" && order.status !== "ACCEPTED") {
     return NextResponse.json(
