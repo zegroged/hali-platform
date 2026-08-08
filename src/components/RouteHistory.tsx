@@ -38,6 +38,12 @@ type RouteData = {
   points: [number, number][];
   /** Veri boşluklarında koparılmış iz — çizgi bundan çizilir (2026-08-07 akşam). */
   parcalar?: [number, number][][];
+  /** 🔴 2026-08-08: Şoför gün boyu dar bir kümede kaldı → çizgi BİLEREK
+   *  çizilmiyor (gürültü "gezinti" gibi görünmesin, 4.64). Sunucu bu bayrağı
+   *  ta 2026-08-07'den beri gönderiyordu ama BURADA OKUNMUYORDU: ekran "51
+   *  Konum kaydı" ile "Bugün mesaiye çıkılmamış"ı yan yana basıyordu.
+   *  (DENETİM md.8b — işletme sahibi sahada yakaladı.) */
+  duruyor?: boolean;
   stops: Stop[];
   tani: Tani | null;
   summary: { pingCount: number; stopCount: number; totalStopMin: number };
@@ -210,6 +216,37 @@ export function RouteHistory({
                   </button>
                 )}
               </div>
+            </>
+          ) : data.summary.pingCount > 0 ? (
+            /* 🔴 HAREKETSİZ GÜN (2026-08-08). Konum GELMİŞ ama çizilecek yol
+               yok: şoför gün boyu dar bir kümede kalmış. Burası eskiden boş
+               mesaja düşüyor ve "mesaiye çıkılmamış" diyordu — ekranın hemen
+               üstünde "51 Konum kaydı" yazarken. Artık haritayı duraklarla
+               gösteriyoruz: halıcı şoförün NEREDE durduğunu görebilmeli. */
+            <>
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-center">
+                <p className="font-medium text-amber-900">
+                  Şoför gün boyu aynı bölgede kaldı
+                </p>
+                <p className="mx-auto mt-1 max-w-md text-sm leading-relaxed text-amber-800">
+                  {data.summary.pingCount} konum kaydı var ama araç yer
+                  değiştirmemiş, o yüzden çizilecek bir yol yok. Aşağıdaki
+                  harita nerede beklediğini gösteriyor.
+                </p>
+              </div>
+              {data.stops.length > 0 && (
+                <div className={`${MAP_H} [&>div]:!h-full`}>
+                  <RouteMap
+                    key={`${driverId}-${date}-duruyor`}
+                    points={data.stops.map(
+                      (s) => [s.lat, s.lng] as [number, number],
+                    )}
+                    stops={data.stops}
+                    playing={false}
+                    onDone={stopPlaying}
+                  />
+                </div>
+              )}
             </>
           ) : (
             (() => {
