@@ -1,6 +1,6 @@
 import * as Location from "expo-location";
 import * as TaskManager from "expo-task-manager";
-import { postLocation } from "./api";
+import { postLocation, postLocations } from "./api";
 import { checkNewOrdersAndNotify } from "./notify";
 import {
   durumuOku,
@@ -107,6 +107,51 @@ TaskManager.defineTask(LOCATION_TASK, async ({ data, error }) => {
   if (!loc) return;
 
   const st = await durumuOku();
+
+  // 🔴 BİRİKEN İZİ KURTAR (2026-08-08 — işletme sahibi: "şoförün nerede
+  // kaytardığını nasıl göreyim?").
+  //
+  // Telefon (Tecno/HiOS) ön plan servisini öldürmüyor — bildirim ekranda
+  // kalıyor — ama JS tarafını DONDURUYOR. Android o sırada konumları
+  // biriktirip uyanışta `locations` dizisi olarak topluca veriyor.
+  // Burada eskiden SADECE son eleman alınıyor, gerisi ÇÖPE gidiyordu: şoför
+  // 20-30 dakika gezse bile haritada DELİK kalıyordu.
+  //
+  // Artık dizinin tamamı, kendi zaman damgalarıyla yükleniyor. Canlı akış
+  // aşağıdaki normal yoldan devam eder; burası yalnız GEÇMİŞİ doldurur.
+  if (locs && locs.length > 1) {
+    const gecmis = locs
+      .slice(0, -1) // sonuncusu aşağıda normal akışta işleniyor
+      .filter((l) => (l.coords.accuracy ?? 0) <= 150)
+      .filter((l) => l.timestamp > (st.lastSent?.t ?? 0));
+    // Duran cihazın yüzlerce aynı noktasını yüklemeyelim: 25 m / 60 sn
+    // kuralını dizi üzerinde de uygula (sunucudaki yükü de kısar).
+    const suzulmus: { lat: number; lng: number; acc?: number; t: number }[] = [];
+    let onceki: { lat: number; lng: number; t: number } | null = st.lastSent;
+    for (const l of gecmis) {
+      const { latitude, longitude, accuracy } = l.coords;
+      if (
+        onceki &&
+        movedMeters(onceki, latitude, longitude) < 25 &&
+        l.timestamp - onceki.t < 60_000
+      )
+        continue;
+      suzulmus.push({
+        lat: latitude,
+        lng: longitude,
+        acc: accuracy ?? undefined,
+        t: l.timestamp,
+      });
+      onceki = { lat: latitude, lng: longitude, t: l.timestamp };
+    }
+    if (suzulmus.length) {
+      try {
+        await postLocations(suzulmus);
+      } catch {
+        // Geçmiş yükleme başarısızsa canlı akış yine de devam etmeli.
+      }
+    }
+  }
 
   // YENİ İŞ BİLDİRİMİ: konum süzgeçlerinden ÖNCE (duran/kaba-konumlu şoför de
   // yeni işten haberdar olmalı). Mesai açıkken ~45 sn'de bir yoklar.

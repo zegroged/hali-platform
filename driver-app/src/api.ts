@@ -149,14 +149,35 @@ export async function setShift(on: boolean) {
 // geçici ağ hatasında tek sefer kısa retry — sonra bırak (sonraki ping günceller).
 // NOT: Kalıcı offline kuyruk için sunucunun client-timestamp'li alımı gerekir
 // (aksi halde eski konumlar yanlış zaman damgasıyla zaman çizelgesini bozar).
+/** Geriye dönük yüklenen nokta (zaman damgası İSTEMCİDEN gider). */
+export type KonumNoktasi = { lat: number; lng: number; acc?: number; t: number };
+
+/** 🔴 TOPLU/GEÇMİŞ ZAMANLI GÖNDERİM (2026-08-08).
+ *
+ *  Tecno/HiOS ön plan servisini öldürmüyor ama JS tarafını donduruyor;
+ *  Android bu sırada konumları biriktirip uyanışta TOPLU veriyor. Eskiden
+ *  dizinin yalnız son elemanı gönderiliyordu, gerisi ÇÖPE gidiyordu —
+ *  işletme sahibi haritada delik görüyordu. Artık biriken iz de yükleniyor. */
+export async function postLocations(
+  noktalar: KonumNoktasi[],
+): Promise<"ok" | "unauthorized" | "failed"> {
+  if (noktalar.length === 0) return "ok";
+  return gonder(JSON.stringify({ points: noktalar }));
+}
+
 export async function postLocation(
   lat: number,
   lng: number,
   acc?: number,
 ): Promise<"ok" | "unauthorized" | "failed"> {
+  return gonder(JSON.stringify({ lat, lng, acc }));
+}
+
+async function gonder(
+  body: string,
+): Promise<"ok" | "unauthorized" | "failed"> {
   const token = await getToken();
   if (!token) return "unauthorized";
-  const body = JSON.stringify({ lat, lng, acc });
   const headers = {
     "Content-Type": "application/json",
     Authorization: `Bearer ${token}`,
