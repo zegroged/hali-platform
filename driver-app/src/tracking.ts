@@ -11,6 +11,16 @@ import {
 
 export const LOCATION_TASK = "hali-driver-location";
 
+/** `startTracking` bu değeri döndürürse sebep izin DEĞİL, telefonun konum
+ *  anahtarının kapalı olmasıdır — çağıran şoförü konum ayarlarına götürmeli
+ *  (izin ekranına değil; orada yapacak bir şey yok). */
+export const KONUM_KAPALI = "KONUM_SERVISI_KAPALI";
+
+/** Telefonun konum anahtarı açık mı? (İzinden bağımsız.) */
+export async function konumServisiAcikMi(): Promise<boolean> {
+  return Location.hasServicesEnabledAsync().catch(() => true);
+}
+
 // Web DriverShift ile AYNI gönderim süzgeci: 25 m'den az hareket VE son
 // gönderim 60 sn'den yeniyse atla. Duran şoför yine de dakikada bir
 // "buradayım" der — panelde çevrimdışı düşmez, durak tespiti beslenir.
@@ -204,6 +214,20 @@ export async function startTracking(): Promise<string | null> {
   // ÖNEMLİ (Google Play politikası): bu fonksiyon çağrılmadan ÖNCE kullanıcıya
   // "belirgin açıklama" (prominent disclosure) gösterilip onay alınmış olmalı —
   // App.tsx toggleShift bunu yapar. İzin isteği onaydan önce ASLA tetiklenmemeli.
+  // 🔴 TELEFONUN KONUM ANAHTARI (2026-08-08, işletme sahibi sordu:
+  // "mesaiye başla konuma bağlı olsun, neden yapmadık?").
+  //
+  // İZİN ≠ KONUM AÇIK. Şoför izni vermiş olabilir ama telefonun konum
+  // anahtarı kapalıysa: iki izin isteği de "granted" döner,
+  // `startLocationUpdatesAsync` BAŞARILI olur, mesai açılır ve TEK KONUM
+  // GELMEZ. Bu, bu projede haftadır kovaladığımız hatanın aynısı: niyete
+  // bakıp kanıta bakmamak (bkz. 4.75a `isTaskRegisteredAsync`).
+  //
+  // Kontrol izin isteklerinden ÖNCE: konum kapalıyken izin sormak şoförü
+  // boşuna diyaloglarda gezdirir, sonunda yine çalışmaz.
+  const servisAcik = await Location.hasServicesEnabledAsync().catch(() => true);
+  if (!servisAcik) return KONUM_KAPALI;
+
   const fg = await Location.requestForegroundPermissionsAsync();
   if (fg.status !== "granted") return "Konum izni gerekli.";
   const bg = await Location.requestBackgroundPermissionsAsync();

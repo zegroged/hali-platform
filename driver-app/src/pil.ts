@@ -47,6 +47,21 @@ export async function pilMuafiyetiIste(paket: string): Promise<boolean> {
   }
 }
 
+/** Telefonun KONUM ayarları ekranı (GPS anahtarının bulunduğu yer).
+ *  İzin ekranından farklı: izin verilmiş olsa bile bu anahtar kapalıysa
+ *  hiçbir konum üretilmez. */
+export async function konumAyarlariniAc(): Promise<boolean> {
+  if (Platform.OS !== "android") return false;
+  try {
+    await IntentLauncher.startActivityAsync(
+      "android.settings.LOCATION_SOURCE_SETTINGS",
+    );
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** Pil optimizasyonu AYARLAR LİSTESİ — "Kısıtlanmamış" seçeneğinin bulunduğu
  *  ekran. Doğrudan diyalog açılmadığında güvenilir ikinci yol; bu intent
  *  neredeyse tüm ROM'larda var. */

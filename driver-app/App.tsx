@@ -26,9 +26,14 @@ import {
   isTracking,
   konumIzniVarMi,
   sonKonumGonderimi,
+  KONUM_KAPALI,
 } from "./src/tracking";
 import { ensureNotifPermission, pushKaydet, pushSil } from "./src/notify";
-import { pilUyarisiGosterildiMi, pilUyarisiniIsaretle } from "./src/pil";
+import {
+  pilUyarisiGosterildiMi,
+  pilUyarisiniIsaretle,
+  konumAyarlariniAc,
+} from "./src/pil";
 import { Kurulum } from "./src/Kurulum";
 import { Orders } from "./src/Orders";
 import { Panel } from "./src/Panel";
@@ -198,6 +203,21 @@ function Driver() {
           if (!accepted) return;
         }
         const err = await startTracking();
+        if (err === KONUM_KAPALI) {
+          // Telefonun konum anahtarı kapalı. İzin ekranına göndermek işe
+          // yaramaz — şoförü doğru yere götür. Mesai AÇILMIYOR: konumsuz
+          // mesai, halıcının boş harita görmesi demek (2026-08-08).
+          Alert.alert(
+            "Telefonun konumu kapalı",
+            "Mesaiye başlayabilmen için telefonun konum (GPS) ayarını açman " +
+              "gerekiyor. Kapalıyken mesai açılsa bile işletmen seni haritada göremez.",
+            [
+              { text: "Vazgeç", style: "cancel" },
+              { text: "Konum ayarlarını aç", onPress: () => void konumAyarlariniAc() },
+            ],
+          );
+          return;
+        }
         if (err) {
           Alert.alert("İzin gerekli", err);
           return;

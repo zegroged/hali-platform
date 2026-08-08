@@ -6,7 +6,9 @@ import {
   pilMuafiyetiIste,
   pilAyarListesiniAc,
   uygulamaAyarlariniAc,
+  konumAyarlariniAc,
 } from "./pil";
+import { konumServisiAcikMi } from "./tracking";
 
 // KURULUM EKRANI (2026-08-08, işletme sahibi isteği: "izinleri tek tıkla bir
 // kez alsın, sonsuz gün kalsın").
@@ -67,12 +69,16 @@ export function Kurulum({
   paket: string;
   onBitti: () => void;
 }) {
+  const [servis, setServis] = useState<AdimDurum>("bilinmiyor");
   const [onIzin, setOnIzin] = useState<AdimDurum>("bilinmiyor");
   const [arkaIzin, setArkaIzin] = useState<AdimDurum>("bilinmiyor");
   const [bildirim, setBildirim] = useState<AdimDurum>("bilinmiyor");
 
   const durumlariOku = useCallback(async () => {
     try {
+      // TELEFONUN KONUM ANAHTARI — izinden AYRI. Kapalıyken izinler "verildi"
+      // görünür ama tek konum üretilmez; mesai düğmesi de bu yüzden engelliyor.
+      setServis((await konumServisiAcikMi()) ? "tamam" : "eksik");
       const fg = await Location.getForegroundPermissionsAsync();
       setOnIzin(fg.status === "granted" ? "tamam" : "eksik");
       const bg = await Location.getBackgroundPermissionsAsync();
@@ -151,7 +157,7 @@ export function Kurulum({
     );
   }
 
-  const zorunluTamam = onIzin === "tamam" && arkaIzin === "tamam";
+  const zorunluTamam = servis === "tamam" && onIzin === "tamam" && arkaIzin === "tamam";
 
   return (
     <ScrollView style={s.kok} contentContainerStyle={s.icerik}>
@@ -163,6 +169,17 @@ export function Kurulum({
 
       <Satir
         no={1}
+        baslik="Telefonun konumu"
+        aciklama="Telefonun GPS anahtarı. Kapalıyken mesaiye başlayamazsın — izin verilse bile hiç konum üretilmez."
+        durum={servis}
+        dugme="Konum ayarlarını aç"
+        onPress={async () => {
+          await konumAyarlariniAc();
+          await durumlariOku();
+        }}
+      />
+      <Satir
+        no={2}
         baslik="Konum izni"
         aciklama="Uygulama açıkken konumunu okuyabilmesi için gerekli."
         durum={onIzin}
@@ -170,7 +187,7 @@ export function Kurulum({
         onPress={konumIste}
       />
       <Satir
-        no={2}
+        no={3}
         baslik="Arka planda konum"
         aciklama="Ekran kapalıyken de konumun gitsin diye. Telefonun bunu Ayarlar'dan istiyor — “Her zaman izin ver” seçeceksin."
         durum={arkaIzin}
@@ -178,7 +195,7 @@ export function Kurulum({
         onPress={arkaPlanIste}
       />
       <Satir
-        no={3}
+        no={4}
         baslik="Bildirimler"
         aciklama="Yeni iş atandığında haberin olsun."
         durum={bildirim}
@@ -190,7 +207,7 @@ export function Kurulum({
           o yüzden rozetsiz — her zaman elle tetiklenebilir dururlar. */}
       <View style={s.kart}>
         <View style={s.basSatir}>
-          <Text style={s.no}>4</Text>
+          <Text style={s.no}>5</Text>
           <Text style={s.baslik}>Pil kısıtlaması</Text>
         </View>
         <Text style={s.aciklama}>
@@ -204,7 +221,7 @@ export function Kurulum({
 
       <View style={s.kart}>
         <View style={s.basSatir}>
-          <Text style={s.no}>5</Text>
+          <Text style={s.no}>6</Text>
           <Text style={s.baslik}>Otomatik başlatma</Text>
         </View>
         <Text style={s.aciklama}>
@@ -226,7 +243,7 @@ export function Kurulum({
       </TouchableOpacity>
       {!zorunluTamam && (
         <Text style={s.uyari}>
-          1 ve 2 verilmeden konum takibi çalışmaz.
+          1, 2 ve 3 tamamlanmadan mesaiye başlayamazsın.
         </Text>
       )}
     </ScrollView>
