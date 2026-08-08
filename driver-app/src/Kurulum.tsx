@@ -1,5 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert } from "react-native";
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  ScrollView,
+  Alert,
+  AppState,
+} from "react-native";
 import * as Location from "expo-location";
 import * as Notifications from "expo-notifications";
 import {
@@ -8,7 +16,7 @@ import {
   uygulamaAyarlariniAc,
   konumAyarlariniAc,
 } from "./pil";
-import { konumServisiAcikMi } from "./tracking";
+import { konumServisiAcikMi, sonKonumGonderimi } from "./tracking";
 
 // KURULUM EKRANI (2026-08-08, işletme sahibi isteği: "izinleri tek tıkla bir
 // kez alsın, sonsuz gün kalsın").
@@ -73,8 +81,20 @@ export function Kurulum({
   const [onIzin, setOnIzin] = useState<AdimDurum>("bilinmiyor");
   const [arkaIzin, setArkaIzin] = useState<AdimDurum>("bilinmiyor");
   const [bildirim, setBildirim] = useState<AdimDurum>("bilinmiyor");
+  // KANIT: son BAŞARILI konum gönderiminin üstünden kaç saniye geçti.
+  // İzin rozetleri "verildi" der; bu satır "gerçekten gidiyor" der. Pil ve
+  // otomatik başlatma ayarlarının durumu Android'den OKUNAMADIĞI için tek
+  // güvenilir doğrulama budur.
+  const [gonderimYasi, setGonderimYasi] = useState<number | null>(null);
+  const [deneniyor, setDeneniyor] = useState(false);
 
   const durumlariOku = useCallback(async () => {
+    try {
+      const t = await sonKonumGonderimi();
+      setGonderimYasi(t === 0 ? -1 : Math.round((Date.now() - t) / 1000));
+    } catch {
+      setGonderimYasi(null);
+    }
     try {
       // TELEFONUN KONUM ANAHTARI — izinden AYRI. Kapalıyken izinler "verildi"
       // görünür ama tek konum üretilmez; mesai düğmesi de bu yüzden engelliyor.
@@ -90,8 +110,23 @@ export function Kurulum({
     }
   }, []);
 
+  // 🔴 EN ÖNEMLİ PARÇA (2026-08-08, işletme sahibi yakaladı):
+  // "konum hizmetini onaylıyorum, her şeyi yapıyorum, oradaki yap butonu
+  // hala duruyor."
+  //
+  // Sebep: Ayarlar'a gönderen düğmeler, intent'i AÇAR AÇMAZ durumu yeniden
+  // okuyordu — şoför daha Ayarlar ekranına varmadan kontrol bitiyordu.
+  // Şoför izni verip geri döndüğünde kimse tekrar bakmıyordu, ekran da
+  // "Gerekli" demeye devam ediyordu.
+  //
+  // Doğrusu: uygulama ÖN PLANA DÖNDÜĞÜNDE yeniden denetle. Kurulum ekranının
+  // tamamı zaten "yap → dışarı çık → geri dön" akışı üzerine kurulu.
   useEffect(() => {
     void durumlariOku();
+    const abone = AppState.addEventListener("change", (durum) => {
+      if (durum === "active") void durumlariOku();
+    });
+    return () => abone.remove();
   }, [durumlariOku]);
 
   async function konumIste() {
@@ -167,6 +202,22 @@ export function Kurulum({
         konumun işletmene gitmez ve sen bunu fark etmezsin.
       </Text>
 
+      {/* Elle denetleme: ayarı yapıp döndüğünde ekran kendiliğinden yenilenir
+          (AppState), ama bazı telefonlar ayar ekranını üstte açtığı için o
+          olay gelmeyebiliyor — kaçış kapısı olsun. */}
+      <TouchableOpacity
+        style={s.denetle}
+        onPress={async () => {
+          setDeneniyor(true);
+          await durumlariOku();
+          setDeneniyor(false);
+        }}
+      >
+        <Text style={s.denetleYazi}>
+          {deneniyor ? "Denetleniyor…" : "↻ Yeniden denetle"}
+        </Text>
+      </TouchableOpacity>
+
       <Satir
         no={1}
         baslik="Telefonun konumu"
@@ -233,6 +284,29 @@ export function Kurulum({
         </TouchableOpacity>
       </View>
 
+      {/* 🔑 ASIL DOĞRULAMA. Pil ve otomatik başlatma ayarlarının durumunu
+          Android okutmuyor — yani 5. ve 6. adım için "tamam" rozeti basmak
+          YALAN olurdu. Onun yerine SONUCU gösteriyoruz: konum gerçekten
+          gidiyor mu? Bu, bütün zincirin (servis + izin + pil + otomatik
+          başlatma) tek seferde kanıtıdır. */}
+      <View style={[s.kart, s.kanit]}>
+        <Text style={s.baslik}>Çalışıyor mu?</Text>
+        <Text style={s.aciklama}>
+          {gonderimYasi == null
+            ? "Konum gönderimi henüz okunamadı."
+            : gonderimYasi < 0
+              ? "Henüz hiç konum gönderilmedi. Mesaiyi açıp bu ekrana dön; birkaç saniye içinde burada süre görünmeli."
+              : gonderimYasi > 180
+                ? `⚠️ Son konum ${Math.round(gonderimYasi / 60)} dakika önce gitti — akış durmuş görünüyor. 5. ve 6. adımları yap.`
+                : `✓ Konum gidiyor — son gönderim ${gonderimYasi} sn önce.`}
+        </Text>
+        <Text style={s.kanitNot}>
+          İzin rozetleri “verildi” der; bu satır “gerçekten gidiyor” der.
+          Pil ve otomatik başlatma ayarlarını telefon bize söylemediği için
+          onların doğrulaması budur.
+        </Text>
+      </View>
+
       <TouchableOpacity
         style={[s.bitir, !zorunluTamam && s.bitirPasif]}
         onPress={onBitti}
@@ -288,6 +362,17 @@ const s = StyleSheet.create({
     alignItems: "center",
   },
   dugmeYazi: { color: "#fff", fontWeight: "700", fontSize: 14 },
+  denetle: {
+    alignSelf: "flex-start",
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#0d9488",
+  },
+  denetleYazi: { color: "#0d9488", fontWeight: "700", fontSize: 13 },
+  kanit: { backgroundColor: "#f0fdfa", borderColor: "#99f6e4" },
+  kanitNot: { fontSize: 11, color: "#64748b", lineHeight: 16, fontStyle: "italic" },
   bitir: {
     marginTop: 8,
     backgroundColor: "#0f172a",
