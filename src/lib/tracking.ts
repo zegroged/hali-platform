@@ -31,7 +31,32 @@ export function evaluateStop(args: {
 
   if (openStop) {
     if (offline) {
-      // Açık durağı SON ping anında bitir; boşluğu sayma.
+      // 🔴 BOŞLUK ARTIK KÖRÜ KÖRÜNE ATILMIYOR (2026-08-08).
+      //
+      // Eskiden her 5 dk+ boşlukta durak, SON ping anında bitiriliyordu;
+      // gerekçe "uydurma uzun durak olmasın"dı. Ama boşluğun İKİ UCU AYNI
+      // NOKTAYSA, şoförün orada kaldığı UYDURMA DEĞİL — veriyle sabit.
+      //
+      // Canlı ölçüm (2026-08-08, gerçek şoför): 5 dk'yı aşan boşlukların
+      // çoğunda iki uç arasındaki mesafe 0 m'ydi (10,8 / 22,7 / 34,8 / 26,4
+      // dakikalık boşluklar). Bir günde ~100 dakikalık gerçek durma süresi
+      // bu yüzden hiç kaydedilmemişti — işletme sahibi haklı olarak
+      // "9 dakika yazıyor ama çok daha uzun durdum" dedi.
+      //
+      // Yeni kural: boşluktan SONRAKİ nokta hâlâ durak çapının içindeyse
+      // durak KESİLMEZ, süre boşluğu da kapsayacak şekilde uzatılır.
+      // Şoför gerçekten ayrılmışsa (çapın dışına çıkmışsa) eski davranış
+      // sürer — o boşlukta nerede olduğunu bilmiyoruz, saymayız.
+      const ayniYerde = haversineKm(openStop.lat, openStop.lng, lat, lng) <= STOP_RADIUS_KM;
+      if (ayniYerde) {
+        return {
+          type: "extend",
+          durationSec: Math.round(
+            (now.getTime() - openStop.startedAt.getTime()) / 1000,
+          ),
+        };
+      }
+      // Yer değiştirmiş: boşlukta nerede olduğu bilinmiyor → son ping'de bitir.
       const durationSec = lastPing
         ? Math.round(
             (lastPing.recordedAt.getTime() - openStop.startedAt.getTime()) / 1000,
@@ -55,11 +80,15 @@ export function evaluateStop(args: {
       : { type: "discard" };
   }
 
-  // Açık durak yok: yeni konum bir önceki (yakın zamanlı) ping'e yakınsa durağanlaşıyor → durak başlat.
-  // Çevrimdışı boşluktan sonra "yakınlık" anlamsız olur, bu yüzden offline ise açma.
+  // Açık durak yok: yeni konum bir önceki ping'e yakınsa durağanlaşıyor → durak başlat.
+  //
+  // 🔴 2026-08-08: burada da `!offline` şartı vardı, yani 5 dk'yı aşan bir
+  // boşluktan sonra durak HİÇ AÇILMIYORDU. Oysa boşluğun iki ucu aynı
+  // noktaysa şoför orada beklemiş demektir — üstteki dalla aynı gerekçe.
+  // Uygulamanın donduğu her sefer, o boşluk boyunca süren bekleme tamamen
+  // görünmez oluyordu.
   if (
     lastPing &&
-    !offline &&
     haversineKm(lastPing.lat, lastPing.lng, lat, lng) <= STOP_RADIUS_KM
   ) {
     return { type: "open", startedAt: lastPing.recordedAt, lat, lng };
