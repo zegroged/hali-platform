@@ -1,6 +1,12 @@
 import Link from "next/link";
 import { IconCheck } from "@/components/icons";
-import { PLAN, merdivenAktif, merdiven, SOFOR_TAVANI } from "@/lib/plan";
+import {
+  PLAN,
+  merdivenAktif,
+  merdiven,
+  fiyatBasamagi,
+  SOFOR_TAVANI,
+} from "@/lib/plan";
 
 // FİYAT MERDİVENİ ŞERİDİ (FIYAT-2026-08-09.md §1-A).
 // Kartta görünen rakam TABAN basamaktır (1 şoför). Ek şoför ve tavan burada
@@ -39,16 +45,16 @@ function Merdiven({
         {basamaklar.map((b, i) => {
           const deger = basamakDegeri(i, b.sinirsiz);
           const isaretli = secili === deger;
-          const etiket = b.sinirsiz
-            ? `${SOFOR_TAVANI}+ şoför (sınırsız)`
-            : `${i + 1} şoför`;
+          // "4+ şoför (sınırsız)" matematik gibi duruyordu; esnaf ne aldığını
+          // okuyabilmeli (kullanıcı ekran görüntüsüyle bildirdi, 2026-08-10).
+          const etiket = b.sinirsiz ? "Sınırsız şoför" : `${i + 1} şoför`;
           const satir = (
             <>
               <span className="flex items-center gap-1.5">
                 {secilebilir && (
                   <span
                     aria-hidden
-                    className={`inline-block h-3 w-3 shrink-0 rounded-full border ${
+                    className={`inline-block h-5 w-5 shrink-0 rounded-full border-2 ${
                       isaretli
                         ? koyu
                           ? "border-white bg-white"
@@ -133,7 +139,28 @@ export default function PlanCard({
   // Günlük karşılık: saha satış dili fiyatı hep günlük hesapla veriyor
   // (Pazarlamacı El Kitabı §4). Önce sabit "80" yazılıydı; merdivende taban
   // 900 → 30 lira. Rakam artık fiyattan türetiliyor, elle yazılmıyor.
-  const gunluk = Math.round(PLAN.priceGrossNumber / 30);
+  // 🔴 BÜYÜK RAKAM SEÇİMİ TAKİP ETMELİ (2026-08-10, kullanıcı ekran
+  // görüntüsüyle bildirdi). Önce başlıkta sabit ₺750 duruyordu; halıcı
+  // "Sınırsız — 1.800" satırını seçtiğinde büyük rakam kıpırdamıyordu ve
+  // hangisini ödeyeceğini ekrandan anlayamıyordu.
+  //
+  // Ayrıca İKİ FARKLI PARA DİLİ yan yanaydı: başlık KDV HARİÇ (750), liste
+  // KDV DAHİL (900). Esnaf tek rakam okur → büyük rakam artık KDV DAHİL,
+  // KDV hariç matrah küçük satıra indi.
+  const secilenBasamak =
+    merdivenAktif && secili
+      ? fiyatBasamagi(
+          secili === "FILO" ? "FILO" : "YONETIM",
+          secili === "FILO" ? SOFOR_TAVANI : Number(secili) || 1,
+        )
+      : null;
+  const buyukTutar = secilenBasamak
+    ? secilenBasamak.brut.toLocaleString("tr-TR")
+    : PLAN.priceAmount;
+  const buyukEk = secilenBasamak ? " TL / ay" : " + KDV / ay";
+  const altSatir = secilenBasamak
+    ? `KDV dahil (${secilenBasamak.net.toLocaleString("tr-TR")} TL + KDV) — günde yaklaşık ${Math.round(secilenBasamak.brut / 30)} lira.`
+    : `Aylık ${PLAN.priceGrossMonthly} TL — günde yaklaşık ${Math.round(PLAN.priceGrossNumber / 30)} lira.`;
 
   const ctaCls =
     "block w-full rounded-xl bg-slate-900 px-4 py-3 text-center text-sm font-semibold text-white transition hover:bg-slate-800 active:scale-[0.99]";
@@ -153,13 +180,11 @@ export default function PlanCard({
     <>
       <p>
         <span className="text-4xl font-extrabold tracking-tight text-slate-900 sm:text-5xl">
-          ₺{PLAN.priceAmount}
+          ₺{buyukTutar}
         </span>
-        <span className="text-sm font-medium text-slate-500"> + KDV / ay</span>
+        <span className="text-sm font-medium text-slate-500">{buyukEk}</span>
       </p>
-      <p className="mt-1 text-sm text-slate-500">
-        Aylık {PLAN.priceGrossMonthly} TL — günde yaklaşık {gunluk} lira.
-      </p>
+      <p className="mt-1 text-sm text-slate-500">{altSatir}</p>
     </>
   );
 
@@ -192,13 +217,11 @@ export default function PlanCard({
           <div>
             <p>
               <span className="text-4xl font-extrabold tracking-tight sm:text-5xl">
-                ₺{PLAN.priceAmount}
+                ₺{buyukTutar}
               </span>
-              <span className="text-sm font-medium text-teal-50"> + KDV / ay</span>
+              <span className="text-sm font-medium text-teal-50">{buyukEk}</span>
             </p>
-            <p className="mt-1 text-sm text-teal-50">
-              Aylık {PLAN.priceGrossMonthly} TL — günde yaklaşık {gunluk} lira.
-            </p>
+            <p className="mt-1 text-sm text-teal-50">{altSatir}</p>
             <Merdiven koyu onSecim={onSecim} secili={secili} />
           </div>
           {onCta ? (
