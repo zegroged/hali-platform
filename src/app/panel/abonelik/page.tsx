@@ -271,7 +271,7 @@ export default async function AbonelikYonetim({
                     ? "Dönemini ücretsiz başlat (%100 indirim)"
                     : pct != null
                       ? `Aboneliğini öde — ${tl(gross)} (indirimli, iyzico ile)`
-                      : "Aboneliğini öde — 2.400 TL (iyzico ile)"}
+                      : `Aboneliğini öde — ${tl(gross)} (iyzico ile)`}
                 </PendingButton>
               </form>
             )
@@ -288,7 +288,7 @@ export default async function AbonelikYonetim({
           <p className="mt-3 text-xs text-slate-500">
             <strong>Düzenli ödeme talimatı:</strong> Kartın iyzico&apos;nun
             güvenli sistemine bir kez kaydedilir; <strong>iptal edene kadar
-            her ay 2.400 TL (KDV dahil)</strong> otomatik çekilir. İstediğin
+            her ay {tl(gross)} (KDV dahil)</strong> otomatik çekilir. İstediğin
             zaman bu sayfadan iptal edebilirsin; iptalde mevcut dönem sonuna
             kadar yayında kalırsın.
           </p>
