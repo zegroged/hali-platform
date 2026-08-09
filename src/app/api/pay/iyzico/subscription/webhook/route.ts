@@ -4,7 +4,8 @@ import { extendSubscription } from "@/lib/subscription";
 import { notifySubscriptionPaid } from "@/lib/paymentNotify";
 import { accrueCommissionForPayment } from "@/lib/commission";
 import { syncVisibility } from "@/lib/panel";
-import { paymentsLive, getIyzicoPlanAmount } from "@/lib/config";
+import { paymentsLive, getIyzicoPlanAmount, merdivenAktif } from "@/lib/config";
+import { effectiveSubscriptionGross } from "@/lib/discount";
 
 // iyzico tekrarlayan abonelik WEBHOOK'u — her aylık otomatik çekimde iyzico
 // buraya POST eder. Başarılı çekimde dönemi 1 ay uzatır; başarısızda PAST_DUE.
@@ -51,7 +52,17 @@ export async function POST(req: NextRequest) {
 
   const sub = await prisma.subscription.findFirst({
     where: { iyzicoSubRef: subRef },
-    select: { businessId: true },
+    select: {
+      businessId: true,
+      // MERDİVENDE ÇEKİLEN TUTAR İŞLETMEYE GÖRE DEĞİŞİR — tek global env
+      // (IYZICO_PLAN_AMOUNT) beş planlı dünyada her yenilemeyi yanlış kaydeder:
+      // makbuz, muhasebe ekranı ve komisyon tahakkuku hep o rakamı okuyor.
+      plan: true,
+      driverSeats: true,
+      priceGrossLocked: true,
+      priceLockedUntil: true,
+      business: { select: { discountPercent: true, discountUntil: true } },
+    },
   });
   if (!sub) return NextResponse.json({ ok: true }); // bize ait değil
 
@@ -72,9 +83,24 @@ export async function POST(req: NextRequest) {
     // İDEMPOTENCY: iyzico webhook'ları en-az-bir-kez teslim edilir; çift teslim
     // çift 30 gün + çift ödeme kaydı üretiyordu. iyzicoPaymentId @unique ile
     // ATOMİK claim — daha önce işlendiyse create P2002 fırlatır, no-op döner.
-    // Çekilen tutar: bağlı planın fiyatı (.env IYZICO_PLAN_AMOUNT; doğrulama
-    // döneminde 1 TL). Sabit 2400 yazmak yanlış makbuz/komisyon üretirdi.
-    const cekilen = getIyzicoPlanAmount();
+    // ÇEKİLEN TUTAR.
+    // Merdiven KAPALIYKEN: bağlı planın fiyatı (.env IYZICO_PLAN_AMOUNT;
+    //   doğrulama döneminde 1 TL). Sabit 2400 yazmak yanlış makbuz üretirdi.
+    // Merdiven AÇIKKEN: işletmenin kendi basamağı — beş plan var, her abonenin
+    //   tutarı farklı. Tek global env okumak makbuzu, muhasebe ekranını ve
+    //   komisyon tahakkukunu birden yanlışlardı (denetim bulgusu).
+    const cekilen = merdivenAktif
+      ? effectiveSubscriptionGross({
+          discountPercent: sub.business.discountPercent,
+          discountUntil: sub.business.discountUntil,
+          subscription: {
+            plan: sub.plan,
+            driverSeats: sub.driverSeats,
+            priceGrossLocked: sub.priceGrossLocked,
+            priceLockedUntil: sub.priceLockedUntil,
+          },
+        }).gross
+      : getIyzicoPlanAmount();
     let yeniDonemSonu: Date | null = null;
     let yeniOdemeId: string | null = null;
     try {
