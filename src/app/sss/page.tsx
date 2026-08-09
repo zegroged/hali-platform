@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import StaticPage from "../_static/StaticPage";
+import { PLAN } from "@/lib/plan";
+
+export const dynamic = "force-dynamic"; // fiyat calisma zamaninda okunur
 
 export const metadata: Metadata = {
   title: "Sık Sorulan Sorular",
@@ -79,7 +82,7 @@ const FAQS: { q: string; a: React.ReactNode }[] = [
         {/* "Kayıt ücretsizdir" YANLIŞTI (2026-07-29): abonelik ödenmeden
             işletme yayına alınmıyor (plan.ts, isletme-sozlesmesi §3). */}
         Hesap açmak ve profilini doldurmak ücretsizdir; yayına girmek için
-        aylık abonelik gerekir (aylık 2.000 TL + KDV).{" "}
+        aylık abonelik gerekir (aylık {PLAN.priceMonthly}).{" "}
         <Link href="/giris" className="font-medium text-brand-dark hover:underline">İşletme girişi</Link>{" "}
         sayfasından başvurabilir veya{" "}
         <Link href="/iletisim" className="font-medium text-brand-dark hover:underline">iletişim</Link>{" "}
