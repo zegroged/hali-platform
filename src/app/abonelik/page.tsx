@@ -3,6 +3,12 @@ import Link from "next/link";
 import StaticPage, { Section } from "../_static/StaticPage";
 import PlanCard from "@/components/PlanCard";
 
+// FİYAT ÇALIŞMA ZAMANINDA OKUNUR (2026-08-10). Bu sayfa statik üretiliyordu ve
+// fiyat BUILD anında gömülüyordu; `.env` Docker build aşamasına girmediği için
+// (.dockerignore) merdiven açılsa bile ekranda eski rakam kalıyordu. Fiyat bir
+// yapılandırma değeridir, derleme çıktısı değil.
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Abonelik ve Paketler",
   description:

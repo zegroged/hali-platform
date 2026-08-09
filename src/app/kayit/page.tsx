@@ -1,5 +1,8 @@
 "use client";
 
+// NOT: bu sayfa client component; fiyat NEXT_PUBLIC_FIYAT_MERDIVENI ile
+// derlemeye gömülür (bkz. lib/plan.ts). Sunucu bayrağı tek başına yetmez.
+
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";

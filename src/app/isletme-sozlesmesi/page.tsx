@@ -4,6 +4,12 @@ import StaticPage, { Section } from "../_static/StaticPage";
 import { CONTRACT_VERSION } from "@/lib/legal";
 import { merdivenAktif, merdiven, SOFOR_TAVANI } from "@/lib/plan";
 
+// FİYAT ÇALIŞMA ZAMANINDA OKUNUR (2026-08-10). Bu sayfa statik üretiliyordu ve
+// fiyat BUILD anında gömülüyordu; `.env` Docker build aşamasına girmediği için
+// (.dockerignore) merdiven açılsa bile ekranda eski rakam kalıyordu. Fiyat bir
+// yapılandırma değeridir, derleme çıktısı değil.
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Platform Aracılık ve Üyelik Sözleşmesi",
   description:

@@ -15,6 +15,11 @@ RUN npx prisma generate
 # Boş gelirse LiveMap ücretsiz OSM'ye düşer — güvenli varsayılan.
 ARG NEXT_PUBLIC_GOOGLE_MAPS_KEY
 ENV NEXT_PUBLIC_GOOGLE_MAPS_KEY=$NEXT_PUBLIC_GOOGLE_MAPS_KEY
+# FİYAT MERDİVENİ istemci tarafı için: /kayit bir client component ve orada
+# yalnız NEXT_PUBLIC_* değişkenleri okunabilir (derleme anında gömülür).
+# Sunucu tarafı FIYAT_MERDIVENI ile çalışır; ikisi BİRLİKTE set edilmeli.
+ARG NEXT_PUBLIC_FIYAT_MERDIVENI
+ENV NEXT_PUBLIC_FIYAT_MERDIVENI=$NEXT_PUBLIC_FIYAT_MERDIVENI
 # Server Action şifreleme anahtarı: build'e gömülünce action kimlikleri deploy'lar
 # arası SABİT kalır → yeniden dağıtım, kullanıcının açık sekmesindeki formu
 # "Failed to find Server Action" ile bozmaz. Runtime'da da (.env) aynısı verilir.

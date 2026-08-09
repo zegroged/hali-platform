@@ -8,7 +8,16 @@
 // `PLAN_TUTARLARI` alıyor, ters yönde import döngü yaratırdı. `config.ts` bunu
 // yeniden dışa veriyor, mevcut `import { merdivenAktif } from "@/lib/config"`
 // satırlarının hepsi çalışmaya devam ediyor.
-export const merdivenAktif = process.env.FIYAT_MERDIVENI === "1";
+// İKİ DEĞİŞKEN, TEK ANLAM. Sunucu tarafı `FIYAT_MERDIVENI` ile çalışır (çalışma
+// zamanında okunur, .env yeter). Ama `/kayit` bir CLIENT COMPONENT ve istemci
+// paketinde yalnız `NEXT_PUBLIC_*` değişkenleri bulunur — diğerleri `undefined`
+// olur. O yüzden istemci tarafı için build arg'ı olan ikizi gerekiyor
+// (Dockerfile + compose build.args; Google Maps anahtarıyla aynı desen).
+// ⚠️ İKİSİ BİRLİKTE SET EDİLMELİ; yalnız biri açılırsa sözleşme 900 derken
+// kayıt formu 2.000 gösterir.
+export const merdivenAktif =
+  process.env.FIYAT_MERDIVENI === "1" ||
+  process.env.NEXT_PUBLIC_FIYAT_MERDIVENI === "1";
 
 export const PLAN = {
   name: "İşletme Aboneliği",
