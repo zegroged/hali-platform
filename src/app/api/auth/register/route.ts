@@ -1,6 +1,8 @@
 import { geocodeDistrict } from "@/lib/geocodeDistrict";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { merdivenAktif } from "@/lib/config";
+import { SOFOR_TAVANI } from "@/lib/plan";
 import { prisma } from "@/lib/prisma";
 import { hashPassword, createSession } from "@/lib/auth";
 import { rateLimit, clientIp, tooMany } from "@/lib/ratelimit";
@@ -17,6 +19,11 @@ import { discountUntilFromMonths } from "@/lib/discount";
 // İşletme self-servis kaydı. Hesap PENDING açılır ve görünmez;
 // panel akışı (e-posta doğrulama → profil → admin onayı) tamamlar.
 const Body = z.object({
+  // SEÇİLEN PAKET (2026-08-10). Kayıt funnel'ında halıcı ne aldığını seçer;
+  // burada gelmezse taban basamak varsayılır. "FILO" = sınırsız şoför.
+  // Değer DOĞRULANIR: uydurma bir sayı gelirse tabana düşer, asla ücretsiz
+  // ya da tanımsız bir pakete dönüşmez.
+  paket: z.string().trim().max(8).optional(),
   businessName: z.string().trim().min(2).max(80),
   name: z.string().trim().min(2).max(60),
   // Telefon giriş kimliği DEĞİL — işletmenin iletişim numarası (müşteriye
@@ -293,6 +300,33 @@ export async function POST(req: NextRequest) {
             currentPeriodEnd: bitis,
           },
           update: {},
+        })
+        .catch(() => {});
+    }
+
+    // SEÇİLEN PAKETİ ABONELİĞE YAZ. Deneme dalından BAĞIMSIZ çalışır: paket
+    // seçimi ödemeden önce yapılır, dönem/statü'ye dokunulmaz. Yazılmazsa
+    // halıcı vitrinde "sınırsız" seçip panelde tek şoförlük fiyatı görürdü.
+    if (merdivenAktif) {
+      const secim = String(parsed.data.paket ?? "").trim();
+      const filo = secim === "FILO";
+      const n = Number(secim);
+      const koltuk = filo
+        ? SOFOR_TAVANI
+        : Number.isInteger(n) && n >= 1 && n <= SOFOR_TAVANI
+          ? n
+          : 1; // tanınmayan değer → taban (sessiz bedava paket YOK)
+      await prisma.subscription
+        .upsert({
+          where: { businessId: biz.id },
+          create: {
+            businessId: biz.id,
+            status: "CANCELED", // ödeme yapılmadı; dönem açılmaz
+            currentPeriodEnd: null,
+            plan: filo ? "FILO" : "YONETIM",
+            driverSeats: koltuk,
+          },
+          update: { plan: filo ? "FILO" : "YONETIM", driverSeats: koltuk },
         })
         .catch(() => {});
     }

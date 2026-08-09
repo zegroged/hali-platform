@@ -7,9 +7,23 @@ import { PLAN, merdivenAktif, merdiven, SOFOR_TAVANI } from "@/lib/plan";
 // yazılmazsa halıcı "900" görüp iki şoförle 1.200 ödediğini kasada öğrenir —
 // sürprizin adı chargeback'tir. Fiyat tablosu VERİDEN basılır (elle liste yok).
 const tl = (n: number) => n.toLocaleString("tr-TR");
-function Merdiven({ koyu = false }: { koyu?: boolean }) {
+/** Basamağın form/aksiyon değeri: koltuk sayısı ya da sınırsız için "FILO". */
+export const basamakDegeri = (i: number, sinirsiz: boolean) =>
+  sinirsiz ? "FILO" : String(i + 1);
+
+function Merdiven({
+  koyu = false,
+  onSecim,
+  secili,
+}: {
+  koyu?: boolean;
+  /** Verilirse satırlar TIKLANABİLİR olur (vitrinde seçim yapılabilsin diye). */
+  onSecim?: (deger: string) => void;
+  secili?: string;
+}) {
   if (!merdivenAktif) return null;
   const basamaklar = merdiven();
+  const secilebilir = typeof onSecim === "function";
   return (
     <div
       className={`mt-3 rounded-xl border p-3 text-xs ${
@@ -19,22 +33,73 @@ function Merdiven({ koyu = false }: { koyu?: boolean }) {
       }`}
     >
       <p className={koyu ? "font-medium text-white" : "font-medium text-slate-800"}>
-        Şoför sayısına göre
+        {secilebilir ? "Paketini seç" : "Şoför sayısına göre"}
       </p>
       <ul className="mt-1.5 space-y-0.5">
-        {basamaklar.map((b, i) => (
-          <li key={b.brut} className="flex justify-between gap-3">
-            <span>
-              {b.sinirsiz ? `${SOFOR_TAVANI}+ şoför (sınırsız)` : `${i + 1} şoför`}
-            </span>
-            <span className={koyu ? "font-semibold text-white" : "font-semibold text-slate-900"}>
-              {tl(b.brut)} TL/ay
-            </span>
-          </li>
-        ))}
+        {basamaklar.map((b, i) => {
+          const deger = basamakDegeri(i, b.sinirsiz);
+          const isaretli = secili === deger;
+          const etiket = b.sinirsiz
+            ? `${SOFOR_TAVANI}+ şoför (sınırsız)`
+            : `${i + 1} şoför`;
+          const satir = (
+            <>
+              <span className="flex items-center gap-1.5">
+                {secilebilir && (
+                  <span
+                    aria-hidden
+                    className={`inline-block h-3 w-3 shrink-0 rounded-full border ${
+                      isaretli
+                        ? koyu
+                          ? "border-white bg-white"
+                          : "border-brand bg-brand"
+                        : koyu
+                          ? "border-white/60"
+                          : "border-slate-400"
+                    }`}
+                  />
+                )}
+                {etiket}
+              </span>
+              <span
+                className={koyu ? "font-semibold text-white" : "font-semibold text-slate-900"}
+              >
+                {tl(b.brut)} TL/ay
+              </span>
+            </>
+          );
+          return (
+            <li key={b.brut}>
+              {secilebilir ? (
+                // Vitrinde SEÇİM YAPILABİLMELİ: liste bilgi amaçlı kalırsa
+                // halıcı "hangisini alıyorum" sorusunu ekranda cevaplayamıyor
+                // (kullanıcı bildirdi, 2026-08-10).
+                <button
+                  type="button"
+                  onClick={() => onSecim!(deger)}
+                  aria-pressed={isaretli}
+                  className={`flex w-full items-center justify-between gap-3 rounded-lg px-2 py-1.5 text-left transition ${
+                    isaretli
+                      ? koyu
+                        ? "bg-white/20"
+                        : "bg-white ring-1 ring-brand"
+                      : koyu
+                        ? "hover:bg-white/10"
+                        : "hover:bg-white"
+                  }`}
+                >
+                  {satir}
+                </button>
+              ) : (
+                <span className="flex justify-between gap-3 px-2 py-0.5">{satir}</span>
+              )}
+            </li>
+          );
+        })}
       </ul>
       <p className="mt-1.5">
         Tutarlar KDV dahil. {SOFOR_TAVANI}. şoförden sonrası ücretsiz.
+        {secilebilir ? " Paketini sonradan panelden değiştirebilirsin." : ""}
       </p>
     </div>
   );
@@ -51,7 +116,12 @@ export default function PlanCard({
   onCta,
   ctaLabel = "Hemen Başla",
   wide = false,
+  onSecim,
+  secili,
 }: {
+  /** Verilirse fiyat merdiveni tıklanabilir olur (kayıt funnel'ında seçim). */
+  onSecim?: (deger: string) => void;
+  secili?: string;
   /** Link olarak davran (ana sayfa, /abonelik) */
   ctaHref?: string;
   /** Buton olarak davran (/kayit: tıklayınca form açılır) */
@@ -129,7 +199,7 @@ export default function PlanCard({
             <p className="mt-1 text-sm text-teal-50">
               Aylık {PLAN.priceGrossMonthly} TL — günde yaklaşık {gunluk} lira.
             </p>
-            <Merdiven koyu />
+            <Merdiven koyu onSecim={onSecim} secili={secili} />
           </div>
           {onCta ? (
             <button
@@ -163,7 +233,7 @@ export default function PlanCard({
     <section className="relative rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
       <h2 className="text-lg font-bold text-slate-900">{PLAN.name}</h2>
       <div className="mt-2">{Price}</div>
-      <Merdiven />
+      <Merdiven onSecim={onSecim} secili={secili} />
       <div className="mt-5">{Features}</div>
       <div className="mt-6">{Cta}</div>
     </section>

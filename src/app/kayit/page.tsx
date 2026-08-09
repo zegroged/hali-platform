@@ -7,8 +7,8 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Footer from "@/components/Footer";
-import PlanCard from "@/components/PlanCard";
-import { PLAN } from "@/lib/plan";
+import PlanCard, { basamakDegeri } from "@/components/PlanCard";
+import { PLAN, merdivenAktif, merdiven, fiyatBasamagi } from "@/lib/plan";
 import { CITIES, districtsOfCity } from "@/lib/cities";
 
 /** Alan bazlı doğrulama hataları (alan adı → mesaj). */
@@ -71,6 +71,15 @@ export default function KayitPage() {
   // Funnel adımı: önce YALNIZ paket kartı; "Hemen Başla" formu açar.
   // (hidden ile gizlenir, unmount edilmez — geri dönüşte yazılanlar kaybolmaz)
   const [started, setStarted] = useState(false);
+  // SEÇİLEN PAKET (2026-08-10). Kullanıcı bildirdi: vitrinde liste vardı ama
+  // seçim yoktu — halıcı ne aldığını ekranda söyleyemiyordu. Varsayılan taban
+  // basamak; kayıt gövdesiyle sunucuya gider ve aboneliğe yazılır.
+  const [paket, setPaket] = useState("1");
+  // Özet kutusundaki tutarlar seçilen pakete göre hesaplanır.
+  const tutar = fiyatBasamagi(
+    paket === "FILO" ? "FILO" : "YONETIM",
+    paket === "FILO" ? 99 : Number(paket) || 1,
+  );
 
   // Telefon adımı gösterilecek mi? Bayrak sunucuda tutuluyor (build'e gömülü
   // değil) — .env değişince yeniden derleme gerekmesin diye uçtan sorulur.
@@ -284,6 +293,7 @@ export default function KayitPage() {
         // ile reddedilirdi.
         body: JSON.stringify({
           ...form,
+          paket,
           consent,
           emailCode,
           ...(phoneOtpRequired ? { phoneCode } : {}),
@@ -335,7 +345,13 @@ export default function KayitPage() {
 
         {/* Funnel 1. adım: yalnız paket kartı; "Hemen Başla" formu açar */}
         <div className={started ? "hidden" : "mt-7"}>
-          <PlanCard wide onCta={() => setStarted(true)} ctaLabel="Hemen Başla" />
+          <PlanCard
+            wide
+            onCta={() => setStarted(true)}
+            ctaLabel="Hemen Başla"
+            onSecim={setPaket}
+            secili={paket}
+          />
         </div>
 
         {/* Funnel 2. adım: SOLDA kayıt + ödeme alanları, SAĞDA sipariş özeti
@@ -746,23 +762,59 @@ export default function KayitPage() {
           {/* SAĞ SÜTUN: sipariş özeti — bedel dökümü + onay + ödeme butonu */}
           <aside className="mt-6 h-fit rounded-2xl border border-slate-200 bg-white p-5 md:sticky md:top-6 md:mt-0">
             <h2 className="font-semibold text-slate-900">Sipariş Özeti</h2>
+            {/* PAKET ÖZETTE DE DEĞİŞTİRİLEBİLİR (2026-08-10): halıcı formu
+                doldururken fikrini değiştirirse yukarı çıkmak zorunda kalmasın.
+                Tutarlar SEÇİME göre hesaplanır — sabit yazılsaydı sınırsız
+                paketi seçen kişi özet kutusunda taban fiyatı görürdü. */}
+            {merdivenAktif && (
+              <div className="mt-3 space-y-1">
+                {merdiven().map((b, i) => {
+                  const deger = basamakDegeri(i, b.sinirsiz);
+                  return (
+                    <label
+                      key={b.brut}
+                      className={`flex cursor-pointer items-center justify-between gap-2 rounded-lg border px-2.5 py-2 text-sm transition ${
+                        paket === deger
+                          ? "border-brand bg-brand-light"
+                          : "border-slate-200 hover:bg-slate-50"
+                      }`}
+                    >
+                      <span className="flex items-center gap-2">
+                        <input
+                          type="radio"
+                          name="paketSecim"
+                          value={deger}
+                          checked={paket === deger}
+                          onChange={() => setPaket(deger)}
+                          className="h-4 w-4 accent-brand"
+                        />
+                        {b.sinirsiz ? "Sınırsız şoför" : `${i + 1} şoför`}
+                      </span>
+                      <span className="whitespace-nowrap font-medium text-slate-900">
+                        {b.brut.toLocaleString("tr-TR")} TL
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            )}
             <dl className="mt-4 space-y-2 text-sm">
               <div className="flex justify-between gap-2">
                 <dt className="text-slate-600">{PLAN.name} (aylık)</dt>
                 <dd className="whitespace-nowrap text-slate-900">
-                  {PLAN.priceNetMonthly} TL
+                  {tutar.net.toLocaleString("tr-TR", { minimumFractionDigits: 2 })} TL
                 </dd>
               </div>
               <div className="flex justify-between gap-2">
                 <dt className="text-slate-600">KDV (%{PLAN.kdvRate})</dt>
                 <dd className="whitespace-nowrap text-slate-900">
-                  {PLAN.kdvMonthly} TL
+                  {tutar.kdv.toLocaleString("tr-TR", { minimumFractionDigits: 2 })} TL
                 </dd>
               </div>
               <div className="flex justify-between gap-2 border-t border-slate-200 pt-2">
                 <dt className="font-semibold text-slate-900">Aylık toplam</dt>
                 <dd className="whitespace-nowrap font-semibold text-slate-900">
-                  {PLAN.priceGrossMonthly} TL
+                  {tutar.brut.toLocaleString("tr-TR", { minimumFractionDigits: 2 })} TL
                 </dd>
               </div>
               <div className="flex justify-between gap-2 rounded-lg bg-brand-light px-3 py-2">
@@ -770,7 +822,7 @@ export default function KayitPage() {
                   Ödenecek (kayıt sonrası)
                 </dt>
                 <dd className="whitespace-nowrap font-semibold text-brand-dark">
-                  {PLAN.priceGrossMonthly} TL
+                  {tutar.brut.toLocaleString("tr-TR", { minimumFractionDigits: 2 })} TL
                 </dd>
               </div>
             </dl>
