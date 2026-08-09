@@ -3,6 +3,8 @@
 // (ödeme alınmadan PAID, oturum sahteciliği, kırık SMS linkleri) başlangıçta
 // NET bir hatayla durmak. Build sırasında atlanır (build env'inde sırlar olmaz).
 
+import { PLAN_TUTARLARI } from "@/lib/plan";
+
 const isProd = process.env.NODE_ENV === "production";
 const isBuild = process.env.NEXT_PHASE === "phase-production-build";
 
@@ -96,19 +98,43 @@ export const merdivenAktif = process.env.FIYAT_MERDIVENI === "1";
  * `recurringPlanFor` null verir → çağıran taraf düzenli ödeme talimatı AÇMAZ.
  * Yarım kurulu tahsilat açılmasın diye kasıtlı olarak fail-closed.
  */
+/** iyzico referans kodu biçimi (UUID). Şekil denetimi ŞART: kurulum script'i
+ *  bulunamayan planlar için `<BULUNAMADI>` yer tutucusu basıyor; o satır
+ *  yanlışlıkla .env'e yapıştırılırsa şekilsiz bir dize "geçerli referans"
+ *  sayılır ve talimat FAIL-OPEN açılırdı (denetim bulgusu). */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export function getIyzicoPlanRefByGross(gross: number): string {
-  const v = process.env[`IYZICO_PLAN_REF_${Math.round(gross)}`];
-  return typeof v === "string" ? v.trim() : "";
+  // TAM EŞLEŞME — yuvarlama YOK (denetim bulgusu). `Math.round` ile 1.499,60
+  // gibi bir tutar 1.500 planına yapışıyor, sonra kayda yuvarlanmamış tutar
+  // yazılıyordu: karttan 1.500 çekilirken defterde 1.499,60 duruyordu.
+  // Merdiven dışı bir tutar üretildiyse bu bir HATADIR, ona en yakın planı
+  // seçerek örtmek yerine talimatı hiç açmamak doğrudur.
+  if (!(PLAN_TUTARLARI as readonly number[]).includes(gross)) return "";
+  const v = process.env[`IYZICO_PLAN_REF_${gross}`];
+  const ref = typeof v === "string" ? v.trim() : "";
+  return UUID_RE.test(ref) ? ref : "";
 }
 
 /** Bu tutar için düzenli ödeme talimatı açılabilir mi + hangi planla.
- *  0 TL (ücretsiz dönem) için talimat YOKTUR — çekilecek bir şey yok. */
+ *  0 TL (ücretsiz dönem) için talimat YOKTUR — çekilecek bir şey yok.
+ *  Dönen `amount` planın KENDİ tutarıdır: çekilen ile kaydedilen ayrışamaz. */
 export function recurringPlanFor(
   gross: number,
 ): { planReferenceCode: string; amount: number } | null {
   if (!paymentsLive || !(gross > 0)) return null;
   const ref = getIyzicoPlanRefByGross(gross);
   return ref ? { planReferenceCode: ref, amount: gross } : null;
+}
+
+/** Merdiven açıkken eksik/bozuk plan referanslarını AÇILIŞTA bildir.
+ *  Sessiz null, uyanma gününde teşhisi imkânsız kılar: halıcı talimat veremez,
+ *  kimse sebebini bilmez. `validateConfig` bunu çağırır. */
+export function eksikPlanReferanslari(): number[] {
+  if (!merdivenAktif) return [];
+  return (PLAN_TUTARLARI as readonly number[]).filter(
+    (t) => !getIyzicoPlanRefByGross(t),
+  );
 }
 
 /** iyzico abonelik ÜRÜN referansı (planlar bunun altında açılır).
@@ -144,6 +170,20 @@ export function validateConfig(): void {
     required("IYZICO_API_KEY");
     required("IYZICO_SECRET");
     getIyzicoBaseUrl();
+  }
+
+  // MERDİVEN AÇIKSA plan referanslarının HEPSİ olmalı. Eksikse tek tek sessiz
+  // null dönerdi: halıcı düzenli ödeme talimatı veremez, panelde sebebi
+  // yazmaz, kimse bakmadan anlamaz. Uyanma günü teşhis edilebilir olsun.
+  if (merdivenAktif && paymentsLive) {
+    const eksik = eksikPlanReferanslari();
+    if (eksik.length) {
+      throw new Error(
+        `FIYAT_MERDIVENI=1 ama şu tutarların iyzico plan referansı eksik/geçersiz: ` +
+          eksik.map((t) => `IYZICO_PLAN_REF_${t}`).join(", ") +
+          ` — referanslar UUID biçiminde olmalı (scripts/iyzico-planlar.ts basar).`,
+      );
+    }
   }
 
   if (isProd) {

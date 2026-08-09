@@ -99,18 +99,61 @@ export function fiyatBasamagi(
   if (paket === "VITRIN") {
     return { koltuk: 0, brut: 0, net: 0, kdv: 0, sinirsiz: false };
   }
-  const merdiven = kurucu ? MERDIVEN_KURUCU : MERDIVEN_LISTE;
+  const basamaklar = kurucu ? MERDIVEN_KURUCU : MERDIVEN_LISTE;
   // FILO = tavan. Aksi hâlde en az 1, en çok SOFOR_TAVANI koltuk faturalanır.
+  //
+  // ⚠️ SONSUZ TAVANA GİDER, TABANA DEĞİL (denetim bulgusu): önceki hâlde
+  // `Number.isFinite(ham) ? ham : 1` yazıyordu, yani Infinity gelirse koltuk 1
+  // olup EN UCUZ basamak seçiliyordu. Sayı olmayan girdi (NaN) için 1 doğru
+  // varsayılan, ama "sonsuz şoför" için tavan doğrusudur.
   const ham = paket === "FILO" ? SOFOR_TAVANI : Math.trunc(soforSayisi);
-  const koltuk = Math.min(Math.max(Number.isFinite(ham) ? ham : 1, 1), SOFOR_TAVANI);
-  const brut = merdiven[koltuk - 1];
+  const guvenli = Number.isNaN(ham) ? 1 : ham; // NaN → taban, ±Infinity aşağıda kelepçelenir
+  const koltuk = Math.min(Math.max(guvenli, 1), SOFOR_TAVANI);
+  const brut = basamaklar[koltuk - 1];
   const net = kurus(brut / (1 + PLAN.kdvRate / 100));
   return { koltuk, brut, net, kdv: kurus(brut - net), sinirsiz: koltuk >= SOFOR_TAVANI };
 }
 
-/** Merdivenin tamamı — /abonelik fiyat tablosunu veriden basmak için. */
+// İKİ MERDİVEN AYNI UZUNLUKTA OLMAK ZORUNDA (denetim bulgusu): kurucu, listenin
+// bir basamak aşağısıdır — biri kısalırsa `fiyatBasamagi` tanımsız okur ve
+// ekranda NaN fiyat çıkar. Yorumla değil, yükleme anında patlayarak korunuyor.
+if (MERDIVEN_LISTE.length !== MERDIVEN_KURUCU.length) {
+  throw new Error(
+    `Fiyat merdivenleri farklı uzunlukta: liste=${MERDIVEN_LISTE.length} kurucu=${MERDIVEN_KURUCU.length}`,
+  );
+}
+
+/** Merdivenin tamamı — /abonelik fiyat tablosunu veriden basmak için.
+ *  Uzunluk değişmezi yukarıda zorlandığı için hangi diziyi gezdiği artık
+ *  önemsiz; yine de niyeti belli olsun diye doğru dizi geziliyor. */
 export function merdiven(kurucu = false): Basamak[] {
-  return MERDIVEN_LISTE.map((_, i) => fiyatBasamagi("YONETIM", i + 1, kurucu));
+  const kaynak = kurucu ? MERDIVEN_KURUCU : MERDIVEN_LISTE;
+  return kaynak.map((_, i) => fiyatBasamagi("YONETIM", i + 1, kurucu));
+}
+
+/**
+ * BU İŞLETMEDEN BU AY TAHSİL EDİLECEK BRÜT — kilit dahil.
+ *
+ * `fiyatBasamagi` yalnız listeyi bilir; kurucu kilidi (`priceGrossLocked`)
+ * işletme kaydında durur ve kilit süresi (`priceLockedUntil`) dolana kadar
+ * merdivenin ÜSTÜNDEDİR. Bu iki kaynağın hangisinin kazandığı tanımsız
+ * kalırsa TÜFE artışından sonra kurucudan yanlış tutar çekilir — sözleşmeye
+ * aykırı tahsilat (ETAHS md.16). Öncelik burada TEK yerde tanımlı.
+ *
+ * Yarım dolu kilit (tutar var, tarih yok) SÜRESİZ kilit sayılır; tersi
+ * (tarih var, tutar yok) kilit sayılmaz.
+ */
+export function tahsilEdilecekBrut(
+  paket: Paket,
+  soforSayisi: number,
+  kilit?: { priceGrossLocked?: unknown; priceLockedUntil?: Date | null } | null,
+): number {
+  const ham = Number(kilit?.priceGrossLocked ?? Number.NaN);
+  const sureli = kilit?.priceLockedUntil ?? null;
+  const gecerli =
+    Number.isFinite(ham) && ham > 0 && (!sureli || sureli.getTime() > Date.now());
+  if (gecerli && paket !== "VITRIN") return ham;
+  return fiyatBasamagi(paket, soforSayisi).brut;
 }
 
 /** iyzico'da açılmış TÜM plan tutarları (KDV dahil). config.ts bu listeyi
