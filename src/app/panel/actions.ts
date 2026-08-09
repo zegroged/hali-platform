@@ -22,7 +22,12 @@ import { sendSms, trackingLink } from "@/lib/sms";
 import { waSiparisYolda, waFiyatOnayi, waSiparisHazir, waGonderVeKaydet } from "@/lib/whatsapp";
 import { sendAdminEmail, sendEmail } from "@/lib/email";
 import { notify, notifyAdmins } from "@/lib/notify";
-import { getAppBaseUrl } from "@/lib/config";
+import { getAppBaseUrl, merdivenAktif } from "@/lib/config";
+import {
+  etkinPaket,
+  soforEklenebilir,
+  soforKapisiMesaji,
+} from "@/lib/paketYetki";
 import { ORDER_STATUS_META, PANEL_NEXT } from "@/lib/orderStatus";
 import { normalizeCarpetCount, CARPET_COUNT_HATA } from "@/lib/carpet";
 import { hataylaDon } from "@/lib/hata";
@@ -316,6 +321,38 @@ export async function removePhoto(formData: FormData) {
 
 export async function addDriver(formData: FormData) {
   const b = await biz();
+
+  // KOLTUK KAPISI (FIYAT-2026-08-09.md §4.1) — SERT.
+  // Merdiven şoför sayısına bağlı olduğu için bu kapı yumuşak olamaz: uyarıyla
+  // geçilirse halıcı ikinci şoförü ekler, sistem farkı isteyemez ve merdiven
+  // kâğıt üstünde kalır. Merdiven KAPALIYKEN hiç çalışmaz — bugün 39
+  // işletmenin `driverSeats` değeri 1 ve kimse fark ödemiyor, kapıyı tek
+  // başına açmak hepsinin ikinci şoförünü engellerdi.
+  if (merdivenAktif) {
+    const [sub, mevcut] = await Promise.all([
+      prisma.subscription.findUnique({
+        where: { businessId: b.id },
+        select: {
+          status: true,
+          currentPeriodEnd: true,
+          plan: true,
+          driverSeats: true,
+        },
+      }),
+      // Şoför listesinde GÖRÜNEN ne ise koltuk odur. Engelli/pasif ayrımı
+      // yapılsaydı halıcının gördüğü sayı ile faturalanan sayı ayrışırdı;
+      // koltuk boşaltmanın yolu şoförü silmektir (removeDriver).
+      prisma.driver.count({ where: { businessId: b.id } }),
+    ]);
+    const paket = etkinPaket(sub);
+    if (!soforEklenebilir(paket, Number(sub?.driverSeats ?? 1), mevcut)) {
+      hataylaDon(
+        "/panel/soforler",
+        soforKapisiMesaji(paket, Number(sub?.driverSeats ?? 1)),
+      );
+    }
+  }
+
   const name = String(formData.get("name") || "").trim();
   const phone = String(formData.get("phone") || "").trim();
   const chosen = String(formData.get("password") || "");

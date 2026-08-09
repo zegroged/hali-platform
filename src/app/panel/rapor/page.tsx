@@ -1,4 +1,5 @@
 import { sadeceSahip } from "@/lib/panelYetki";
+import { modulGerekir } from "@/lib/paketYetki";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { getCurrentBusiness } from "@/lib/panel";
@@ -32,6 +33,8 @@ export default async function PanelReport({
 
   const b = await getCurrentBusiness();
   if (!b) return null;
+  // PAKET KAPISI — sayfanın kendi verisine dokunmadan önce (FIYAT §1-C).
+  modulGerekir(b.subscription, "DURAK_RAPORU");
 
   const sp = await searchParams;
   const now = new Date();

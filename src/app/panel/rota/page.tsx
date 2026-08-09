@@ -1,4 +1,5 @@
 import { getPanelErisim } from "@/lib/panelYetki";
+import { modulGerekir } from "@/lib/paketYetki";
 import { getPanelBusiness } from "@/lib/panel";
 import { RouteHistory } from "@/components/RouteHistory";
 import EmptyState from "@/components/EmptyState";
@@ -9,6 +10,8 @@ export const dynamic = "force-dynamic";
 export default async function RotaPage() {
   const b = await getPanelBusiness();
   if (!b) return null;
+  // PAKET KAPISI — sayfanın kendi verisine dokunmadan önce (FIYAT §1-C).
+  modulGerekir(b.subscription, "ROTA_GECMISI");
 
   const drivers = b.drivers.map((d) => ({ id: d.id, name: d.user.name }));
   const now = new Date();

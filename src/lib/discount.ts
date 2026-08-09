@@ -1,4 +1,5 @@
-import { PLAN } from "@/lib/plan";
+import { PLAN, tahsilEdilecekBrut, type Paket } from "@/lib/plan";
+import { merdivenAktif } from "@/lib/config";
 
 // ABONELİK İNDİRİMİ (2026-07-23): premium komisyoncu kodla, admin elle tanımlar.
 // İndirim işletme kaydında durur (discountPercent + discountUntil) ve süresi
@@ -19,7 +20,41 @@ export const MAX_SUB_DISCOUNT_MONTHS = 12;
 export type DiscountLike = {
   discountPercent: unknown; // Prisma Decimal | null
   discountUntil: Date | null;
+  /** MERDİVEN AÇIKKEN ZORUNLU: liste fiyatı artık işletmeye göre değişiyor
+   *  (paket + koltuk + kurucu kilidi). Merdiven kapalıyken okunmaz. */
+  subscription?: {
+    plan?: unknown;
+    driverSeats?: unknown;
+    priceGrossLocked?: unknown;
+    priceLockedUntil?: Date | null;
+  } | null;
 };
+
+/** Bu işletmenin İNDİRİMSİZ liste fiyatı (KDV dahil).
+ *
+ *  Merdiven kapalıyken tek fiyat vardır ve davranış 2026-08-09 öncesiyle
+ *  birebir aynıdır. Açıkken işletmenin kendi basamağı okunur.
+ *
+ *  🔴 SESSİZ VARSAYILAN YOK: merdiven açıkken abonelik kaydı gelmezse
+ *  FIRLATIR. Buradaki sessiz bir varsayılan (2.400 ya da 900) yanlış tutarın
+ *  karttan çekilmesi demektir; gürültülü hata, yanlış tahsilattan iyidir.
+ */
+function listeBrut(b: DiscountLike): number {
+  if (!merdivenAktif) return PLAN.priceGrossNumber;
+  const s = b.subscription;
+  if (!s) {
+    throw new Error(
+      "effectiveSubscriptionGross: merdiven açıkken abonelik kaydı (plan, driverSeats, priceGrossLocked) sorguya dahil edilmeli.",
+    );
+  }
+  const p = s.plan;
+  const paket: Paket =
+    p === "FILO" || p === "YONETIM" || p === "VITRIN" ? p : "VITRIN";
+  return tahsilEdilecekBrut(paket, Number(s.driverSeats ?? 1), {
+    priceGrossLocked: s.priceGrossLocked,
+    priceLockedUntil: s.priceLockedUntil ?? null,
+  });
+}
 
 /** Şu an geçerli indirim yüzdesi (yoksa/bittiyse null). */
 export function activeDiscountPercent(b: DiscountLike): number | null {
@@ -36,9 +71,14 @@ export function effectiveSubscriptionGross(b: DiscountLike): {
   gross: number;
   pct: number | null;
 } {
+  const liste = listeBrut(b);
   const pct = activeDiscountPercent(b);
-  if (pct == null) return { gross: PLAN.priceGrossNumber, pct: null };
-  const gross = kurus(PLAN.priceGrossNumber * (1 - pct / 100));
+  if (pct == null) return { gross: liste, pct: null };
+  // ⚠️ İNDİRİM MERDİVEN DIŞI TUTAR ÜRETİR (ör. 1.200 × 0,8 = 960) ve o tutarın
+  // iyzico'da planı yoktur → `recurringPlanFor` null döner, düzenli ödeme
+  // talimatı AÇILMAZ. Bu bir kusur değil, mevcut kuralın devamı: indirimli
+  // işletme bugün de talimat veremiyor (odeme/abonelik/page.tsx), elle ödüyor.
+  const gross = kurus(liste * (1 - pct / 100));
   return { gross: gross < 1 ? 0 : gross, pct };
 }
 

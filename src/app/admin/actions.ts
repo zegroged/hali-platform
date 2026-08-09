@@ -579,11 +579,25 @@ export async function activateSubscription(formData: FormData) {
 
   const isletme = await prisma.cleanerBusiness.findUnique({
     where: { id },
-    select: { discountPercent: true, discountUntil: true },
+    select: {
+      discountPercent: true,
+      discountUntil: true,
+      // Merdiven açıkken liste fiyatı işletmeye göre değişir; abonelik kaydı
+      // olmadan `effectiveSubscriptionGross` fırlatır (sessiz yanlış tutar yok).
+      subscription: {
+        select: {
+          plan: true,
+          driverSeats: true,
+          priceGrossLocked: true,
+          priceLockedUntil: true,
+        },
+      },
+    },
   });
   const { gross } = effectiveSubscriptionGross({
     discountPercent: isletme?.discountPercent ?? null,
     discountUntil: isletme?.discountUntil ?? null,
+    subscription: isletme?.subscription ?? null,
   });
 
   const payment = await prisma.$transaction(async (tx) => {

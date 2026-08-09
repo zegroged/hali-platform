@@ -1,4 +1,5 @@
 import { sadeceSahip } from "@/lib/panelYetki";
+import { modulGerekir } from "@/lib/paketYetki";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
@@ -50,6 +51,8 @@ export default async function MutabakatSayfasi({
   // yaşandı (bkz. DEVIR, app-router yetki sızıntısı).
   const b = await getCurrentBusiness();
   if (!b) redirect("/giris");
+  // PAKET KAPISI — sayfanın kendi verisine dokunmadan önce (FIYAT §1-C).
+  modulGerekir(b.subscription, "MUTABAKAT");
 
   const sp = await searchParams;
   const gunISO = /^\d{4}-\d{2}-\d{2}$/.test(sp.gun ?? "")

@@ -1,4 +1,5 @@
 import { sadeceSahip } from "@/lib/panelYetki";
+import { modulGerekir } from "@/lib/paketYetki";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { getCurrentBusiness } from "@/lib/panel";
@@ -37,6 +38,8 @@ export default async function KasaSayfasi({
 
   const b = await getCurrentBusiness();
   if (!b) return null;
+  // PAKET KAPISI — sayfanın kendi verisine dokunmadan önce (FIYAT §1-C).
+  modulGerekir(b.subscription, "KASA");
   const { ay, hata, ok } = await searchParams;
 
   // ?ay=2026-07 — yoksa bu ay.

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getPanelBusiness } from "@/lib/panel";
 import { trDayBoundsUTC } from "@/lib/time";
 import { izHazirla } from "@/lib/konumFiltre";
+import { modulAcikMi } from "@/lib/paketYetki";
 
 /**
  * Canlı iz için SON `enFazla` noktayı, parça kopukluklarını BOZMADAN al.
@@ -29,6 +30,16 @@ export async function GET() {
   const b = await getPanelBusiness();
   if (!b) {
     return NextResponse.json({ error: "Yetkisiz" }, { status: 401 });
+  }
+
+  // PAKET KAPISI (FIYAT §1-C) — SAYFA KİLİDİ TEK BAŞINA YETMEZ.
+  // Canlı konumu bu uç servis ediyor; panel sayfası kapatılıp burası açık
+  // bırakılsaydı kilit yalnız görsel olurdu (denetim bulgusu).
+  if (!modulAcikMi(b.subscription, "CANLI_KONUM")) {
+    return NextResponse.json(
+      { error: "Canlı şoför konumu paketinizde yok.", kilit: "CANLI_KONUM" },
+      { status: 403 },
+    );
   }
 
   const { start: startToday } = trDayBoundsUTC(); // bugünün TR gün başı

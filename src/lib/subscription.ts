@@ -26,13 +26,20 @@ type Db = PrismaClient | Prisma.TransactionClient;
 export async function extendSubscription(
   db: Db,
   businessId: string,
+  months = 1,
 ): Promise<Date> {
+  // ÇOK AYLIK DÖNEM (2026-08-09). Eskiden bu fonksiyon her çağrıda SABİT 1 ay
+  // ekliyor ve ödenen tutara hiç bakmıyordu. Sezonluk peşin (9 ay) bu yüzden
+  // İMKÂNSIZDI: 8.100 TL alınıp 1 ay açılırdı, halıcı 8 ayın parasını ödemiş
+  // ama hizmet almıyor olurdu (denetim bulgusu). Ay sayısı artık çağıranın
+  // sorumluluğunda ve `SubscriptionPayment.periodMonths` ile birlikte yazılır.
+  const ay = Math.min(Math.max(Math.trunc(Number(months) || 1), 1), 24);
   const id = "sub_" + crypto.randomBytes(12).toString("hex"); // yalnız INSERT dalında kullanılır
   const rows = await db.$queryRaw<{ endsAt: Date }[]>(Prisma.sql`
     INSERT INTO "Subscription"
       (id, "businessId", status, "priceMonthly", "currentPeriodStart", "currentPeriodEnd", "createdAt", "updatedAt")
     VALUES
-      (${id}, ${businessId}, 'ACTIVE'::"SubscriptionStatus", 2000, now(), now() + interval '1 month' + interval '3 days', now(), now())
+      (${id}, ${businessId}, 'ACTIVE'::"SubscriptionStatus", 2000, now(), now() + interval '1 month' * ${ay}::int + interval '3 days', now(), now())
     ON CONFLICT ("businessId") DO UPDATE SET
       status = 'ACTIVE'::"SubscriptionStatus",
       -- Dönem hâlâ geçerliyse üstüne ekle, dolduysa şimdiden başlat (atomik birikim).
@@ -43,7 +50,7 @@ export async function extendSubscription(
       -- API'si 410 veriyordu — yılda ~7 gün "ödedim ama yokum". Takvim ayına
       -- geçildi; 3 gün pay ise çekimin banka/iyzico tarafında birkaç saat
       -- gecikmesine karşı emniyet payı (fazladan gün bedava, eksik gün pahalı).
-      "currentPeriodEnd" = GREATEST(now(), "Subscription"."currentPeriodEnd") + interval '1 month' + interval '3 days',
+      "currentPeriodEnd" = GREATEST(now(), "Subscription"."currentPeriodEnd") + interval '1 month' * ${ay}::int + interval '3 days',
       "updatedAt" = now()
     RETURNING "currentPeriodEnd" AS "endsAt"
   `);
