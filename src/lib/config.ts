@@ -71,6 +71,39 @@ export function getIyzicoPlanAmount(): number {
   return Number.isFinite(v) && v > 0 ? v : 2400;
 }
 
+/** FİYAT MERDİVENİ PLAN REFERANSLARI (FIYAT-2026-08-09.md) — HENÜZ KULLANILMIYOR.
+ *
+ * Yukarıdaki tek `IYZICO_PLAN_REFERENCE` sabit tek fiyat içindi. Merdivende
+ * beş ayrı tutar var ve iyzico'da her tutarın AYRI planı bulunuyor (plan = fiyat,
+ * paket değil — kurucu+2 şoför ile liste+1 şoför aynı 900'ü öder; paket başına
+ * plan açmak aynı fiyattan iki plan yaratıp mutabakatı bozardı).
+ *
+ * Planlar canlıda açık (2026-08-09), referanslar DEVIR §1'de tabloda. Sunucu
+ * .env'ine IYZICO_PLAN_REF_<tutar> satırları eklenmeden bu eşleme BOŞ döner ve
+ * `recurringPlanFor` null verir → çağıran taraf düzenli ödeme talimatı AÇMAZ.
+ * Yarım kurulu tahsilat açılmasın diye kasıtlı olarak fail-closed.
+ */
+export function getIyzicoPlanRefByGross(gross: number): string {
+  const v = process.env[`IYZICO_PLAN_REF_${Math.round(gross)}`];
+  return typeof v === "string" ? v.trim() : "";
+}
+
+/** Bu tutar için düzenli ödeme talimatı açılabilir mi + hangi planla.
+ *  0 TL (ücretsiz dönem) için talimat YOKTUR — çekilecek bir şey yok. */
+export function recurringPlanFor(
+  gross: number,
+): { planReferenceCode: string; amount: number } | null {
+  if (!paymentsLive || !(gross > 0)) return null;
+  const ref = getIyzicoPlanRefByGross(gross);
+  return ref ? { planReferenceCode: ref, amount: gross } : null;
+}
+
+/** iyzico abonelik ÜRÜN referansı (planlar bunun altında açılır).
+ *  scripts/iyzico-planlar.mjs bunu okur/yazar; kod tarafı yalnız teşhis için. */
+export function getIyzicoProductReference(): string {
+  return process.env.IYZICO_PRODUCT_REFERENCE ?? "";
+}
+
 /** iyzico API tabanı; canlı modda sandbox'a düşmesini engelle. */
 export function getIyzicoBaseUrl(): string {
   const v = process.env.IYZICO_BASE_URL ?? "https://sandbox-api.iyzipay.com";

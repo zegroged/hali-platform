@@ -119,15 +119,15 @@ model User {
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
-  ownedBusiness CleanerBusiness? @relation("BusinessOwner")
-  agentProfile  Agent?
-  driverProfile Driver?
-  orders        Order[]          @relation("CustomerOrders")
-  reviews       Review[]
-  notifications Notification[]
-  pushTokens    PushToken[]
+  ownedBusiness  CleanerBusiness? @relation("BusinessOwner")
+  agentProfile   Agent?
+  driverProfile  Driver?
+  orders         Order[]          @relation("CustomerOrders")
+  reviews        Review[]
+  notifications  Notification[]
+  pushTokens     PushToken[]
   passwordResets PasswordReset[]
-  staffProfile  Staff?
+  staffProfile   Staff?
 }
 
 // DÜKKÂN ÇALIŞANI (2026-08-06). Driver ile AYNI desen: kullanıcı ↔ işletme
@@ -188,23 +188,23 @@ model Notification {
 }
 
 model CleanerBusiness {
-  waMessages        WhatsAppMessage[]
-  cashHandovers     CashHandover[]
-  id          String  @id @default(cuid())
-  owner       User    @relation("BusinessOwner", fields: [ownerId], references: [id])
-  ownerId     String  @unique
-  name        String
-  description String?
-  address     String
-  city        String
-  district    String
-  lat         Float
-  lng         Float
-  phone       String
+  waMessages         WhatsAppMessage[]
+  cashHandovers      CashHandover[]
+  id                 String            @id @default(cuid())
+  owner              User              @relation("BusinessOwner", fields: [ownerId], references: [id])
+  ownerId            String            @unique
+  name               String
+  description        String?
+  address            String
+  city               String
+  district           String
+  lat                Float
+  lng                Float
+  phone              String
   // Ek iletişim numaraları — müşteri vitrini "Sabit Hat" + "GSM & WhatsApp"
   // gruplu gösterir. phone birincil GSM'dir (SMS bildirimleri oraya gider).
-  gsmPhone2     String? // ikinci GSM & WhatsApp numarası
-  landlinePhone String? // sabit hat (0 2xx/3xx/4xx...)
+  gsmPhone2          String? // ikinci GSM & WhatsApp numarası
+  landlinePhone      String? // sabit hat (0 2xx/3xx/4xx...)
   // WHATSAPP DOĞRULAMASI (2026-07-26): işletme kaydının kapısı e-postadır
   // (sabit hatta OTP gitmez); WhatsApp numarası AYRI doğrulanır. Doğrulanan
   // numara burada saklanır — sonradan değişirse doğrulama düşer.
@@ -221,7 +221,7 @@ model CleanerBusiness {
   billingTitle       String? // fatura ünvanı (yasal unvan; name yalnız görünen ad)
   taxOffice          String? // vergi dairesi
   billingAddress     String? // fatura adresi (abonelik ödemesi öncesi zorunlu)
-  billingCode        String? @unique // cari/abone kodu (HY-0001) — muhasebe eşleştirmesi
+  billingCode        String?            @unique // cari/abone kodu (HY-0001) — muhasebe eşleştirmesi
   // İşletme logosu (kare, ≤512px WebP) — kartta ve profil başlığında gösterilir.
   logoUrl            String?
   googleProfileUrl   String? // işletmenin Google Haritalar/İşletme profili linki (gerçek Google yorumları)
@@ -251,28 +251,28 @@ model CleanerBusiness {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  serviceAreas ServiceArea[]
-  ledgerEntries      LedgerEntry[]
-  ledgerRecurrences  LedgerRecurrence[]
-  photos       BusinessPhoto[]
-  pricing      PricingItem[]
-  drivers      Driver[]
-  staff        Staff[]
-  orders       Order[]
-  reviews      Review[]
-  badges       Badge[]
-  subscription Subscription?
-  payments     SubscriptionPayment[]
-  commissions  CommissionEntry[]
+  serviceAreas             ServiceArea[]
+  ledgerEntries            LedgerEntry[]
+  ledgerRecurrences        LedgerRecurrence[]
+  photos                   BusinessPhoto[]
+  pricing                  PricingItem[]
+  drivers                  Driver[]
+  staff                    Staff[]
+  orders                   Order[]
+  reviews                  Review[]
+  badges                   Badge[]
+  subscription             Subscription?
+  payments                 SubscriptionPayment[]
+  commissions              CommissionEntry[]
   // Komisyoncu referansı: bu işletmeyi platforma hangi komisyoncu getirdi.
   // Her abonelik ödemesinde (yenileme dahil) komisyon tahakkuku üretir.
-  referredByAgent   Agent?  @relation(fields: [referredByAgentId], references: [id], onDelete: SetNull)
-  referredByAgentId String?
-  usedReferralCodes AgentReferralCode[] @relation("CodeUsedBy")
+  referredByAgent          Agent?                @relation(fields: [referredByAgentId], references: [id], onDelete: SetNull)
+  referredByAgentId        String?
+  usedReferralCodes        AgentReferralCode[]   @relation("CodeUsedBy")
   // Abonelik indirimi: discountUntil geçerliyken her ödeme %discountPercent
   // indirimli tahsil edilir (kaynak: premium komisyoncu kodu VEYA admin eli).
-  discountPercent Decimal?  @db.Decimal(5, 2)
-  discountUntil   DateTime?
+  discountPercent          Decimal?              @db.Decimal(5, 2)
+  discountUntil            DateTime?
   // İNDİRİMİ KİM VERDİ (2026-07-26): komisyoncu kodundan geldiyse o komisyoncunun
   // id'si; admin elle verdiyse null. Kural: indirimin YARISI, indirimi veren
   // komisyoncunun komisyonundan düşer (kalan yarısı platformdan). Admin verdiyse
@@ -305,24 +305,24 @@ enum LedgerCategory {
 }
 
 model LedgerEntry {
-  id         String          @id @default(cuid())
-  business   CleanerBusiness @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  businessId String
-  kind       LedgerKind      @default(EXPENSE)
-  category   LedgerCategory  @default(DIGER)
+  id            String            @id @default(cuid())
+  business      CleanerBusiness   @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  businessId    String
+  kind          LedgerKind        @default(EXPENSE)
+  category      LedgerCategory    @default(DIGER)
   // SERBEST KATEGORİ (2026-07-27): sabit 8 kalıp her işletmeye uymuyordu
   // ("adamları neden bir kategoriye sığdırmaya çalışıyoruz"). Halıcı kendi
   // adını yazar; enum kaba kova olarak kalır (eski kayıtlarla uyum + gruplama
   // yedeği). Dolu olduğunda ekranda ve özet tablosunda BU gösterilir.
   categoryLabel String?
-  label      String // "Ahmet maaş", "Omo 5kg x4"
-  amount     Decimal         @db.Decimal(10, 2)
-  date       DateTime // kalemin ait olduğu gün (elle seçilebilir)
-  note       String?
+  label         String // "Ahmet maaş", "Omo 5kg x4"
+  amount        Decimal           @db.Decimal(10, 2)
+  date          DateTime // kalemin ait olduğu gün (elle seçilebilir)
+  note          String?
   // Tekrarlayan kalemin kopyası mı (hangi kuraldan üretildi):
-  recurrence   LedgerRecurrence? @relation(fields: [recurrenceId], references: [id], onDelete: SetNull)
-  recurrenceId String?
-  createdAt  DateTime        @default(now())
+  recurrence    LedgerRecurrence? @relation(fields: [recurrenceId], references: [id], onDelete: SetNull)
+  recurrenceId  String?
+  createdAt     DateTime          @default(now())
 
   @@index([businessId, date])
 }
@@ -382,16 +382,16 @@ model PricingItem {
 
 model Driver {
   cashHandovers CashHandover[]
-  id         String          @id @default(cuid())
-  user       User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId     String          @unique
-  business   CleanerBusiness @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  businessId String
+  id            String          @id @default(cuid())
+  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId        String          @unique
+  business      CleanerBusiness @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  businessId    String
 
-  isOnShift  Boolean   @default(false) // mesaide mi
-  lastLat    Float? // en güncel canlı konum
-  lastLng    Float?
-  lastSeenAt DateTime?
+  isOnShift      Boolean   @default(false) // mesaide mi
+  lastLat        Float? // en güncel canlı konum
+  lastLng        Float?
+  lastSeenAt     DateTime?
   // Mesainin AÇILDIĞI an. `lastSeenAt` bunu karşılamıyor: mesai ucu da, ping de
   // ona yazıyor — yani "hiç ping gelmedi" ile "ping geliyordu, kesildi" ayırt
   // edilemiyor. Konum bekçisi (lib/konumBekcisi.ts) bu ikisini ayırmak için
@@ -439,9 +439,9 @@ model DriverStop {
 
 model Order {
   waMessages    WhatsAppMessage[]
-  id            String  @id @default(cuid())
-  trackingToken String  @unique @default(cuid()) // SMS takip linki
-  code          String? @unique // kısa, müşteri-dostu takip kodu (ör. HLK-4F2A9)
+  id            String            @id @default(cuid())
+  trackingToken String            @unique @default(cuid()) // SMS takip linki
+  code          String?           @unique // kısa, müşteri-dostu takip kodu (ör. HLK-4F2A9)
 
   customer      User?   @relation("CustomerOrders", fields: [customerId], references: [id], onDelete: SetNull)
   customerId    String?
@@ -491,23 +491,21 @@ model Order {
   //
   // ARTIK: tahsilat teslim eden kişinin BEYANIDIR. İşaretlenmezse sipariş
   // "teslim edildi, tahsil edilmedi" durumunda kalır.
-  collectedAmount Decimal?  @db.Decimal(10, 2) // fiilen tahsil edilen tutar
-  collectedAt     DateTime? // tahsilat anı
-  collectedById   String? // tahsil eden kullanıcı (şoför veya halıcı)
+  collectedAmount  Decimal?  @db.Decimal(10, 2) // fiilen tahsil edilen tutar
+  collectedAt      DateTime? // tahsilat anı
+  collectedById    String? // tahsil eden kullanıcı (şoför veya halıcı)
   // TAHSİLAT YÖNTEMİ: "CASH" | "IBAN" (2026-07-30 kullanıcı isteği).
   // NEDEN AYRIM ÖNEMLİ: IBAN'a gelen para ZATEN işletmenin hesabında —
   // şoförün üzerinde nakit BIRAKMAZ. Mutabakatta "şoförde bekleyen" hesabı
   // yalnız NAKİT tahsilattan yürür; ikisi karışırsa halıcı şoförden olmayan
   // parayı ister. Enum yerine String: yarın "kredi kartı" eklenirse
   // migration gerekmesin (katmerli kalsın).
-  collectedMethod String?
+  collectedMethod  String?
   // SEZON HATIRLATMASI (2026-07-30): bu siparişin müşterisine hatırlatma
   // gönderildiği an. Aynı kişiye tekrar tekrar gönderilmesini engeller.
   // ⚠️ Gönderim BAYRAK ARKASINDA (SEZON_HATIRLATMA=1) — hukuki taraf
   // (6563 + İYS + işletme sözleşmesi §) işletme sahibinde.
   seasonRemindedAt DateTime?
-
-  @@index([businessId, collectedAt])
 
   pickupPhotoUrl   String?
   deliveryPhotoUrl String? // şoförün teslimde çektiği kanıt fotoğrafı
@@ -544,7 +542,7 @@ model Order {
   //
   // null = eski sipariş (geriye dönük): o kayıtlarda numara yine fotoğraftan
   // okunur, ekranlar ikisini de gösterebilir.
-  carpetCount     Int?
+  carpetCount Int?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -554,6 +552,7 @@ model Order {
   review Review?
   stops  DriverStop[]
 
+  @@index([businessId, collectedAt])
   @@index([businessId, status])
 }
 
@@ -637,7 +636,6 @@ model OrderPhoto {
   createdAt DateTime @default(now())
 
   @@index([orderId, carpetNo])
-
   @@index([orderId])
 }
 
@@ -681,26 +679,56 @@ model Subscription {
   // gider. Alanlar HANGİ dönem için gönderildiğini tutar → dönem başına tek mail.
   renewalRemindedFor DateTime?
   expiredNotifiedFor DateTime?
+
+  // FİYAT MERDİVENİ (FIYAT-2026-08-09.md) — alanlar açıldı, HENÜZ OKUNMUYOR.
+  // Varsayılanlar BUGÜNKÜ gerçeği yazar: panelde modül kilidi olmadığı için
+  // 39 işletmenin hepsi fiilen YONETIM kapsamını kullanıyor. Kilit çıktığında
+  // süresiz-ücretsiz olanlar VITRIN'e taşınacak (geçiş planı FIYAT §6).
+  plan             SubscriptionTier @default(YONETIM)
+  // Faturalanan şoför koltuğu. Bu alan olmadan merdiven kâğıt üstünde kalır:
+  // halıcı ikinci şoförü ekler, sistem farkı isteyemez (denetim bulgusu).
+  driverSeats      Int              @default(1)
+  // KURUCU fiyatı MUTLAK TUTAR olarak kilitlenir, yüzde olarak DEĞİL.
+  // Yüzdeyle kilitlenseydi liste fiyatı TÜFE ile artınca aynı yüzde daha
+  // yüksek tutar üretir, "12 ay artmaz" taahhüdü sözleşmeye aykırı tahsilata
+  // dönerdi (ETAHS md.16). Doluysa fiyat hesabı bu değeri kullanır.
+  priceGrossLocked Decimal?         @db.Decimal(10, 2)
+  priceLockedUntil DateTime?
+}
+
+/**
+ * Abonelik katmanı — src/lib/plan.ts `Paket` ile AYNI kümedir, ikisi birlikte
+ * değişir. VITRIN kalıcı ücretsiz (profil + listelenme + sipariş defteri).
+ */
+enum SubscriptionTier {
+  VITRIN
+  YONETIM
+  FILO
 }
 
 // Abonelik ödemesi kaydı — iyzico Checkout. Idempotency (çift callback/replay)
 // ve yasal saklama (6563 md.11/3 on yıl) için her ödeme burada tutulur.
 model SubscriptionPayment {
-  id              String          @id @default(cuid())
-  business        CleanerBusiness @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  id              String           @id @default(cuid())
+  business        CleanerBusiness  @relation(fields: [businessId], references: [id], onDelete: Cascade)
   businessId      String
   // iyzico'ya conversationId olarak bu kaydın id'si gider; callback bununla bulur.
-  status          String          @default("PENDING") // PENDING | PAID | FAILED
-  amount          Decimal         @db.Decimal(10, 2) // KDV dahil tahsil edilen (2400)
+  status          String           @default("PENDING") // PENDING | PAID | FAILED
+  amount          Decimal          @db.Decimal(10, 2) // KDV dahil tahsil edilen (2400)
   iyzicoToken     String? // checkout token
-  iyzicoPaymentId String?         @unique // iyzico ödeme kimliği — idempotency anahtarı
+  iyzicoPaymentId String?          @unique // iyzico ödeme kimliği — idempotency anahtarı
   periodStart     DateTime?
   periodEnd       DateTime?
-  createdAt       DateTime        @default(now())
+  createdAt       DateTime         @default(now())
   paidAt          DateTime?
+  // KAÇ AYLIK dönem ödendi. Bugün tahsilat hep aylık olduğu için 1; sezonluk
+  // peşin (9 ay) bu alan olmadan İMKÂNSIZ — `extendSubscription` her ödemede
+  // sabit 1 ay ekliyor ve ödenen tutara bakmıyor, yani 9 aylık parayı alıp
+  // 1 ay açardık (denetim bulgusu). Muhasebe ekranı da dönemi bu alandan yazar.
+  periodMonths    Int              @default(1)
+  commission      CommissionEntry?
 
   @@index([businessId])
-  commission CommissionEntry?
 }
 
 // ---- KOMİSYONCU (satış ortağı) sistemi ----
@@ -708,15 +736,15 @@ model SubscriptionPayment {
 // işletmenin HER abonelik ödemesinde (ilk + yenileme) KDV HARİÇ net tutar
 // üzerinden komisyon tahakkuk eder — abonelik sürdükçe devam eder.
 model Agent {
-  id        String   @id @default(cuid())
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId    String   @unique
-  percent   Decimal  @db.Decimal(5, 2) // NET (KDV hariç) tutar üzerinden yüzde
-  active    Boolean  @default(true) // pasif komisyoncuya YENİ tahakkuk işlemez
+  id                 String   @id @default(cuid())
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId             String   @unique
+  percent            Decimal  @db.Decimal(5, 2) // NET (KDV hariç) tutar üzerinden yüzde
+  active             Boolean  @default(true) // pasif komisyoncuya YENİ tahakkuk işlemez
   // PREMIUM yetkisi (2026-07-23): kod üretirken abonelik fiyatına istediği
   // yüzdede + istediği sürede indirim tanımlayabilir. Admin verir/alır.
   // BAŞ komisyoncu bu yetkiyi ALTINA GEÇİREMEZ (2026-07-25 kullanıcı kararı).
-  canDiscount Boolean @default(false)
+  canDiscount        Boolean  @default(false)
   // İNDİRİM TAVANI (2026-07-26): bu komisyoncunun koda gömebileceği EN YÜKSEK
   // indirim yüzdesi. Baş komisyoncunun açtığı hesaplarda ZORUNLU ve platform
   // sınırı %20'dir (lib/discount.ts MAX_SUB_DISCOUNT). null = sınırsız
@@ -730,39 +758,39 @@ model Agent {
   // komisyoncu alta en çok bu kadar verebilir; FARKI kendisi alır. Kendi
   // kodundan getirdiği işletmede havuzun tamamını alır (percent = poolPercent).
   // parentId: alt komisyoncunun baş komisyoncusu (3. kademe YOK — alt hesap açamaz).
-  isHead      Boolean  @default(false)
-  poolPercent Decimal? @db.Decimal(5, 2)
+  isHead           Boolean  @default(false)
+  poolPercent      Decimal? @db.Decimal(5, 2)
   // DENEME SÜRESİ YETKİSİ (2026-08-02): canTrial olan komisyoncu ürettiği koda
   // ÜCRETSİZ deneme gömebilir (15 veya 30 gün). maxTrialDays kişiye özel tavan
   // (null = platform varsayılanı 30). Deneme dönemi ÖDEME değildir → komisyon
   // işlemez; komisyoncu ancak işletme parayı ödeyince kazanır.
-  canTrial     Boolean @default(false)
-  maxTrialDays Int?
+  canTrial         Boolean  @default(false)
+  maxTrialDays     Int?
   // ADMIN DONDURDU: baş komisyoncu bunu kendi panelinden geri AÇAMAZ (inceleme
   // bulgusu — aynı `active` bayrağı kullanılınca admin kararı sessizce geri
   // alınabiliyordu). Yalnız admin kaldırır.
-  suspendedByAdmin Boolean @default(false)
-  parent      Agent?   @relation("AgentTree", fields: [parentId], references: [id], onDelete: SetNull)
-  parentId    String?
-  children    Agent[]  @relation("AgentTree")
+  suspendedByAdmin Boolean  @default(false)
+  parent           Agent?   @relation("AgentTree", fields: [parentId], references: [id], onDelete: SetNull)
+  parentId         String?
+  children         Agent[]  @relation("AgentTree")
 
   // ÖDEME (çekim) bilgileri — 2026-07-26: komisyoncu birikmiş bakiyesi için
   // çekim talebi oluşturur; istersen her ayın belirli günü OTOMATİK talep düşer.
   // Havale/EFT'yi admin elle yapar (iyzico dışarıya para göndermez).
-  iban      String? // TR.. (yalnız admin ve sahibi görür)
+  iban            String? // TR.. (yalnız admin ve sahibi görür)
   // 2026-07-31 (kullanıcı isteği): havale için hesap sahibinin AD SOYADI şart —
   // bankalar isim uyuşmazlığında havaleyi geri çevirebiliyor.
-  ibanName  String?
+  ibanName        String?
   // Gider pusulası için TCKN/VKN (opsiyonel; stopajlı ödemede belgeye yazılır).
-  taxId     String?
+  taxId           String?
   // Gider pusulası zorunlu alanı (VUK 234): işi yapanın ADRESİ. IBAN ile
   // birlikte istenir — pusula/dekont dökümü adressiz şeklen eksik kalır.
-  address   String?
+  address         String?
   // FATURA MÜKELLEFİ (2026-07-31): true = komisyoncu vergi mükellefi, ödemeye
   // FATURA keser → stopaj UYGULANMAZ (brüt ödenir). false = mükellef değil →
   // aylık eşik aşıldığında ödeme anında stopaj OTOMATİK hesaplanıp kaydedilir.
   faturaMukellefi Boolean @default(false)
-  payoutDay Int? // 1-28: her ay bu gün otomatik çekim talebi oluşur
+  payoutDay       Int? // 1-28: her ay bu gün otomatik çekim talebi oluşur
 
   createdAt DateTime @default(now())
 
@@ -804,28 +832,28 @@ model AgentTerritory {
 // ödenmemiş tahakkuklar (kendi payı + baş komisyoncuysa havuz farkı) ödenmiş
 // sayılır. Statü: PENDING | PAID | REJECTED.
 model PayoutRequest {
-  id         String    @id @default(cuid())
-  agent      Agent     @relation(fields: [agentId], references: [id], onDelete: Restrict)
-  agentId    String
-  amount     Decimal   @db.Decimal(10, 2) // talep anındaki bakiye (bilgi amaçlı)
-  paidAmount Decimal?  @db.Decimal(10, 2) // ödeme anında fiilen kapatılan tutar
-  iban       String? // talep anındaki IBAN kopyası (sonradan değişse de kayıt sabit)
-  ibanName   String? // talep anındaki hesap sahibi adı (havale isim uyuşması için)
+  id          String    @id @default(cuid())
+  agent       Agent     @relation(fields: [agentId], references: [id], onDelete: Restrict)
+  agentId     String
+  amount      Decimal   @db.Decimal(10, 2) // talep anındaki bakiye (bilgi amaçlı)
+  paidAmount  Decimal?  @db.Decimal(10, 2) // ödeme anında fiilen kapatılan tutar
+  iban        String? // talep anındaki IBAN kopyası (sonradan değişse de kayıt sabit)
+  ibanName    String? // talep anındaki hesap sahibi adı (havale isim uyuşması için)
   // STOPAJ KAYDI (2026-07-31, kullanıcı kararı: "kesinti otomatik olmalı"):
   // ödeme PAID işaretlenirken sistem hesaplar ve BURAYA yazar — sonradan oran
   // değişse de tarihi kayıt sabittir. Mükellef/eşik-altı ödemede üçü de null.
-  stopajOran  Decimal? @db.Decimal(5, 2)
-  stopajTutar Decimal? @db.Decimal(10, 2)
-  netTutar    Decimal? @db.Decimal(10, 2)
+  stopajOran  Decimal?  @db.Decimal(5, 2)
+  stopajTutar Decimal?  @db.Decimal(10, 2)
+  netTutar    Decimal?  @db.Decimal(10, 2)
   // Ödeme ANINDAKİ mükelleflik kopyası (denetim: canlı bayrak okununca admin
   // sonradan değiştirdiğinde geçmiş dökümün "Fatura/—" etiketi değişiyordu).
   mukellefti  Boolean?
-  status     String    @default("PENDING")
-  auto       Boolean   @default(false) // aylık otomatik mi, elle mi
-  note       String? // komisyoncunun notu
-  adminNote  String? // ret sebebi / havale referansı
-  createdAt  DateTime  @default(now())
-  paidAt     DateTime?
+  status      String    @default("PENDING")
+  auto        Boolean   @default(false) // aylık otomatik mi, elle mi
+  note        String? // komisyoncunun notu
+  adminNote   String? // ret sebebi / havale referansı
+  createdAt   DateTime  @default(now())
+  paidAt      DateTime?
 
   @@index([agentId, createdAt])
   @@index([status, createdAt])
@@ -835,19 +863,19 @@ model PayoutRequest {
 // komisyoncu her müşteri için panelinden yeni kod üretir; kod bir işletmeye
 // bağlanınca YANAR (usedAt dolar), tekrar kullanılamaz.
 model AgentReferralCode {
-  id        String    @id @default(cuid())
-  agent     Agent     @relation(fields: [agentId], references: [id], onDelete: Cascade)
-  agentId   String
-  code      String    @unique // HYK-XXXXXX
+  id               String           @id @default(cuid())
+  agent            Agent            @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  agentId          String
+  code             String           @unique // HYK-XXXXXX
   // Koda gömülü abonelik indirimi (yalnız canDiscount komisyoncu tanımlar):
   // kodla kaydolan işletmenin fiyatı discountMonths boyunca %discountPercent düşer.
-  discountPercent Decimal? @db.Decimal(5, 2)
-  discountMonths  Int?
+  discountPercent  Decimal?         @db.Decimal(5, 2)
+  discountMonths   Int?
   // Koda gömülü ÜCRETSİZ deneme (gün). Kod bir işletmeye bağlanınca o işletmeye
   // TRIAL aboneliği açılır; süre bitince ödeme istenir (indirimden bağımsız).
-  trialDays Int?
-  createdAt DateTime  @default(now())
-  usedAt    DateTime? // dolunca kod tükenmiştir
+  trialDays        Int?
+  createdAt        DateTime         @default(now())
+  usedAt           DateTime? // dolunca kod tükenmiştir
   usedByBusiness   CleanerBusiness? @relation("CodeUsedBy", fields: [usedByBusinessId], references: [id], onDelete: SetNull)
   usedByBusinessId String?
 
@@ -855,21 +883,21 @@ model AgentReferralCode {
 }
 
 model CommissionEntry {
-  id         String              @id @default(cuid())
+  id          String              @id @default(cuid())
   // Restrict (inceleme bulgusu): komisyon DEFTERİ silinme zincirleriyle yok
   // olmasın — ödenmemiş borç kaydı, bağlı kayıt silinse bile korunur.
-  agent      Agent               @relation(fields: [agentId], references: [id], onDelete: Restrict)
-  agentId    String
-  business   CleanerBusiness     @relation(fields: [businessId], references: [id], onDelete: Restrict)
-  businessId String
-  payment    SubscriptionPayment @relation(fields: [paymentId], references: [id], onDelete: Restrict)
-  paymentId  String              @unique // idempotency: her ödemeye EN FAZLA 1 komisyon
-  grossAmount Decimal @db.Decimal(10, 2) // tahsil edilen (KDV dahil)
-  netAmount   Decimal @db.Decimal(10, 2) // KDV hariç matrah
-  percent     Decimal @db.Decimal(5, 2) // tahakkuk anındaki yüzde (sonradan değişse de sabit)
-  amount      Decimal @db.Decimal(10, 2) // komisyoncuya ödenecek tutar
+  agent       Agent               @relation(fields: [agentId], references: [id], onDelete: Restrict)
+  agentId     String
+  business    CleanerBusiness     @relation(fields: [businessId], references: [id], onDelete: Restrict)
+  businessId  String
+  payment     SubscriptionPayment @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+  paymentId   String              @unique // idempotency: her ödemeye EN FAZLA 1 komisyon
+  grossAmount Decimal             @db.Decimal(10, 2) // tahsil edilen (KDV dahil)
+  netAmount   Decimal             @db.Decimal(10, 2) // KDV hariç matrah
+  percent     Decimal             @db.Decimal(5, 2) // tahakkuk anındaki yüzde (sonradan değişse de sabit)
+  amount      Decimal             @db.Decimal(10, 2) // komisyoncuya ödenecek tutar
   paidAt      DateTime? // admin "ödendi" işaretleyince dolar
-  createdAt   DateTime  @default(now())
+  createdAt   DateTime            @default(now())
 
   // ---- BAŞ KOMİSYONCU PAYI (2026-07-25) ----
   // Aynı ödemede iki hak sahibi olabilir: alt komisyoncu (yukarıdaki alanlar) ve
@@ -888,7 +916,7 @@ model CommissionEntry {
   // Artık pasif dönemde 0 tutarlı bu satır yazılır: paymentId kilidi dolar,
   // backfill bir daha uğramaz, "pasif dönem = tahakkuk yok" kalıcı olur.
   // Toplamlarda ve listelerde HARİÇ tutulur.
-  skipped     Boolean   @default(false)
+  skipped Boolean @default(false)
 
   @@index([agentId, createdAt])
   @@index([headAgentId, createdAt])
@@ -950,13 +978,13 @@ model CashHandover {
   businessId String
   // Parayı getiren şoför. Şoför kaydı silinse bile GEÇMİŞ SİLİNMEZ
   // (muhasebe kaydı) — Kasa'daki kararın aynısı.
-  driver   Driver? @relation(fields: [driverId], references: [id], onDelete: SetNull)
-  driverId String?
+  driver     Driver?         @relation(fields: [driverId], references: [id], onDelete: SetNull)
+  driverId   String?
   // Kayıt anındaki şoför adı: şoför silinirse geçmiş okunabilir kalsın.
   driverName String
-  amount     Decimal  @db.Decimal(10, 2)
+  amount     Decimal         @db.Decimal(10, 2)
   note       String?
-  createdAt  DateTime @default(now())
+  createdAt  DateTime        @default(now())
 
   @@index([businessId, createdAt])
   @@index([driverId, createdAt])
@@ -974,15 +1002,15 @@ model CashHandover {
 // YALNIZ admin görür. Panel sorguları HER ZAMAN businessId ile daraltılmalı —
 // halıcının başka halıcının mesajını görmesi en ağır sızıntı olur.
 model WhatsAppMessage {
-  id        String   @id @default(cuid())
+  id         String           @id @default(cuid())
   // Meta'nın mesaj kimliği (wamid). Webhook aynı olayı tekrar gönderebilir;
   // benzersiz olması ÇİFT KAYDI engeller (Meta 200 almazsa tekrar dener).
-  waId      String   @unique
+  waId       String           @unique
   // IN = müşteriden geldi, OUT = biz gönderdik
-  direction String
-  phone     String // karşı taraf (E.164'süz, 905xxxxxxxxx)
-  name      String? // WhatsApp profil adı (yalnız gelen mesajlarda gelir)
-  body      String
+  direction  String
+  phone      String // karşı taraf (E.164'süz, 905xxxxxxxxx)
+  name       String? // WhatsApp profil adı (yalnız gelen mesajlarda gelir)
+  body       String
   // Eşleşme: gelen numara son siparişin müşteri numarasıyla tutuyorsa oraya bağlanır.
   business   CleanerBusiness? @relation(fields: [businessId], references: [id], onDelete: Cascade)
   businessId String?
@@ -993,17 +1021,17 @@ model WhatsAppMessage {
   // indirme adresi ~5 dakikada ölür — saklamazsak leke/hasar kanıtı kaybolur.
   // `mediaType` MIME (image/webp, audio/ogg…): arayüz neyi nasıl göstereceğine
   // buna bakarak karar verir.
-  mediaUrl  String?
-  mediaType String?
+  mediaUrl   String?
+  mediaType  String?
   // Meta'daki medya kimliği. İNDİRME BAŞARISIZ OLURSA TEK UMUT BUDUR:
   // dosya Meta'da 30 gün duruyor, kimlikle saatlik yeniden denenir
   // (lib/retention.ts). Kimliği saklamadığımız için 2026-08-07 öncesi
   // başarısız indirmeler kalıcı olarak kayıptı.
-  mediaId   String?
+  mediaId    String?
   // Gönderim başarısızsa Meta'nın sebebi (yalnız OUT).
-  error     String?
-  readAt    DateTime?
-  createdAt DateTime @default(now())
+  error      String?
+  readAt     DateTime?
+  createdAt  DateTime         @default(now())
 
   @@index([businessId, createdAt])
   @@index([phone, createdAt])

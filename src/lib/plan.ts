@@ -38,3 +38,82 @@ export const PLAN = {
     "Bölgenin arama ve ilçe sayfasında listelenme — bunun için ayrıca ücret alınmaz",
   ],
 } as const;
+
+// ============================================================================
+// FİYAT MERDİVENİ (FIYAT-2026-08-09.md kararı) — HENÜZ UYKUDA.
+//
+// Yukarıdaki PLAN sabiti BİLEREK dokunulmadı: ekranda görünen fiyat, sözleşme
+// §3 ile birebir aynı kalmak zorunda ve sözleşme revizyonu + 30 gün bildirim
+// tamamlanana kadar 2.400 TL'dir. Aşağısı o gün tek noktadan devreye girecek
+// yapıdır; bugün hiçbir yer okumuyor.
+//
+// KARAR: sabit tek fiyat yerine ŞOFÖR SAYISINA BAĞLI merdiven. Gerekçe ölçüldü —
+// düz "sınırsız 900 TL"de ikame sepetinden alınan pay 1 şoförde %51 iken
+// 4 şoförde %30'a düşüyordu: en çok değer verilen müşteriden en az para.
+// Merdiven her basamakta sepetin ~%55'inde duruyor. Ayrıca maliyet sigortası:
+// şoför sayısı sipariş hacminin, sipariş hacmi de WhatsApp giderinin vekilidir.
+// ============================================================================
+
+/** Abonelik katmanı. VITRIN kalıcı ücretsizdir (profil + listelenme + sipariş
+ *  defteri); ücretli modüller YONETIM'den itibaren açılır. */
+export type Paket = "VITRIN" | "YONETIM" | "FILO";
+
+/** KDV DAHİL aylık tutarlar; dizin = faturalanan şoför koltuğu - 1.
+ *  4. koltuktan sonra TAVAN: şoför sınırsız, fiyat sabit. */
+const MERDIVEN_LISTE = [900, 1200, 1500, 1800] as const;
+/** KURUCU listeden BİR BASAMAK aşağıdır (taban 600). Yani "kurucu + 2 şoför"
+ *  ile "liste + 1 şoför" aynı tutarı öder — bu yüzden iyzico'da paket başına
+ *  değil FİYAT başına plan vardır (bkz. scripts/iyzico-planlar.mjs). */
+const MERDIVEN_KURUCU = [600, 900, 1200, 1500] as const;
+
+/** Merdivenin son basamağı: bu koltuk sayısından sonrası ücretsiz (sınırsız). */
+export const SOFOR_TAVANI = MERDIVEN_LISTE.length; // 4
+
+/** Pakete dahil aylık WhatsApp konuşması. 150 siparişlik dükkânın üstünde
+ *  tutuldu → pratikte kimse aşım görmez, ama taahhüt YAZILIDIR (ucu açık
+ *  değişken maliyet ne bütçelenebilir ne de esnafa imzalatılabilir). */
+export const DAHIL_KONUSMA = 500;
+
+export type Basamak = {
+  /** Faturalanan koltuk sayısı (tavana kelepçelenmiş). */
+  koltuk: number;
+  /** KDV DAHİL, iyzico'dan çekilen tutar. */
+  brut: number;
+  /** KDV hariç matrah (komisyon/muhasebe bu tutardan işler). */
+  net: number;
+  kdv: number;
+  /** Tavana dayandı mı — arayüzde "sınırsız şoför" yazmak için. */
+  sinirsiz: boolean;
+};
+
+const kurus = (n: number) => Math.round(n * 100) / 100;
+
+/** (paket, şoför sayısı, kurucu mu) → o ay tahsil edilecek tutar.
+ *  VITRIN her zaman 0'dır; şoför sayısı fiyatı etkilemez çünkü VITRIN'de canlı
+ *  konum yoktur. FILO doğrudan tavandan faturalanır. */
+export function fiyatBasamagi(
+  paket: Paket,
+  soforSayisi: number,
+  kurucu = false,
+): Basamak {
+  if (paket === "VITRIN") {
+    return { koltuk: 0, brut: 0, net: 0, kdv: 0, sinirsiz: false };
+  }
+  const merdiven = kurucu ? MERDIVEN_KURUCU : MERDIVEN_LISTE;
+  // FILO = tavan. Aksi hâlde en az 1, en çok SOFOR_TAVANI koltuk faturalanır.
+  const ham = paket === "FILO" ? SOFOR_TAVANI : Math.trunc(soforSayisi);
+  const koltuk = Math.min(Math.max(Number.isFinite(ham) ? ham : 1, 1), SOFOR_TAVANI);
+  const brut = merdiven[koltuk - 1];
+  const net = kurus(brut / (1 + PLAN.kdvRate / 100));
+  return { koltuk, brut, net, kdv: kurus(brut - net), sinirsiz: koltuk >= SOFOR_TAVANI };
+}
+
+/** Merdivenin tamamı — /abonelik fiyat tablosunu veriden basmak için. */
+export function merdiven(kurucu = false): Basamak[] {
+  return MERDIVEN_LISTE.map((_, i) => fiyatBasamagi("YONETIM", i + 1, kurucu));
+}
+
+/** iyzico'da açılmış TÜM plan tutarları (KDV dahil). config.ts bu listeyi
+ *  env'deki referans kodlarıyla eşler; buradaki bir tutarın karşılığı yoksa
+ *  düzenli ödeme talimatı AÇILMAZ (yarım kurulu tahsilat açılmasın). */
+export const PLAN_TUTARLARI = [600, 900, 1200, 1500, 1800] as const;
