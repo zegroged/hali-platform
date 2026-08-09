@@ -71,6 +71,19 @@ export function getIyzicoPlanAmount(): number {
   return Number.isFinite(v) && v > 0 ? v : 2400;
 }
 
+/** FİYAT MERDİVENİ ANA ANAHTARI (FIYAT-2026-08-09.md).
+ *
+ * Model değişikliği TEK ANDA yürürlüğe girmek zorunda: fiyat, paket kısıtlaması,
+ * VİTRİN görünürlüğü, koltuk kapısı ve komisyon matrahı birbirine bağlı. Bunları
+ * ayrı ayrı açmak yarım bir sistem üretir — örneğin koltuk kapısı fiyat merdiveni
+ * bağlanmadan açılırsa, bugün `driverSeats=1` olan 39 işletmenin hiçbiri ikinci
+ * şoförünü ekleyemez ve kimse fark için para ödemiyordur.
+ *
+ * Kapalıyken (varsayılan) sistem 2026-08-09 öncesiyle BİREBİR aynı davranır.
+ * Açılması sözleşme revizyonu + 30 gün bildirim tamamlandıktan sonradır.
+ */
+export const merdivenAktif = process.env.FIYAT_MERDIVENI === "1";
+
 /** FİYAT MERDİVENİ PLAN REFERANSLARI (FIYAT-2026-08-09.md) — HENÜZ KULLANILMIYOR.
  *
  * Yukarıdaki tek `IYZICO_PLAN_REFERENCE` sabit tek fiyat içindi. Merdivende

@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
-import { PLAN } from "@/lib/plan";
+import { PLAN, fiyatBasamagi, type Paket } from "@/lib/plan";
+import { merdivenAktif } from "@/lib/config";
 
 // KOMİSYON TAHAKKUKU: komisyoncunun getirdiği işletmenin HER başarılı abonelik
 // ödemesinde (ilk ödeme + aylık yenileme) KDV HARİÇ net tutar üzerinden,
@@ -24,6 +25,11 @@ export async function accrueCommissionForPayment(paymentId: string): Promise<voi
             isDemo: true,
             referredByAgentId: true,
             discountGrantedByAgentId: true,
+            // MERDİVENDE "tam fiyat" işletmeye GÖRE değişir (paket + koltuk +
+            // kurucu kilidi). İndirim tespiti global sabitle yapılamaz.
+            subscription: {
+              select: { plan: true, driverSeats: true, priceGrossLocked: true },
+            },
             referredByAgent: {
               select: {
                 id: true,
@@ -84,7 +90,23 @@ export async function accrueCommissionForPayment(paymentId: string): Promise<voi
     // 200 platformdan. Komisyoncu payı bu yüzden İNDİRİMSİZ net üzerinden
     // hesaplanıp yarım indirim düşülerek bulunur. İndirimi admin verdiyse
     // (discountGrantedByAgentId null) komisyoncu cezalandırılmaz.
-    const netTam = kurus(PLAN.priceGrossNumber / (1 + PLAN.kdvRate / 100));
+    // İNDİRİMSİZ MATRAH. Merdiven kapalıyken tek fiyat vardır (2.400) ve hesap
+    // 2026-08-09 öncesiyle birebir aynıdır. Merdiven açıkken bu işletmenin KENDİ
+    // basamağı esas alınır; global sabit kullanılsaydı FİLO ödemesi "indirimli",
+    // VİTRİN'den gelen küçük ödeme ise "tam" görünür, komisyoncu payı yanlış
+    // hesaplanırdı. Kurucu kilidi varsa o tutar zaten işletmenin tam fiyatıdır —
+    // kurucu bir KAMPANYADIR, komisyoncunun verdiği indirim değildir, o yüzden
+    // komisyoncu payından düşülmez.
+    const tamBrut = merdivenAktif
+      ? Number(
+          payment.business.subscription?.priceGrossLocked ??
+            fiyatBasamagi(
+              (payment.business.subscription?.plan ?? "YONETIM") as Paket,
+              Number(payment.business.subscription?.driverSeats ?? 1),
+            ).brut,
+        )
+      : PLAN.priceGrossNumber;
+    const netTam = kurus(tamBrut / (1 + PLAN.kdvRate / 100));
     const indirimTutari = Math.max(0, kurus(netTam - net));
     const indirimiVerenBen =
       indirimTutari > 0 &&

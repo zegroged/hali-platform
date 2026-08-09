@@ -5,8 +5,8 @@
 // (TRIAL dalı yalnız eski kayıtların geriye uyumu için duruyor.)
 
 import crypto from "node:crypto";
-import { prisma } from "@/lib/prisma";
 import { Prisma, type PrismaClient } from "@prisma/client";
+import { merdivenAktif } from "@/lib/config";
 
 export const PERIOD_DAYS = 30;
 
@@ -65,6 +65,37 @@ export function activeSubscriptionWhere() {
     OR: [
       { status: "ACTIVE" as const, currentPeriodEnd: { gt: new Date() } },
       { status: "TRIAL" as const, currentPeriodEnd: { gt: new Date() } },
+    ],
+  };
+}
+
+/**
+ * KEŞİF GÖRÜNÜRLÜK FİLTRESİ — merdiven modelinin görünürlük kuralı.
+ *
+ * Bugünkü model (merdiven KAPALI): ödeme yayın şartıdır, sözleşme §3/§4 böyle
+ * diyor → `activeSubscriptionWhere()` aynen uygulanır.
+ *
+ * Merdiven AÇIKKEN: VİTRİN kalıcı ücretsizdir ve LİSTELENME VİTRİN'e dahildir.
+ * Yani ödemesi biten işletme keşiften KAYBOLMAZ, ücretli modülleri kapanır.
+ * Bu ayrım kritik: 1 Eylül bildiriminde işletmelere "profilin, listelenmen ve
+ * yorumların hiç kapanmayacak" diye YAZILI söz verilecek. Filtre değişmezse o
+ * söz bugünkü kodla tutulamaz (denetim bulgusu) — ödemeyen işletmeler ertesi
+ * gün il/ilçe sayfalarından silinirdi.
+ *
+ * Yayından düşürmenin yolu abonelik DEĞİLDİR, ayrı mekanizmalar korunur:
+ * REJECTED (kill switch), tatil modu (`pausedUntil`) ve profil eksikliği.
+ */
+export function gorunurlukWhere() {
+  if (!merdivenAktif) return activeSubscriptionWhere();
+  return {
+    OR: [
+      { status: "ACTIVE" as const, currentPeriodEnd: { gt: new Date() } },
+      { status: "TRIAL" as const, currentPeriodEnd: { gt: new Date() } },
+      // Dönemi bitmiş/iptal olmuş herkes VİTRİN'dir ve vitrin listelenir.
+      { status: "ACTIVE" as const, currentPeriodEnd: { lte: new Date() } },
+      { status: "CANCELED" as const },
+      { status: "PAST_DUE" as const },
+      { status: "TRIAL" as const, currentPeriodEnd: { lte: new Date() } },
     ],
   };
 }
