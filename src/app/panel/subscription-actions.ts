@@ -5,7 +5,8 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getCurrentBusiness, syncVisibility } from "@/lib/panel";
 import { initSubscriptionCheckout, cancelRecurring } from "@/lib/iyzico";
-import { getAppBaseUrl } from "@/lib/config";
+import { getAppBaseUrl, merdivenAktif } from "@/lib/config";
+import { SOFOR_TAVANI } from "@/lib/plan";
 import { ensureBillingCode } from "@/lib/billing";
 import { effectiveSubscriptionGross } from "@/lib/discount";
 import { extendSubscription } from "@/lib/subscription";
@@ -188,4 +189,67 @@ export async function cancelRecurringSubscription() {
   revalidatePath("/panel/abonelik");
   revalidatePath("/panel");
   redirect("/panel/abonelik?durum=iptal-ok");
+}
+
+/**
+ * PAKET SEÇİMİ (2026-08-10).
+ *
+ * NEDEN VAR: merdiven ilk kurulduğunda fiyat, işletmenin ŞOFÖR SAYISINDAN
+ * türetiliyordu — yani sistem paketi DAYATIYORDU. Tek şoförü olan bir halıcı
+ * "sınırsız istiyorum" diyemiyordu. Doğrusu ters yön: paketi işletme seçer,
+ * koltuk sayısı seçtiği paketten gelir, şoför eklemesi o koltuğa kadar açılır.
+ *
+ * Fiyat DEĞİŞİKLİĞİ geriye işlemez: ödenmiş dönem sonuna kadar aynen sürer,
+ * yeni tutar bir sonraki tahsilatta geçerli olur. Aksi hâlde paket yükselten
+ * halıcıdan aynı gün ikinci kez para istenmiş olurdu.
+ */
+export async function paketSec(formData: FormData) {
+  const b = await getCurrentBusiness();
+  if (!b) redirect("/giris");
+  if (!merdivenAktif) redirect("/panel/abonelik?durum=paket-kapali");
+  if (b.isDemo) redirect("/panel/abonelik?durum=demo");
+
+  const secim = String(formData.get("secim") || "").trim();
+  const filo = secim === "FILO";
+  const koltuk = filo ? SOFOR_TAVANI : Number(secim);
+  if (!filo && (!Number.isInteger(koltuk) || koltuk < 1 || koltuk > SOFOR_TAVANI)) {
+    redirect("/panel/abonelik?durum=paket-gecersiz");
+  }
+
+  // 🔴 AKTİF TALİMAT VARKEN PAKET DEĞİŞTİRİLEMEZ.
+  // iyzico'da çalışan bir planın fiyatı değiştirilemez; başka plana geçiş
+  // talimatın İPTALİ + kartın YENİDEN alınması demektir (kodda `upgrade`
+  // çağrısı yok). Sessizce plan alanını değiştirseydik panelde yeni fiyat
+  // yazar, karttan ESKİ tutar çekilmeye devam ederdi.
+  if (b.subscription?.iyzicoSubRef && b.subscription.autoRenew) {
+    redirect("/panel/abonelik?durum=paket-talimat-var");
+  }
+
+  // Koltuk, MEVCUT şoför sayısının altına indirilemez — indirilirse fazla
+  // şoförler sistemde kalır ama hangisinin "fazla" olduğu tanımsızdır.
+  // Önce şoför silinsin, sonra paket düşürülsün.
+  const soforSayisi = await prisma.driver.count({ where: { businessId: b.id } });
+  if (!filo && soforSayisi > koltuk) {
+    redirect(
+      `/panel/abonelik?durum=paket-dusuk&sofor=${soforSayisi}&koltuk=${koltuk}`,
+    );
+  }
+
+  await prisma.subscription.upsert({
+    where: { businessId: b.id },
+    // Aboneliği hiç olmayan işletme (yeni kayıt) için de çalışsın: paket seçimi
+    // ödemeden ÖNCE yapılır, dönem açılmaz — status/period'a dokunulmuyor.
+    create: {
+      businessId: b.id,
+      status: "CANCELED",
+      currentPeriodEnd: null,
+      plan: filo ? "FILO" : "YONETIM",
+      driverSeats: koltuk,
+    },
+    update: { plan: filo ? "FILO" : "YONETIM", driverSeats: koltuk },
+  });
+
+  revalidatePath("/panel/abonelik");
+  revalidatePath("/panel");
+  redirect("/panel/abonelik?durum=paket-ok");
 }

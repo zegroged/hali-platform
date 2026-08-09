@@ -3,9 +3,11 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { getCurrentBusiness } from "@/lib/panel";
 import { subscriptionActive } from "@/lib/subscription";
-import { recurringEnabled, paymentsLive } from "@/lib/config";
+import { recurringEnabled, paymentsLive, merdivenAktif } from "@/lib/config";
+import { PLAN } from "@/lib/plan";
 import { effectiveSubscriptionGross } from "@/lib/discount";
 import { PendingButton } from "@/components/PendingButton";
+import PaketSecici from "@/components/PaketSecici";
 import {
   startSubscriptionPayment,
   cancelRecurringSubscription,
@@ -68,6 +70,31 @@ const DURUM: Record<string, { cls: string; text: string }> = {
   "indirimli-erken": {
     cls: "border-amber-300 bg-amber-50 text-amber-800",
     text: "Dönemin zaten aktif — indirimli yenileme, dönem sonuna 3 gün kala açılabilir.",
+  },
+  // PAKET SEÇİMİ (2026-08-10)
+  "paket-ok": {
+    cls: "border-green-300 bg-green-50 text-green-800",
+    text: "Paketin kaydedildi. Yeni tutar bir sonraki ödemede geçerli olur — ödediğin dönem kısalmaz.",
+  },
+  "paket-talimat-var": {
+    cls: "border-amber-300 bg-amber-50 text-amber-800",
+    text: "Düzenli ödeme talimatın aktifken paket değiştirilemez: bankadaki talimat eski tutara bağlıdır, sessizce değiştirseydik panelde yeni fiyat yazar ama kartından eski tutar çekilmeye devam ederdi. Önce talimatı iptal et, paketini seç, sonra kartını yeniden tanımla.",
+  },
+  "paket-dusuk": {
+    cls: "border-amber-300 bg-amber-50 text-amber-800",
+    text: "Seçtiğin pakette, kayıtlı şoför sayından daha az koltuk var. Önce fazla şoförleri sil, sonra paketi düşür.",
+  },
+  "paket-gecersiz": {
+    cls: "border-red-300 bg-red-50 text-red-700",
+    text: "Geçersiz paket seçimi.",
+  },
+  "paket-kapali": {
+    cls: "border-amber-300 bg-amber-50 text-amber-800",
+    text: "Paket seçimi şu an kapalı.",
+  },
+  "plan-yok": {
+    cls: "border-red-300 bg-red-50 text-red-700",
+    text: "Bu tutar için ödeme planı tanımlı değil, talimat açılmadı (yanlış tutarın çekilmemesi için kasıtlı). Bize ulaş.",
   },
   "indirimli-talimat-yok": {
     cls: "border-amber-300 bg-amber-50 text-amber-800",
@@ -144,17 +171,47 @@ export default async function AbonelikYonetim({
         </p>
       )}
 
+      {/* PAKET SEÇİMİ — ödeme bölümünün ÜSTÜNDE: halıcı önce ne aldığını
+          seçer, sonra öder. Seçim doğrudan tahsil edilecek tutarı belirler;
+          merdiven kapalıyken bileşen hiçbir şey çizmez. */}
+      <PaketSecici
+        mevcutPlan={sub?.plan ?? "YONETIM"}
+        mevcutKoltuk={Number(sub?.driverSeats ?? 1)}
+        talimatVar={autoRenew}
+      />
+
       {/* Durum kartı */}
       <section className="rounded-2xl border border-slate-200 bg-white p-5">
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-sm text-slate-500">İşletme Aboneliği</p>
+            {/* Rakam ELLE YAZILMAZ (2026-08-10): burada sabit ₺2.000 duruyordu
+                ve merdiven açılınca sayfanın üstü 2.000, ödeme düğmesi 900
+                gösteriyordu. Tutar işletmenin kendi basamağından gelir. */}
             <p className="text-2xl font-bold tracking-tight text-slate-900">
-              ₺2.000{" "}
-              <span className="text-sm font-medium text-slate-500">
-                + KDV / ay
-              </span>
+              {merdivenAktif ? (
+                <>
+                  {gross.toLocaleString("tr-TR")}{" "}
+                  <span className="text-sm font-medium text-slate-500">
+                    TL / ay (KDV dahil)
+                  </span>
+                </>
+              ) : (
+                <>
+                  ₺{PLAN.priceAmount}{" "}
+                  <span className="text-sm font-medium text-slate-500">
+                    + KDV / ay
+                  </span>
+                </>
+              )}
             </p>
+            {merdivenAktif && (
+              <p className="mt-0.5 text-xs text-slate-500">
+                {sub?.plan === "FILO"
+                  ? "Sınırsız şoför paketi"
+                  : `${Number(sub?.driverSeats ?? 1)} şoför koltuğu`}
+              </p>
+            )}
             {pct != null && b.discountUntil && (
               <p className="mt-1 inline-flex rounded-full bg-violet-100 px-2.5 py-0.5 text-xs font-medium text-violet-700">
                 %{pct.toLocaleString("tr-TR", { maximumFractionDigits: 2 })}{" "}
