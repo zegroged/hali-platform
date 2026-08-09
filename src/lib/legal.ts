@@ -1,3 +1,4 @@
+import { merdivenAktif } from "@/lib/plan";
 // Yasal metin sürümü — metinlerde esaslı değişiklik yapıldığında GÜNCELLE.
 // Sipariş onayında (Order.contractVersion) saklanır: hangi tarihte hangi
 // metnin teyit edildiğinin ispatı (Mesafeli Sözleşmeler Yönetmeliği md.7).
@@ -12,4 +13,8 @@
 // birincil kaynakla teyit edildi; "Sigortalı" rozeti "Fotoğraflı Güvence" oldu.
 // DEPLOY AVUKAT ONAYINA BAĞLI; mevcut işletmelere §9 uyarınca 30 gün önceden
 // bildirim + panelden yeniden onay alınmalı (işletme aleyhine yeni yükümlülük).
-export const CONTRACT_VERSION = "2026-07-15.1";
+// FİYAT MERDİVENİ sözleşme §3 ve §4'ü değiştiriyor (paket bazlı bedel + Vitrin
+// katmanında bedelsiz yayın). Metin ile sürüm BİRLİKTE değişmeli: sürüm
+// artmazsa panel "sözleşme güncel" der ve işletme değişmiş metni hiç görmez.
+// Bayrak kapalıyken eski sürüm korunur → gereksiz yeniden onay istenmez.
+export const CONTRACT_VERSION = merdivenAktif ? "2026-08-10.1" : "2026-07-15.1";

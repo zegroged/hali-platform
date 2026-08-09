@@ -3,7 +3,7 @@
 // (ödeme alınmadan PAID, oturum sahteciliği, kırık SMS linkleri) başlangıçta
 // NET bir hatayla durmak. Build sırasında atlanır (build env'inde sırlar olmaz).
 
-import { PLAN_TUTARLARI } from "@/lib/plan";
+import { PLAN_TUTARLARI, merdivenAktif } from "@/lib/plan";
 
 const isProd = process.env.NODE_ENV === "production";
 const isBuild = process.env.NEXT_PHASE === "phase-production-build";
@@ -81,10 +81,15 @@ export function getIyzicoPlanAmount(): number {
  * bağlanmadan açılırsa, bugün `driverSeats=1` olan 39 işletmenin hiçbiri ikinci
  * şoförünü ekleyemez ve kimse fark için para ödemiyordur.
  *
- * Kapalıyken (varsayılan) sistem 2026-08-09 öncesiyle BİREBİR aynı davranır.
- * Açılması sözleşme revizyonu + 30 gün bildirim tamamlandıktan sonradır.
+ * Kapalıyken sistem 2026-08-09 öncesiyle BİREBİR aynı davranır — geri dönüş
+ * yolu olarak duruyor.
+ *
+ * NOT (2026-08-09): "30 gün önceden bildirim" burada YAZILIYDI, kaldırıldı.
+ * O yükümlülük karşı tarafa karşıdır; kayıtlı 39 işletmenin tamamı işletme
+ * sahibinin kendi kayıtları, yani bildirilecek üçüncü kişi yok. Gerçek
+ * müşteri geldiğinde fiyat değişikliği yine sözleşme §9'a tabidir.
  */
-export const merdivenAktif = process.env.FIYAT_MERDIVENI === "1";
+export { merdivenAktif };
 
 /** FİYAT MERDİVENİ PLAN REFERANSLARI (FIYAT-2026-08-09.md) — HENÜZ KULLANILMIYOR.
  *

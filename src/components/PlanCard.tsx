@@ -1,6 +1,44 @@
 import Link from "next/link";
 import { IconCheck } from "@/components/icons";
-import { PLAN } from "@/lib/plan";
+import { PLAN, merdivenAktif, merdiven, SOFOR_TAVANI } from "@/lib/plan";
+
+// FİYAT MERDİVENİ ŞERİDİ (FIYAT-2026-08-09.md §1-A).
+// Kartta görünen rakam TABAN basamaktır (1 şoför). Ek şoför ve tavan burada
+// yazılmazsa halıcı "900" görüp iki şoförle 1.200 ödediğini kasada öğrenir —
+// sürprizin adı chargeback'tir. Fiyat tablosu VERİDEN basılır (elle liste yok).
+const tl = (n: number) => n.toLocaleString("tr-TR");
+function Merdiven({ koyu = false }: { koyu?: boolean }) {
+  if (!merdivenAktif) return null;
+  const basamaklar = merdiven();
+  return (
+    <div
+      className={`mt-3 rounded-xl border p-3 text-xs ${
+        koyu
+          ? "border-white/25 bg-white/10 text-teal-50"
+          : "border-slate-200 bg-slate-50 text-slate-600"
+      }`}
+    >
+      <p className={koyu ? "font-medium text-white" : "font-medium text-slate-800"}>
+        Şoför sayısına göre
+      </p>
+      <ul className="mt-1.5 space-y-0.5">
+        {basamaklar.map((b, i) => (
+          <li key={b.brut} className="flex justify-between gap-3">
+            <span>
+              {b.sinirsiz ? `${SOFOR_TAVANI}+ şoför (sınırsız)` : `${i + 1} şoför`}
+            </span>
+            <span className={koyu ? "font-semibold text-white" : "font-semibold text-slate-900"}>
+              {tl(b.brut)} TL/ay
+            </span>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-1.5">
+        Tutarlar KDV dahil. {SOFOR_TAVANI}. şoförden sonrası ücretsiz.
+      </p>
+    </div>
+  );
+}
 
 /**
  * Fiyatlandırma kartı — tek pakete tek kart. İki düzen:
@@ -22,6 +60,11 @@ export default function PlanCard({
   /** Geniş, ekranı dolduran iki kolonlu düzen */
   wide?: boolean;
 }) {
+  // Günlük karşılık: saha satış dili fiyatı hep günlük hesapla veriyor
+  // (Pazarlamacı El Kitabı §4). Önce sabit "80" yazılıydı; merdivende taban
+  // 900 → 30 lira. Rakam artık fiyattan türetiliyor, elle yazılmıyor.
+  const gunluk = Math.round(PLAN.priceGrossNumber / 30);
+
   const ctaCls =
     "block w-full rounded-xl bg-slate-900 px-4 py-3 text-center text-sm font-semibold text-white transition hover:bg-slate-800 active:scale-[0.99]";
   const Cta = onCta ? (
@@ -45,7 +88,7 @@ export default function PlanCard({
         <span className="text-sm font-medium text-slate-500"> + KDV / ay</span>
       </p>
       <p className="mt-1 text-sm text-slate-500">
-        Aylık {PLAN.priceGrossMonthly} TL — günde yaklaşık 80 lira.
+        Aylık {PLAN.priceGrossMonthly} TL — günde yaklaşık {gunluk} lira.
       </p>
     </>
   );
@@ -71,7 +114,9 @@ export default function PlanCard({
           <div>
             <h2 className="text-xl font-bold">{PLAN.name}</h2>
             <p className="mt-1 text-sm text-teal-50">
-              Tek paket, gizli ücret yok.
+              {merdivenAktif
+                ? "Şoför sayısına göre, gizli ücret yok."
+                : "Tek paket, gizli ücret yok."}
             </p>
           </div>
           <div>
@@ -82,8 +127,9 @@ export default function PlanCard({
               <span className="text-sm font-medium text-teal-50"> + KDV / ay</span>
             </p>
             <p className="mt-1 text-sm text-teal-50">
-              Aylık {PLAN.priceGrossMonthly} TL — günde yaklaşık 80 lira.
+              Aylık {PLAN.priceGrossMonthly} TL — günde yaklaşık {gunluk} lira.
             </p>
+            <Merdiven koyu />
           </div>
           {onCta ? (
             <button
@@ -117,6 +163,7 @@ export default function PlanCard({
     <section className="relative rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
       <h2 className="text-lg font-bold text-slate-900">{PLAN.name}</h2>
       <div className="mt-2">{Price}</div>
+      <Merdiven />
       <div className="mt-5">{Features}</div>
       <div className="mt-6">{Cta}</div>
     </section>

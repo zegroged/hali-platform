@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import StaticPage, { Section } from "../_static/StaticPage";
 import { CONTRACT_VERSION } from "@/lib/legal";
+import { merdivenAktif, merdiven, SOFOR_TAVANI } from "@/lib/plan";
 
 export const metadata: Metadata = {
   title: "Platform Aracılık ve Üyelik Sözleşmesi",
@@ -65,13 +66,52 @@ export default function IsletmeSozlesmesiPage() {
       </Section>
 
       <Section title="3. Ücretler ve Ödemelerin Aktarımı">
-        <p>
-          Aylık abonelik bedeli <strong>2.000 TL + KDV</strong>&apos;dir ve
-          kayıt sırasında peşin tahsil edilir. Abonelik, bedelin ödenmesiyle
-          başlar; ödemesi alınmayan işletme yayına alınmaz. Bedel karşılığında
-          e-arşiv fatura düzenlenir. Müşteri siparişlerinden ayrıca komisyon
-          alınmaz.
-        </p>
+        {merdivenAktif ? (
+          <>
+            <p>
+              Aylık abonelik bedeli, işletmenin sistemde tanımlı{" "}
+              <strong>şoför koltuğu sayısına</strong> göre belirlenir ve kayıt
+              sırasında peşin tahsil edilir:
+            </p>
+            <ul>
+              {merdiven().map((b, i) => (
+                <li key={b.brut}>
+                  {b.sinirsiz ? `${SOFOR_TAVANI} ve üzeri şoför` : `${i + 1} şoför`}:{" "}
+                  <strong>
+                    {b.net.toLocaleString("tr-TR")} TL + KDV ={" "}
+                    {b.brut.toLocaleString("tr-TR")} TL
+                  </strong>
+                </li>
+              ))}
+            </ul>
+            <p>
+              {SOFOR_TAVANI}. şoförden sonrası ücretsizdir; şoför sayısı
+              sınırsızdır. Koltuk sayısı, işletmenin onayı olmadan
+              kendiliğinden artmaz — mevcut koltuk dolduğunda yeni şoför
+              eklenmesi paket yükseltmesine bağlıdır.
+            </p>
+            <p>
+              <strong>Vitrin</strong> katmanı ücretsizdir: profil sayfası, il
+              ve ilçe sayfalarında listelenme, siteden sipariş alma, sipariş
+              defteri ve müşteri değerlendirmeleri bedelsizdir. Canlı şoför
+              konumu, rota geçmişi, durak raporu, kasa, gün sonu mutabakatı ve
+              WhatsApp bildirimleri ücretli katmana dahildir.
+            </p>
+            <p>
+              Abonelik, bedelin ödenmesiyle başlar. Bedel karşılığında e-arşiv
+              fatura düzenlenir. Müşteri siparişlerinden ayrıca komisyon
+              alınmaz.
+            </p>
+          </>
+        ) : (
+          <p>
+            Aylık abonelik bedeli <strong>2.000 TL + KDV</strong>&apos;dir ve
+            kayıt sırasında peşin tahsil edilir. Abonelik, bedelin ödenmesiyle
+            başlar; ödemesi alınmayan işletme yayına alınmaz. Bedel
+            karşılığında e-arşiv fatura düzenlenir. Müşteri siparişlerinden
+            ayrıca komisyon alınmaz.
+          </p>
+        )}
         <p>
           Online kartlı ödeme tahsilatı aktif hâle geldiğinde sipariş bedeli;
           bedelin platformun (ödeme kuruluşunun) tasarrufuna girdiği ve
@@ -87,9 +127,11 @@ export default function IsletmeSozlesmesiPage() {
         <p>
           İşletme profili; vergi kimlik numarası beyanı, e-posta doğrulaması,
           eksiksiz profil (fiyat, hizmet bölgesi, teslim süresi, fotoğraf,
-          çalışma saatleri), en az bir şoför kaydı, bu sözleşmenin onayı ve
-          abonelik bedelinin ödenmesi şartlarının <strong>tamamı</strong>{" "}
-          sağlandığında <strong>kendiliğinden (otomatik) yayına alınır</strong>;
+          çalışma saatleri), en az bir şoför kaydı ve bu sözleşmenin onayı
+          {merdivenAktif
+            ? " şartlarının tamamı sağlandığında kendiliğinden (otomatik) yayına alınır — yayın Vitrin katmanında bedelsizdir"
+            : " ile abonelik bedelinin ödenmesi şartlarının tamamı sağlandığında kendiliğinden (otomatik) yayına alınır"}
+          ;
           ayrıca bir yönetici onayı beklenmez. Platform, işletmenin tanıtıcı
           bilgilerini (unvan, vergi no, iletişim) ilgili kurumların erişime
           açık elektronik sistemleri veya işletmece sunulan belgeler üzerinden{" "}

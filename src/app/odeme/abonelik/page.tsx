@@ -8,9 +8,11 @@ import {
   getAppBaseUrl,
   getIyzicoPlanReference,
   getIyzicoPlanAmount,
+  merdivenAktif,
+  recurringPlanFor,
   recurringEnabled,
 } from "@/lib/config";
-import { activeDiscountPercent } from "@/lib/discount";
+import { activeDiscountPercent, effectiveSubscriptionGross } from "@/lib/discount";
 import { pickIyzicoGsm } from "@/lib/phone";
 import { IyzicoFormGuard } from "@/components/IyzicoFormGuard";
 
@@ -58,7 +60,29 @@ export default async function AbonelikTalimatOde() {
   const gsm = pickIyzicoGsm(b.owner.phone, b.gsmPhone2, b.phone);
   if (!gsm) redirect("/panel/profil?odeme=cep");
 
-  const planTutar = getIyzicoPlanAmount();
+  // ÇEKİLECEK TUTAR ve BAĞLANACAK PLAN BİRLİKTE SEÇİLİR.
+  //
+  // 🔴 Merdivende bu ikisi AYRIŞIRSA felaket olur: ekranda 900 yazıp karttan
+  // 2.400 çekilir. Eski kod tutarı `IYZICO_PLAN_AMOUNT`tan, planı
+  // `IYZICO_PLAN_REFERENCE`tan alıyordu — ikisi de TEK global değer, yani beş
+  // planlı dünyada her işletme için aynı. Artık işletmenin kendi basamağı
+  // hesaplanıyor ve plan referansı O TUTARDAN türetiliyor.
+  //
+  // Karşılığı olmayan tutarda `recurringPlanFor` null döner ve talimat
+  // AÇILMAZ (fail-closed) — yanlış plana bağlamaktansa hiç bağlamamak doğru.
+  let planTutar: number;
+  let planRef: string;
+  if (merdivenAktif) {
+    const { gross } = effectiveSubscriptionGross(b);
+    const secim = recurringPlanFor(gross);
+    if (!secim) redirect("/panel/abonelik?durum=plan-yok");
+    planTutar = secim.amount;
+    planRef = secim.planReferenceCode;
+  } else {
+    planTutar = getIyzicoPlanAmount();
+    planRef = getIyzicoPlanReference();
+  }
+
   const payment = await prisma.subscriptionPayment.create({
     data: { businessId: b.id, status: "PENDING", amount: planTutar },
   });
@@ -66,7 +90,7 @@ export default async function AbonelikTalimatOde() {
   const base = getAppBaseUrl();
   const r = await initRecurringCheckout({
     conversationId: payment.id,
-    planReferenceCode: getIyzicoPlanReference(),
+    planReferenceCode: planRef,
     callbackUrl: `${base}/api/pay/iyzico/subscription/recurring-callback`,
     name,
     surname,

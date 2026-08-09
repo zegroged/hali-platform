@@ -4,17 +4,25 @@
 // ÜCRETSİZ DENEME YOK (2026-07-07 kararı): abonelik ödemeyle başlar,
 // ödemesi alınmayan işletme yayına alınmaz. Fiyat KDV HARİÇ anılır
 // (kartta "₺2.000 + KDV / ay"), sözleşme §3 ile birebir aynı.
+// MERDİVEN ANAHTARI BURADA TANIMLI, config.ts'te DEĞİL — config.ts bu dosyadan
+// `PLAN_TUTARLARI` alıyor, ters yönde import döngü yaratırdı. `config.ts` bunu
+// yeniden dışa veriyor, mevcut `import { merdivenAktif } from "@/lib/config"`
+// satırlarının hepsi çalışmaya devam ediyor.
+export const merdivenAktif = process.env.FIYAT_MERDIVENI === "1";
+
 export const PLAN = {
   name: "İşletme Aboneliği",
-  priceAmount: "2.000", // kart görünümünde "₺2.000 + KDV" olarak basılır
-  priceMonthly: "2.000 TL + KDV",
+  // Merdiven açıkken görünen fiyat TABAN basamaktır (1 şoför): 750 + KDV = 900.
+  // Ek şoför ve tavan bilgisi kartın kendisinde ayrıca yazılır (PlanCard).
+  priceAmount: merdivenAktif ? "750" : "2.000",
+  priceMonthly: merdivenAktif ? "750 TL + KDV" : "2.000 TL + KDV",
   kdvRate: 20,
-  priceNetMonthly: "2.000,00",
-  kdvMonthly: "400,00",
-  priceGrossMonthly: "2.400,00",
+  priceNetMonthly: merdivenAktif ? "750,00" : "2.000,00",
+  kdvMonthly: merdivenAktif ? "150,00" : "400,00",
+  priceGrossMonthly: merdivenAktif ? "900,00" : "2.400,00",
   // iyzico'ya gönderilen KDV DAHİL sayısal tutar (tahsil edilen). Görünen
   // metinlerle (yukarısı) tutarlı olmalı.
-  priceGrossNumber: 2400,
+  priceGrossNumber: merdivenAktif ? 900 : 2400,
   // SIRA KASITLIDIR (2026-07-29). Bu liste halıcının PARAYI ÖDERKEN gördüğü
   // "pakete dahil olanlar"dı ve ilk iki maddesi görünürlük/sipariş vaadiydi —
   // yani bedelin karşılığı müşteri olarak ilan ediliyordu. Canlıda tüm
