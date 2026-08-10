@@ -18,3 +18,9 @@ reklam-varliklari/
 *firebase-adminsdk*.json
 driver-app/*firebase-adminsdk*.json
 customer-app/*firebase-adminsdk*.json
+
+# Expo prebuild ciktisi — EAS kendi uretir. Depoda DURMAMALI: varsa EAS
+# prebuild adimini ATLAR ve app.json eklentileri (izinler, foregroundServiceType)
+# uygulanmayabilir. 2026-08-10 yerel derleme denemesinden kalmisti.
+driver-app/android/
+driver-app/ios/
