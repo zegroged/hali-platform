@@ -19,6 +19,7 @@ import {
   rehberGovdesi,
   rehberleriListele,
 } from "../src/lib/rehberler";
+import { PLAN, merdivenAktif, merdiven } from "../src/lib/plan";
 
 const cikisDizin = process.argv[2] ?? null;
 let hata = 0;
@@ -95,6 +96,39 @@ if (cikisDizin) {
     "utf8",
   );
   console.log(`\nÖnizleme dosyaları yazıldı: ${cikisDizin}`);
+}
+
+// ── FİYAT BAYATLIK BEKÇİSİ (2026-08-10) ───────────────────────────────────
+// Komisyoncu rehberleri fiyatı ELLE yazıyor ve fiyat değişince sahada eski
+// rakamla satış yapılıyordu (2.400 → merdiven geçişinde birebir yaşandı;
+// rehberlerde 21 yerde eski tutar kalmıştı). Bu kontrol, rehber metinlerinin
+// güncel fiyattan HABERDAR olmasını zorunlu kılar: fiyat değişip rehber
+// güncellenmezse `npm run test:rehber` kırılır.
+console.log("\n— Fiyat güncelliği —");
+const tumMetin = REHBERLER.map((r) => rehberGovdesi(r)).join("\n");
+const bicim = (n: number) => n.toLocaleString("tr-TR");
+
+// 1) Güncel taban fiyat rehberlerde GEÇMELİ.
+kontrol(
+  `taban fiyat (${bicim(PLAN.priceGrossNumber)} TL) rehberlerde geçiyor`,
+  tumMetin.includes(bicim(PLAN.priceGrossNumber)),
+);
+
+// 2) Merdiven açıksa tavan (sınırsız) fiyatı da geçmeli — satıcı en üst
+//    paketi bilmeden üst pakete satış yapamaz.
+if (merdivenAktif) {
+  const tavan = merdiven()[merdiven().length - 1];
+  kontrol(
+    `sınırsız paket fiyatı (${bicim(tavan.brut)} TL) rehberlerde geçiyor`,
+    tumMetin.includes(bicim(tavan.brut)),
+  );
+}
+
+// 3) EMEKLİ RAKAMLAR geri sızmamalı. Rehberler .md'den derleniyor; eski bir
+//    kopya geri yapıştırılırsa sessizce eski fiyata dönerdi.
+const EMEKLI = ["2.400", "12.000 TL", "günde 80 lira"];
+for (const eski of EMEKLI) {
+  kontrol(`emekli rakam geçmiyor: "${eski}"`, !tumMetin.includes(eski));
 }
 
 console.log(hata ? `\n${hata} KONTROL BAŞARISIZ` : "\nTÜM KONTROLLER GEÇTİ");

@@ -19,6 +19,7 @@
     "test:konum": "tsx scripts/test-konum.ts",
     "test:durak": "tsx scripts/test-durak.ts",
     "test:fiyat": "tsx scripts/test-fiyat.ts",
+    "test:odeme": "tsx scripts/odeme-dogrula.ts",
     "test:paket": "tsx scripts/test-paket.ts"
   },
   "dependencies": {
