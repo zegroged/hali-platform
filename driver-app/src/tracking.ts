@@ -335,6 +335,17 @@ export async function startTracking(): Promise<string | null> {
     foregroundService: {
       notificationTitle: "Mesaidesin",
       notificationBody: "Konumun halıcına iletiliyor.",
+      // 🔴 SON KULLANILANLARDAN KAYDIRINCA SERVİS ÖLMESİN (2026-08-10).
+      //
+      // Varsayılan davranış: kullanıcı uygulamayı "recents" ekranından
+      // kaydırınca (task destroy) konum servisi de kapanıyor. Şoför gün içinde
+      // telefonunu temizlerken farkında olmadan takibi kapatıyordu — panelde
+      // "bir gönderiyor bir göndermiyor" görünmesinin sebeplerinden biri budur
+      // ve bildirim de kaybolduğu için şoför durumu göremiyordu.
+      //
+      // false = uygulama kapatılsa bile foreground service (ve bildirimi)
+      // ayakta kalır; mesai kapatılana kadar konum akmaya devam eder.
+      killServiceOnDestroy: false,
     },
   });
   return null;
