@@ -11,6 +11,7 @@ import {
   Linking,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
+import * as ImageManipulator from "expo-image-manipulator";
 import {
   listOrders,
   acceptOrder,
@@ -102,6 +103,31 @@ async function takePhoto(): Promise<FotoSonuc> {
         "Kamera fotoğrafı döndürmedi. Telefonun depolaması dolu olabilir; yer açıp tekrar dene.",
     };
   }
+  // 🔴 İNTERNET TÜKETİMİNİN EN BÜYÜK KALEMİ BURASIYDI (2026-08-10 ölçümü).
+  //
+  // `quality: 0.6` sıkıştırıyor ama BOYUT KÜÇÜLTMÜYOR: modern telefon kamerası
+  // 4000×3000 çekiyor ve dosya 1,5-3 MB çıkıyor. Şoför her siparişte en az iki
+  // kare çekiyor (alım + teslim); günde 10 sipariş = 30-60 MB. Şoförün kendi
+  // hattından gidiyor ve fatura ona yazılıyor.
+  //
+  // Üstelik BOŞA gidiyordu: sunucu zaten 2560 px'e indirip WebP'ye çeviriyor
+  // (api/panel/orders/[id]/photos). Yani telefon 3 MB yüklüyor, sunucu onu
+  // atıp ~300 KB saklıyor. Aradaki fark tamamen israf.
+  //
+  // 1600 px uzun kenar: teslim/hasar kanıtı için fazlasıyla yeterli (yüzde
+  // yüz yakınlaşmada bile leke görünür), dosya ~200-400 KB'ye iner — yaklaşık
+  // 6-10 kat tasarruf.
+  try {
+    const kucuk = await ImageManipulator.manipulateAsync(
+      uri,
+      [{ resize: { width: 1600 } }],
+      { compress: 0.6, format: ImageManipulator.SaveFormat.JPEG },
+    );
+    if (kucuk?.uri) return { ok: true, uri: kucuk.uri };
+  } catch {
+    // Küçültme başarısızsa ORİJİNALİ gönder — fotoğrafsız ilerlenemiyor,
+    // veri tasarrufu uğruna işi durdurmak yanlış olur.
+  }
   return { ok: true, uri };
 }
 
@@ -128,7 +154,10 @@ export function Orders({ onSessionExpired }: { onSessionExpired: () => void }) {
 
   useEffect(() => {
     fetchOrders();
-    const t = setInterval(fetchOrders, 20000); // 20 sn'de bir tazele
+    // 20 sn → 45 sn (2026-08-10, veri tasarrufu). Ekran açıkken saatte 180
+    // istek atıyordu; 45 sn'de 80'e iner ve şoför farkı hissetmez (yeni iş
+    // zaten PUSH ile bildiriliyor, ayrıca aşağı çekerek tazeleyebiliyor).
+    const t = setInterval(fetchOrders, 45000);
     return () => clearInterval(t);
   }, [fetchOrders]);
 

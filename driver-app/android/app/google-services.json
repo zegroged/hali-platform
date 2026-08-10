@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "763077394009",
+    "project_id": "enyakinhaliyikamaservisi-cb568",
+    "storage_bucket": "enyakinhaliyikamaservisi-cb568.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:763077394009:android:95edc390572dbe76e23b48",
+        "android_client_info": {
+          "package_name": "com.enyakinhaliyikamaservisi.driver"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBUzHUhuAHfFvzAM9zbMARlxQ2SizVGtDg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

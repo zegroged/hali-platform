@@ -154,9 +154,14 @@ TaskManager.defineTask(LOCATION_TASK, async ({ data, error }) => {
   }
 
   // YENİ İŞ BİLDİRİMİ: konum süzgeçlerinden ÖNCE (duran/kaba-konumlu şoför de
-  // yeni işten haberdar olmalı). Mesai açıkken ~45 sn'de bir yoklar.
+  // yeni işten haberdar olmalı).
   const simdi = Date.now();
-  if (simdi - st.lastOrderCheck > 45_000) {
+  // 45 sn → 2 dk (2026-08-10, veri tasarrufu). 8 saatlik mesaide 640 istek
+  // yerine 240 istek. Bu yoklama YENİ İŞ BİLDİRİMİNİN TEK KANALI DEĞİL —
+  // sunucu yeni sipariş düşünce zaten push gönderiyor (lib/notify.ts); bu
+  // yalnız push gecikirse/düşerse devreye giren yedek. Yedeğin 45 saniyede
+  // bir çalışması gereksiz.
+  if (simdi - st.lastOrderCheck > 120_000) {
     st.lastOrderCheck = simdi;
     // Yoklama İSTEĞİNDEN ÖNCE yaz: eşzamanlı ikinci bir çağrı aynı anda
     // girip aynı bildirimi bir daha üretmesin (canlıda 2 saniyede 6 istek
