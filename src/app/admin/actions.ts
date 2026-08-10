@@ -19,6 +19,7 @@ import { CONTRACT_VERSION } from "@/lib/legal";
 import { normalizeBusinessName } from "@/lib/text";
 import { ensureBillingCode } from "@/lib/billing";
 import { effectiveSubscriptionGross } from "@/lib/discount";
+import { PLAN, fiyatBasamagi, merdivenAktif, SOFOR_TAVANI } from "@/lib/plan";
 import { accrueCommissionForPayment } from "@/lib/commission";
 import { notifySubscriptionPaid } from "@/lib/paymentNotify";
 import { findUsableCode, claimCode, attachCodeToBusiness } from "@/lib/referralCode";
@@ -291,6 +292,26 @@ export async function createBusinessByAdmin(formData: FormData) {
       : { lat: 41.0082, lng: 28.9784 };
   const farFuture = new Date("2099-12-31T00:00:00.000Z"); // süresiz ücretsiz
 
+  // ELDEN NAKİT TAHSİLAT (2026-08-10). Admin dükkânda parayı alıp işletmeyi
+  // buradan açıyor: kaç aylık aldıysa onu seçer, dönem o kadar açılır ve
+  // ödeme deftere GERÇEK tutarla yazılır (muhasebe ekranında görünür,
+  // komisyoncu payı da bu kayıttan işler). Seçilmezse eski davranış: süresiz
+  // ücretsiz — ama artık bilinçli bir tercih, varsayılan sessizlik değil.
+  const nakitAyRaw = Number(String(formData.get("nakitAy") ?? "0"));
+  const nakitAy = [1, 2, 3, 6, 12].includes(nakitAyRaw) ? nakitAyRaw : 0;
+  const nakitYontem =
+    String(formData.get("nakitYontem") ?? "CASH").toUpperCase() === "TRANSFER"
+      ? "TRANSFER"
+      : "CASH";
+  const paketSecim = String(formData.get("paket") || "1").trim();
+  const nakitFilo = paketSecim === "FILO";
+  const paketN = Number(paketSecim);
+  const nakitKoltuk = nakitFilo
+    ? SOFOR_TAVANI
+    : Number.isInteger(paketN) && paketN >= 1 && paketN <= SOFOR_TAVANI
+      ? paketN
+      : 1;
+
   const owner = await prisma.user.create({
     data: {
       role: "CLEANER",
@@ -358,11 +379,20 @@ export async function createBusinessByAdmin(formData: FormData) {
           // rozet hiçbir şeyi ayırt etmiyordu. Artık güven rozeti ancak gerçekten
           // belge kontrolü yapıldığında admin tarafından elle verilir; performans
           // rozetleri ise geceleri veriden hesaplanır (lib/badgeCompute.ts).
+          // ABONELİK: SÜRESİZ BEDAVA MI, NAKİT DÖNEM Mİ (2026-08-10).
+          // Eskiden burası KOŞULSUZ `farFuture` (2099) yazıyordu — admin/destek
+          // panelinden açılan her işletme süresiz ücretsiz oluyordu. Canlıdaki
+          // 39 işletmenin 36'sının bedava olmasının sebebi tam olarak buydu.
+          // Artık açan kişi hangisi olduğunu SEÇİYOR; nakit seçilirse dönem
+          // aşağıda `extendSubscription` ile ay sayısınca açılır.
           subscription: {
             create: {
               status: "ACTIVE",
               currentPeriodStart: new Date(),
-              currentPeriodEnd: farFuture,
+              currentPeriodEnd: nakitAy > 0 ? new Date() : farFuture,
+              ...(merdivenAktif
+                ? { plan: nakitFilo ? "FILO" : "YONETIM", driverSeats: nakitKoltuk }
+                : {}),
             },
           },
         },
@@ -376,6 +406,45 @@ export async function createBusinessByAdmin(formData: FormData) {
   // Cari/abone kodu (muhasebe eşleştirmesi) — hata hesabı engellemesin.
   await ensureBillingCode(businessId).catch(() => {});
   if (claimedCodeId) await attachCodeToBusiness(claimedCodeId, businessId);
+
+  // NAKİT TAHSİLATI DEFTERE YAZ + DÖNEMİ AÇ.
+  // Ödeme kaydı olmadan yalnız dönem uzatmak, bu projede daha önce yaşanmış
+  // bir hataydı: para alınıyor ama muhasebe ekranında görünmüyor, komisyoncuya
+  // 0 TL yazılıyor ve makbuz çıkmıyordu.
+  if (nakitAy > 0) {
+    const basamak = fiyatBasamagi(
+      nakitFilo ? "FILO" : "YONETIM",
+      nakitKoltuk,
+    );
+    // Merdiven kapalıyken tek fiyat geçerlidir (PLAN), açıkken basamak.
+    const aylik = merdivenAktif ? basamak.brut : PLAN.priceGrossNumber;
+    const toplam = Math.round(aylik * nakitAy * 100) / 100;
+    try {
+      const odeme = await prisma.$transaction(async (tx) => {
+        const p = await tx.subscriptionPayment.create({
+          data: {
+            businessId,
+            amount: toplam,
+            status: "PAID",
+            paidAt: new Date(),
+            periodMonths: nakitAy,
+            method: nakitYontem,
+          },
+        });
+        const end = await extendSubscription(tx, businessId, nakitAy);
+        await tx.subscriptionPayment.update({
+          where: { id: p.id },
+          data: { periodStart: new Date(), periodEnd: end },
+        });
+        return p.id;
+      });
+      await accrueCommissionForPayment(odeme);
+    } catch (e) {
+      // Kayıt düşmezse işletme yine açılmış olur; sessiz geçmek yerine logla —
+      // "para aldım ama defterde yok" durumunun tek izi bu satır olur.
+      console.error("[admin-yeni] nakit tahsilat kaydı YAZILAMADI:", businessId, e);
+    }
+  }
 
   // Opsiyonel ilk şoför (yayın şartı) — panel addDriver ile aynı mantık.
   if (wantsDriver) {
@@ -600,23 +669,34 @@ export async function activateSubscription(formData: FormData) {
     subscription: isletme?.subscription ?? null,
   });
 
+  // ÇOK AYLIK ELDEN TAHSİLAT (2026-08-10). Nakit alınan işletmeye 1/2/3 aylık
+  // dönem tek seferde açılabilsin diye. Tutar AY SAYISIYLA ÇARPILIR — yoksa
+  // 3 ay açılıp deftere tek ay yazılırdı: hem muhasebe hem komisyoncu payı
+  // eksik kalırdı. Form boş gelirse 1 ay (eski davranış birebir korunur).
+  const ayRaw = Number(String(formData.get("months") ?? "1"));
+  const ay = Number.isInteger(ayRaw) && ayRaw >= 1 && ayRaw <= 12 ? ayRaw : 1;
+  const yontemRaw = String(formData.get("method") ?? "CASH").toUpperCase();
+  const yontem = yontemRaw === "TRANSFER" ? "TRANSFER" : "CASH";
+  const toplam = Math.round(gross * ay * 100) / 100;
+
   const payment = await prisma.$transaction(async (tx) => {
     const p = await tx.subscriptionPayment.create({
       data: {
         businessId: id,
-        amount: gross,
+        amount: toplam,
         status: "PAID",
         paidAt: new Date(),
-        // `iyzicoPaymentId` NULL kalır — havale/EFT ile kartlı ödemeyi
-        // ayıran işaret budur (şemada ayrı bir "yöntem" alanı yok).
+        periodMonths: ay,
+        method: yontem,
+        // `iyzicoPaymentId` NULL kalır — kartlı ödemeden ayıran ikinci işaret.
       },
     });
-    const end = await extendSubscription(tx, id);
+    const end = await extendSubscription(tx, id, ay);
     await tx.subscriptionPayment.update({
       where: { id: p.id },
       data: { periodStart: new Date(), periodEnd: end },
     });
-    return { id: p.id, periodEnd: end };
+    return { id: p.id, periodEnd: end, toplam };
   });
 
   // Komisyon tahakkuku transaction DIŞINDA (kartlı yolla aynı gerekçe:
@@ -624,8 +704,10 @@ export async function activateSubscription(formData: FormData) {
   await accrueCommissionForPayment(payment.id);
   await syncVisibility(id); // ödeme sonrası profil tamsa yayına al
   await notifySubscriptionPaid({
+    // Makbuz TAHSİL EDİLEN tutarı göstermeli: 3 aylık nakit alındıysa
+    // bildirimde tek ay yazması işletmeyi de mali müşaviri de yanıltır.
+    amount: payment.toplam,
     businessId: id,
-    amount: gross,
     periodEnd: payment.periodEnd,
     iyzicoPaymentId: null,
     kind: "ilk-odeme",

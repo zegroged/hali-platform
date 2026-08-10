@@ -197,10 +197,35 @@ export default async function AdminBusinessDetail({
         )}
         {/* Havale/EFT dönemi köprüsü — iyzico canlıya alınınca ödeme callback'i
             bunu otomatik yapacak, buton yedek kalacak. */}
-        <form action={activateSubscription}>
+        {/* ELDEN TAHSİLAT: süre + yöntem seçilebilir (2026-08-10).
+            Önce sabit 1 aydı; 3 aylık nakit alınınca admin butona üç kez
+            basmak zorunda kalıyor ve deftere üç ayrı tek-aylık kayıt
+            düşüyordu. Artık tek kayıt, doğru tutar (paket × ay). */}
+        <form action={activateSubscription} className="flex flex-wrap items-center gap-2">
           <input type="hidden" name="id" value={b.id} />
+          <select
+            name="months"
+            defaultValue="1"
+            aria-label="Tahsil edilen süre"
+            className="rounded-lg border border-slate-300 px-2 py-2 text-sm"
+          >
+            {[1, 2, 3, 6, 12].map((a) => (
+              <option key={a} value={a}>
+                {a} ay
+              </option>
+            ))}
+          </select>
+          <select
+            name="method"
+            defaultValue="CASH"
+            aria-label="Tahsilat yöntemi"
+            className="rounded-lg border border-slate-300 px-2 py-2 text-sm"
+          >
+            <option value="CASH">Nakit</option>
+            <option value="TRANSFER">Havale/EFT</option>
+          </select>
           <button className="rounded-lg border border-brand px-4 py-2 text-sm font-medium text-brand-dark hover:bg-brand-light/50">
-            Ödeme alındı — 1 ay aktifleştir/uzat
+            Ödeme alındı — aktifleştir/uzat
           </button>
         </form>
         {b.pausedUntil && b.pausedUntil > new Date() && (

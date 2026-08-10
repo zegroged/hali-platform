@@ -726,6 +726,11 @@ model SubscriptionPayment {
   // sabit 1 ay ekliyor ve ödenen tutara bakmıyor, yani 9 aylık parayı alıp
   // 1 ay açardık (denetim bulgusu). Muhasebe ekranı da dönemi bu alandan yazar.
   periodMonths    Int              @default(1)
+  // TAHSİLAT YÖNTEMİ: CARD (iyzico) · CASH (elden nakit) · TRANSFER (havale).
+  // Önce yöntem `iyzicoPaymentId == null` ile DOLAYLI anlaşılıyordu; nakit ile
+  // havaleyi ayırmıyordu ve mali müşavir hangisinin makbuz, hangisinin dekont
+  // olduğunu göremiyordu. Kayıt muhasebe ekranında GÖRÜNÜR — gizlenmez.
+  method          String           @default("CARD")
   commission      CommissionEntry?
 
   @@index([businessId])

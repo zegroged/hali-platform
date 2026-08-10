@@ -1,5 +1,7 @@
 import { createBusinessByAdmin } from "@/app/admin/actions";
 import CityDistrictSelect from "@/components/CityDistrictSelect";
+import { merdivenAktif, merdiven } from "@/lib/plan";
+import { basamakDegeri } from "@/components/PlanCard";
 
 const inp =
   "w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:border-brand";
@@ -111,6 +113,68 @@ export default function NewBusinessForm() {
           className={inp}
         />
       </div>
+
+      {/* ELDEN TAHSİLAT (2026-08-10) — dükkânda parayı alıp işletmeyi buradan
+          açmak için. Eskiden bu formdan açılan HER işletme sessizce "süresiz
+          ücretsiz" oluyordu (canlıdaki 39 işletmenin 36'sının sebebi buydu);
+          artık hangisi olduğu AÇIKÇA seçiliyor.
+          ⚠️ Seçilen süre kadar dönem açılır VE ödeme deftere gerçek tutarla
+          yazılır — muhasebe ekranında görünür, komisyoncu payı oradan işler. */}
+      <fieldset className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+        <legend className="px-1 text-xs font-semibold text-amber-900">
+          Abonelik / Tahsilat
+        </legend>
+        <div className="grid gap-4 sm:grid-cols-3">
+          {merdivenAktif && (
+            <div>
+              <label htmlFor="paket" className={lbl}>
+                Paket
+              </label>
+              <select id="paket" name="paket" defaultValue="1" className={inp}>
+                {merdiven().map((b, i) => (
+                  <option key={b.brut} value={basamakDegeri(i, b.sinirsiz)}>
+                    {b.sinirsiz ? "Sınırsız şoför" : `${i + 1} şoför`} —{" "}
+                    {b.brut.toLocaleString("tr-TR")} TL/ay
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+          <div>
+            <label htmlFor="nakitAy" className={lbl}>
+              Tahsil edilen süre
+            </label>
+            <select id="nakitAy" name="nakitAy" defaultValue="0" className={inp}>
+              <option value="0">Ücretsiz (süresiz) — para alınmadı</option>
+              <option value="1">1 ay</option>
+              <option value="2">2 ay</option>
+              <option value="3">3 ay</option>
+              <option value="6">6 ay</option>
+              <option value="12">12 ay</option>
+            </select>
+          </div>
+          <div>
+            <label htmlFor="nakitYontem" className={lbl}>
+              Yöntem
+            </label>
+            <select
+              id="nakitYontem"
+              name="nakitYontem"
+              defaultValue="CASH"
+              className={inp}
+            >
+              <option value="CASH">Nakit (elden)</option>
+              <option value="TRANSFER">Havale / EFT</option>
+            </select>
+          </div>
+        </div>
+        <p className="mt-2 text-xs text-amber-900">
+          Süre seçilirse dönem o kadar açılır ve tahsilat{" "}
+          <strong>ödeme defterine yazılır</strong> (paket tutarı × ay). Muhasebe
+          ekranında görünür; faturasını GİB portalından ayrıca kesmen gerekir.
+          &quot;Ücretsiz&quot; seçilirse hiçbir ödeme kaydı oluşmaz.
+        </p>
+      </fieldset>
       <div className="grid gap-4 sm:grid-cols-3">
         <div>
           <label htmlFor="pricePerM2" className={lbl}>
