@@ -36,6 +36,7 @@ import {
 } from "./src/notify";
 import {
   pilUyarisiGosterildiMi,
+  pilBeyaniVarMi,
   pilUyarisiniIsaretle,
   konumAyarlariniAc,
 } from "./src/pil";
@@ -239,6 +240,12 @@ function Driver() {
         // izin akışını bölmesin, ve mesai bu yüzden asla engellenmesin.
         void (async () => {
           try {
+            // MUAFİYET ZATEN VARSA HİÇ SORMA (2026-08-10). Önce durumu OKU:
+            // şoför daha önce izni vermişse kurulum davetiyle rahatsız etme.
+            if (await pilBeyaniVarMi()) {
+              await pilUyarisiniIsaretle();
+              return;
+            }
             if (await pilUyarisiGosterildiMi()) return;
             if (await kurulumaDavet()) setKurulumGoster(true);
             // "Sonra" dense bile işaretle: her mesaide sormak eziyet olur.

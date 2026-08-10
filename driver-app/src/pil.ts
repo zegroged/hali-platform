@@ -21,6 +21,41 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const GOSTERILDI = "pil-uyarisi-gosterildi";
 
+/** Şoförün "muafiyeti verdim" beyanı. */
+const PIL_BEYAN = "pil-muafiyeti-verildi";
+
+/**
+ * "YAPTIM DİYORUM, YİNE SORUYOR" — 2026-08-10.
+ *
+ * Şikâyet haklıydı: pil adımı HER AÇILIŞTA "yap" diyordu, çünkü şoförün
+ * verdiği cevap hiçbir yere yazılmıyordu. Sorulan soru ("Ekran açıldı mı?")
+ * yalnız o anlık bir uyarıydı; ekran durumu ise sabit "yapılmadı"ydı.
+ *
+ * ⚠️ NEDEN GERÇEK DENETLEYİCİ YOK: Android muafiyet durumunu
+ * (`PowerManager.isIgnoringBatteryOptimizations`) uygulamaya ancak native
+ * kod üzerinden verir; Expo'nun hazır modüllerinde karşılığı yok.
+ * `react-native-device-info` denendi — o API'yi TAŞIMIYOR, bağımlılık geri
+ * alındı. Uydurma bir kontrol yazmaktansa şoförün beyanını kalıcı kılıyoruz
+ * ve ASIL KANITI ayrı gösteriyoruz: konum gerçekten akıyor mu
+ * (`sonKonumGonderimi`). Beyan "sormayı kesmek" içindir, kanıt yerine geçmez.
+ */
+export async function pilBeyaniVarMi(): Promise<boolean> {
+  try {
+    return (await AsyncStorage.getItem(PIL_BEYAN)) === "1";
+  } catch {
+    return false;
+  }
+}
+
+export async function pilBeyaniniKaydet(verildi: boolean): Promise<void> {
+  try {
+    if (verildi) await AsyncStorage.setItem(PIL_BEYAN, "1");
+    else await AsyncStorage.removeItem(PIL_BEYAN);
+  } catch {
+    // yazılamazsa yalnız "bir daha sorma" özelliği kaybolur, akış bozulmaz
+  }
+}
+
 /** Android'de pil optimizasyonu muafiyeti diyaloğunu doğrudan açar.
  *
  *  ⚠️ 2026-08-08 — SESSİZ BAŞARISIZLIK BURADAYDI: bu çağrı Tecno/HiOS'ta

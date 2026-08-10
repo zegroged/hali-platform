@@ -12,6 +12,8 @@ import * as Location from "expo-location";
 import * as Notifications from "expo-notifications";
 import {
   pilMuafiyetiIste,
+  pilBeyaniVarMi,
+  pilBeyaniniKaydet,
   pilAyarListesiniAc,
   uygulamaAyarlariniAc,
   konumAyarlariniAc,
@@ -86,9 +88,19 @@ export function Kurulum({
   // otomatik başlatma ayarlarının durumu Android'den OKUNAMADIĞI için tek
   // güvenilir doğrulama budur.
   const [gonderimYasi, setGonderimYasi] = useState<number | null>(null);
+  // PİL ADIMI: şoförün BEYANI (2026-08-10). Android muafiyet durumunu
+  // uygulamaya okutmuyor — `react-native-device-info` denendi, o API'yi
+  // taşımıyor, bağımlılık geri alındı. Uydurma bir kontrol yazmaktansa
+  // beyanı kalıcı kılıyoruz; ASIL KANIT aşağıdaki "konum akıyor mu" satırı.
+  const [pilMuaf, setPilMuaf] = useState<boolean | null>(null);
   const [deneniyor, setDeneniyor] = useState(false);
 
   const durumlariOku = useCallback(async () => {
+    try {
+      setPilMuaf((await pilBeyaniVarMi()) ? true : false);
+    } catch {
+      setPilMuaf(null);
+    }
     try {
       const t = await sonKonumGonderimi();
       setGonderimYasi(t === 0 ? -1 : Math.round((Date.now() - t) / 1000));
@@ -160,9 +172,11 @@ export function Kurulum({
 
   async function pilIste() {
     await pilMuafiyetiIste(paket);
-    // Android muafiyet durumunu okumamıza izin vermiyor ve bazı telefonlar
-    // (Tecno/HiOS) diyaloğu sessizce yutuyor → KULLANICIYA SOR. Eski sürüm
-    // burada susuyordu ve düğme "çalışmıyor" görünüyordu.
+    // 🔴 CEVAP ARTIK KAYDEDİLİYOR (2026-08-10). Şikâyet: "kaldırdım diyorum,
+    // sormaya devam ediyor." Sebep buradaydı — şoför "Açıldı, verdim" dese de
+    // hiçbir yere yazılmıyordu; ekran her açılışta yeniden "Gerekli" diyordu.
+    // Bazı telefonlar (Tecno/HiOS) sistem diyaloğunu sessizce yutuyor, o
+    // yüzden soru duruyor; ama cevap artık kalıcı.
     Alert.alert(
       "Ekran açıldı mı?",
       "“Halı Şoför uygulamasının pili kısıtlamadan çıkarılsın mı?” diye soran " +
@@ -170,7 +184,13 @@ export function Kurulum({
         "Hiçbir şey açılmadıysa telefonun bu pencereyi engelliyordur — " +
         "aşağıdaki düğmeyle listeden elle seçebilirsin.",
       [
-        { text: "Açıldı, verdim", style: "cancel" },
+        {
+          text: "Açıldı, verdim",
+          onPress: () => {
+            void pilBeyaniniKaydet(true);
+            setPilMuaf(true); // ekran anında ✓ olsun, yeniden okumayı bekleme
+          },
+        },
         { text: "Açılmadı — listeyi aç", onPress: () => void pilAyarListesiniAc() },
       ],
     );
@@ -260,21 +280,24 @@ export function Kurulum({
         onPress={bildirimIste}
       />
 
-      {/* Pil ve otomatik başlatma DURUMU OKUNAMIYOR (Android izin vermiyor),
-          o yüzden rozetsiz — her zaman elle tetiklenebilir dururlar. */}
-      <View style={s.kart}>
-        <View style={s.basSatir}>
-          <Text style={s.no}>5</Text>
-          <Text style={s.baslik}>Pil kısıtlaması</Text>
-        </View>
-        <Text style={s.aciklama}>
-          Telefonun uygulamayı uyutmasını engeller. Bu adım olmadan konum
-          birkaç dakika sonra kesilir.
-        </Text>
-        <TouchableOpacity style={s.dugme} onPress={pilIste}>
-          <Text style={s.dugmeYazi}>Kısıtlamayı kaldır</Text>
-        </TouchableOpacity>
-      </View>
+      {/* PİL ADIMI ARTIK DENETLENİYOR (2026-08-10).
+          Önce durum okunamıyor sayılıyor ve adım rozetsiz duruyordu; şoför
+          muafiyeti verse bile ekran "yap" demeye devam ediyordu ("yaptım
+          diyorum yine soruyor"). `pilMuafiyetiVarMi()` gerçek değeri okuyor:
+          muafsa ✓ Tamam ve DÜĞME KAYBOLUYOR. Okunamazsa (null) eski davranış
+          korunuyor — bilinmiyor diye "Gerekli" demek de yanlış olurdu. */}
+      <Satir
+        no={5}
+        baslik="Pil kısıtlaması"
+        aciklama={
+          pilMuaf === true
+            ? "Yaptığını işaretledin. Telefon bunu bize doğrulayamıyor — gerçek kanıt aşağıdaki “konum akıyor mu” satırı."
+            : "Telefonun uygulamayı uyutmasını engeller. Bu adım olmadan konum birkaç dakika sonra kesilir."
+        }
+        durum={pilMuaf === true ? "tamam" : pilMuaf === false ? "eksik" : "bilinmiyor"}
+        dugme="Kısıtlamayı kaldır"
+        onPress={pilIste}
+      />
 
       <View style={s.kart}>
         <View style={s.basSatir}>
