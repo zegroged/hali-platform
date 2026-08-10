@@ -188,6 +188,25 @@ export default function PlanCard({
     </>
   );
 
+  // ÖZELLİK LİSTESİ TÜM PAKETLERDE AYNI — ekranda bunu SÖYLEMEK gerekiyor.
+  // Fiyat seçilebilir olunca liste "acaba hangi pakette hangisi var?" sorusunu
+  // doğuruyor; paketler yalnız şoför sayısında ayrışıyor (kullanıcı istedi).
+  const paketSayisi = merdivenAktif ? merdiven().length : 0;
+  const FeatureBaslik = merdivenAktif ? (
+    <>
+      <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+        {paketSayisi} pakette de var
+      </h3>
+      <p className="mt-0.5 text-xs text-slate-500">
+        Paketler yalnız şoför sayısında ayrışır — özellikler aynı.
+      </p>
+    </>
+  ) : (
+    <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+      Pakete dahil olan her şey
+    </h3>
+  );
+
   const Features = (
     <ul className={wide ? "grid gap-x-6 gap-y-3 sm:grid-cols-2" : "space-y-2.5"}>
       {PLAN.features.map((f) => (
@@ -243,9 +262,7 @@ export default function PlanCard({
         </div>
         {/* Sağ: faydalar (ekranı doldurur) */}
         <div className="p-8">
-          <h3 className="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-500">
-            Pakete dahil olan her şey
-          </h3>
+          <div className="mb-4">{FeatureBaslik}</div>
           {Features}
         </div>
       </section>
@@ -257,7 +274,10 @@ export default function PlanCard({
       <h2 className="text-lg font-bold text-slate-900">{PLAN.name}</h2>
       <div className="mt-2">{Price}</div>
       <Merdiven onSecim={onSecim} secili={secili} />
-      <div className="mt-5">{Features}</div>
+      <div className="mt-5">
+        <div className="mb-3">{FeatureBaslik}</div>
+        {Features}
+      </div>
       <div className="mt-6">{Cta}</div>
     </section>
   );
