@@ -184,6 +184,12 @@ export function Kurulum({
         "• “Otomatik başlat” / “Autostart”\n" +
         "• “Arka planda çalışmaya izin ver”\n" +
         "• Pil → “Kısıtlama yok” / “Sınırsız”\n\n" +
+        // SON KULLANILANLARDA KİLİTLEME (2026-08-10): bu adım en çok atlanan
+        // ve en çok işe yarayanlardan biri. Programla YAPILAMAZ (böyle bir API
+        // yok), yalnız şoför elle yapar — o yüzden burada tarif ediliyor.
+        "Bir de şunu yap: son kullanılanlar (kare tuşu) ekranını aç, " +
+        "“Halı Şoför” kartını bul ve kartın üstündeki KİLİT işaretine bas. " +
+        "Kilitli uygulamayı telefon temizlerken kapatmaz.\n\n" +
         "Bunlar kapalıysa mesai açıkken bile konumun birkaç dakika sonra kesilir.",
       [
         { text: "Sonra", style: "cancel" },

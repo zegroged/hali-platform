@@ -151,6 +151,16 @@ export async function konumsuzMesaiKontrol(): Promise<void> {
         `Uygulamayı aç, mesaiyi kapatıp yeniden aç. Tekrarlıyorsa telefonun ` +
         `pil ayarlarından "Halı Şoför" uygulamasını kısıtlamadan çıkar.`,
       href: "/sofor",
+      // UYANDIRMA (2026-08-10): bildirimin tek işi haber vermek değil, konum
+      // akışını KENDİLİĞİNDEN diriltmek. Uygulama süreci ayaktaysa bu veriyi
+      // alır almaz `startTracking()` yeniden çağrılır ve şoförün hiçbir şey
+      // yapması gerekmez. Süreç öldürülmüşse bildirim görünür kalır; şoför
+      // dokununca uygulama açılır ve aynı akış işler.
+      //
+      // Neden gerekli: Transsion/HiOS gibi ROM'lar foreground service'i bile
+      // öldürüyor (ölçüm: ~6,5 dk). Öldürülen servisi uygulama kendi başına
+      // diriltemez — dışarıdan bir tetik şart, o tetik push'tur.
+      ekstra: { tip: "konum-yeniden-baslat" },
     });
 
     // İŞLETMEYE — haritanın neden boş olduğunu ekrandan görsün.

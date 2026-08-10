@@ -18,6 +18,10 @@ export type NotifyInput = {
   title: string;
   body?: string;
   href?: string;
+  /** Uygulamanın DAVRANIŞ ÜRETMESİ için ek veri (2026-08-10).
+   *  Örnek: `{ tip: "konum-yeniden-baslat" }` — şoför uygulaması bunu alınca
+   *  konum akışını yeniden başlatır. Panel/web tarafı görmezden gelir. */
+  ekstra?: Record<string, string>;
 };
 
 /** Tek kullanıcıya bildirim (best-effort; hata yutulur, akışı bozmaz).
@@ -44,7 +48,7 @@ export async function notify(input: NotifyInput): Promise<void> {
   }
   try {
     const { pushGonder } = await import("@/lib/push");
-    await pushGonder(input.userId, input.title, input.body, input.href);
+    await pushGonder(input.userId, input.title, input.body, input.href, input.ekstra);
   } catch (e) {
     console.error("push gönderilemedi:", e);
   }

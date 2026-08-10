@@ -151,3 +151,66 @@ export async function checkNewOrdersAndNotify(): Promise<void> {
     // sonraki yoklamada tekrar denenir
   }
 }
+
+// ── UYANDIRMA: SUNUCU PUSH'UYLA KONUM AKIŞINI DİRİLT (2026-08-10) ──────────
+//
+// NEDEN VAR: Transsion/HiOS gibi ROM'lar foreground service'i bile öldürüyor
+// (canlı ölçüm: ~6,5 dk). Öldürülen servisi uygulama KENDİ BAŞINA diriltemez —
+// çalışan kodu kalmaz. Dışarıdan bir tetik şart, o tetik push'tur.
+//
+// Sunucu tarafı: `lib/konumBekcisi.ts` mesai açıkken 10 dk ping gelmezse
+// `{ tip: "konum-yeniden-baslat" }` verisiyle YÜKSEK ÖNCELİKLİ bildirim yollar.
+//
+// İKİ YOL BİRDEN, çünkü hangisinin çalışacağı ROM'a bağlı:
+//  1. Süreç ayaktaysa bildirim GELİR GELMEZ akış yeniden başlar — şoför
+//     hiçbir şey yapmaz, çoğu zaman farkına bile varmaz.
+//  2. Süreç öldürülmüşse bildirim ekranda durur; şoför DOKUNUNCA uygulama
+//     açılır ve aynı akış işler.
+//
+// ⚠️ GARANTİ DEĞİL: ROM push'u da geciktirebilir. Bu bir olasılık artırıcıdır,
+// "kusursuz süreklilik" değil — ürün metinlerinde öyle anlatılmamalı.
+import { startTracking, isTracking } from "./tracking";
+
+/** Bildirim verisi bu tipi taşıyorsa konum akışı yeniden başlatılır. */
+const YENIDEN_BASLAT = "konum-yeniden-baslat";
+
+function tipiOku(veri: unknown): string | null {
+  if (!veri || typeof veri !== "object") return null;
+  const t = (veri as Record<string, unknown>).tip;
+  return typeof t === "string" ? t : null;
+}
+
+async function konumuDirilt(kaynak: string): Promise<void> {
+  try {
+    // Zaten akıyorsa dokunma: `startTracking` idempotent olsa da gereksiz
+    // yeniden başlatma bildirimi söndürüp yeniden yakar (şoför için gürültü).
+    if (await isTracking()) return;
+    const hata = await startTracking();
+    console.log(
+      hata
+        ? `[uyandirma:${kaynak}] konum yeniden başlatılamadı: ${hata}`
+        : `[uyandirma:${kaynak}] konum akışı yeniden başladı`,
+    );
+  } catch (e) {
+    console.log(`[uyandirma:${kaynak}] hata:`, e);
+  }
+}
+
+/** Uygulama açılışında bir kez çağrılır (App.tsx). Dinleyicileri kurar ve
+ *  kaldırma fonksiyonunu döndürür. */
+export function uyandirmaDinleyicisiKur(): () => void {
+  const alindi = Notifications.addNotificationReceivedListener((n) => {
+    if (tipiOku(n.request.content.data) === YENIDEN_BASLAT) {
+      void konumuDirilt("alindi");
+    }
+  });
+  const dokunuldu = Notifications.addNotificationResponseReceivedListener((r) => {
+    if (tipiOku(r.notification.request.content.data) === YENIDEN_BASLAT) {
+      void konumuDirilt("dokunuldu");
+    }
+  });
+  return () => {
+    alindi.remove();
+    dokunuldu.remove();
+  };
+}

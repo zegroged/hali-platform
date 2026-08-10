@@ -24,6 +24,9 @@ type Mesaj = {
   data?: Record<string, unknown>;
   sound?: "default";
   channelId?: string;
+  /** Doze/uygulama-uykusu altında da teslim edilsin (uyandırma bildirimi
+   *  geciktiğinde işe yaramaz — 2026-08-10). */
+  priority?: "high" | "normal";
 };
 
 /** Expo'nun jeton biçimi. Bozuk kayıt servise hiç gitmesin. */
@@ -40,6 +43,10 @@ export async function pushGonder(
   title: string,
   body?: string,
   href?: string,
+  /** Uygulamanın DAVRANIŞ ÜRETMESİ için ek veri (ör. konum akışını yeniden
+   *  başlat). Görünen bildirimin yanında taşınır; uygulama açıksa arka planda
+   *  işlenir, kapalıysa şoför dokununca uygulanır. */
+  ekstra?: Record<string, string>,
 ): Promise<void> {
   let jetonlar: { token: string }[] = [];
   try {
@@ -61,7 +68,12 @@ export async function pushGonder(
     sound: "default",
     // Android'de bildirim kanalı: uygulama tarafında aynı adla kuruluyor.
     channelId: "default",
-    data: href ? { href } : undefined,
+    // ÖNCELİK YÜKSEK: Doze/uygulama-uykusu altında da teslim edilsin —
+    // konum akışı kesildiğinde gönderdiğimiz uyandırma bildirimi gecikirse
+    // işe yaramaz (2026-08-10).
+    priority: "high",
+    data:
+      href || ekstra ? { ...(href ? { href } : {}), ...(ekstra ?? {}) } : undefined,
   }));
 
   try {

@@ -28,7 +28,12 @@ import {
   sonKonumGonderimi,
   KONUM_KAPALI,
 } from "./src/tracking";
-import { ensureNotifPermission, pushKaydet, pushSil } from "./src/notify";
+import {
+  ensureNotifPermission,
+  pushKaydet,
+  pushSil,
+  uyandirmaDinleyicisiKur,
+} from "./src/notify";
 import {
   pilUyarisiGosterildiMi,
   pilUyarisiniIsaretle,
@@ -121,6 +126,11 @@ function Driver() {
   const [konumYasiSn, setKonumYasiSn] = useState<number | null>(null);
   const [kurulumGoster, setKurulumGoster] = useState(false);
   const [busy, setBusy] = useState(false);
+
+  // UYANDIRMA DİNLEYİCİSİ (2026-08-10): sunucu "konum akışı kesildi" push'u
+  // yollayınca akışı yeniden başlatır. Süreç ayaktaysa şoför fark etmez;
+  // öldürülmüşse bildirime dokununca aynı akış işler.
+  useEffect(() => uyandirmaDinleyicisiKur(), []);
 
   useEffect(() => {
     (async () => {
