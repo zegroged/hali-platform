@@ -11,7 +11,7 @@
  *
  * Çalıştır: npx tsx scripts/test-durak.ts
  */
-import { evaluateStop, STOP_RADIUS_KM, OFFLINE_GAP_SEC } from "../src/lib/tracking";
+import { evaluateStop, STOP_RADIUS_KM, OFFLINE_GAP_SEC, MAX_ABSORB_GAP_SEC, MAX_STOP_SEC } from "../src/lib/tracking";
 
 let gecti = 0;
 let kaldi = 0;
@@ -119,5 +119,71 @@ console.log("\nG) Sabitler beklenen değerde (kural sessizce değişmesin)");
 bekle("durak çapı 50 m", STOP_RADIUS_KM === 0.05);
 bekle("çevrimdışı eşiği 5 dk", OFFLINE_GAP_SEC === 300);
 
-console.log(`\n${gecti} geçti · ${kaldi} kaldı`);
-process.exit(kaldi > 0 ? 1 : 0);
+
+// ── UZUN BOŞLUK YUTULMAZ (2026-08-10, canlıda yaşandı) ───────────────────
+// 8 Ağustos'ta açılan durak hiç kapanmadı, durationSec 37 SAATE çıktı: gece
+// ve mesai dışı saatler "durakta" sayıldı, sonraki günlerin raporu boşaldı.
+console.log("\nUZUN BOŞLUK — aynı yerde olsa bile yutulmaz");
+{
+  const capa = { lat: 37.9515, lng: 32.4846, startedAt: T0 };
+  // 30 dakikalık boşluk + aynı nokta → YUTULUR (2026-08-08 kuralı korunmalı)
+  const kisa = evaluateStop({
+    openStop: capa,
+    lastPing: { recordedAt: dk(30), lat: 37.9515, lng: 32.4846 },
+    lat: 37.9515,
+    lng: 32.4846,
+    now: dk(60),
+  });
+  bekle("30 dk boşluk + aynı yer → süre uzar", kisa.type === "extend");
+
+  // 12 saatlik boşluk + aynı nokta → BİTİRİLİR (yeni üst sınır)
+  const uzun = evaluateStop({
+    openStop: capa,
+    lastPing: { recordedAt: dk(30), lat: 37.9515, lng: 32.4846 },
+    lat: 37.9515,
+    lng: 32.4846,
+    now: dk(12 * 60),
+  });
+  bekle(
+    "12 saatlik boşluk + aynı yer → durak BİTER (gece yutulmaz)",
+    uzun.type === "finalize",
+    uzun.type,
+  );
+  if (uzun.type === "finalize") {
+    bekle(
+      "biten durak SON PING anıyla kapanır (boşluk süreye girmez)",
+      uzun.durationSec === 30 * 60,
+      `durationSec=${uzun.durationSec}`,
+    );
+  }
+}
+// TAVAN (2026-08-10): boşluk sınırı tek başına yetmiyordu — şoför AKTİF ping
+// atarken ve çapadan hiç çıkmazken durak sonsuza kadar büyüyordu. Canlıda 37
+// saatlik "durak" böyle oluştu (dükkân bahçesinde park hâlindeki araç) ve
+// sonraki günlerin raporu boş çıktı.
+console.log("\nDURAK SÜRESİ TAVANI — boşluk olmasa bile");
+{
+  const capa = { lat: 37.9515, lng: 32.4846, startedAt: T0 };
+  const tasan = evaluateStop({
+    openStop: capa,
+    lastPing: { recordedAt: dk(13 * 60), lat: 37.9515, lng: 32.4846 },
+    lat: 37.9515,
+    lng: 32.4846,
+    now: dk(13 * 60 + 1),
+  });
+  bekle("13 saatlik durak (boşluk YOK) → kapanır", tasan.type === "finalize", tasan.type);
+  if (tasan.type === "finalize")
+    bekle("süre tavana kelepçelenir (12 saat)", tasan.durationSec === MAX_STOP_SEC);
+
+  const normal = evaluateStop({
+    openStop: capa,
+    lastPing: { recordedAt: dk(60), lat: 37.9515, lng: 32.4846 },
+    lat: 37.9515,
+    lng: 32.4846,
+    now: dk(61),
+  });
+  bekle("1 saatlik durak normal uzamaya devam eder", normal.type === "extend");
+}
+
+console.log(`\n${gecti} geçti, ${kaldi} kaldı`);
+process.exit(kaldi === 0 ? 0 : 1);

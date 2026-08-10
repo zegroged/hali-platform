@@ -537,14 +537,30 @@ export function waSiparisHazir(to: string, ad: string, isletme: string, kod: str
   return sendTemplate(to, "siparis_hazir", [ad, isletme, kod]);
 }
 
-/** Teslimata çıktı. */
+/** Teslimata çıktı.
+ *
+ * 🔴 GEÇİCİ OLARAK GÖNDERİLMİYOR (2026-08-10, işletme sahibinin kararı).
+ *
+ * `siparis_yolda` / `siparis_yolda_link` şablonlarının Meta'da onaylı METNİ
+ * müşteriye "şoförünüzü takip edebilirsiniz" diyor. Bu vaat tutulmuyor:
+ * şoförün konumu arka planda ~6,5 dakika sonra kesiliyor (Tecno/HiOS) ve web
+ * şoför sayfası telefon kilitlenince duruyor — harita donmuş bir nokta
+ * gösteriyor. Metin Meta panelinden değiştirilip onaydan geçene kadar bu
+ * bildirim WhatsApp'tan GİTMEZ.
+ *
+ * ⚠️ MÜŞTERİ HABERSİZ KALMIYOR: aynı olayda e-posta gidiyor (orderNotify.ts)
+ * ve metni düzeltildi ("şoför konum paylaştığı sürece haritada da görünür").
+ * Kanal tamamen susturulsaydı takip linki hiç ulaşmazdı.
+ *
+ * Şablon metni onaylandığında yapılacak tek şey: aşağıdaki erken dönüşü silmek.
+ */
 export function waSiparisYolda(
-  to: string, ad: string, isletme: string, kod: string, token: string,
+  _to: string, _ad: string, _isletme: string, _kod: string, _token: string,
 ) {
-  return sendTemplateLinkli(
-    to, "siparis_yolda_link", [ad, isletme],
-    "siparis_yolda", [ad, isletme, kod], token,
-  );
+  return Promise.resolve({
+    ok: false as const,
+    skipped: "siparis_yolda-sablon-metni-guncellenecek",
+  });
 }
 
 /** Teslim edildi + değerlendirme daveti (2026-07-28). */

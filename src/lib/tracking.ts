@@ -5,6 +5,37 @@ export const STOP_RADIUS_KM = 0.05; // ~50 m: bu çapın içinde kalmak = durakt
 export const STOP_MIN_SEC = 180; // gerçek durak eşiği: 3 dk altı (ışık/yavaşlama/GPS) = gürültü
 export const OFFLINE_GAP_SEC = 300; // 5 dk'dan büyük ping boşluğu = şoför çevrimdışı kalmış
 
+/**
+ * BOŞLUK YUTMANIN ÜST SINIRI (2026-08-10) — canlıda ölçülen hatanın kaynağı.
+ *
+ * 2026-08-08'de "boşluğun iki ucu aynı noktaysa durak kesilmesin" kuralı
+ * eklendi ve doğruydu: gerçek boşluklar 10-35 dakikalıktı, o süreler
+ * kaydedilmiyordu. Ama kuralın ÜST SINIRI YOKTU.
+ *
+ * Sonuç canlıda görüldü: 8 Ağustos 19:45'te açılan durak hiç kapanmadı ve
+ * `durationSec` 133.719'a (37 SAAT) çıktı — gece, mesai dışı ve telefon kapalı
+ * geçen saatler "durakta" sayıldı. Üstelik durak o günün kaydı olduğu için
+ * SONRAKİ günlerin raporu boş çıkıyordu: panel "gün boyu aynı bölgede kaldı"
+ * derken aynı ekranda "0 durak · 0 dk" yazıyordu.
+ *
+ * Telefon saatlerce kapalıyken şoförün orada olduğunu BİLMİYORUZ — aynı yere
+ * dönmüş de olabilir. 1 saati aşan boşlukta durak son ping'de bitirilir.
+ */
+export const MAX_ABSORB_GAP_SEC = 3600; // 1 saat
+
+/**
+ * BİR DURAĞIN EN UZUN SÜRESİ (2026-08-10).
+ *
+ * Boşluk sınırı tek başına yetmiyordu: şoför AKTİF ping atarken (boşluk yok)
+ * ve çapadan hiç çıkmazken durak sonsuza kadar büyüyor. Canlıda 37 saatlik
+ * "durak" böyle oluştu — dükkânın kendi bahçesinde park hâlindeki araç.
+ *
+ * Bir iş gününü aşan "durak" rapor olarak da anlamsız: halıcının sorusu
+ * "bugün nerede ne kadar bekledi", "iki gündür orada mı" değil. 12 saati aşan
+ * durak kapatılır; şoför hâlâ oradaysa bir sonraki ping yeni durak açar.
+ */
+export const MAX_STOP_SEC = 12 * 3600; // 12 saat
+
 export type StopAction =
   | { type: "none" } // hareket halinde, bir şey yapma
   | { type: "open"; startedAt: Date; lat: number; lng: number } // durak başlat
@@ -47,7 +78,11 @@ export function evaluateStop(args: {
       // durak KESİLMEZ, süre boşluğu da kapsayacak şekilde uzatılır.
       // Şoför gerçekten ayrılmışsa (çapın dışına çıkmışsa) eski davranış
       // sürer — o boşlukta nerede olduğunu bilmiyoruz, saymayız.
-      const ayniYerde = haversineKm(openStop.lat, openStop.lng, lat, lng) <= STOP_RADIUS_KM;
+      // ÜST SINIR: boşluk çok uzunsa (gece/mesai dışı/telefon kapalı) aynı
+      // yerde olmak orada KALDIĞINI kanıtlamaz — ayrılıp dönmüş olabilir.
+      const ayniYerde =
+        gapSec <= MAX_ABSORB_GAP_SEC &&
+        haversineKm(openStop.lat, openStop.lng, lat, lng) <= STOP_RADIUS_KM;
       if (ayniYerde) {
         return {
           type: "extend",
@@ -72,6 +107,12 @@ export function evaluateStop(args: {
     );
     const dist = haversineKm(openStop.lat, openStop.lng, lat, lng);
     if (dist <= STOP_RADIUS_KM) {
+      // TAVAN: bir iş gününü aşan durak kapatılır (yukarıdaki MAX_STOP_SEC
+      // notu). Aksi hâlde park hâlindeki araç günlerce tek "durak" olur ve
+      // sonraki günlerin raporu boş çıkar — canlıda böyle oldu.
+      if (durationSec > MAX_STOP_SEC) {
+        return { type: "finalize", endedAt: now, durationSec: MAX_STOP_SEC };
+      }
       return { type: "extend", durationSec }; // çapanın içinde → hâlâ durakta
     }
     // çapadan ayrıldı: yeterince uzun durduysa kaydet, yoksa gürültü → sil
