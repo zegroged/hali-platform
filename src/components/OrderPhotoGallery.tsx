@@ -39,20 +39,41 @@ export function OrderPhotoGallery({
 
   // Aşama başlıklarını yalnız aşama DEĞİŞTİĞİNDE yaz — grid akışı bölünmesin
   // diye başlık ayrı bir tam-genişlik satırı olur.
-  const bloklar: { key: string; label: string | null; items: GalleryPhoto[] }[] = [];
+  const bloklar: {
+    key: string;
+    label: string | null;
+    sonradan: boolean;
+    items: GalleryPhoto[];
+  }[] = [];
   for (const p of sirali) {
     const label = photoStageLabel(p.stage);
     const son = bloklar[bloklar.length - 1];
     if (son && son.label === label) son.items.push(p);
-    else bloklar.push({ key: `${label ?? "yok"}-${p.id}`, label, items: [p] });
+    else
+      bloklar.push({
+        key: `${label ?? "yok"}-${p.id}`,
+        label,
+        sonradan: p.stage === "SONRADAN",
+        items: [p],
+      });
   }
 
   return (
     <div className="space-y-3">
       {bloklar.map((blok) => (
         <div key={blok.key}>
+          {/* SONRADAN eklenen kareler AYRI RENKTE (2026-08-10): sipariş
+              kapandıktan sonra eklenen fotoğraf, alım/teslim kanıtıyla aynı
+              rozetle görünürse aynı ağırlıkta sanılır. Etiket zaten farklı
+              ("Sonradan eklendi"); renk de ayrışsın ki göz kaçırmasın. */}
           <p className="mb-1.5 flex items-center gap-2 text-xs font-semibold text-slate-600">
-            <span className="rounded-full bg-brand-light px-2 py-0.5 text-brand-dark">
+            <span
+              className={
+                blok.sonradan
+                  ? "rounded-full bg-amber-100 px-2 py-0.5 text-amber-800"
+                  : "rounded-full bg-brand-light px-2 py-0.5 text-brand-dark"
+              }
+            >
               {blok.label ?? "Diğer"}
             </span>
             {blok.items[0].createdAt && (

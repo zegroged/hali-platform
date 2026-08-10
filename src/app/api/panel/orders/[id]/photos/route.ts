@@ -1,3 +1,4 @@
+import { isKanitStage } from "@/lib/photoStage";
 import { NextRequest, NextResponse } from "next/server";
 import sharp from "sharp";
 import { prisma } from "@/lib/prisma";
@@ -46,6 +47,8 @@ export async function POST(
     select: {
       id: true,
       carpetCount: true,
+      // Durum, aşama etiketini belirlemek için gerekli (aşağıda "SONRADAN").
+      status: true,
       _count: { select: { photos: true } },
     },
   });
@@ -113,7 +116,23 @@ export async function POST(
   // AŞAMA (2026-07-30): panelden YALNIZ "YIKAMA" etiketlenebilir. Alım/teslim
   // fotoğrafı şoför akışında zorunlu çekilen KANIT'tır; panelden o etiketin
   // uydurulabilmesi kanıt zincirini değersizleştirirdi. Tanınmayan değer → null.
-  const stage = form.get("stage") === "YIKAMA" ? "YIKAMA" : null;
+  //
+  // SONRADAN (2026-08-10): sipariş kapandıktan sonra eklenen kare AYRI
+  // etiketlenir. Yükleme kısıtlanmadı — meşru kullanımı var (müşteri "şu
+  // köşenin fotoğrafını atar mısın" der). Ama teslimden sonra eklenen bir
+  // karenin alım/teslim kanıtıyla aynı ağırlıkta görünmesi iki tarafı da
+  // yanıltır: işletme sonradan lehine kare ekleyebilir, ya da iyi niyetle
+  // eklenen kare "delil" sanılabilir. Etiket İSTEMCİDEN GELMEZ, sunucu
+  // siparişin durumundan türetir — uydurulamaz.
+  const kapali =
+    order.status === "DELIVERED" ||
+    order.status === "CANCELED" ||
+    order.status === "REJECTED";
+  const stage = kapali
+    ? "SONRADAN"
+    : form.get("stage") === "YIKAMA"
+      ? "YIKAMA"
+      : null;
   const files = form
     .getAll("files")
     .filter((f): f is File => f instanceof File)
@@ -215,8 +234,7 @@ export async function DELETE(
   // yazılıyor (panelden yazılamaz), dolayısıyla url eşleşmesi kaçırsa bile
   // (ör. aynı siparişte ikinci bir alım karesi) korumaya takılır.
   const kanit =
-    foto.stage === "ALIM" ||
-    foto.stage === "TESLIM" ||
+    isKanitStage(foto.stage) ||
     foto.url === foto.order.pickupPhotoUrl ||
     foto.url === foto.order.deliveryPhotoUrl;
   if (kanit) {

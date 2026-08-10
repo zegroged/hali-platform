@@ -11,7 +11,19 @@
 // fiyat/süre tahmini yapabilsin). Bu yüzden akışın EN BAŞINDA gelir ve
 // "Alım"dan önce sıralanır; ayrı etiketle gösterilir ki şoförün çektiği
 // zorunlu alım fotoğrafıyla karıştırılmasın.
-export const PHOTO_STAGES = ["MUSTERI", "ALIM", "YIKAMA", "TESLIM"] as const;
+// SONRADAN (2026-08-10): sipariş TESLİM EDİLDİKTEN (ya da iptal/red olduktan)
+// SONRA panelden eklenen kare. Yükleme kısıtlanmadı — meşru kullanımı var
+// (müşteri "şu köşenin fotoğrafını atar mısın" der). Ama kanıt zincirinin
+// PARÇASI DEĞİLDİR ve öyle görünmemeli: teslimden sonra eklenen bir kare,
+// hasar tartışmasında alım/teslim karesiyle aynı ağırlıkta sanılırsa iki tarafı
+// da yanıltır. Bu yüzden ayrı etiketle ve akışın EN SONUNDA gösterilir.
+export const PHOTO_STAGES = [
+  "MUSTERI",
+  "ALIM",
+  "YIKAMA",
+  "TESLIM",
+  "SONRADAN",
+] as const;
 
 export type PhotoStage = (typeof PHOTO_STAGES)[number];
 
@@ -21,7 +33,15 @@ export const PHOTO_STAGE_LABEL: Record<PhotoStage, string> = {
   ALIM: "Alım",
   YIKAMA: "Yıkama",
   TESLIM: "Teslim",
+  SONRADAN: "Sonradan eklendi",
 };
+
+/** Kanıt zincirinin parçası mı? Yalnız şoför akışında çekilen alım/teslim
+ *  kareleri kanıttır; müşterinin kendi eklediği ve teslim sonrası eklenenler
+ *  bilgi amaçlıdır. Silme koruması ve galeri vurgusu bunu okur. */
+export function isKanitStage(stage: string | null | undefined): boolean {
+  return stage === "ALIM" || stage === "TESLIM";
+}
 
 export function isPhotoStage(v: unknown): v is PhotoStage {
   return typeof v === "string" && (PHOTO_STAGES as readonly string[]).includes(v);
