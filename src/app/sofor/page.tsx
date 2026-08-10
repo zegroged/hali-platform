@@ -259,7 +259,12 @@ export default async function SoforPage({
                   </PendingButton>
                   {next === "OUT_FOR_DELIVERY" && (
                     <p className="mt-1 text-center text-xs text-slate-500">
-                      Müşteri artık seni canlı takip edebilecek.
+                      {/* Şoföre de doğrusu söylensin: konum ancak uygulama
+                          çalışırken gidiyor. "Takip edilecek" demek, şoförün
+                          telefonu kilitleyip konumun kesildiğini bilmemesine
+                          yol açıyordu. */}
+                      Müşteri siparişini izleyebilecek — konumun uygulama açıkken
+                      haritaya düşer.
                     </p>
                   )}
                 </form>

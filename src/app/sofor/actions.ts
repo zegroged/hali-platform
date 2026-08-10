@@ -203,7 +203,11 @@ export async function advanceOrder(formData: FormData) {
     try {
       await sendSms(
         o.customerPhone,
-        `Haliniz yola cikti! Canli takip: ${trackingLink(o.trackingToken)}`,
+        // "Canli takip" TUTULAMAYAN bir vaatti (2026-08-10): şoförün konumu
+        // arka planda ~6,5 dk sonra kesiliyor (Tecno/HiOS) ve web şoför
+        // sayfası telefon kilitlenince duruyor — harita donmuş bir nokta
+        // gösterebiliyor. Söz verilen şey artık TUTULABİLEN şey: sipariş takibi.
+        `Haliniz yola cikti! Siparis takibi: ${trackingLink(o.trackingToken)}`,
       );
     } catch (e) {
       console.error("advanceOrder SMS hatası:", e);

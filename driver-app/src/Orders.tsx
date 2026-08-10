@@ -235,10 +235,19 @@ export function Orders({ onSessionExpired }: { onSessionExpired: () => void }) {
     run(o.id, () => deliverOrder(o.id, price, uri));
   }
 
+  // YOL TARİFİ (2026-08-10) — web ile İKİZ (src/app/sofor/page.tsx).
+  //
+  // ESKİSİ `maps/search` idi: adresi haritada GÖSTERİYOR ama navigasyonu
+  // BAŞLATMIYORDU. Şoför haritayı açıyor, sonra elle "yol tarifi"ne basıp
+  // hedefi yeniden seçmek zorunda kalıyordu — direksiyon başında.
+  // `maps/dir` ise şoförün BULUNDUĞU konumdan hedefe sürüş tarifini doğrudan
+  // açar (kaynak boş bırakılınca Google mevcut konumu alır).
   function mapUrl(o: DriverOrder): string {
-    if (o.pickupLat != null && o.pickupLng != null)
-      return `https://www.google.com/maps/search/?api=1&query=${o.pickupLat},${o.pickupLng}`;
-    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(o.pickupAddress)}`;
+    const hedef =
+      o.pickupLat != null && o.pickupLng != null
+        ? `${o.pickupLat},${o.pickupLng}`
+        : encodeURIComponent(o.pickupAddress);
+    return `https://www.google.com/maps/dir/?api=1&destination=${hedef}&travelmode=driving`;
   }
 
   function renderActions(o: DriverOrder) {
@@ -361,9 +370,29 @@ export function Orders({ onSessionExpired }: { onSessionExpired: () => void }) {
           <TouchableOpacity onPress={() => Linking.openURL(`tel:${o.customerPhone}`)}>
             <Text style={s.link}>📞 {o.customerPhone}</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => Linking.openURL(mapUrl(o))}>
-            <Text style={s.addr}>📍 {o.pickupAddress}</Text>
-          </TouchableOpacity>
+          <Text style={s.addrPlain}>📍 {o.pickupAddress}</Text>
+          {/* AÇIK DÜĞME (2026-08-10) — web'de zaten böyleydi (sofor/page.tsx).
+              Mobilde tek dokunma hedefi ADRES METNİYDİ: direksiyon başındaki
+              şoför onun tıklanabilir olduğunu görmüyordu. Şoförün en çok
+              kullandığı işlem yol tarifi; düğme olarak duruyor. */}
+          <View style={[s.row, { marginTop: 8 }]}>
+            <TouchableOpacity
+              style={[s.btn, s.btnNav]}
+              onPress={() => Linking.openURL(mapUrl(o))}
+              accessibilityRole="button"
+              accessibilityLabel="Yol tarifi başlat"
+            >
+              <Text style={s.btnNavText}>🧭 Yol Tarifi</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[s.btn, s.btnCall]}
+              onPress={() => Linking.openURL(`tel:${o.customerPhone}`)}
+              accessibilityRole="button"
+              accessibilityLabel="Müşteriyi ara"
+            >
+              <Text style={s.btnCallText}>📞 Ara</Text>
+            </TouchableOpacity>
+          </View>
           {o.approxM2 != null && <Text style={s.meta}>~{o.approxM2} m²</Text>}
           {!!o.note && <Text style={s.note}>Not: {o.note}</Text>}
           {o.quotedPrice != null && (
@@ -399,6 +428,12 @@ const s = StyleSheet.create({
   name: { fontSize: 17, fontWeight: "700", color: "#0f172a", marginTop: 4 },
   link: { color: "#0d9488", marginTop: 2 },
   addr: { color: "#0d9488", marginTop: 2 },
+  // Adres artık DÜĞME değil düz metin (dokunma hedefi aşağıdaki butonlarda).
+  addrPlain: { color: "#334155", marginTop: 2 },
+  btnNav: { backgroundColor: "#0d9488", flex: 1 },
+  btnNavText: { color: "#fff", fontWeight: "700" },
+  btnCall: { backgroundColor: "#fff", borderWidth: 1, borderColor: "#cbd5e1", flex: 1 },
+  btnCallText: { color: "#334155", fontWeight: "700" },
   meta: { color: "#64748b", fontSize: 13, marginTop: 2 },
   note: { color: "#64748b", fontSize: 13, fontStyle: "italic", marginTop: 2 },
   row: { flexDirection: "row", gap: 8 },

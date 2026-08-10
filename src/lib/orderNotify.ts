@@ -279,11 +279,15 @@ export async function bildirMusteriyeEposta(
           }
         : {
             konu: `Halın yola çıktı (${kod})`,
-            duz: `${order.business.name} halını teslimata çıkardı. Şoförü haritada canlı izleyebilirsin: ${url}`,
+            // "Şoförü haritada canlı izleyebilirsin" KOŞULSUZ bir vaatti ve
+            // tutulmuyordu (2026-08-10): şoförün konumu arka planda ~6,5 dk
+            // sonra kesilebiliyor. Vaat KOŞULLU hâle getirildi — sipariş
+            // takibi her zaman çalışır, harita şoför konum paylaştığı sürece.
+            duz: `${order.business.name} halını teslimata çıkardı. Siparişini buradan izleyebilirsin: ${url}`,
             html: `<p style="margin:0 0 12px;">Merhaba ${esc(order.customerName)},</p>
               <p style="margin:0 0 12px;"><strong>${esc(order.business.name)}</strong> halını teslimata çıkardı.</p>
-              <p style="margin:0 0 16px;">Şoförü haritada canlı izleyebilirsin. Ödeme teslimde yapılır.</p>
-              <p style="margin:0 0 16px;"><a href="${url}" style="display:inline-block;background-color:#0f766e;color:#ffffff;text-decoration:none;font-weight:bold;padding:12px 24px;border-radius:8px;">Şoförü canlı takip et</a></p>`,
+              <p style="margin:0 0 16px;">Siparişinin durumunu buradan izleyebilirsin; şoför konum paylaştığı sürece haritada da görünür. Ödeme teslimde yapılır.</p>
+              <p style="margin:0 0 16px;"><a href="${url}" style="display:inline-block;background-color:#0f766e;color:#ffffff;text-decoration:none;font-weight:bold;padding:12px 24px;border-radius:8px;">Siparişini takip et</a></p>`,
             etiket: "Teslimat bilgisi",
           };
 
