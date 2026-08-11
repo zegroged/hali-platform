@@ -2,7 +2,7 @@
   "expo": {
     "name": "Halı Şoför",
     "slug": "hali-driver",
-    "version": "1.2.7",
+    "version": "1.2.8",
     "orientation": "portrait",
     "scheme": "halidriver",
     "userInterfaceStyle": "light",
@@ -54,7 +54,7 @@
     "android": {
       "package": "com.enyakinhaliyikamaservisi.driver",
       "googleServicesFile": "./google-services.json",
-      "versionCode": 21,
+      "versionCode": 22,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0d9488"
@@ -80,6 +80,6 @@
         "projectId": "bd1f8e08-a13b-49ab-8eb3-8b836f0bc390"
       }
     },
-    "owner": "enyakinhaliyikamaservisi"
+    "owner": "zegroged"
   }
 }

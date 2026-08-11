@@ -19,6 +19,7 @@ import {
   advanceOrder,
   pickupOrder,
   deliverOrder,
+  type Tahsilat,
   type DriverOrder,
 } from "./api";
 
@@ -137,6 +138,8 @@ export function Orders({ onSessionExpired }: { onSessionExpired: () => void }) {
   const [refreshing, setRefreshing] = useState(false);
   const [actingId, setActingId] = useState<string | null>(null);
   const [prices, setPrices] = useState<Record<string, string>>({});
+  /** Sipariş başına tahsilat beyanı; boşsa nakit varsayılır (web ile aynı). */
+  const [tahsilat, setTahsilat] = useState<Record<string, Tahsilat>>({});
   // Alım anında girilen halı sayısı (2026-08-06) — sipariş kimliği başına.
   const [carpetCounts, setCarpetCounts] = useState<Record<string, string>>({});
 
@@ -261,7 +264,12 @@ export function Orders({ onSessionExpired }: { onSessionExpired: () => void }) {
     }
     const uri = await fotoAl();
     if (!uri) return;
-    run(o.id, () => deliverOrder(o.id, price, uri));
+    // Nakit siparişte varsayılan "nakit aldım" — web ile aynı varsayılan.
+    // Kart ödemesinde beyan sorulmaz, alan da gönderilmez (sunucu eski
+    // davranışı sürdürür).
+    const secim: Tahsilat | undefined =
+      o.paymentMethod === "CASH" ? (tahsilat[o.id] ?? "CASH") : undefined;
+    run(o.id, () => deliverOrder(o.id, price, uri, secim));
   }
 
   // YOL TARİFİ (2026-08-10) — web ile İKİZ (src/app/sofor/page.tsx).
@@ -352,6 +360,46 @@ export function Orders({ onSessionExpired }: { onSessionExpired: () => void }) {
             }
             onChangeText={(v) => setPrices((p) => ({ ...p, [o.id]: v }))}
           />
+          {/* 🔴 TAHSİLAT BEYANI (2026-08-11, işletme sahibi: "apk'da nakit
+              aldım / iban aldım seçenekleri yok").
+              Web şoför ekranında 2026-07-30'dan beri VARDI (sofor/page.tsx),
+              sunucu da kabul ediyordu — yalnız uygulama göndermiyordu, üstelik
+              REST ucu da okumuyordu. İki halka birden kopuktu.
+              NEDEN AYRI: IBAN'a geçen para ZATEN işletmenin hesabında, şoförün
+              üzerinde nakit BIRAKMAZ. İkisi karışırsa mutabakatta halıcı
+              şoförden olmayan parayı ister.
+              Yalnız NAKİT siparişte sorulur — kart ödemesi iyzico tarafında. */}
+          {o.paymentMethod === "CASH" && (
+            <View style={{ gap: 6 }}>
+              <Text style={s.meta}>Parayı nasıl aldın?</Text>
+              <View style={{ flexDirection: "row", gap: 6 }}>
+                {(
+                  [
+                    { k: "CASH", e: "💵 Nakit aldım" },
+                    { k: "IBAN", e: "🏦 IBAN'a geldi" },
+                    { k: "NO", e: "✖ Alamadım" },
+                  ] as const
+                ).map((se) => {
+                  const secili = (tahsilat[o.id] ?? "CASH") === se.k;
+                  return (
+                    <TouchableOpacity
+                      key={se.k}
+                      style={[s.secim, secili && s.secimAktif]}
+                      onPress={() =>
+                        setTahsilat((t) => ({ ...t, [o.id]: se.k }))
+                      }
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: secili }}
+                    >
+                      <Text style={[s.secimText, secili && s.secimTextAktif]}>
+                        {se.e}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+          )}
           <TouchableOpacity
             style={[s.btn, busy && s.off]}
             disabled={busy}
@@ -464,6 +512,21 @@ const s = StyleSheet.create({
   btnCall: { backgroundColor: "#fff", borderWidth: 1, borderColor: "#cbd5e1", flex: 1 },
   btnCallText: { color: "#334155", fontWeight: "700" },
   meta: { color: "#64748b", fontSize: 13, marginTop: 2 },
+  // TAHSİLAT SEÇİMİ (2026-08-11). Dokunma hedefi direksiyon başındaki şoför
+  // için yeterince büyük olmalı; yatay üç seçenek eşit paylaşır.
+  secim: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: "#cbd5e1",
+    backgroundColor: "#fff",
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 6,
+    alignItems: "center",
+  },
+  secimAktif: { borderColor: "#0f766e", backgroundColor: "#ccfbf1" },
+  secimText: { color: "#475569", fontSize: 12, fontWeight: "600" },
+  secimTextAktif: { color: "#0f766e" },
   note: { color: "#64748b", fontSize: 13, fontStyle: "italic", marginTop: 2 },
   row: { flexDirection: "row", gap: 8 },
   btn: {

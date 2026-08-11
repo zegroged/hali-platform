@@ -169,7 +169,13 @@ export async function checkNewOrdersAndNotify(): Promise<void> {
 //
 // ⚠️ GARANTİ DEĞİL: ROM push'u da geciktirebilir. Bu bir olasılık artırıcıdır,
 // "kusursuz süreklilik" değil — ürün metinlerinde öyle anlatılmamalı.
-import { startTracking, isTracking } from "./tracking";
+import { startTracking, isTracking, stopTracking } from "./tracking";
+import { sonGonderimiOku } from "./izlemeDurumu";
+
+/** Akış bu süredir hiç veri göndermediyse "ölü" sayılır ve zorla diriltilir.
+ *  180 sn: duran şoför bile 60 saniyede bir kalp atışı gönderiyor (tracking.ts),
+ *  yani 3 kaçmış atış. Geçici şebeke kesintisine takılmaz. */
+const OLU_ESIK_MS = 180_000;
 
 /** Bildirim verisi bu tipi taşıyorsa konum akışı yeniden başlatılır. */
 const YENIDEN_BASLAT = "konum-yeniden-baslat";
@@ -182,14 +188,39 @@ function tipiOku(veri: unknown): string | null {
 
 async function konumuDirilt(kaynak: string): Promise<void> {
   try {
-    // Zaten akıyorsa dokunma: `startTracking` idempotent olsa da gereksiz
-    // yeniden başlatma bildirimi söndürüp yeniden yakar (şoför için gürültü).
-    if (await isTracking()) return;
+    // 🔴 CANLILIK ARTIK "KAYITLI MI" DEĞİL "AKIYOR MU" (2026-08-11).
+    //
+    // ESKİSİ: `if (await isTracking()) return;`
+    // `isTracking()` = `Location.hasStartedLocationUpdatesAsync()` ve bu API
+    // yalnızca GÖREV KAYITLI MI der. HiOS'un yaptığı şey tam olarak servisi
+    // KAYITLI BIRAKIP JS'i dondurmak: o hâlde `isTracking()` true döner, akış
+    // ölüdür ve bu satır uyandırmayı ÇÖPE ATAR. Sunucunun gönderdiği kurtarma
+    // push'u hiçbir şey yapmadan geri dönerdi — şoför bildirime DOKUNSA BİLE.
+    // Canlıda ölçüldü (2026-08-10): tek günde 12 delik, ikisi 109 ve 114 dakika.
+    //
+    // Doğru soru: "en son ne zaman veri GİTTİ?" — o damga zaten tutuluyor.
+    // Bayatsa görev yıkılıp yeniden kuruluyor; kayıtlı bir zombi görevi
+    // yeniden başlatmak tek başına yetmez, önce SÖKMEK gerekir.
+    //
+    // KURAL 1 (DEVIR §4.87-D): canlılık çağrının dönüşünden değil, zaman
+    // damgalı gözlenen etkiden okunur.
+    const sonGonderim = await sonGonderimiOku();
+    const yas = sonGonderim > 0 ? Date.now() - sonGonderim : Infinity;
+    const kayitli = await isTracking();
+
+    if (kayitli && yas < OLU_ESIK_MS) return; // gerçekten akıyor → dokunma
+
+    if (kayitli) {
+      // Zombi görev: kayıtlı ama veri gitmiyor. Yeniden başlatmadan ÖNCE sök.
+      await stopTracking().catch(() => {});
+    }
     const hata = await startTracking();
     console.log(
       hata
         ? `[uyandirma:${kaynak}] konum yeniden başlatılamadı: ${hata}`
-        : `[uyandirma:${kaynak}] konum akışı yeniden başladı`,
+        : `[uyandirma:${kaynak}] konum akışı yeniden başladı (yaş=${
+            yas === Infinity ? "hiç" : Math.round(yas / 1000) + "sn"
+          }, kayıtlıydı=${kayitli})`,
     );
   } catch (e) {
     console.log(`[uyandirma:${kaynak}] hata:`, e);

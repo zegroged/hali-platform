@@ -314,7 +314,20 @@ export const pickupOrder = (
     photoUri,
     carpetCount != null ? { carpetCount: String(carpetCount) } : undefined,
   );
-export const deliverOrder = (id: string, price: number, photoUri: string) =>
+/** Teslimde tahsilat beyanı — web şoför ekranıyla AYNI seçenekler.
+ *  "CASH" nakit aldım · "IBAN" hesaba geldi · "NO" alamadım.
+ *  IBAN AYRI TUTULUYOR: o para zaten işletmenin hesabında, şoförün üzerinde
+ *  nakit BIRAKMAZ. İkisi karışırsa mutabakatta halıcı şoförden olmayan parayı
+ *  ister (sunucu tarafı gerekçesi: lib/driverOrders.ts). */
+export type Tahsilat = "CASH" | "IBAN" | "NO";
+
+export const deliverOrder = (
+  id: string,
+  price: number,
+  photoUri: string,
+  tahsilat?: Tahsilat,
+) =>
   photoPost(`/api/driver/orders/${id}/deliver`, photoUri, {
     price: String(price),
+    ...(tahsilat ? { tahsilat } : {}),
   });

@@ -146,7 +146,23 @@ TaskManager.defineTask(LOCATION_TASK, async ({ data, error }) => {
     }
     if (suzulmus.length) {
       try {
-        await postLocations(suzulmus);
+        // 🔴 DÖNÜŞ DEĞERİ ARTIK OKUNUYOR (2026-08-11).
+        //
+        // Eskiden `await postLocations(...)` çağrılıp sonucu ATILIYORDU ve
+        // `sonGonderimAt` damgalanmıyordu. Oysa ekrandaki "son konum N sn önce"
+        // sayacının TEK kaynağı o damga. Sonuç: Android konumları biriktirip
+        // TOPLU verdiğinde (yani tam da uygulamayı kıstığı anda) veri sunucuya
+        // akmaya devam ederken sayaç DONUYORDU.
+        //
+        // Canlıda görüldü (2026-08-11): sunucuya 20 saniyede bir ping düşerken
+        // ekran "⚠️ 5 dk'dır konum gitmiyor — mesaiyi kapatıp yeniden aç"
+        // diyordu. Şoför o tavsiyeye uysa ÇALIŞAN akışı kendi eliyle kesecekti.
+        //
+        // KURAL 1'in (DEVIR §4.87-D) bir kopyası daha: canlılık, verinin
+        // gerçekten gittiği YOLDAN okunmalı — yollardan yalnız birinden değil.
+        const toplu = await postLocations(suzulmus);
+        if (toplu === "ok") st.sonGonderimAt = Date.now();
+        if (toplu === "unauthorized") await stopTracking();
       } catch {
         // Geçmiş yükleme başarısızsa canlı akış yine de devam etmeli.
       }
@@ -210,10 +226,28 @@ TaskManager.defineTask(LOCATION_TASK, async ({ data, error }) => {
     }
   }
 
+  // GÖNDERİM SIKLIĞI DURUMA GÖRE (2026-08-11, işletme sahibi: "1 dakika çok
+  // uzun, şoför 1 dakikada kaç kilometre gider").
+  //
+  // ESKİSİ herkese 25 m / 60 sn idi. Hızlı sürüşte sınırlayıcı zaten örnekleme
+  // (5 sn ≈ 70 m), ama ŞEHİR TRAFİĞİNDE (15 km/sa → 5 sn'de 21 m) 25 m eşiği
+  // tutuyor ve nokta 60 saniye beklemek zorunda kalıyordu — tam da izin en çok
+  // gerektiği yerde seyrekleşiyordu.
+  //
+  // ⚠️ ÖRNEKLEME 5 SANİYEDE BIRAKILDI, 1 saniyeye ÇEKİLMEDİ. Araştırma
+  // (2026-08-10) iki şey gösterdi: (a) daha sık GPS = daha çok pil = HiOS'un
+  // öldürme kararı ERKENE kayar, yani çözünürlük kazanıp ayakta kalmayı
+  // kaybedebiliriz; (b) örnekleme aralığını çalışırken değiştirmek foreground
+  // service'i yeniden başlatmayı gerektiriyor ve Android 12+ bunu arka planda
+  // REDDEDİYOR → takip KALICI durur. Bu build'in asıl işi uyandırmanın çalışıp
+  // çalışmadığını ölçmek; iki değişkeni aynı anda oynatmayalım.
+  const parkta = st.durum === "DURUYOR";
+  const esikM = parkta ? 25 : 15;
+  const esikMs = parkta ? 60_000 : 20_000;
   if (
     st.lastSent &&
-    movedMeters(st.lastSent, gonderLat, gonderLng) < 25 &&
-    now - st.lastSent.t < 60_000
+    movedMeters(st.lastSent, gonderLat, gonderLng) < esikM &&
+    now - st.lastSent.t < esikMs
   ) {
     // Süzgeç tuttu: gönderme YOK ama demirleme/durum değişmiş olabilir — yaz.
     await durumuYaz(st);
