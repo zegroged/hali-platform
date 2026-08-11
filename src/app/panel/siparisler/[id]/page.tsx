@@ -60,9 +60,13 @@ export default async function OrderManagePage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ hata?: string }>;
+  // `hali`: Halı Bul duvarından hangi halının karesine dokunulduğu (2026-08-11).
+  searchParams: Promise<{ hata?: string; hali?: string }>;
 }) {
-  const { hata } = await searchParams;
+  const { hata, hali } = await searchParams;
+  // Sadece rakam kabul et; sunucu doğrulamasız istemci girdisine güvenmesin.
+  const secilenHali =
+    hali && /^\d{1,3}$/.test(hali) && Number(hali) > 0 ? Number(hali) : null;
   // HAFİF sorgu: bu sayfa yalnız işletme id'si + şoför listesi kullanıyor.
   // getPanelBusiness tüm işletme grafiğini (fiyat/bölge/foto...) çekiyordu ve
   // her form işleminden sonraki yeniden-render'ı yavaşlatıyordu (B: hız).
@@ -596,6 +600,8 @@ export default async function OrderManagePage({
             }))}
             uploadStage={o.status === "WASHING" ? "YIKAMA" : undefined}
             carpetCount={o.carpetCount}
+            varsayilanHaliNo={secilenHali}
+            carpetNoBase={o.carpetNoBase}
           />
         </div>
         {/* "Hazır" haberi (2026-07-31): siparis_hazir şablonu onaylıydı ama

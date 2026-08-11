@@ -544,6 +544,21 @@ model Order {
   // okunur, ekranlar ikisini de gösterebilir.
   carpetCount Int?
 
+  // DÜKKÂN GENELİ HALI NUMARASI — HAFTALIK (2026-08-10, işletme sahibi).
+  //
+  // `carpetCount` sipariş İÇİ sırayı verir (o siparişin 3 halısı 1-2-3).
+  // Depoda halıyı elinde tutan kişinin sipariş kodu yoktur; ona dükkân
+  // genelinde tek bir numara lazım. Bu alan o numaranın BAŞLANGICIDIR:
+  // siparişin halıları `carpetNoBase … carpetNoBase + carpetCount - 1`.
+  //
+  // Alımda (PICKED_UP) doğar, her pazartesi 1'den başlar, ama dükkânda
+  // BEKLEYEN bir numarayı atlar — yoksa aynı anda iki "3" olur ve numaranın
+  // tek işi (halıyı bulmak) tam da en çok gerektiği anda bozulur.
+  // Üretimi ve gerekçesi: `src/lib/haliNo.ts`.
+  //
+  // null = numara verilmeden önce açılmış sipariş (geriye dönük).
+  carpetNoBase Int?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

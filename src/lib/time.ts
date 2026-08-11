@@ -31,8 +31,35 @@ export function trDayBoundsUTC(dateStr?: string): { start: Date; end: Date } {
   return { start, end };
 }
 
+/** TR takvimine göre bir günün `YYYY-MM-DD` gösterimi (varsayılan: bugün).
+ *  `<input type="date">` bu biçimi ister; sunucu UTC'de çalıştığı için ham
+ *  `toISOString().slice(0,10)` gece yarısından sonra günü BİR GÜN geri alır. */
+export function trGunISO(dt: Date = new Date()): string {
+  const tr = shiftToTr(dt);
+  const ay = String(tr.getUTCMonth() + 1).padStart(2, "0");
+  const gun = String(tr.getUTCDate()).padStart(2, "0");
+  return `${tr.getUTCFullYear()}-${ay}-${gun}`;
+}
+
 /** Bir tarihin TR yılı ve ayı (durak dönem raporu için). */
 export function trYearMonth(dt: Date): { year: number; month: number } {
   const tr = shiftToTr(dt);
   return { year: tr.getUTCFullYear(), month: tr.getUTCMonth() + 1 };
+}
+
+/**
+ * Bir tarihin içinde bulunduğu TR haftasının başlangıcı (PAZARTESİ 00:00), UTC olarak.
+ *
+ * Haftalık halı numarası için (lib/haliNo.ts). Pazartesi seçildi çünkü dükkânın
+ * iş haftası pazartesi başlıyor; `getUTCDay()` 0=Pazar döndürdüğü için pazar
+ * günü 6 gün geri gidilir (yoksa hafta bir gün erken döner).
+ */
+export function trWeekStartUTC(dt: Date): Date {
+  const tr = shiftToTr(dt);
+  const gun = tr.getUTCDay(); // 0=Pazar, 1=Pazartesi …
+  const geri = gun === 0 ? 6 : gun - 1;
+  const h = TR_OFFSET_MIN / 60; // 3
+  return new Date(
+    Date.UTC(tr.getUTCFullYear(), tr.getUTCMonth(), tr.getUTCDate() - geri, -h, 0, 0),
+  );
 }

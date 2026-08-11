@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { normalizeCarpetCount, CARPET_COUNT_HATA } from "@/lib/carpet";
+import { haliNoAta } from "@/lib/haliNo";
 import { hataylaDon } from "@/lib/hata";
 import {
   bildirAraAdim,
@@ -117,6 +118,9 @@ export async function savePickup(formData: FormData) {
   const sayi = normalizeCarpetCount(formData.get("carpetCount"));
   if (sayi === "gecersiz") hataylaDon("/sofor", CARPET_COUNT_HATA);
 
+  // DÜKKÂN NUMARASI alımda doğar (üç alım yolunda da AYNI kaynaktan).
+  const base = await haliNoAta(o.businessId, sayi ?? 1);
+
   // CAS (denetim bulgusu): koşulsuz yazım, eşzamanlı panel iptali/reddini
   // (ACCEPTED→CANCELED/REJECTED) ezip siparişi PICKED_UP'a diriltiyordu.
   const picked = await prisma.order.updateMany({
@@ -125,6 +129,7 @@ export async function savePickup(formData: FormData) {
       status: "PICKED_UP",
       pickedUpAt: new Date(), // İKİZ: lib/driverOrders.ts (2026-08-07 akşam)
       pickupPhotoUrl: photoUrl,
+      carpetNoBase: base,
       ...(sayi != null ? { carpetCount: sayi } : {}),
     },
   });

@@ -6,7 +6,7 @@ import { getPanelBusiness } from "@/lib/panel";
 import { prisma } from "@/lib/prisma";
 import { ORDER_STATUS_META } from "@/lib/orderStatus";
 import { photoStageLabel } from "@/lib/photoStage";
-import { trDayBoundsUTC } from "@/lib/time";
+import { trDayBoundsUTC, trGunISO } from "@/lib/time";
 
 export const metadata: Metadata = {
   title: "Halı Bul",
@@ -60,6 +60,20 @@ export default async function HalilarSayfasi({
   const tarihGecerli = tarih && /^\d{4}-\d{2}-\d{2}$/.test(tarih) ? tarih : null;
   const gun = tarihGecerli ? trDayBoundsUTC(tarihGecerli) : null;
 
+  // Tarih kutusunun sınırları + kısayollar (2026-08-11). TR gününe göre
+  // hesaplanır; sunucu UTC'de çalıştığı için ham ISO kesme gece yarısından
+  // sonra günü bir gün geri alırdı.
+  const bugun = trGunISO();
+  const dun = trGunISO(new Date(Date.now() - 86_400_000));
+  const oncekiGun = trGunISO(new Date(Date.now() - 2 * 86_400_000));
+  // Alt sınır: bir yıl öncesi. Yanlış yıl (1926 gibi) tarayıcıda reddedilsin.
+  const enEskiGun = trGunISO(new Date(Date.now() - 365 * 86_400_000));
+  const KISAYOL_GUNLER = [
+    { gun: bugun, etiket: "Bugün" },
+    { gun: dun, etiket: "Dün" },
+    { gun: oncekiGun, etiket: "Önceki gün" },
+  ];
+
   // Arama sunucuda: 200 halılık dükkânda istemci tarafı filtre için tüm veriyi
   // telefona indirmek gerekirdi. Boş aramada da liste gelir (duvar görünümü).
   const siparisler = await prisma.order.findMany({
@@ -98,6 +112,9 @@ export default async function HalilarSayfasi({
       createdAt: true,
       pickedUpAt: true,
       carpetCount: true,
+      // DÜKKÂN NUMARASI (2026-08-10) — depodaki kişinin elinde sipariş kodu
+      // yok; aradığı tek şey halının üstündeki numara (bkz. lib/haliNo.ts).
+      carpetNoBase: true,
       photos: {
         orderBy: [{ carpetNo: "asc" }, { createdAt: "asc" }],
         select: { id: true, url: true, stage: true, carpetNo: true },
@@ -113,6 +130,11 @@ export default async function HalilarSayfasi({
     orderId: string;
     url: string | null;
     no: number | null;
+    /** DÜKKÂN NUMARASI — halının üstündeki etiket. Depoda aranan şey budur;
+     *  `no` (sipariş içi sıra) yalnız eski kayıtlarda tek başına kalır. */
+    dukkanNo: number | null;
+    /** Siparişin tüm numara aralığı ("12" ya da "12–14") — alım karesi için. */
+    aralik: string | null;
     stage: string | null;
     ad: string;
     tel: string;
@@ -123,6 +145,19 @@ export default async function HalilarSayfasi({
   };
   const kartlar: Kart[] = [];
   for (const o of siparisler) {
+    // Sipariş içi sıra (1..N) → dükkân numarası. Base yoksa (numara sisteminden
+    // önceki sipariş) null döner ve ekran eski davranışa düşer.
+    const dukkan = (icSira: number | null): number | null =>
+      o.carpetNoBase == null || icSira == null ? null : o.carpetNoBase + icSira - 1;
+    // Siparişin numara aralığı — ŞOFÖRÜN ALIM KARESİ tek bir halıyı değil
+    // yükün tamamını gösterir; ona tek numara yazmak yalan olur, aralık doğru.
+    const kac = Math.max(1, o.carpetCount ?? 1);
+    const aralik =
+      o.carpetNoBase == null
+        ? null
+        : kac === 1
+          ? `${o.carpetNoBase}`
+          : `${o.carpetNoBase}–${o.carpetNoBase + kac - 1}`;
     const ortak = {
       orderId: o.id,
       ad: o.customerName,
@@ -130,6 +165,7 @@ export default async function HalilarSayfasi({
       kod: o.code ?? "",
       durum: o.status as (typeof AKTIF)[number],
       tarih: o.pickedUpAt ?? o.createdAt,
+      aralik,
     };
     // 🔴 HALI SAYISI ALIMDAN GELİYOR (2026-08-06). Sipariş alınırken kaç halı
     // olduğu girildiyse (`carpetCount`), FOTOĞRAFI OLMAYAN halılar da burada
@@ -143,6 +179,7 @@ export default async function HalilarSayfasi({
             key: `${o.id}-no${slot.no}`,
             url: null,
             no: slot.no,
+            dukkanNo: dukkan(slot.no),
             stage: null,
             ...ortak,
           });
@@ -153,17 +190,20 @@ export default async function HalilarSayfasi({
             key: p.id,
             url: p.url,
             no: p.carpetNo,
+            dukkanNo: dukkan(p.carpetNo),
             stage: p.stage,
             ...ortak,
           });
         }
       }
-      // Numarasız fotoğraflar (aynı halının ek fotoğrafı / şoför kanıtı).
+      // Numarasız fotoğraflar (aynı halının ek fotoğrafı / ŞOFÖRÜN ALIM KARESİ).
+      // Bunlar tek bir halıyı göstermez; numara yerine siparişin ARALIĞI yazılır.
       for (const p of o.photos.filter((x) => x.carpetNo == null)) {
         kartlar.push({
           key: p.id,
           url: p.url,
           no: null,
+          dukkanNo: null,
           stage: p.stage,
           ...ortak,
         });
@@ -173,7 +213,14 @@ export default async function HalilarSayfasi({
 
     // Eski sipariş (halı sayısı girilmemiş): davranış aynen korunur.
     if (o.photos.length === 0) {
-      kartlar.push({ key: `${o.id}-yok`, url: null, no: null, stage: null, ...ortak });
+      kartlar.push({
+        key: `${o.id}-yok`,
+        url: null,
+        no: null,
+        dukkanNo: null,
+        stage: null,
+        ...ortak,
+      });
       continue;
     }
     for (const p of o.photos) {
@@ -181,6 +228,7 @@ export default async function HalilarSayfasi({
         key: p.id,
         url: p.url,
         no: p.carpetNo,
+        dukkanNo: dukkan(p.carpetNo),
         stage: p.stage,
         ...ortak,
       });
@@ -229,10 +277,19 @@ export default async function HalilarSayfasi({
         />
         {/* ALIM TARİHİ SÜZGECİ (2026-08-07 akşam, kullanıcı isteği).
             Metin aramasıyla BİRLİKTE çalışır: "o gün gelen Ayşe'nin halısı". */}
+        {/* 🔴 YIL YAZDIRMA (2026-08-11, işletme sahibi: "adamlar neden 2026'yı
+            girmek zorunda, gün ay girseler yeter").
+            `<input type="date">` TARAYICININ kontrolü — yıl hanesi kaldırılamaz,
+            Türkçe yerelde gg.aa.yyyy çizilir. Yapılabilecek şey yazdırmamak:
+            (1) aşağıdaki tek dokunuşluk kısayollar — aramaların çoğu son
+            birkaç gün, (2) `max` ile geleceğe gidiş kapalı, (3) `min` ile
+            yanlış yıl (1926 gibi) reddedilir. */}
         <input
           type="date"
           name="tarih"
           defaultValue={tarihGecerli ?? ""}
+          min={enEskiGun}
+          max={bugun}
           aria-label="Alım tarihi"
           className={inp}
         />
@@ -242,6 +299,22 @@ export default async function HalilarSayfasi({
         >
           Ara
         </button>
+        {/* TEK DOKUNUŞLUK GÜNLER — tarih yazmaya gerek kalmasın. Aramaların
+            çoğu "bugün gelenler" ya da "dün gelenler"; bunlar için takvim
+            açmak da yıl yazmak da gereksiz. */}
+        {KISAYOL_GUNLER.map((k) => (
+          <Link
+            key={k.gun}
+            href={`/panel/halilar?tarih=${k.gun}${arama ? `&q=${encodeURIComponent(arama)}` : ""}`}
+            className={`rounded-lg border px-4 py-3 text-sm font-medium ${
+              tarihGecerli === k.gun
+                ? "border-brand bg-brand-light/40 text-brand-dark"
+                : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+            }`}
+          >
+            {k.etiket}
+          </Link>
+        ))}
         {(arama || tarihGecerli) && (
           <Link
             href="/panel/halilar"
@@ -302,7 +375,12 @@ export default async function HalilarSayfasi({
           {kartlar.map((k) => (
             <Link
               key={k.key}
-              href={`/panel/siparisler/${k.orderId}`}
+              // HANGİ HALI OLDUĞUNU DA TAŞI (2026-08-11). Eskiden yalnız
+              // sipariş kimliği gidiyordu: 2 numaralı halının karesine dokunup
+              // giren kişi, fotoğraf kutusunda "Sıradaki halı" buluyordu —
+              // yanlış halıya yükleme yapmanın en kolay yolu. Kart hangi halı
+              // olduğunu ZATEN biliyor, linkte kaybediyorduk.
+              href={`/panel/siparisler/${k.orderId}${k.no != null ? `?hali=${k.no}` : ""}`}
               className="overflow-hidden rounded-xl border border-slate-200 bg-white transition hover:border-brand"
             >
               <div className="relative">
@@ -321,11 +399,25 @@ export default async function HalilarSayfasi({
                     eklemek için dokun
                   </div>
                 )}
-                {k.no != null && (
+                {/* NUMARA ROZETİ (2026-08-10) — depodaki kişinin aradığı tek
+                    şey bu. Öncelik DÜKKÂN numarasında: halının üstündeki etiket
+                    o. Belirli bir halıya bağlı olmayan kare (şoförün alım
+                    fotoğrafı yükün tamamıdır) için siparişin ARALIĞI yazılır —
+                    ona tek numara yazmak yanlış halıyı gösterirdi. Numara
+                    sisteminden önceki siparişlerde sipariş içi sıraya düşer. */}
+                {k.dukkanNo != null ? (
+                  <span className="absolute left-1.5 top-1.5 rounded-md bg-slate-900/80 px-2 py-0.5 text-sm font-bold text-white">
+                    No {k.dukkanNo}
+                  </span>
+                ) : k.aralik ? (
+                  <span className="absolute left-1.5 top-1.5 rounded-md bg-slate-900/60 px-2 py-0.5 text-sm font-bold text-white">
+                    No {k.aralik}
+                  </span>
+                ) : k.no != null ? (
                   <span className="absolute left-1.5 top-1.5 rounded-md bg-slate-900/80 px-2 py-0.5 text-sm font-bold text-white">
                     #{k.no}
                   </span>
-                )}
+                ) : null}
                 {k.stage && (
                   <span className="absolute right-1.5 top-1.5 rounded-md bg-white/90 px-1.5 py-0.5 text-xs font-medium text-slate-700">
                     {photoStageLabel(k.stage)}

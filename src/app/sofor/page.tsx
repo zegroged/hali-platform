@@ -101,11 +101,46 @@ export default async function SoforPage({
             key={o.id}
             className="rounded-xl border border-slate-200 bg-white p-4"
           >
-            <div className="flex items-start justify-between">
-              <div>
+            <div className="flex items-start justify-between gap-3">
+              {/* ALDIĞI HALI GÖZÜNÜN ÖNÜNDE (2026-08-10, işletme sahibi:
+                  "şoför zorluk çekmesin"). Teslimde araçta 5 sipariş varken
+                  şoför hangi denk kimin diye açıp bakmak zorunda kalıyordu;
+                  kendi çektiği alım karesi + halı numarası kartta duruyor.
+                  Panel kartıyla İKİZ (panel/siparisler/page.tsx). */}
+              {o.pickupPhotoUrl && (
+                <div className="relative shrink-0">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={o.pickupPhotoUrl}
+                    alt={`${o.customerName} — aldığın halı`}
+                    loading="lazy"
+                    decoding="async"
+                    className="h-20 w-20 rounded-lg border border-slate-200 bg-slate-100 object-cover"
+                  />
+                  {o.carpetNoBase != null && (
+                    <span className="absolute left-1 top-1 rounded bg-slate-900/80 px-1.5 py-0.5 text-xs font-bold text-white">
+                      {o.carpetCount && o.carpetCount > 1
+                        ? `${o.carpetNoBase}–${o.carpetNoBase + o.carpetCount - 1}`
+                        : o.carpetNoBase}
+                    </span>
+                  )}
+                </div>
+              )}
+              <div className="min-w-0 flex-1">
                 <p className="font-medium text-slate-900">{o.customerName}</p>
                 <p className="text-sm text-slate-500">{o.customerPhone}</p>
                 <p className="mt-1 text-sm text-slate-600">{o.pickupAddress}</p>
+                {o.carpetCount != null && (
+                  <p className="text-xs font-medium text-slate-700">
+                    🧶 {o.carpetCount} halı
+                    {o.carpetNoBase != null &&
+                      ` · No ${
+                        o.carpetCount > 1
+                          ? `${o.carpetNoBase}–${o.carpetNoBase + o.carpetCount - 1}`
+                          : o.carpetNoBase
+                      }`}
+                  </p>
+                )}
                 {o.approxM2 && (
                   <p className="text-xs text-slate-500">~{o.approxM2} m²</p>
                 )}

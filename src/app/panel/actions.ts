@@ -30,6 +30,7 @@ import {
 } from "@/lib/paketYetki";
 import { ORDER_STATUS_META, PANEL_NEXT } from "@/lib/orderStatus";
 import { normalizeCarpetCount, CARPET_COUNT_HATA } from "@/lib/carpet";
+import { haliNoAta } from "@/lib/haliNo";
 import { hataylaDon } from "@/lib/hata";
 import { taxIdError } from "@/lib/taxId";
 import { normalizePhone, isMobilePhone, isLandlinePhone } from "@/lib/phone";
@@ -817,6 +818,14 @@ export async function advanceOrderPanel(formData: FormData) {
   const sayi = normalizeCarpetCount(formData.get("carpetCount"));
   if (sayi === "gecersiz") hataylaDon(`/panel/siparisler/${orderId}`, CARPET_COUNT_HATA);
 
+  // DÜKKÂN NUMARASI alımda doğar (üç alım yolunda da AYNI kaynaktan).
+  // Yalnız PICKED_UP adımında ve numarası yoksa — sonraki adımlar (yıkama,
+  // teslimat) numarayı DEĞİŞTİRMEZ; halının etiketi dükkânda sabit kalmalı.
+  const base =
+    step.next === "PICKED_UP" && order.carpetNoBase == null
+      ? await haliNoAta(b.id, sayi ?? order.carpetCount ?? 1)
+      : null;
+
   const updated = await prisma.order.updateMany({
     where: { id: orderId, businessId: b.id, status: order.status },
     data: {
@@ -824,6 +833,7 @@ export async function advanceOrderPanel(formData: FormData) {
       // Alım anı: Halı Bul ekranı bunu gösterip arıyor (2026-08-07 akşam).
       // İKİZ: lib/driverOrders.ts + app/sofor/actions.ts — üç alım yolu da yazar.
       ...(step.next === "PICKED_UP" ? { pickedUpAt: new Date() } : {}),
+      ...(base != null ? { carpetNoBase: base } : {}),
       ...(step.next === "PICKED_UP" && sayi != null
         ? { carpetCount: sayi }
         : {}),

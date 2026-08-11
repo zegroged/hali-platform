@@ -16,6 +16,7 @@ import { waSiparisYolda, waGonderVeKaydet } from "@/lib/whatsapp";
 import { DRIVER_NEXT, ORDER_STATUS_META } from "@/lib/orderStatus";
 import { getAppBaseUrl } from "@/lib/config";
 import { normalizeCarpetCount, CARPET_COUNT_HATA } from "@/lib/carpet";
+import { haliNoAta } from "@/lib/haliNo";
 
 /** Bearer (native) VEYA çerez ile giriş yapmış ŞOFÖRÜN driver.id'si; yoksa null. */
 export async function currentDriverId(): Promise<string | null> {
@@ -146,12 +147,15 @@ export async function driverPickup(
   if (sayi === "gecersiz") {
     return { ok: false, error: CARPET_COUNT_HATA, code: 400 };
   }
+  // DÜKKÂN NUMARASI alımda doğar (üç alım yolunda da AYNI kaynaktan).
+  const base = await haliNoAta(o.businessId, sayi ?? 1);
   const r = await prisma.order.updateMany({
     where: { id: orderId, driverId, status: "ACCEPTED" },
     data: {
       status: "PICKED_UP",
       pickedUpAt: new Date(), // Halı Bul ekranı bunu gösterip arıyor (2026-08-07 akşam)
       pickupPhotoUrl: photoUrl,
+      carpetNoBase: base,
       ...(sayi != null ? { carpetCount: sayi } : {}),
     },
   });

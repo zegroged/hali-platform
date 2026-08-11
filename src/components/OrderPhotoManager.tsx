@@ -19,6 +19,8 @@ export function OrderPhotoManager({
   photos: initialPhotos,
   uploadStage,
   carpetCount,
+  varsayilanHaliNo,
+  carpetNoBase,
 }: {
   orderId: string;
   photos: GalleryPhoto[];
@@ -27,11 +29,22 @@ export function OrderPhotoManager({
    *  yüklendiği seçilebilir. Boş bırakılırsa sunucu fotoğrafı olmayan İLK
    *  halıya bağlar; hiçbiri boş değilse numara vermez (yeni halı UYDURMAZ). */
   carpetCount?: number | null;
+  /** 🔴 HALI BUL'DAN GELEN SEÇİM (2026-08-11, işletme sahibi: "halı ikinin
+   *  içine girdim, neden 'sıradaki halı' diyor?").
+   *  Duvarda 2 numaralı halının karesine dokunup siparişe giren kişi ZATEN
+   *  hangi halıyla ilgilendiğini söylemişti; kutunun bunu unutup "sıradaki"ye
+   *  düşmesi, yanlış halıya fotoğraf yüklemenin en kolay yoluydu. */
+  varsayilanHaliNo?: number | null;
+  /** Dükkân numarası başlangıcı — seçenekler depodaki etiketle aynı okunsun
+   *  (halıcı "Halı #2" değil "No 7" diye arıyor). */
+  carpetNoBase?: number | null;
 }) {
   const [photos, setPhotos] = useState<GalleryPhoto[]>(initialPhotos);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const [carpetNo, setCarpetNo] = useState("");
+  const [carpetNo, setCarpetNo] = useState(
+    varsayilanHaliNo != null && varsayilanHaliNo > 0 ? String(varsayilanHaliNo) : "",
+  );
   const fileRef = useRef<HTMLInputElement>(null);
   const yikama = uploadStage === "YIKAMA";
 
@@ -122,7 +135,9 @@ export function OrderPhotoManager({
             <option value="">Sıradaki halı</option>
             {Array.from({ length: carpetCount }, (_, i) => i + 1).map((n) => (
               <option key={n} value={n}>
-                Halı #{n}
+                {/* Depodaki etiketle AYNI okunsun: halıcı "Halı #2" diye
+                    değil, halının üstündeki dükkân numarasıyla arıyor. */}
+                {carpetNoBase != null ? `No ${carpetNoBase + n - 1}` : `Halı #${n}`}
               </option>
             ))}
           </select>
