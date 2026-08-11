@@ -33,6 +33,11 @@ const MIME: Record<string, string> = {
   // 3 saniyede tam iniyor (59,6 MB) → sorun Expo CDN'inin oraya giden yolunda.
   // Artık build'ler kendi alan adımızdan (Cloudflare arkasında) veriliyor.
   apk: "application/vnd.android.package-archive",
+  // AAB (2026-08-11): Play Console'a yüklenecek paket. APK ile aynı gerekçe —
+  // Expo'nun indirme linki Türkiye'den takılıyor, dosya kendi alan adımızdan
+  // veriliyor. ⚠️ Bu bir KURULABİLİR paket DEĞİL, yalnız Play'e yüklenir;
+  // telefona indirilip kurulamaz (şoförlere APK verilecek, .aab değil).
+  aab: "application/octet-stream",
 };
 
 // Dosyayı RAM'e almadan akıtır. 62 MB'lık APK'yı `readFile` ile okumak hem

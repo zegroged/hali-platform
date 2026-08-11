@@ -94,6 +94,28 @@ async function konumTick() {
   }
 }
 
+/**
+ * SESSİZ UYANDIRMA TİKİ — 15 saniyede bir (2026-08-10).
+ *
+ * `konumTick`ten AYRI ve çok daha sık: o insanı uyarır (pahalı, seyrek
+ * olmalı), bu uygulamayı dürter (bedava, sık olmalı). Aynı takvime
+ * bindirilmeleri 109/114 dakikalık deliklerin sebebiydi (§4.87-B).
+ *
+ * Maliyeti: mesaide şoför yoksa tek indeksli sorguda çıkar. Push yalnız
+ * 45 saniyedir sessiz olana ve şoför başına en fazla 60 saniyede bir gider.
+ *
+ * ⚠️ Daha sık yapmanın anlamı yok: sinyal FCM üzerinden gidiyor, teslim
+ * süresini biz belirlemiyoruz.
+ */
+async function uyandirmaTick() {
+  try {
+    const { konumUyandirmaTik } = await import("@/lib/konumBekcisi");
+    await konumUyandirmaTik();
+  } catch (e) {
+    console.error("[konum-uyandirma] hata:", e);
+  }
+}
+
 const DAILY_STATE_KEY = "dailyTickDay";
 
 /**
@@ -192,4 +214,10 @@ export async function register() {
   setTimeout(konumTick, 60_000);
   const konumTimer = setInterval(konumTick, 5 * 60 * 1000);
   if (typeof konumTimer.unref === "function") konumTimer.unref();
+
+  // Sessiz uyandırma: 15 saniyede bir (gerekçe uyandirmaTick'in başında).
+  // Konum bekçisinden AYRI takvim — ikisini aynı zamanlayıcıya bindirmek
+  // 109/114 dakikalık deliklerin sebebiydi (§4.87-B).
+  const uyandirmaTimer = setInterval(uyandirmaTick, 15 * 1000);
+  if (typeof uyandirmaTimer.unref === "function") uyandirmaTimer.unref();
 }

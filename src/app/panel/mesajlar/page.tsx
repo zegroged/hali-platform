@@ -374,7 +374,7 @@ export default async function MesajlarSayfasi({
       ) : (
         <div className="grid gap-4 lg:grid-cols-[20rem_1fr]">
           {/* SOHBET LİSTESİ — mobilde sohbet açıkken gizlenir */}
-          <div className={`space-y-2 ${seciliTel ? "hidden lg:block" : ""}`}>
+          <div className={`min-w-0 space-y-2 ${seciliTel ? "hidden lg:block" : ""}`}>
             {sohbetler.map((s) => {
               const aktif = s.phone === seciliTel;
               return (
@@ -451,7 +451,10 @@ export default async function MesajlarSayfasi({
 
           {/* AÇIK SOHBET */}
           {seciliTel ? (
-            <div className="space-y-3">
+            // min-w-0: bu bir GRID ÖĞESİ ve varsayılan `min-width:auto` ile
+            // içindeki en geniş öğenin altına inemez. Baloncuğa min-w-0
+            // eklemek tek başına yetmez — taşma bir üst kutuya kaçardı.
+            <div className="min-w-0 space-y-3">
               <Link
                 href="/panel/mesajlar"
                 className="inline-block text-sm text-slate-500 hover:text-slate-800 lg:hidden"
@@ -522,16 +525,33 @@ export default async function MesajlarSayfasi({
                           </p>
                         )}
                         <div
-                          className={`flex ${gelen ? "justify-start" : "justify-end"}`}
+                          className={`flex min-w-0 ${gelen ? "justify-start" : "justify-end"}`}
                         >
+                          {/* 🔴 min-w-0 ŞART (2026-08-10). Flex/grid öğesinin
+                              varsayılan `min-width:auto` değeri, kutunun
+                              içeriğinin en-küçük genişliğinin ALTINA inmesini
+                              engeller. Canlıda ölçüldü: gelen mesajlarda
+                              65 karakterlik boşluksuz parça var (giden tarafta
+                              en uzunu 17). O parça kapsayıcıyı ekrandan geniş
+                              yapıyor, kutu genişleyince `justify-end` ile sağa
+                              yaslanan GİDEN mesajlar ekranın dışına taşıyordu —
+                              gelen mesajlar solda kaldığı için sorun yalnız
+                              giden tarafta görünüyordu. Suçlu giden mesaj değil,
+                              gelendeki uzun parçaydı.
+                              `break-words` tek başına yetmiyor: kırma iznini
+                              verir ama kutunun küçülmesine izin vermez. */}
                           <div
-                            className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm sm:max-w-[75%] ${
+                            className={`min-w-0 max-w-[85%] rounded-2xl px-3 py-2 text-sm sm:max-w-[75%] ${
                               gelen
                                 ? "rounded-bl-sm bg-slate-100 text-slate-800"
                                 : "rounded-br-sm bg-brand-light text-brand-dark"
                             }`}
                           >
-                            <p className="whitespace-pre-wrap break-words">
+                            {/* overflow-wrap:anywhere — `break-words`ten farkı:
+                                gerektiğinde kelimeyi HER YERDEN kırar ve en-küçük
+                                genişlik hesabına da girer. `break-all` seçilmedi:
+                                o normal Türkçe kelimeleri de keserdi. */}
+                            <p className="whitespace-pre-wrap [overflow-wrap:anywhere]">
                               {m.body}
                             </p>
                             {/* Fotoğraf/ses/video/belge (2026-08-07 akşam) */}

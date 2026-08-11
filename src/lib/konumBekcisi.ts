@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { notify } from "@/lib/notify";
+import { pushSessizUyandir } from "@/lib/push";
 
 // KONUM BEKÇİSİ — "mesai açık ama konum gelmiyor" hâlini GÖRÜNÜR yapar.
 //
@@ -31,6 +32,78 @@ const TEKRAR_DK = 60;
  *  sahiplerine) uyarı yağdırır, üstelik saat başı tekrarlar. Onlarınki ayrı
  *  bir sorun: mesai gün sonunda otomatik kapanmıyor (§5-B'ye eklendi). */
 const TERK_DK = 12 * 60;
+
+// ——— SESSİZ UYANDIRMA (2026-08-10) — insana uyarıdan AYRI takvim ———
+//
+// 🔴 NEDEN AYRILDI: bugüne kadar "uygulamayı dirilt" ile "şoförü uyar" AYNI
+// bildirimdi, dolayısıyla aynı eşiği (10 dk) ve aynı freni (60 dk) miras
+// alıyordu. İlk uyandırma tutmazsa bir sonraki deneme BİR SAAT sonraydı.
+// Canlı ölçüm (§4.87-B): 10 Ağustos'ta tek şoförde 12 delik, ikisi 109 ve
+// 114 dakika. Deliğin büyük kısmı ROM'un öldürmesi değil BİZİM beklememizdi.
+//
+// İki işin doğası farklı: insanı uyarmak PAHALI (dikkat harcar, güven yıpratır)
+// → seyrek ve frenli olmalı. Uygulamayı dürtmek BEDAVA (ekranda görünmez)
+// → sık olmalı. Aynı takvime binmeleri tasarım hatasıydı.
+// 🔴 45 sn / 60 sn İDİ — GERİ ALINDI (2026-08-10, araştırma bulgusu).
+//
+// Sık sessiz push "daha agresif = daha iyi" sanılıyordu; TERSİ çıktı.
+// Google'ın FCM dokümanı: kullanıcıya GÖRÜNÜR bildirim üretmeyen yüksek
+// öncelikli mesaj deseni tespit edilirse, FCM o uygulamanın önceliğini
+// NORMALE DÜŞÜRÜR — ve normal öncelikli mesaj cihaz Doze'dan çıkana kadar
+// bekletilir. Yani şoför başına saatte 60 sessiz push atmak, tam da güvenmek
+// istediğimiz uyandırma kanalını kendi elimizle yakıyordu.
+//
+// Bu, bu projenin klasik hatasının bir başka kopyası: mekanizmanın KABUL
+// ettiğine bakıp işin OLDUĞUNU varsaymak. Expo isteği kabul eder, FCM sessizce
+// önceliği düşürür, telefona bir şey düşmez.
+const UYANDIRMA_SESSIZLIK_SN = 120;
+/** Aynı şoförü bundan sık dürtme (tik 15 sn'de bir çalışıyor).
+ *  5 dakika: FCM'in kısma eşiğinin altında kalır, ama 109 dakikalık
+ *  deliklerin sebebi olan 60 dakikalık frenden 12 kat hızlı. */
+const UYANDIRMA_TEKRAR_SN = 300;
+/** Süreç içi hafıza: bu yol DB'ye yazmaz — 15 sn'de bir yazım gereksiz yük.
+ *  Çok kopyalı kuruluma geçilirse her kopya kendi başına dürter; zararsız
+ *  (push idempotent), yalnız birkaç fazla istek olur. */
+const sonUyandirma = new Map<string, number>();
+
+/**
+ * SESSİZ UYANDIRMA TİKİ — 15 saniyede bir çalışır (instrumentation.ts).
+ * Mesaisi açık ama 45 saniyedir konum göndermeyen şoförün uygulamasını
+ * ekranda hiçbir şey göstermeden dürter.
+ *
+ * ⚠️ Bu tik TEK BAŞINA yetmez: alıcı taraftaki `isTracking()` kusuru
+ * (§4.87-B) düzeltilmeden uygulama bu push'u da çöpe atar. Sunucu tarafı
+ * hazır olsun diye şimdi kuruluyor; asıl kazanç APK ile gelecek.
+ */
+export async function konumUyandirmaTik(): Promise<void> {
+  const soforler = await prisma.driver.findMany({
+    where: { isOnShift: true, shiftStartedAt: { not: null } },
+    select: { id: true, userId: true, shiftStartedAt: true, lastSeenAt: true },
+  });
+  if (soforler.length === 0) return;
+
+  const simdi = Date.now();
+  for (const s of soforler) {
+    // Referans = son konum YA DA mesai açılışı (hangisi yeniyse) — aynı
+    // gerekçe aşağıdaki insan uyarısında yazılı: "hiç ping gelmedi" hâli de
+    // yakalanmalı.
+    const referans = Math.max(
+      s.lastSeenAt?.getTime() ?? 0,
+      s.shiftStartedAt?.getTime() ?? 0,
+    );
+    if (referans === 0) continue;
+
+    const sessizSn = (simdi - referans) / 1000;
+    if (sessizSn < UYANDIRMA_SESSIZLIK_SN) continue;
+    // Kapatılmayı unutulmuş mesai: saatlerdir sessiz olanı 15 saniyede bir
+    // dürtmenin anlamı yok, boşuna istek üretir (gerekçe: TERK_DK).
+    if (sessizSn > TERK_DK * 60) continue;
+
+    if (simdi - (sonUyandirma.get(s.id) ?? 0) < UYANDIRMA_TEKRAR_SN * 1000) continue;
+    sonUyandirma.set(s.id, simdi);
+    await pushSessizUyandir(s.userId);
+  }
+}
 
 const anahtar = (driverId: string) => `konum-uyari-${driverId}`;
 

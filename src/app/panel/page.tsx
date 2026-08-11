@@ -469,10 +469,20 @@ export default async function PanelHome({
                   <span className="block text-sm font-medium text-slate-700">
                     Hangi tarihe kadar kapalı kalsın?
                   </span>
+                  {/* 🔴 YIL ÖNCEDEN DOLU GELSİN (2026-08-11, işletme sahibi:
+                      "2026 fonksiyonel olsun, değiştirilebilsin,
+                      değiştirilmezse otomatik kalsın").
+                      Alan `required` ve BOŞ başlıyordu: halıcı gg.aa.yyyy'nin
+                      üçünü de yazmak zorundaydı. Artık bugünle dolu geliyor —
+                      yıl hazır, halıcı yalnız gün/ayı değiştiriyor, hiç
+                      dokunmazsa bugün olarak kalıyor.
+                      ⚠️ `<input type="date">` tarayıcının kendi kontrolü; yıl
+                      hanesi GİZLENEMEZ. Yapılabilecek tek şey doldurmaktır. */}
                   <input
                     type="date"
                     name="pausedUntil"
                     required
+                    defaultValue={pauseMin}
                     min={pauseMin}
                     max={pauseMax}
                     className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:border-brand sm:w-auto"

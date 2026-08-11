@@ -46,7 +46,19 @@ type RouteData = {
   duruyor?: boolean;
   stops: Stop[];
   tani: Tani | null;
-  summary: { pingCount: number; stopCount: number; totalStopMin: number };
+  aralik?: { bas: number; bit: number };
+  summary: {
+    pingCount: number;
+    stopCount: number;
+    totalStopMin: number;
+    /** Akışın 3 dk'dan uzun sustuğu boşluk sayısı. */
+    delikSayisi?: number;
+    /** O boşlukların toplamı — "bu kadar süre BİLMİYORUZ". */
+    bilinmeyenDk?: number;
+    enUzunDelikDk?: number;
+    /** İki ucu birbirinden uzak boşluk: şoförün nerede olduğu gerçekten meçhul. */
+    kopukSayisi?: number;
+  };
 };
 
 /** Boş günün sebebini halıcının anlayacağı dilde açıkla. */
@@ -98,6 +110,11 @@ export function RouteHistory({
 }) {
   const [driverId, setDriverId] = useState(drivers[0]?.id ?? "");
   const [date, setDate] = useState(today);
+  // SAAT ARALIĞI (2026-08-11, işletme sahibi: "istediği saat aralığına
+  // bakabilsin"). Gün boyu iz tek ekranda karışıyor; "14:00-16:00 arası
+  // neredeydi" sorusuna gün geneli cevap vermiyor.
+  const [bas, setBas] = useState(0);
+  const [bit, setBit] = useState(24);
   const [data, setData] = useState<RouteData | null>(null);
   const [loading, setLoading] = useState(false);
   const [playing, setPlaying] = useState(false);
@@ -109,11 +126,11 @@ export function RouteHistory({
     setLoading(true);
     setPlaying(false);
     const res = await fetch(
-      `/api/panel/drivers/route?driverId=${driverId}&date=${date}`,
+      `/api/panel/drivers/route?driverId=${driverId}&date=${date}&bas=${bas}&bit=${bit}`,
     );
     setLoading(false);
     setData(res.ok ? await res.json() : null);
-  }, [driverId, date]);
+  }, [driverId, date, bas, bit]);
 
   // KENDİLİĞİNDEN YÜKLE (2026-07-28 kullanıcı isteği: "göster butonuna basmaya
   // gerek olmasın"). Sayfa açılır açılmaz bugünün rotası gelir; şoför ya da
@@ -154,6 +171,57 @@ export function RouteHistory({
             className={inp}
           />
         </div>
+        {/* SAAT ARALIĞI — bitiş her zaman başlangıçtan büyük tutulur, yoksa
+            sunucu 400 döner ve ekran sebepsiz boşalır. */}
+        <div>
+          <label className="block text-xs text-slate-500">Saat</label>
+          <div className="flex items-center gap-1">
+            <select
+              value={bas}
+              onChange={(e) => {
+                const v = Number(e.target.value);
+                setBas(v);
+                if (v >= bit) setBit(Math.min(24, v + 1));
+              }}
+              className={inp}
+              aria-label="Başlangıç saati"
+            >
+              {Array.from({ length: 24 }, (_, h) => (
+                <option key={h} value={h}>
+                  {String(h).padStart(2, "0")}:00
+                </option>
+              ))}
+            </select>
+            <span className="text-slate-400">–</span>
+            <select
+              value={bit}
+              onChange={(e) => {
+                const v = Number(e.target.value);
+                setBit(v);
+                if (v <= bas) setBas(Math.max(0, v - 1));
+              }}
+              className={inp}
+              aria-label="Bitiş saati"
+            >
+              {Array.from({ length: 24 }, (_, i) => i + 1).map((h) => (
+                <option key={h} value={h}>
+                  {h === 24 ? "24:00" : `${String(h).padStart(2, "0")}:00`}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+        {(bas !== 0 || bit !== 24) && (
+          <button
+            onClick={() => {
+              setBas(0);
+              setBit(24);
+            }}
+            className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50"
+          >
+            Gün geneli
+          </button>
+        )}
         <button
           onClick={load}
           disabled={loading}
@@ -185,6 +253,39 @@ export function RouteHistory({
               <div className="text-xs text-slate-500">Konum kaydı</div>
             </div>
           </div>
+
+          {/* 🔴 "BİLMİYORUM" AYRI BİR SAYI (2026-08-11).
+              Öncesinde akışın sustuğu süre hiçbir yerde yazmıyordu; daha kötüsü
+              boşluğun iki ucu aynı noktadaysa süre DURAK olarak yutuluyor ve
+              "şoför 47 dk durakladı" diye okunuyordu. Ölçüldü: 10 Ağustos'ta tek
+              şoförde 34, 38 ve 52 dakikalık üç boşluk vardı. Duraklama iddiası
+              maaşa dokunur; ölçülmeden yazılmamalı. */}
+          {(data.summary.delikSayisi ?? 0) > 0 && (
+            <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+              <p className="font-semibold">
+                ⚠️ {data.summary.delikSayisi} kesinti ·{" "}
+                {data.summary.bilinmeyenDk} dk BİLİNMİYOR
+                {(data.summary.enUzunDelikDk ?? 0) > 0 &&
+                  ` · en uzunu ${data.summary.enUzunDelikDk} dk`}
+              </p>
+              <p className="mt-1 leading-relaxed">
+                Bu sürelerde şoförün telefonu konum göndermedi.{" "}
+                {(data.summary.kopukSayisi ?? 0) > 0 ? (
+                  <>
+                    Bunların <strong>{data.summary.kopukSayisi} tanesinde</strong>{" "}
+                    kesintinin iki ucu farklı yerde — o aralıkta nereye gittiği{" "}
+                    <strong>bilinmiyor</strong>, harita orada çizgi çizmez.
+                  </>
+                ) : (
+                  <>
+                    Kesintilerin iki ucu aynı noktada: araç yerinden kıpırdamamış
+                    görünüyor. Yine de bu süre <strong>ölçüm değil</strong> —
+                    &quot;orada bekledi&quot; diye kesin konuşma.
+                  </>
+                )}
+              </p>
+            </div>
+          )}
 
           {data.points.length > 0 ? (
             <>

@@ -19,7 +19,10 @@ const EXPO_UC = "https://exp.host/--/api/v2/push/send";
 
 type Mesaj = {
   to: string;
-  title: string;
+  /** SESSİZ UYANDIRMADA YOK (2026-08-10): `title`/`body` verilmezse Android'de
+   *  bildirim GÖRÜNMEZ, yalnız `data` düşer. Görünür bildirimlerde zorunlu
+   *  gibi davranılır — `pushGonder` her zaman doldurur. */
+  title?: string;
   body?: string;
   data?: Record<string, unknown>;
   sound?: "default";
@@ -32,6 +35,59 @@ type Mesaj = {
 /** Expo'nun jeton biçimi. Bozuk kayıt servise hiç gitmesin. */
 function gecerliJeton(t: string): boolean {
   return /^Expo(nent)?PushToken\[[^\]]+\]$/.test(t);
+}
+
+/**
+ * SESSİZ UYANDIRMA (2026-08-10) — ekranda HİÇBİR ŞEY göstermeden uygulamayı
+ * dürter, yalnız veri taşır.
+ *
+ * NEDEN AYRI: bugüne kadar uyandırma ile "şoförü uyar" AYNI bildirimdi ve
+ * aynı freni paylaşıyorlardı (10 dk sessizlik + 60 dk tekrar freni). Yani
+ * ilk uyandırma tutmazsa bir SONRAKİ deneme 60 dakika sonraydı — canlıda
+ * ölçülen 109 ve 114 dakikalık deliklerin sebebi buydu (§4.87-B).
+ * İki işin takvimi ayrı olmalı: insanı uyarmak seyrek ve frenli, uygulamayı
+ * diriltmek sık ve bedava.
+ *
+ * `title`/`body` YOK → Android'de bildirim GÖRÜNMEZ, yalnız `data` düşer.
+ * Şoför 45 saniyede bir bildirim yağmuruna tutulmaz.
+ *
+ * ⚠️ DÜRÜST SINIR: ROM süreci TAMAMEN öldürdüyse (force-stop) hiçbir push
+ * uyandıramaz. Bu bir olasılık artırıcıdır, garanti değil.
+ */
+export async function pushSessizUyandir(userId: string): Promise<void> {
+  let jetonlar: { token: string }[] = [];
+  try {
+    jetonlar = await prisma.pushToken.findMany({
+      where: { userId },
+      select: { token: true },
+    });
+  } catch (e) {
+    console.error("[push:sessiz] jetonlar okunamadı:", e);
+    return;
+  }
+  const hedefler = jetonlar.map((j) => j.token).filter(gecerliJeton);
+  if (hedefler.length === 0) return;
+
+  const mesajlar: Mesaj[] = hedefler.map((to) => ({
+    to,
+    // title/body BİLEREK YOK — veri-push.
+    data: { tip: "konum-yeniden-baslat", sessiz: "1" },
+    priority: "high",
+  }));
+
+  try {
+    const res = await fetch(EXPO_UC, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify(mesajlar),
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!res.ok) {
+      console.error(`[push:sessiz] reddedildi HTTP ${res.status}`);
+    }
+  } catch (e) {
+    console.error("[push:sessiz] gönderilemedi:", e);
+  }
 }
 
 /**

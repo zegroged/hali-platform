@@ -5,6 +5,7 @@ import { STOP_MIN_SEC } from "@/lib/tracking";
 import { trDayBoundsUTC } from "@/lib/time";
 import { izHazirla } from "@/lib/konumFiltre";
 import { yollaraOturt } from "@/lib/yolaOturt";
+import { haversineKm } from "@/lib/geo";
 
 // YOLLARA OTURTMA ÖNBELLEĞİ (2026-08-07 gecesi).
 // Aynı şoför-gün her sayfa açılışında yeniden oturtulmasın: iz DEĞİŞMEDİĞİ
@@ -37,7 +38,29 @@ export async function GET(req: NextRequest) {
   if (dateStr && !/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
     return NextResponse.json({ error: "Geçersiz tarih" }, { status: 400 });
   }
-  const { start, end } = trDayBoundsUTC(dateStr ?? undefined);
+  const { start: gunBas, end: gunBit } = trDayBoundsUTC(dateStr ?? undefined);
+
+  // SAAT ARALIĞI (2026-08-11, işletme sahibi: "istediği saat aralığına
+  // bakabilsin"). Gün boyu iz tek ekranda karışıyor; 14:00-16:00 arası
+  // sorulduğunda gün geneli cevap vermiyor.
+  //
+  // ⚠️ TR saatine göre: gün sınırı zaten TR'ye göre hesaplanıyor, saatler de
+  // onun üstüne ekleniyor. Sunucu UTC'de çalıştığı için ham saat eklemek
+  // aralığı 3 saat kaydırırdı.
+  const saatOku = (ham: string | null, varsayilan: number): number | null => {
+    if (ham == null || ham === "") return varsayilan;
+    if (!/^\d{1,2}$/.test(ham)) return null;
+    const n = Number(ham);
+    return n >= 0 && n <= 24 ? n : null;
+  };
+  const bas = saatOku(sp.get("bas"), 0);
+  const bit = saatOku(sp.get("bit"), 24);
+  if (bas == null || bit == null || bas >= bit) {
+    return NextResponse.json({ error: "Geçersiz saat aralığı" }, { status: 400 });
+  }
+  const start = new Date(gunBas.getTime() + bas * 3600_000);
+  // Gün sonunu aşma: 24 verilirse günün kendi sınırı kullanılır.
+  const end = new Date(Math.min(gunBas.getTime() + bit * 3600_000, gunBit.getTime()));
 
   const [pings, stops] = await Promise.all([
     prisma.driverLocationPing.findMany({
@@ -107,7 +130,10 @@ export async function GET(req: NextRequest) {
   // 🔴 YOLLARA OTURT — "şoförün nereye gittiği belli mi?" sorusunun cevabı.
   // Yalnız PARÇA İÇİNDE; kopukluk üzerinden yol uydurulmaz (lib/yolaOturt.ts).
   // OSRM kapalıysa/yavaşsa ham iz çizilir — harita boş kalmaz.
-  const anahtar = `${driverId}|${dateStr ?? "bugun"}|${pings.length}`;
+  // ⚠️ SAAT ARALIĞI ANAHTARA GİRMELİ (2026-08-11): girmezse 09-12 aralığı için
+  // hesaplanan oturtma, aynı gün 14-16 sorulduğunda ping SAYISI da denk gelirse
+  // yanlışlıkla geri döner. Sessiz ve tespiti zor bir hata olurdu.
+  const anahtar = `${driverId}|${dateStr ?? "bugun"}|${bas}-${bit}|${pings.length}`;
   const vurus = oturtmaOnbellek.get(anahtar);
   if (vurus && Date.now() - vurus.zaman < ONBELLEK_TTL_MS) {
     parcalarKucuk = vurus.veri;
@@ -128,6 +154,37 @@ export async function GET(req: NextRequest) {
   }));
   const totalStopMin = stopRows.reduce((a, s) => a + s.durationMin, 0);
 
+  // 🔴 DELİK SAYIMI (2026-08-11) — "bilmiyorum" ile "durdu"yu AYIR.
+  //
+  // İşletme sahibi haritadaki kopukluğu sorunca ölçüldü: aynı gün 34, 38 ve
+  // 52 dakikalık üç boşluk vardı ve panel bunları hiçbir yerde SÖYLEMİYORDU.
+  // Daha kötüsü, boşluğun iki ucu aynı noktadaysa süre "durak" olarak
+  // yutuluyor ve halıcıya "şoför 47 dk durakladı" diye gösteriliyor — oysa
+  // bilinen tek şey uygulamanın susduğu. Bu, maaş kesintisine kadar gidebilecek
+  // bir iddia; ölçülmeden ekrana yazılmamalı.
+  //
+  // İKİ AYRI SAYI, KARIŞTIRMA:
+  //  · `delikSayisi` / `bilinmeyenDk` — akışın sustuğu her boşluk.
+  //  · `kopukSayisi` — iki ucu BİRBİRİNDEN UZAK olan boşluk; yalnız bunlarda
+  //    şoförün nerede olduğu gerçekten bilinmiyor ve harita çizgiyi koparıyor
+  //    (aynı eşikler: lib/konumFiltre.ts BOSLUK_SN/BOSLUK_M).
+  const DELIK_SN = 180;
+  const KOPUK_M = 200;
+  let delikSayisi = 0;
+  let bilinmeyenSn = 0;
+  let enUzunDelikSn = 0;
+  let kopukSayisi = 0;
+  for (let i = 1; i < pings.length; i++) {
+    const sn = (pings[i].recordedAt.getTime() - pings[i - 1].recordedAt.getTime()) / 1000;
+    if (sn <= DELIK_SN) continue;
+    delikSayisi++;
+    bilinmeyenSn += sn;
+    if (sn > enUzunDelikSn) enUzunDelikSn = sn;
+    const m =
+      haversineKm(pings[i - 1].lat, pings[i - 1].lng, pings[i].lat, pings[i].lng) * 1000;
+    if (m > KOPUK_M) kopukSayisi++;
+  }
+
   return NextResponse.json({
     points,
     parcalar: parcalarKucuk,
@@ -136,10 +193,16 @@ export async function GET(req: NextRequest) {
     duruyor,
     stops: stopRows,
     tani,
+    // Seçili aralık — arayüz "gün geneli mi, dilim mi" diye tahmin etmesin.
+    aralik: { bas, bit },
     summary: {
       pingCount: pings.length,
       stopCount: stopRows.length,
       totalStopMin,
+      delikSayisi,
+      bilinmeyenDk: Math.round(bilinmeyenSn / 60),
+      enUzunDelikDk: Math.round(enUzunDelikSn / 60),
+      kopukSayisi,
     },
   });
 }
