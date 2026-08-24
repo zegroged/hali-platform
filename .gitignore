@@ -24,3 +24,10 @@ customer-app/*firebase-adminsdk*.json
 # uygulanmayabilir. 2026-08-10 yerel derleme denemesinden kalmisti.
 driver-app/android/
 driver-app/ios/
+
+# --- Gelistirme araci artiklari ---
+.claude/
+CLAUDE.md
+AGENTS.md
+.cursor/
+.aider*
