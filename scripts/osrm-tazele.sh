@@ -16,10 +16,12 @@ NICE="nice -n 15 ionice -c3"
 log() { echo "[$(date '+%F %T')] $*" >> "$LOG"; }
 mail_at() {
   set -a; . /opt/hali/.env; set +a
-  printf 'From: %s\nTo: [EPOSTA]\nSubject: =?UTF-8?B?%s?=\nContent-Type: text/plain; charset=UTF-8\n\n%s\n' \
-    "$SMTP_USER" "$(printf '%s' "$1" | base64 -w0)" "$2" > /tmp/osrm-mail.txt
+  # Uyarı adresi ortamdan gelir; tanımlı değilse SMTP hesabının kendisine gider.
+  ALICI="${BILDIRIM_MAIL:-$SMTP_USER}"
+  printf 'From: %s\nTo: %s\nSubject: =?UTF-8?B?%s?=\nContent-Type: text/plain; charset=UTF-8\n\n%s\n' \
+    "$SMTP_USER" "$ALICI" "$(printf '%s' "$1" | base64 -w0)" "$2" > /tmp/osrm-mail.txt
   curl -s --url "smtp://$SMTP_HOST:$SMTP_PORT" --ssl-reqd --user "$SMTP_USER:$SMTP_PASS" \
-    --mail-from "$SMTP_USER" --mail-rcpt "[EPOSTA]" --upload-file /tmp/osrm-mail.txt >/dev/null
+    --mail-from "$SMTP_USER" --mail-rcpt "$ALICI" --upload-file /tmp/osrm-mail.txt >/dev/null
   rm -f /tmp/osrm-mail.txt
 }
 

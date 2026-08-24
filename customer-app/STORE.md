@@ -16,8 +16,8 @@
 Webdeki anahtar HTTP-referrer kısıtlı olduğu için uygulamada ÇALIŞMAZ; ayrı
 anahtar gerekir:
 
-1. https://console.cloud.google.com → mevcut proje ("My First Project",
-   [EPOSTA]).
+1. https://console.cloud.google.com → web anahtarının bulunduğu mevcut proje
+   (Google hesabınla giriş yap).
 2. "APIs & Services → Library" → **Maps SDK for Android** → Enable.
 3. "Credentials → Create credentials → API key" → adı: `hali-customer-android`.
 4. Anahtarı KISITLA: Application restrictions → **Android apps** →

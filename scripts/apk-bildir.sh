@@ -14,7 +14,7 @@
 
 set -u
 BUILD_ID="${1:?build id gerekli}"
-ALICI="${2:-[EPOSTA]}"
+ALICI="${2:-${BILDIRIM_MAIL:?alici adresi gerekli (2. argüman ya da BILDIRIM_MAIL)}}"
 TOKEN="${EXPO_TOKEN:?EXPO_TOKEN gerekli}"
 
 ARALIK=60          # saniye
