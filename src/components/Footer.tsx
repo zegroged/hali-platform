@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Logo } from "@/components/icons";
+import { SIRKET } from "@/lib/sirket";
 
 /** Kamusal sayfaların altına konan kurumsal footer (panel/admin/sofor hariç). */
 export default function Footer() {
@@ -133,8 +134,8 @@ export default function Footer() {
         </div>
         <div className="mt-8 flex flex-col gap-4 border-t border-slate-800 pt-6 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-xs text-slate-500">
-            © 2026 En Yakın Halı Yıkama — [YASAL AD] · VKN:
-            [VKN] · KEP: [KEP] · Selçuklu/Konya
+            © 2026 En Yakın Halı Yıkama — {SIRKET.yasalAd} · VKN:{" "}
+            {SIRKET.vergiNo} · KEP: {SIRKET.kep} · {SIRKET.sehir}
           </p>
           <div className="flex flex-col gap-1.5 sm:items-end">
             {/* iyzico logo bandı (resmî paket, beyaz sürüm) — ödeme güven işareti */}

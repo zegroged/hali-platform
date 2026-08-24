@@ -1,6 +1,6 @@
 # Caddy — otomatik HTTPS (Let's Encrypt) + reverse proxy.
 # Kurulum (host'ta): apt install caddy; bu dosyayı /etc/caddy/Caddyfile yap.
-# DOMAIN'i kendi alan adınla değiştir. DNS A kaydı [SUNUCU]'e bakmalı.
+# DOMAIN'i kendi alan adınla değiştir. DNS A kaydı sunucunun IP adresine bakmalı.
 enyakinhaliyikamaservisi.com {
     encode gzip
     reverse_proxy 127.0.0.1:3000

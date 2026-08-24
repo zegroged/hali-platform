@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { SIRKET, vergiSatiri } from "@/lib/sirket";
 import StaticPage, { Section } from "../_static/StaticPage";
 
 export const metadata: Metadata = {
@@ -86,9 +87,8 @@ export default function HakkimizdaPage() {
 
       <Section title="Künye ve İletişim">
         <p>
-          İşletici: <strong>[YASAL AD]</strong> (şahıs işletmesi) ·
-          [ADRES], Selçuklu/Konya ·
-          Vergi Dairesi/No: Meram / [VKN]. Bize ulaşmak için{" "}
+          İşletici: <strong>{SIRKET.yasalAd}</strong> ({SIRKET.isletmeTuru}) ·{" "}
+          {SIRKET.adres} · Vergi Dairesi/No: {vergiSatiri}. Bize ulaşmak için{" "}
           <Link
             href="/iletisim"
             className="font-medium text-brand-dark hover:underline"

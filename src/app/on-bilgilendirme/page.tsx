@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import StaticPage, { Section } from "../_static/StaticPage";
 import { CONTRACT_VERSION } from "@/lib/legal";
+import { SIRKET, vergiSatiri } from "@/lib/sirket";
 
 export const metadata: Metadata = {
   title: "Ön Bilgilendirme Formu",
@@ -29,11 +30,9 @@ export default function OnBilgilendirmePage() {
         </p>
         <p>
           Platform işleticisi (aracı hizmet sağlayıcı):{" "}
-          <strong>[YASAL AD]</strong> (şahıs işletmesi). Adres:
-          [ADRES], Selçuklu/Konya. Vergi
-          Dairesi/No: Meram / [VKN]. KEP:
-          [KEP]. İletişim:
-          info@enyakinhaliyikamaservisi.com.
+          <strong>{SIRKET.yasalAd}</strong> ({SIRKET.isletmeTuru}). Adres:{" "}
+          {SIRKET.adres}. Vergi Dairesi/No: {vergiSatiri}. KEP: {SIRKET.kep}.
+          İletişim: {SIRKET.eposta}.
         </p>
       </Section>
 
@@ -98,7 +97,7 @@ export default function OnBilgilendirmePage() {
           <strong>&quot;Siparişi iptal et&quot; butonu</strong> (halınız teslim
           alınana kadar), takip sayfanızda görünen{" "}
           <strong>işletme telefonu</strong>,{" "}
-          <strong>info@enyakinhaliyikamaservisi.com</strong> e-posta adresi
+          <strong>{SIRKET.eposta}</strong> e-posta adresi
           veya{" "}
           <Link href="/iletisim" className="text-brand-dark underline">
             iletişim sayfamız

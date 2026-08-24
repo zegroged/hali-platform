@@ -3,6 +3,7 @@ import Link from "next/link";
 import StaticPage, { Section } from "../_static/StaticPage";
 import { CONTRACT_VERSION } from "@/lib/legal";
 import { merdivenAktif, merdiven, SOFOR_TAVANI } from "@/lib/plan";
+import { SIRKET, vergiSatiri } from "@/lib/sirket";
 
 // FİYAT ÇALIŞMA ZAMANINDA OKUNUR (2026-08-10). Bu sayfa statik üretiliyordu ve
 // fiyat BUILD anında gömülüyordu; `.env` Docker build aşamasına girmediği için
@@ -34,9 +35,9 @@ export default function IsletmeSozlesmesiPage() {
           <strong>Platform:</strong> enyakinhaliyikamaservisi.com — 6563 sayılı
           Elektronik Ticaretin Düzenlenmesi Hakkında Kanun md.2/1-d anlamında{" "}
           <strong>aracı hizmet sağlayıcıdır</strong>; halı yıkama hizmetinin
-          tarafı değildir. İşletici: <strong>[YASAL AD]</strong> (şahıs
-          işletmesi), [ADRES],
-          Selçuklu/Konya · Vergi Dairesi/No: Meram / [VKN].
+          tarafı değildir. İşletici: <strong>{SIRKET.yasalAd}</strong> (
+          {SIRKET.isletmeTuru}), {SIRKET.adres} · Vergi Dairesi/No:{" "}
+          {vergiSatiri}.
         </p>
         <p>
           <strong>İşletme:</strong> Platformda profili yayımlanan, halı yıkama

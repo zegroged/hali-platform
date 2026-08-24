@@ -2,6 +2,7 @@ import { redirect, notFound } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { stopajHesapla, STOPAJ_ORAN } from "@/lib/stopaj";
+import { SIRKET } from "@/lib/sirket";
 import PrintButton from "@/components/PrintButton";
 
 // GİDER PUSULASI — /pusula/[id] (2026-08-01 denetim bulgusuyla /admin DIŞINA
@@ -109,11 +110,11 @@ export default async function GiderPusulasi({
           <div className="rounded-lg border border-slate-200 p-3">
             <p className="font-semibold text-slate-900">Düzenleyen (İşletme)</p>
             <p className="mt-1 text-slate-700">
-              [YASAL AD] — En Yakın Halı Yıkama
+              {SIRKET.yasalAd} — {SIRKET.ticariAd}
               <br />
-              [ADRES], Selçuklu/Konya
+              {SIRKET.adres}
               <br />
-              Meram VD · VKN [VKN]
+              {SIRKET.vergiDairesi} VD · VKN {SIRKET.vergiNo}
             </p>
           </div>
           <div className="rounded-lg border border-slate-200 p-3">

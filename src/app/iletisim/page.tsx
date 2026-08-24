@@ -2,12 +2,18 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import StaticPage from "../_static/StaticPage";
 import { IconMail, IconPackage, IconPhone } from "@/components/icons";
+import { SIRKET, isleticiTamAd, vergiSatiri } from "@/lib/sirket";
 
 export const metadata: Metadata = {
   title: "İletişim",
   description:
     "En Yakın Halı Yıkama ile iletişime geçin: destek e-postası ve sık sorulan sorular.",
 };
+
+// wa.me uluslararası biçim ister: boşluklar atılır, baştaki 0 yerine ülke kodu 90 gelir.
+// SIRKET.telefon tanımsızsa "[TELEFON]" olur; rakam çıkmazsa link üretme (wa.me/90 bozuk olur).
+const telefonRakam = SIRKET.telefon.replace(/\D/g, "").replace(/^0/, "");
+const waNumarasi = telefonRakam.length >= 10 ? `90${telefonRakam}` : null;
 
 export default function IletisimPage() {
   return (
@@ -18,7 +24,7 @@ export default function IletisimPage() {
       <div className="space-y-3">
         {/* E-posta */}
         <a
-          href="mailto:info@enyakinhaliyikamaservisi.com"
+          href={`mailto:${SIRKET.eposta}`}
           className="flex items-center gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-brand"
         >
           <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-brand-light text-brand-dark">
@@ -29,30 +35,32 @@ export default function IletisimPage() {
               E-posta
             </span>
             <span className="block truncate text-sm text-brand-dark">
-              info@enyakinhaliyikamaservisi.com
+              {SIRKET.eposta}
             </span>
           </span>
         </a>
 
-        {/* Telefon / WhatsApp destek hattı */}
-        <a
-          href="https://wa.me/9[TELEFON]"
-          target="_blank"
-          rel="noreferrer"
-          className="flex items-center gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-brand"
-        >
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-brand-light text-brand-dark">
-            <IconPhone size={20} />
-          </span>
-          <span className="min-w-0">
-            <span className="block text-sm font-semibold text-slate-900">
-              Telefon / WhatsApp
+        {/* Telefon / WhatsApp destek hattı — numara tanımlıysa göster */}
+        {waNumarasi && (
+          <a
+            href={`https://wa.me/${waNumarasi}`}
+            target="_blank"
+            rel="noreferrer"
+            className="flex items-center gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-brand"
+          >
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-brand-light text-brand-dark">
+              <IconPhone size={20} />
             </span>
-            <span className="block text-sm text-brand-dark">
-              [TELEFON]
+            <span className="min-w-0">
+              <span className="block text-sm font-semibold text-slate-900">
+                Telefon / WhatsApp
+              </span>
+              <span className="block text-sm text-brand-dark">
+                {SIRKET.telefon}
+              </span>
             </span>
-          </span>
-        </a>
+          </a>
+        )}
 
         {/* Sipariş takibi yönlendirmesi */}
         <Link
@@ -79,29 +87,27 @@ export default function IletisimPage() {
         <dl className="mt-2 space-y-1 text-base text-slate-700">
           <div>
             <dt className="inline font-medium">İşletici: </dt>
-            <dd className="inline">[YASAL AD] (şahıs işletmesi)</dd>
+            <dd className="inline">{isleticiTamAd}</dd>
           </div>
           <div>
             <dt className="inline font-medium">Adres: </dt>
-            <dd className="inline">
-              [ADRES], Selçuklu/Konya
-            </dd>
+            <dd className="inline">{SIRKET.adres}</dd>
           </div>
           <div>
             <dt className="inline font-medium">Vergi Dairesi/No: </dt>
-            <dd className="inline">Meram / [VKN]</dd>
+            <dd className="inline">{vergiSatiri}</dd>
           </div>
           <div>
             <dt className="inline font-medium">KEP: </dt>
-            <dd className="inline">[KEP]</dd>
+            <dd className="inline">{SIRKET.kep}</dd>
           </div>
           <div>
             <dt className="inline font-medium">Telefon: </dt>
-            <dd className="inline">[TELEFON]</dd>
+            <dd className="inline">{SIRKET.telefon}</dd>
           </div>
           <div>
             <dt className="inline font-medium">E-posta: </dt>
-            <dd className="inline">info@enyakinhaliyikamaservisi.com</dd>
+            <dd className="inline">{SIRKET.eposta}</dd>
           </div>
         </dl>
       </div>

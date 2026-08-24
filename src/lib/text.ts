@@ -45,7 +45,7 @@ export function normalizeBusinessDescription(text: string): string {
 }
 
 /** Adres (işletme/fatura/sipariş alım): kelime-başı büyük düzen —
- *  "PARSANA MAH. YAŞİYAN SK. NO: 30" → "[ADRES]". */
+ *  "ÇİÇEK MAH. GÜL SK. NO: 12" → "Çiçek Mah. Gül Sk. No: 12". */
 export function normalizeAddress(address: string): string {
   return trTitleCase(address);
 }

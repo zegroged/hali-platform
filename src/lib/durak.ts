@@ -1,7 +1,7 @@
 // DURAK ETİKETİ — harita balonu ve liste aynı metni kullansın (2026-08-06).
 
 /**
- * Durak balonu metni: "14:32 · 18 dk · Yaşiyan Sk."
+ * Durak balonu metni: "14:32 · 18 dk · Atatürk Cd."
  * Kullanıcı 2026-08-06: *"noktaların üzerine bastığımda ne zaman ne kadar
  * durduğunu göstermiyor."* Veri (DriverStop.startedAt/durationSec/address)
  * zaten vardı; yalnız haritaya taşınmamıştı.

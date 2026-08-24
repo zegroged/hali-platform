@@ -31,3 +31,7 @@ CLAUDE.md
 AGENTS.md
 .cursor/
 .aider*
+
+# TypeScript artımlı derleme önbelleği (çıktı)
+tsconfig.tsbuildinfo
+*.tsbuildinfo

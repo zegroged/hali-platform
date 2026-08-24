@@ -13,8 +13,10 @@
  * NE DOĞRULAMAZ: gerçek karttan çekim. O yalnız gerçek kartla, gerçek 3D
  * ekranıyla olur ve para hareketi doğurur — bu betik bilerek oraya girmez.
  *
- * KULLANIM (sunucudaki anahtarlarla, yerelden):
- *   set -a; eval "$(ssh root@SUNUCU 'grep -E "^IYZICO_" /opt/hali/.env')"; set +a
+ * KULLANIM (üretim ortamının anahtarlarıyla, yerelden):
+ *   # IYZICO_API_KEY / IYZICO_SECRET / IYZICO_BASE_URL değerlerini üretim
+ *   # ortamından (gizli anahtar deposu ya da üretim sunucusunun .env dosyası)
+ *   # kabuğa yükleyin; erişim bilgileri bu depoda tutulmaz.
  *   FIYAT_MERDIVENI=1 PAYMENTS_MODE=live npx tsx scripts/odeme-dogrula.ts
  */
 import Iyzipay from "iyzipay";

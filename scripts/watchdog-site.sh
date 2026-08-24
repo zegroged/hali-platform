@@ -13,6 +13,10 @@ ENVF="/opt/hali/.env"
 FLAG="/run/hali-site-down.flag"      # down maili atıldı işareti
 FAILCNT="/run/hali-site-failcount"   # ardışık başarısız yoklama sayısı
 
+# Üretim sunucusunun SSH erişim bilgisi depoda tutulmaz.
+# Gerekirse çalıştırma ortamından verilir, örn: SUNUCU_SSH="kullanici@sunucu"
+SUNUCU_SSH="${SUNUCU_SSH:-}"
+
 SMTP_USER=$(grep -E '^SMTP_USER=' "$ENVF" | cut -d= -f2- | tr -d '"')
 SMTP_PASS=$(grep -E '^SMTP_PASS=' "$ENVF" | cut -d= -f2- | tr -d '"')
 
@@ -70,12 +74,19 @@ echo "$(date '+%F %T') YOKLAMA BASARISIZ (HTTP $code, ardisik $n)"
 [ "$n" -lt 2 ] && exit 0
 [ -f "$FLAG" ] && exit 0
 
+# SSH satırı yalnızca ortam değişkeni verilmişse yazılır; varsayılan jeneriktir.
+if [ -n "$SUNUCU_SSH" ]; then
+  ssh_satiri="ssh $SUNUCU_SSH"
+else
+  ssh_satiri="# üretim sunucusuna SSH ile bağlan (erişim bilgisi parola kasasında)"
+fi
+
 send_mail "🔴 Site YANIT VERMİYOR — enyakinhaliyikamaservisi.com" \
 "<p style=\"margin:0 0 12px;\"><strong>Ana sayfa üst üste 2 yoklamada açılmadı</strong> (son HTTP kodu: $code, $(date '+%d.%m.%Y %H:%M')).</p>
 <p style=\"margin:0 0 12px;\">Bu genellikle uygulama konteynerinin durması veya sunucu sorunudur. Claude'a &quot;site down maili geldi, bak&quot; yazman yeterli — ya da elle kontrol:</p>
-<pre style=\"margin:0 0 12px;background:#f8fafc;padding:12px;border-radius:8px;font-size:13px;\">ssh root@[SUNUCU]
-docker ps | grep hali
-docker logs hali-app-1 --tail 50</pre>
+<pre style=\"margin:0 0 12px;background:#f8fafc;padding:12px;border-radius:8px;font-size:13px;\">$ssh_satiri
+docker ps
+docker logs &lt;uygulama-konteyneri&gt; --tail 50</pre>
 <p style=\"margin:0;color:#64748b;font-size:13px;\">Site düzeldiğinde bekçi otomatik olarak &quot;düzeldi&quot; maili gönderir; bu uyarı kesinti başına bir kez atılır.</p>"
 touch "$FLAG"
 echo "$(date '+%F %T') DOWN maili gonderildi + flag"

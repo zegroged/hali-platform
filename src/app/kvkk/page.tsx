@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { CONTRACT_VERSION } from "@/lib/legal";
+import { SIRKET, vergiSatiri } from "@/lib/sirket";
 import StaticPage, { Section } from "../_static/StaticPage";
 
 export const metadata: Metadata = {
@@ -26,10 +27,10 @@ export default function KvkkPage() {
           tarafından aşağıda açıklanan kapsamda işlenmektedir.
         </p>
         <p>
-          Veri sorumlusu: <strong>[YASAL AD]</strong> (şahıs
-          işletmesi) — [ADRES],
-          Selçuklu/Konya (Vergi Dairesi/No: Meram / [VKN]). KVKK
-          kapsamındaki başvurularınız için başvuru kanalı:{" "}
+          Veri sorumlusu: <strong>{SIRKET.yasalAd}</strong> (
+          {SIRKET.isletmeTuru}) — {SIRKET.adres} (Vergi Dairesi/No:{" "}
+          {vergiSatiri}). KVKK kapsamındaki başvurularınız için başvuru
+          kanalı:{" "}
           <a
             href="mailto:info@enyakinhaliyikamaservisi.com"
             className="font-medium text-brand-dark hover:underline"
