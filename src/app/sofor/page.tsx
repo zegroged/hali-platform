@@ -17,6 +17,7 @@ import {
   IconPhone,
 } from "@/components/icons";
 import EmptyState from "@/components/EmptyState";
+import { OtoYenile } from "@/components/OtoYenile";
 import {
   acceptOrder,
   rejectOrder,
@@ -64,6 +65,9 @@ export default async function SoforPage({
 
   return (
     <div className="space-y-4">
+      {/* Liste 45 saniyede bir kendini tazeler — mobil ikiziyle aynı aralık
+          (driver-app/src/Orders.tsx). Fotoğraf yüklenirken atlar. */}
+      <OtoYenile />
       <DriverShift initialOnShift={driver.isOnShift} />
 
       <HataSeridi mesaj={hata} />
@@ -335,9 +339,7 @@ export default async function SoforPage({
                   <MoneyInput
                     name="price"
                     required
-                    defaultValue={
-                      o.quotedPrice != null ? String(o.quotedPrice) : ""
-                    }
+                    defaultNumber={o.quotedPrice}
                     placeholder="Tahsil edilen tutar"
                     className={inp}
                   />

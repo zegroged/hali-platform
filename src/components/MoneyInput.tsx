@@ -34,13 +34,48 @@ export function paraBicimle(ham: string): string {
   return tamNokta + "," + kurus.slice(0, 2);
 }
 
+/**
+ * 🔴 MAKİNE BİÇİMİNDEN EKRAN BİÇİMİNE (2026-08-11) — 10-100 KATLIK PARA HATASI.
+ *
+ * `paraBicimle` KULLANICININ YAZDIĞINI biçimlendirmek için yazıldı: nokta
+ * kullanıcıdan gelirse binlik ayıracıdır, silinir. Ama `defaultValue`
+ * veritabanından geliyor ve orada nokta ONDALIK ayıracıdır:
+ *
+ *   Prisma Decimal(10,2) 1250.50  ->  String() = "1250.5"
+ *   paraBicimle("1250.5")  ->  nokta silinir  ->  "12505"  ->  "12.505"
+ *   parseTutar("12.505")   ->  binlik sanılır ->  12505     ← 10 KATI
+ *
+ * Gerçek kodla ölçüldü: 1250.5 → 12505 (10x), 1250.05 → 125005 (100x).
+ * Şoför alana DOKUNMADAN "Teslim Et"e bassa bile yanlış tutar kaydediliyordu.
+ * Canlıda henüz patlamamıştı çünkü 53 fiyatın hiçbiri kuruşlu değildi — ilk
+ * "1.250,50" yazan halıcıda patlayacaktı.
+ *
+ * Bu fonksiyon makine biçimini (nokta = ondalık) doğru ekran biçimine çevirir.
+ */
+export function paraBicimleSayi(deger: unknown): string {
+  if (deger == null || deger === "") return "";
+  const n = Number(String(deger));
+  if (!Number.isFinite(n)) return "";
+  // Kuruş varsa iki hane göster, yoksa hiç gösterme (1250 → "1.250").
+  const tam = Math.trunc(Math.abs(n));
+  const kurus = Math.round((Math.abs(n) - tam) * 100);
+  const tamNokta = String(tam).replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  const isaret = n < 0 ? "-" : "";
+  return kurus === 0
+    ? `${isaret}${tamNokta}`
+    : `${isaret}${tamNokta},${String(kurus).padStart(2, "0")}`;
+}
+
 type Props = {
   name: string;
   id?: string;
   required?: boolean;
   placeholder?: string;
   className?: string;
+  /** KULLANICI BİÇİMİ ("1.250,50"). Veritabanı değeri için `defaultNumber` kullan. */
   defaultValue?: string;
+  /** MAKİNE BİÇİMİ — Prisma Decimal / number / "1250.5". Doğru biçime çevrilir. */
+  defaultNumber?: unknown;
   /** Alanın sağında "TL" rozeti gösterilsin mi (varsayılan: evet). */
   suffix?: string | null;
 };
@@ -52,9 +87,16 @@ export default function MoneyInput({
   placeholder = "Ör. 1.250,50",
   className = "",
   defaultValue = "",
+  defaultNumber,
   suffix = "TL",
 }: Props) {
-  const [deger, setDeger] = useState(paraBicimle(defaultValue));
+  // `defaultNumber` verildiyse makine biçiminden çevrilir; `defaultValue`
+  // kullanıcı biçimindedir ve eskisi gibi biçimlendiriciden geçer.
+  const [deger, setDeger] = useState(
+    defaultNumber !== undefined
+      ? paraBicimleSayi(defaultNumber)
+      : paraBicimle(defaultValue),
+  );
 
   const alan = (
     <input

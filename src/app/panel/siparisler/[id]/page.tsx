@@ -384,9 +384,7 @@ export default async function OrderManagePage({
                   id="teslim-tutar"
                   name="price"
                   required
-                  defaultValue={
-                    o.quotedPrice != null ? String(o.quotedPrice) : ""
-                  }
+                  defaultNumber={o.quotedPrice}
                   placeholder="Ör. 850"
                   className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:border-brand"
                 />
@@ -485,9 +483,7 @@ export default async function OrderManagePage({
                         id="kesin-fiyat"
                         name="price"
                         required
-                        defaultValue={
-                          o.quotedPrice != null ? String(o.quotedPrice) : ""
-                        }
+                        defaultNumber={o.quotedPrice}
                         placeholder="Ör. 850"
                         className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:border-brand"
                       />

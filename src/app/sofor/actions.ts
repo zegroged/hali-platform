@@ -12,6 +12,7 @@ import {
   bildirMusteriyeEposta,
 } from "@/lib/orderNotify";
 import { parseTutar } from "@/lib/money";
+import { teslimNotu } from "@/lib/tahsilat";
 import { getSessionUser } from "@/lib/auth";
 import { sendSms, trackingLink } from "@/lib/sms";
 import { waSiparisYolda, waGonderVeKaydet } from "@/lib/whatsapp";
@@ -39,7 +40,13 @@ export async function acceptOrder(formData: FormData) {
     where: { id, driverId: d.id, status: "CREATED" },
     data: { status: "ACCEPTED" },
   });
-  if (accepted.count === 0) return;
+
+  // 🔴 SESSİZ DEĞİL (2026-08-11): burada çıplak `return;` vardı. Şoför
+  // düğmeye basıyor, ekranda HİÇBİR ŞEY olmuyor, düğmenin bozuk olduğunu
+  // sanıp tekrar basıyordu. Mobil ikizi (lib/driverOrders.ts) sebebini
+  // yazıyor; metinler oradan AYNEN alındı (İKİZ tutarlılığı).
+  if (accepted.count === 0)
+    hataylaDon("/sofor", "Bu sipariş artık kabul edilemiyor — büyük ihtimalle başka bir şoföre atandı ya da iptal edildi. Listeyi yenile.");
   await prisma.orderEvent.create({
     data: { orderId: id, status: "ACCEPTED", note: "Şoför kabul etti" },
   });
@@ -55,7 +62,9 @@ export async function rejectOrder(formData: FormData) {
   const o = await prisma.order.findFirst({
     where: { id, driverId: d.id, status: "CREATED" },
   });
-  if (!o) return;
+  // Sessiz değil (2026-08-11) — mobil ikizi: driverOrders.ts:100.
+  if (!o)
+    hataylaDon("/sofor", "Bu sipariş reddedilemiyor — artık sende değil ya da durumu değişmiş. Listeyi yenile.");
   // CAS (denetim bulgusu — kardeş fix): koşulsuz yazım, tam o sırada işletme
   // panelden KABUL ederse (CREATED→ACCEPTED) şoförün reddi ACCEPTED'i REJECTED'e
   // ezip devam eden siparişi yanlışlıkla kapatıp müşteriye "karşılanamadı" SMS'i
@@ -64,7 +73,13 @@ export async function rejectOrder(formData: FormData) {
     where: { id, driverId: d.id, status: "CREATED" },
     data: { status: "REJECTED", rejectReason: reason },
   });
-  if (rejected.count === 0) return;
+
+  // 🔴 SESSİZ DEĞİL (2026-08-11): burada çıplak `return;` vardı. Şoför
+  // düğmeye basıyor, ekranda HİÇBİR ŞEY olmuyor, düğmenin bozuk olduğunu
+  // sanıp tekrar basıyordu. Mobil ikizi (lib/driverOrders.ts) sebebini
+  // yazıyor; metinler oradan AYNEN alındı (İKİZ tutarlılığı).
+  if (rejected.count === 0)
+    hataylaDon("/sofor", "Bu sipariş reddedilemiyor — durumu değişmiş olabilir. Listeyi yenile.");
   await prisma.orderEvent.create({
     data: { orderId: id, status: "REJECTED", note: `Reddedildi: ${reason}` },
   });
@@ -87,7 +102,9 @@ export async function savePickup(formData: FormData) {
   const o = await prisma.order.findFirst({
     where: { id, driverId: d.id, status: "ACCEPTED" },
   });
-  if (!o) return;
+  // Sessiz değil (2026-08-11) — mobil ikizi: driverOrders.ts:137.
+  if (!o)
+    hataylaDon("/sofor", "Bu sipariş şu an alınamıyor — kabul edilmiş durumda değil. Listeyi yenile.");
 
   // ALIM (öncesi) FOTOĞRAFI ZORUNLU: halının işletmeye teslim edildiği andaki
   // durumunun kanıtı — hasar/kayıp uyuşmazlığında "Fotoğraflı Güvence"nin
@@ -133,7 +150,13 @@ export async function savePickup(formData: FormData) {
       ...(sayi != null ? { carpetCount: sayi } : {}),
     },
   });
-  if (picked.count === 0) return; // yarış: durum değişti → yazma, yan etki yok
+
+  // 🔴 SESSİZ DEĞİL (2026-08-11): burada çıplak `return;` vardı. Şoför
+  // düğmeye basıyor, ekranda HİÇBİR ŞEY olmuyor, düğmenin bozuk olduğunu
+  // sanıp tekrar basıyordu. Mobil ikizi (lib/driverOrders.ts) sebebini
+  // yazıyor; metinler oradan AYNEN alındı (İKİZ tutarlılığı).
+  if (picked.count === 0)
+    hataylaDon("/sofor", "Bu sipariş şu an alınamıyor — bu arada iptal edilmiş ya da başkasına atanmış olabilir. Listeyi yenile.");
   await prisma.orderEvent.create({
     data: { orderId: id, status: "PICKED_UP", note: "Halı alındı" },
   });
@@ -149,9 +172,11 @@ export async function advanceOrder(formData: FormData) {
   const o = await prisma.order.findFirst({
     where: { id, driverId: d.id, status: { in: ["PICKED_UP", "WASHING"] } },
   });
-  if (!o) return;
+  // Sessiz değil (2026-08-11) — mobil ikizi: driverOrders.ts:193-195.
+  if (!o)
+    hataylaDon("/sofor", "Bu adım şu an yapılamıyor — sipariş bu aşamada değil. Listeyi yenile.");
   const next = DRIVER_NEXT[o.status];
-  if (!next) return;
+  if (!next) hataylaDon("/sofor", "Sıradaki adım yok — bu sipariş için yapacak bir şey kalmamış.");
 
   // 🔴 KESİN FİYAT ZORUNLU (2026-08-02) — panel/actions ve driverOrders ile İKİZ.
   // Şoför fiyatı giremez; işletme paneli girer. Bu yüzden mesaj şoförü
@@ -172,7 +197,13 @@ export async function advanceOrder(formData: FormData) {
     where: { id, driverId: d.id, status: o.status },
     data: { status: next },
   });
-  if (advanced.count === 0) return;
+
+  // 🔴 SESSİZ DEĞİL (2026-08-11): burada çıplak `return;` vardı. Şoför
+  // düğmeye basıyor, ekranda HİÇBİR ŞEY olmuyor, düğmenin bozuk olduğunu
+  // sanıp tekrar basıyordu. Mobil ikizi (lib/driverOrders.ts) sebebini
+  // yazıyor; metinler oradan AYNEN alındı (İKİZ tutarlılığı).
+  if (advanced.count === 0)
+    hataylaDon("/sofor", "Bu adım şu an yapılamıyor — siparişin durumu bu arada değişmiş. Listeyi yenile.");
   await prisma.orderEvent.create({
     data: { orderId: id, status: next, note: ORDER_STATUS_META[next].label },
   });
@@ -260,7 +291,9 @@ export async function deliverOrder(formData: FormData) {
   const o = await prisma.order.findFirst({
     where: { id, driverId: d.id, status: "OUT_FOR_DELIVERY" },
   });
-  if (!o) return;
+  // Sessiz değil (2026-08-11) — mobil ikizi: driverOrders.ts:303.
+  if (!o)
+    hataylaDon("/sofor", "Bu sipariş şu an teslim edilemiyor — teslimata çıkmış durumda değil. Listeyi yenile.");
 
   // TESLİM (sonrası) FOTOĞRAFI ZORUNLU: teslim kanıtı + halının iade anındaki
   // durumu. CAS'ten ÖNCE al ki foto yoksa sipariş DELIVERED işaretlenip para
@@ -317,12 +350,20 @@ export async function deliverOrder(formData: FormData) {
       collectedMethod: tahsilEdildi ? yontem : undefined,
     },
   });
-  if (updated.count === 0) return; // başka istek önce teslim etti
 
-  const note =
-    o.paymentMethod === "CASH"
-      ? `Teslim edildi · ${price} TL nakit tahsil edildi`
-      : `Teslim edildi · ${price} TL (kartla ödeme bekleniyor)`;
+  // 🔴 SESSİZ DEĞİL (2026-08-11): burada çıplak `return;` vardı. Şoför
+  // düğmeye basıyor, ekranda HİÇBİR ŞEY olmuyor, düğmenin bozuk olduğunu
+  // sanıp tekrar basıyordu. Mobil ikizi (lib/driverOrders.ts) sebebini
+  // yazıyor; metinler oradan AYNEN alındı (İKİZ tutarlılığı).
+  // ⚠️ EN AĞIRI BU: şoför fotoğrafı çekti, PARAYI TAHSİL ETTİ, "Teslim Et"e
+  // bastı. Sipariş bu arada panelden iptal edildiyse eskiden ekranda hiçbir
+  // şey olmuyor, şoför teslimin kaydedildiğini sanıyor, kasa açıkta kalıyordu.
+  if (updated.count === 0)
+    hataylaDon("/sofor", "Bu sipariş şu an teslim edilemiyor — başka bir işlem önce tamamlamış olabilir. PARAYI ALDIYSAN halıcını ara, kayıt açıkta kalmasın.");
+
+  // Not artık TEK KAYNAKTAN (lib/tahsilat.ts). Eskiden ödeme YÖNTEMİNE bakıp
+  // "nakit tahsil edildi" diyordu — şoför "Almadım" dese bile. Bkz. teslimNotu.
+  const note = teslimNotu(price, !isCash, tahsilEdildi, yontem);
   await prisma.orderEvent.create({
     data: { orderId: id, status: "DELIVERED", note },
   });

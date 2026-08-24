@@ -162,3 +162,51 @@ export function bugunISO(simdi: Date): string {
   const tr = new Date(simdi.getTime() + 3 * 60 * 60 * 1000);
   return tr.toISOString().slice(0, 10);
 }
+
+/**
+ * 🔴 TESLİM OLAY NOTU — TEK KAYNAK (2026-08-11).
+ *
+ * ÖNCESİ: not `paymentMethod === "CASH"` ile seçiliyordu, oysa asıl soru
+ * "para ALINDI MI". Şoför **"Almadım (sonra ödeyecek)"** seçse bile geçmişe
+ * *"1.250 TL nakit tahsil edildi"* yazılıyordu — üstelik `paymentStatus`
+ * PAID OLMUYORDU. Yani sipariş geçmişi ile ödeme durumu birbirini
+ * yalanlıyordu. IBAN seçimi de "nakit" diye kaydediliyordu.
+ *
+ * Bu kayıt ispat belgesi: halıcı mutabakatta bunu okuyor, uyuşmazlıkta
+ * dayanılan iz bu. Yalan yazması kabul edilemez.
+ *
+ * NEDEN ORTAK FONKSİYON: aynı metin İKİ yerde ayrı ayrı kuruluyordu
+ * (app/sofor/actions.ts ve lib/driverOrders.ts) ve ikisi de aynı hatayı
+ * taşıyordu. Bu depoda ikiz mantık ayrıştırması defalarca pahalıya patladı;
+ * metin tek yerden üretilirse bir daha ayrışamaz.
+ */
+export function teslimNotu(
+  tutar: number,
+  kartla: boolean,
+  tahsilEdildi: boolean,
+  yontem?: string | null,
+): string {
+  // ⚠️ BU METİN MÜŞTERİYE GÖRÜNÜR. Zincir: OrderEvent.note →
+  // api/orders/[token] → TrackingClient (herkese açık /takip sayfası).
+  // İlk yazımda "TAHSİL EDİLMEDİ (şoför 'almadım' dedi)" ve "şoförde nakit
+  // YOK" yazıyordu; ikisi de iç kasa bilgisi, üstelik ilki meşru vadeli
+  // müşteriyi tırnak içinde suçluyordu. Doğrulama denetimi yakaladı.
+  // Kural: not, DOĞRUYU söylesin ama müşteriye söylenebilir olsun.
+  const bas = `Teslim edildi · ${tlYaz(tutar)}`;
+  if (kartla) return `${bas} (kartla ödeme bekleniyor)`;
+  if (!tahsilEdildi) return `${bas} (ödeme bekleniyor)`;
+  return yontem === "IBAN"
+    ? `${bas} (havale/EFT ile ödendi)`
+    : `${bas} nakit tahsil edildi`;
+}
+
+/** "1250.5" → "1.250,50 TL". Ham JS sayısı ekrana basılmasın. */
+function tlYaz(n: number): string {
+  const tam = Math.trunc(Math.abs(n));
+  const kurus = Math.round((Math.abs(n) - tam) * 100);
+  const tamNokta = String(tam).replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  const isaret = n < 0 ? "-" : "";
+  return kurus === 0
+    ? `${isaret}${tamNokta} TL`
+    : `${isaret}${tamNokta},${String(kurus).padStart(2, "0")} TL`;
+}

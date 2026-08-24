@@ -31,6 +31,7 @@ import {
 import { ORDER_STATUS_META, PANEL_NEXT } from "@/lib/orderStatus";
 import { normalizeCarpetCount, CARPET_COUNT_HATA } from "@/lib/carpet";
 import { haliNoAta } from "@/lib/haliNo";
+import { teslimNotu } from "@/lib/tahsilat";
 import { hataylaDon } from "@/lib/hata";
 import { taxIdError } from "@/lib/taxId";
 import { normalizePhone, isMobilePhone, isLandlinePhone } from "@/lib/phone";
@@ -935,7 +936,13 @@ export async function deliverOrderPanel(formData: FormData) {
   const order = await prisma.order.findFirst({
     where: { id: orderId, businessId: b.id, status: "OUT_FOR_DELIVERY" },
   });
-  if (!order) return;
+  // Sessiz değil (2026-08-11): kardeş düzeltme şoför yolunu temizlerken PARA
+  // TAHSİLATI OLAN bu yolu atlamıştı.
+  if (!order)
+    hataylaDon(
+      `/panel/siparisler/${orderId}`,
+      "Bu sipariş teslim edilemiyor — teslimata çıkmış durumda değil. Sayfayı yenile.",
+    );
 
   const isCash = order.paymentMethod === "CASH";
   // TAHSILAT SECIMI (2026-07-30): "Nakit aldim" | "IBAN'a geldi" | "Almadim".
@@ -966,14 +973,19 @@ export async function deliverOrderPanel(formData: FormData) {
       collectedMethod: tahsilEdildi ? yontem : undefined,
     },
   });
-  if (updated.count === 0) return;
+  if (updated.count === 0)
+    hataylaDon(
+      `/panel/siparisler/${orderId}`,
+      "Teslim kaydedilemedi — başka bir işlem önce tamamlamış olabilir. PARA ALINDIYSA kaydı elle kontrol et.",
+    );
   await prisma.orderEvent.create({
     data: {
       orderId,
       status: "DELIVERED",
-      note: isCash
-        ? `Teslim edildi · ${price} TL nakit tahsil edildi`
-        : `Teslim edildi · ${price} TL (kartla ödeme bekleniyor)`,
+      // TEK KAYNAK (2026-08-11). Bu yol atlanmıştı: şoför web ve mobil
+      // düzeltildikten sonra ÜÇ teslim yolundan ikisi doğruyu, biri hâlâ
+      // "nakit tahsil edildi" yalanını yazacaktı — halıcı "Almadım" seçse bile.
+      note: teslimNotu(price, !isCash, tahsilEdildi, yontem),
     },
   });
   // KANIT ZİNCİRİNİN İKİ EKSİĞİ KAPATILDI (2026-07-29 denetimi).

@@ -189,7 +189,6 @@ export default async function Home({
     q: sp.q,
     il: sp.il,
     district: sp.district,
-    cities: sehirler,
     lat: sp.lat,
     lng: sp.lng,
     sort: sp.sort,

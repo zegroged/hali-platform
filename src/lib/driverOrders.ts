@@ -17,6 +17,7 @@ import { DRIVER_NEXT, ORDER_STATUS_META } from "@/lib/orderStatus";
 import { getAppBaseUrl } from "@/lib/config";
 import { normalizeCarpetCount, CARPET_COUNT_HATA } from "@/lib/carpet";
 import { haliNoAta } from "@/lib/haliNo";
+import { teslimNotu } from "@/lib/tahsilat";
 
 /** Bearer (native) VEYA çerez ile giriş yapmış ŞOFÖRÜN driver.id'si; yoksa null. */
 export async function currentDriverId(): Promise<string | null> {
@@ -334,9 +335,9 @@ export async function driverDeliver(
   });
   if (r.count === 0)
     return { ok: false, error: "Bu sipariş şu an teslim edilemiyor.", code: 409 };
-  const note = isCash
-    ? `Teslim edildi · ${price} TL nakit tahsil edildi`
-    : `Teslim edildi · ${price} TL (kartla ödeme bekleniyor)`;
+  // Not artık TEK KAYNAKTAN (lib/tahsilat.ts) — web ile İKİZ. Eskiden ikisi de
+  // ayrı ayrı kuruluyordu ve ikisi de aynı yalanı yazıyordu.
+  const note = teslimNotu(price, !isCash, tahsilEdildi, yontem);
   await prisma.orderEvent.create({
     data: { orderId, status: "DELIVERED", note },
   });

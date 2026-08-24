@@ -56,6 +56,16 @@ function konumKaniti(): Promise<{ ok: true } | { ok: false; sebep: string }> {
 export function DriverShift({ initialOnShift }: { initialOnShift: boolean }) {
   const [on, setOn] = useState(initialOnShift);
   const [sent, setSent] = useState(0);
+  /** Artınca konum izleyicisi sökülüp yeniden kurulur (akış toparlama). */
+  const [kurulum, setKurulum] = useState(0);
+  /** Akışın başladığı an — "henüz ilk fix gelmedi" ile "akış öldü" AYRI şeyler.
+   *  Doğrulama denetimi yakaladı: yalnız `sonGonderim`e bakınca mesai açılışında
+   *  ref 0 olduğu için yaş Infinity çıkıyor ve 30 saniyede bir kendini yeniden
+   *  kuruyordu. Sunucu bekçisi de aynı deseni kullanıyor:
+   *  `Math.max(lastSeenAt, shiftStartedAt)` (lib/konumBekcisi.ts). */
+  const akisBaslangic = useRef(0);
+  /** Üst üste kaç kez toparlandı — sonsuz döngüye tavan. */
+  const toparlamaSayaci = useRef(0);
   const [err, setErr] = useState<string | null>(null);
   // İzin diyaloğu cevapsız kalırsa hiçbir geolocation callback'i tetiklenmez —
   // 20 sn boyunca tek konum gelmediyse proaktif uyarı göster.
@@ -115,6 +125,8 @@ export function DriverShift({ initialOnShift }: { initialOnShift: boolean }) {
       setOn(next);
       setSent(0);
       sonGonderim.current = 0;
+      akisBaslangic.current = next ? Date.now() : 0;
+      toparlamaSayaci.current = 0;
       setYasSn(null);
       router.refresh();
     } catch {
@@ -127,15 +139,23 @@ export function DriverShift({ initialOnShift }: { initialOnShift: boolean }) {
   function gonderimSonucu(r: Response) {
     if (r.ok) {
       sonGonderim.current = Date.now();
+      toparlamaSayaci.current = 0; // akış düzeldi, tavan sıfırlansın
       setSent((n) => n + 1);
       setGonderimHatasi(null);
       return;
     }
     // Başarısız: freni sıfırla ki bir sonraki fix hemen denesin.
     if (lastPost.current) lastPost.current.t = 0;
+    // 🔴 401'DE AKIŞI DURDUR (2026-08-11). Eskiden yalnız METİN basılıyordu:
+    // oturum ölse bile watchPosition ve kalp atışı çalışmaya devam ediyor,
+    // düğme hâlâ "Mesaiyi Bitir" gösteriyordu. Üstelik yukarıdaki fren
+    // sıfırlaması 401'de de çalıştığı için her fix HEMEN yeniden 401 yiyordu
+    // — saatlerce boşa GPS, pil ve veri. `setOn(false)` aşağıdaki efektin
+    // temizliğini tetikler: watch ve wake lock bırakılır.
+    if (r.status === 401) setOn(false);
     setGonderimHatasi(
       r.status === 401
-        ? "Oturumun düşmüş — konum gitmiyor. Sayfayı yenileyip tekrar giriş yap."
+        ? "Oturumun düşmüş — konum durdu. Sayfayı yenileyip tekrar giriş yap, sonra mesaiyi yeniden aç."
         : r.status === 429
           ? "Çok sık gönderim — sunucu kısıtladı, birazdan kendiliğinden düzelir."
           : `Konum sunucuya yazılamadı (${r.status}).`,
@@ -159,8 +179,63 @@ export function DriverShift({ initialOnShift }: { initialOnShift: boolean }) {
     return () => clearInterval(id);
   }, [on]);
 
+  // 🔴 AKIŞ ÖLÜNCE KENDİNİ TOPARLA (2026-08-11).
+  //
+  // Ekran ölümü ZATEN BİLİYORDU (`akisOlu` kartı sarıya boyuyordu) ama bu
+  // bilgiyle hiçbir şey yapmıyordu: KURAL 1'in yarısı (görünürlük) vardı,
+  // yarısı (kurtarma) yoktu. Sekme arka plana düşüp geri geldiğinde ya da
+  // GPS kesintisinde watch sessizce ölü kalıyor, tek çıkış mesaiyi elle
+  // kapatıp açmaktı.
+  //
+  // Mobil ikizi bunu 1.2.8'de kazandı (driver-app/src/notify.ts konumuDirilt):
+  // 180 sn'dir veri gitmiyorsa görev SÖKÜLÜP yeniden kuruluyor. Burada da
+  // aynı eşik ve aynı yöntem — `kurulum` artınca aşağıdaki efekt temizlenip
+  // yeniden çalışır, yani watch bırakılıp yeniden kurulur.
+  //
+  // İzin zaten verilmiş olduğu için kullanıcıya yeni bir diyalog çıkmaz.
   useEffect(() => {
-    function stop() {
+    if (!on) return;
+    // Sayfa yenilenerek mesai açık geldiyse damga burada kurulur.
+    if (akisBaslangic.current === 0) akisBaslangic.current = Date.now();
+    const id = setInterval(() => {
+      // REFERANS = son gönderim YA DA akış başlangıcı (hangisi yeniyse).
+      // "Henüz ilk fix gelmedi" ölü DEĞİLDİR: bina içinde GPS kilidi
+      // dakikalar sürebilir ve her turda watch'ı sökmek kilidi sıfırlar —
+      // yani sözde toparlama, asıl sorunu KÖTÜLEŞTİRİR.
+      const referans = Math.max(sonGonderim.current, akisBaslangic.current);
+      if (referans === 0) return;
+      if ((Date.now() - referans) / 1000 <= 180) return;
+
+      // TAVAN: üç denemeden sonra durdur. Sonsuz sök/kur, wake lock ve GPS'i
+      // boşuna yakar; bu noktada sorun sayfanın çözebileceği bir şey değil.
+      if (toparlamaSayaci.current >= 3) {
+        setGonderimHatasi(
+          "Konum akışı düzelmiyor — mesaiyi kapatıp yeniden aç, olmazsa şoför uygulamasını kullan.",
+        );
+        return;
+      }
+      toparlamaSayaci.current += 1;
+      // Yeni pencere aç: yoksa referans hep eski kalır ve her turda tetiklenir.
+      akisBaslangic.current = Date.now();
+      setGonderimHatasi(
+        `Konum akışı durmuştu, yeniden başlatıldı (${toparlamaSayaci.current}/3).`,
+      );
+      setKurulum((k) => k + 1);
+    }, 30_000);
+    return () => clearInterval(id);
+  }, [on]);
+
+  useEffect(() => {
+    // 🔴 İKİYE AYRILDI (2026-08-11, doğrulama denetimi bulgusu).
+    //
+    // Tek bir `stop()` vardı ve `lastPost`i null'lıyordu. Akış toparlaması
+    // (watch'ı söküp yeniden kurma) da onu çağırdığı için kalp atışı
+    // (`if (!last) return`) KALICI SUSUYORDU: yani "bayat konum" hâlini
+    // "hiç konum yok" hâline çeviriyordu — düzeltmenin kendisi zarar veriyordu.
+    //
+    // Artık: yeniden kurulumda YALNIZ izleyici bırakılır; çıpa, son gönderim
+    // ve demirleme durumu KORUNUR. Tam sıfırlama yalnız mesai kapanınca.
+    function izleyiciyiBirak() {
       if (watchRef.current != null) {
         navigator.geolocation.clearWatch(watchRef.current);
         watchRef.current = null;
@@ -169,16 +244,22 @@ export function DriverShift({ initialOnShift }: { initialOnShift: boolean }) {
         wakeRef.current.release?.();
         wakeRef.current = null;
       }
+    }
+
+    function tamDur() {
+      izleyiciyiBirak();
       lastPost.current = null;
       // Mesai kapanınca demirleme sıfırlanır — yeni mesai dünkü çıpayla
       // başlamasın (İKİZ: tracking.ts startTracking).
       durum.current = "DURUYOR";
       demir.current = null;
       uzakArdisik.current = 0;
+      akisBaslangic.current = 0;
+      toparlamaSayaci.current = 0;
     }
 
     if (!on) {
-      stop();
+      tamDur();
       return;
     }
 
@@ -273,8 +354,13 @@ export function DriverShift({ initialOnShift }: { initialOnShift: boolean }) {
       })
       .catch(() => {});
 
-    return stop;
-  }, [on]);
+    // Temizlik YALNIZ izleyiciyi bırakır. `kurulum` artınca efekt yeniden
+    // çalışır ve watch yeniden kurulur; çıpa/son gönderim korunduğu için
+    // kalp atışı susmaz.
+    return izleyiciyiBirak;
+    // `kurulum` BİLEREK bağımlılıkta: artırıldığında efekt temizlenip yeniden
+    // çalışır = watch sökülüp yeniden kurulur (yukarıdaki toparlama).
+  }, [on, kurulum]);
 
   // Kalp atışı: duran şoförde watchPosition yeni konum üretmez (+25m/8sn
   // süzgeci de keser) → 5 dk sonra panel onu "çevrimdışı" gösteriyordu.

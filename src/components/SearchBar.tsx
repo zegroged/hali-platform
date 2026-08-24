@@ -19,8 +19,6 @@ type Props = {
   view?: string;
   /** Toplam işletme sayısı — 0 iken arama pasifleşir (lansman/boş DB dönemi). */
   totalCount?: number;
-  /** Hızlı butonlar: yayında işletmesi olan iller (sunucudan gelir). */
-  cities?: string[];
 };
 
 export function SearchBar(p: Props) {
@@ -198,31 +196,13 @@ export function SearchBar(p: Props) {
         <p className="mt-2.5 text-sm text-slate-600">
           Arama çok yakında aktif — bölgendeki halıcılar şu anda ekleniyor.
         </p>
-      ) : (
-        <div className="mt-2.5 flex flex-wrap items-center gap-2">
-          {(p.cities ?? []).map((d) => (
-            <button
-              key={d}
-              onClick={() =>
-                nav({
-                  il: d,
-                  district: undefined,
-                  lat: undefined,
-                  lng: undefined,
-                  q: undefined,
-                })
-              }
-              className={`rounded-full border px-3 py-2 text-sm ${
-                p.il === d
-                  ? "border-brand bg-brand-light text-brand-dark"
-                  : "border-slate-200 text-slate-600 hover:border-brand"
-              }`}
-            >
-              {d}
-            </button>
-          ))}
-        </div>
-      )}
+      ) : null}
+      {/* 🔴 ŞEHİR KISAYOLLARI KALDIRILDI (2026-08-11, işletme sahibi isteği).
+          Arama kutusunun HEMEN ALTINDA, yayında işletmesi olan illerin
+          düğmeleri duruyordu (Gaziantep · Konya · Batman · Adana). Kaldırıldı.
+          NOT: sayfanın alt kısmındaki "Şehrinde halı yıkama servisi" bölümü
+          (app/page.tsx CityShortcuts) AYRI bir şeydir ve DURUYOR — SEO iç
+          linklemesi oradan geliyor. */}
 
       {/* Filtre + görünüm satırı: yalnız aktif bir sorgu varken görünür */}
       {active && !idle && (

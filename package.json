@@ -21,7 +21,8 @@
     "test:fiyat": "tsx scripts/test-fiyat.ts",
     "test:odeme": "tsx scripts/odeme-dogrula.ts",
     "test:paket": "tsx scripts/test-paket.ts",
-    "test:halino": "tsx scripts/test-halino.ts"
+    "test:halino": "tsx scripts/test-halino.ts",
+    "test:para": "tsx scripts/test-para.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1076.0",
