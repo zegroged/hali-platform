@@ -15,6 +15,8 @@
 
 ---
 
+**Nasıl yazıldı:** kod yapay zekâ yardımıyla yazıldı ve yazar tarafından gözden geçirildi.
+
 ## Genel bakış
 
 Türkiye'de halı yıkama, küçük dükkânların yürüttüğü bir mahalle işi. Koordinasyon telefonla ve defterle yapılıyor: müşteri arar, dükkân sahibi adresi bir yere yazar, şoförüne telefonda söyler, sonra haftanın kalanını *"halım nerede?"* sorusuna cevap vererek geçirir. Neredeyse hiçbir şey kayda geçmez — hangi halının kime ait olduğu da, şoförün gerçekte ne kadar nakit topladığı da, bir adreste ne kadar beklediği de.

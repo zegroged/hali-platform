@@ -15,6 +15,8 @@
 
 ---
 
+**How this was built:** the code was written with AI assistance and reviewed by the author.
+
 ## Overview
 
 Carpet washing in Turkey is a neighbourhood trade run by small shops. The work is coordinated by phone and notebook: the customer calls, the owner writes an address down, tells a driver over the phone, and then spends the rest of the week answering *"where is my carpet?"*. Almost nothing is recorded — not which carpet belongs to whom, not what the driver actually collected in cash, not how long he waited at an address.

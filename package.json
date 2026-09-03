@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "test": "npm run test:para && npm run test:fiyat && npm run test:durak && npm run test:paket && npm run test:halino && npm run test:tahsilat && npm run test:konum",
     "predev": "node scripts/rehber-derle.mjs",
     "dev": "next dev",
     "prebuild": "node scripts/rehber-derle.mjs",
