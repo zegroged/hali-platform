@@ -16,6 +16,10 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci
-      # Fiyatlandirma, para, durak tespiti, paket ve tahsilat testleri.
-      # Hepsi hermetik: veritabani, iyzico anahtari ya da ag erisimi istemez.
+      # Fiyatlandirma, para, durak, paket, hali numarasi, tahsilat ve konum.
+      # Hicbiri sorgu atmaz. test-halino src/lib/haliNo -> prisma zincirini
+      # cektigi icin prisma.ts yuklenirken bir DATABASE_URL gormek zorunda;
+      # asagidaki sahte deger yalnizca o yuklemeyi gecmek icin, baglanti kurulmaz.
       - run: npm test
+        env:
+          DATABASE_URL: postgresql://x:x@localhost:5432/x
