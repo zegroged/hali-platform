@@ -11,7 +11,7 @@
 ![Prisma](https://img.shields.io/badge/Prisma-6-2d3748)
 ![Expo](https://img.shields.io/badge/Expo-SDK%2052-000020)
 ![Docker](https://img.shields.io/badge/Docker-Compose-2496ed)
-![License: MIT](https://img.shields.io/badge/License-MIT-blue)
+![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue)
 
 ---
 
@@ -244,4 +244,6 @@ It is published as a **reference implementation**: a complete, deployed system r
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+AGPL-3.0 — see [LICENSE](LICENSE).
+
+This is a running commercial product, not a reference implementation. The AGPL is deliberate: anyone may read, learn from, and modify this code, but running a modified version as a network service requires publishing the source of that version. Copyright is held by the author, so separate commercial terms can be arranged on request.
