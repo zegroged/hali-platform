@@ -4,6 +4,7 @@
 
 **Live site:** https://enyakinhaliyikamaservisi.com · **Turkish README:** [README.tr.md](README.tr.md)
 
+[![tests](https://github.com/zegroged/hali-platform/actions/workflows/test.yml/badge.svg)](https://github.com/zegroged/hali-platform/actions/workflows/test.yml)
 ![Next.js 15](https://img.shields.io/badge/Next.js-15-000000)
 ![React 19](https://img.shields.io/badge/React-19-087ea4)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.7-3178c6)
