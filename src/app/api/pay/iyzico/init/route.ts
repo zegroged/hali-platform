@@ -41,6 +41,8 @@ export async function POST(req: NextRequest) {
     price,
     customerName: o.customerName,
     customerPhone: o.customerPhone,
+    // Sipariş formunda toplanıp Order'da duruyordu ama ödemeye geçirilmiyordu.
+    customerEmail: o.customerEmail,
     address: o.pickupAddress,
     callbackUrl: `${base}/api/pay/iyzico/callback`,
   });

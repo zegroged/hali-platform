@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import crypto from "node:crypto";
 import Iyzipay from "iyzipay";
-import { getIyzicoBaseUrl, paymentsLive } from "@/lib/config";
+import { getAppBaseUrl, getIyzicoBaseUrl, paymentsLive } from "@/lib/config";
 
 const API_KEY = process.env.IYZICO_API_KEY ?? "";
 const SECRET = process.env.IYZICO_SECRET ?? "";
@@ -24,6 +24,7 @@ export type InitParams = {
   price: number; // TL
   customerName: string;
   customerPhone: string;
+  customerEmail?: string | null;
   address: string;
   callbackUrl: string;
 };
@@ -51,6 +52,23 @@ export async function initCheckout(p: InitParams): Promise<InitResult> {
   const price = p.price.toFixed(2);
   const gsm =
     "+90" + p.customerPhone.replace(/\D/g, "").replace(/^90/, "").replace(/^0/, "");
+
+  // iyzico alıcı bloğunda email ve identityNumber ZORUNLU — boş geçilemez, SDK
+  // yerelde doğrulamaz ama sunucu reddeder. İkisi de artık sabit dolgu değil:
+  //
+  //  email  — siparişin gerçek e-postası. Form zaten topluyor (isteğe bağlı) ve
+  //           Order.customerEmail'de duruyor; buraya geçirilmiyordu. Boşsa kendi
+  //           alan adımızdan türetiyoruz. Eskiden "musteri@hali.local" sabitti:
+  //           var olmayan bir alan adı, üye işyeri denetiminde risk.
+  //
+  //  identityNumber — kimsenin kimlik bilgisi DEĞİL. Hizmet satışında iyzico
+  //           gerçek TC istemiyor, biz de toplamıyoruz ve toplamayacağız; bu
+  //           iyzico'nun kendi dokümanındaki dolgu sabiti. Farklı bir değer
+  //           gerekirse IYZICO_BUYER_IDENTITY ile verilir.
+  const buyerEmail =
+    p.customerEmail?.trim() ||
+    `siparis-${p.orderId}@${new URL(getAppBaseUrl()).hostname.replace(/^www\./, "")}`;
+  const BUYER_IDENTITY = process.env.IYZICO_BUYER_IDENTITY || "11111111111";
   const request = {
     locale: "tr",
     conversationId: p.orderId,
@@ -66,11 +84,8 @@ export async function initCheckout(p: InitParams): Promise<InitResult> {
       name: first,
       surname,
       gsmNumber: gsm,
-      // UYARI: Sabit sahte e-posta/kimlik no yalnız SANDBOX testi içindir. CANLI'da
-      // iyzico geçerli veri bekler (red/askı riski) — siparişte gerçek e-posta
-      // (ve gerekiyorsa TC) toplayıp buraya geçir. Canlıya almadan önce düzelt.
-      email: "musteri@hali.local",
-      identityNumber: "11111111111",
+      email: buyerEmail,
+      identityNumber: BUYER_IDENTITY,
       registrationAddress: p.address,
       city: "Istanbul",
       country: "Turkey",
